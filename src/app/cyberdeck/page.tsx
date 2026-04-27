@@ -7,6 +7,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { bindKeyboardSfx, unlockKeyboardSfx, playSystemSound } from "@/lib/AudioEngine";
 
 const servers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
@@ -29,8 +30,28 @@ export default function CyberdeckPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamText]);
 
+  useEffect(() => {
+    const unlock = () => unlockKeyboardSfx();
+    window.addEventListener("pointerdown", unlock, { once: true });
+
+    const unbind = bindKeyboardSfx(window, {
+      mode: "cyberdeck",
+      volume: 0.8,
+    });
+
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      unbind();
+    };
+  }, []);
+
   const handleServerClick = (id: string) => {
-    setServer(id);
+    if (server !== id) {
+      setServer(id);
+      playSystemSound("chirp");
+    } else {
+      playSystemSound("click", 0.05);
+    }
   };
 
   const handleSend = async () => {

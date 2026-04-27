@@ -254,7 +254,7 @@ body,
 }
 
 .terminal-window {
-  animation: flicker 0.15s infinite;
+  /* animation: flicker 0.15s infinite; */
   text-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
 }
 
@@ -274,4 +274,15 @@ body,
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+/* Scroll fade effect for terminal panels */
+.scroll-fade-y {
+  mask-image: linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%);
+}
+
+.scroll-fade-x {
+  mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
 }
