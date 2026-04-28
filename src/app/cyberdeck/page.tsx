@@ -116,6 +116,11 @@ export default function CyberdeckPage() {
   /** Gateway column: keyboard highlight on model rows (arrows move providers + models as one column). */
   const [modelKeyboardHighlightId, setModelKeyboardHighlightId] = useState<string | null>(null);
   const [providerKeys, setProviderKeys] = useState<Record<string, string>>({});
+  const [defaultKeyAvailableByProvider, setDefaultKeyAvailableByProvider] = useState<Record<string, boolean>>({
+    opencode: false,
+    openrouter: false,
+    openai: false,
+  });
   const [modelList, setModelList] = useState<{ id: string }[]>([]);
   const [modelByProvider, setModelByProvider] = useState<Record<string, string>>({});
   const [modelFetchStatusByProvider, setModelFetchStatusByProvider] = useState<
@@ -186,7 +191,8 @@ export default function CyberdeckPage() {
     Boolean(probeInFlightByProvider[activeProvider]) ||
     providerModelFetchStatus === "retrieving" ||
     isStreaming;
-  const isConnected = Boolean(providerKeys[activeProvider]) && Boolean(modelID) && providerModelFetchStatus === "ready";
+  const hasProviderAuth = Boolean(providerKeys[activeProvider]) || Boolean(defaultKeyAvailableByProvider[activeProvider]);
+  const isConnected = hasProviderAuth && Boolean(modelID) && providerModelFetchStatus === "ready";
   const connectionState: "offline" | "connecting" | "connected" = scanActivityActive
     ? "connecting"
     : isConnected
@@ -384,14 +390,14 @@ export default function CyberdeckPage() {
 
   // When the active gateway has no stored key, mirror Weyland: one [SYS] line per provider (deduped).
   useEffect(() => {
-    if (providerKeys[activeProvider]) return;
+    if (providerKeys[activeProvider] || defaultKeyAvailableByProvider[activeProvider]) return;
     const tip = gatewayKeySysMessage(activeProvider);
     setMessages((prev) => {
       const last = prev[prev.length - 1];
       if (last?.role === "system" && last.text === tip) return prev;
       return [...prev, { role: "system", text: tip }];
     });
-  }, [activeProvider, providerKeys[activeProvider]]);
+  }, [activeProvider, defaultKeyAvailableByProvider, providerKeys]);
 
   const setModelHealth = useCallback((provider: string, model: string, status: string) => {
     setModelHealthByProvider((prev) => ({
@@ -402,7 +408,7 @@ export default function CyberdeckPage() {
 
   const probeSelectedModel = useCallback(
     async (provider: string, model: string, key: string) => {
-      if (!provider || !model || !key) return;
+      if (!provider || !model) return;
       setProbeInFlightByProvider((prev) => ({ ...prev, [provider]: model }));
       setModelHealth(provider, model, "testing");
       try {
@@ -465,7 +471,7 @@ export default function CyberdeckPage() {
   const activateModelById = useCallback(
     (modelId: string) => {
       const key = providerKeys[activeProvider];
-      if (!key || !modelId) return;
+      if (!modelId) return;
       setModelByProvider((prev) => ({ ...prev, [activeProvider]: modelId }));
       try {
         localStorage.setItem(`ascii_model_${activeProvider}`, modelId);
@@ -473,9 +479,9 @@ export default function CyberdeckPage() {
         /* ignore */
       }
       playSystemSound("click", 0.05);
-      void probeSelectedModel(activeProvider, modelId, key);
+      void probeSelectedModel(activeProvider, modelId, key || "");
     },
-    [activeProvider, providerKeys, probeSelectedModel],
+    [activeProvider, probeSelectedModel, providerKeys],
   );
 
   // Column-scoped arrows: rail / chat scroll / gateway (providers + models). Tab rail: Escape; Enter on rail → gateway + provider hover.
@@ -850,14 +856,10 @@ export default function CyberdeckPage() {
     });
   }, [activeProvider, modelList]);
 
-  // Fetch models when provider key is present (weyland App.jsx pattern)
+  // Fetch models for selected provider; API route can use user key or server default key.
   useEffect(() => {
     const currentKey = providerKeys[activeProvider];
     setModelList([]);
-    if (!currentKey) {
-      setModelFetchStatusByProvider((prev) => ({ ...prev, [activeProvider]: "idle" }));
-      return;
-    }
 
     let cancelled = false;
     setModelFetchStatusByProvider((prev) => ({ ...prev, [activeProvider]: "retrieving" }));
@@ -871,12 +873,21 @@ export default function CyberdeckPage() {
         });
         if (cancelled) return;
         if (!res.ok) {
+          const errJson = (await res.json().catch(() => ({}))) as {
+            authSource?: "user" | "default" | "none";
+            code?: string;
+          };
+          if (errJson.authSource === "none" || errJson.code === "NO_PROVIDER_KEY") {
+            setDefaultKeyAvailableByProvider((prev) => ({ ...prev, [activeProvider]: false }));
+            setModelFetchStatusByProvider((prev) => ({ ...prev, [activeProvider]: "idle" }));
+            return;
+          }
           const invalid = res.status === 401 || res.status === 403;
           setModelFetchStatusByProvider((prev) => ({
             ...prev,
             [activeProvider]: invalid ? "invalid-key" : "error",
           }));
-          if (invalid) {
+          if (invalid && currentKey) {
             setProviderKeys((prev) => {
               const next = { ...prev };
               delete next[activeProvider];
@@ -890,9 +901,16 @@ export default function CyberdeckPage() {
           }
           return;
         }
-        const json = (await res.json()) as { data?: { id: string }[] };
+        const json = (await res.json()) as {
+          data?: { id: string }[];
+          authSource?: "user" | "default";
+        };
         const raw = Array.isArray(json.data) ? json.data : [];
         if (cancelled) return;
+        setDefaultKeyAvailableByProvider((prev) => ({
+          ...prev,
+          [activeProvider]: json.authSource === "default",
+        }));
         setModelList(raw);
         setModelFetchStatusByProvider((prev) => ({ ...prev, [activeProvider]: "ready" }));
         setModelByProvider((prev) => {
@@ -901,7 +919,7 @@ export default function CyberdeckPage() {
           const nextModel = hasCurrent ? current : raw[0]?.id || "";
           if (nextModel && nextModel !== current) {
             localStorage.setItem(`ascii_model_${activeProvider}`, nextModel);
-            void probeSelectedModel(activeProvider, nextModel, currentKey);
+            void probeSelectedModel(activeProvider, nextModel, currentKey || "");
           }
           return { ...prev, [activeProvider]: nextModel };
         });
@@ -916,7 +934,7 @@ export default function CyberdeckPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeProvider, providerKeys[activeProvider], probeSelectedModel]);
+  }, [activeProvider, probeSelectedModel, providerKeys]);
 
   useEffect(() => {
     let unlocked = false;
@@ -956,7 +974,7 @@ export default function CyberdeckPage() {
     setGeneratedUI(null);
 
     // Gateway key registration (weyland: set key + LS, model fetch effect validates)
-    if (!providerKeys[activeProvider]) {
+    if (!hasProviderAuth) {
       handleModelLabelClick();
       setProviderKeys((prev) => ({ ...prev, [activeProvider]: userMessage }));
       try {
@@ -992,7 +1010,7 @@ export default function CyberdeckPage() {
         body: JSON.stringify({
           message: userMessage,
           provider: activeProvider,
-          apiKey: providerKeys[activeProvider],
+          apiKey: providerKeys[activeProvider] || "",
           model: modelID,
         }),
       });
@@ -1274,9 +1292,7 @@ export default function CyberdeckPage() {
                       syncInputCaret();
                     }}
                     onBlur={() => setIsInputFocused(false)}
-                    placeholder={
-                      !providerKeys[activeProvider] ? "ENTER GATEWAY KEY..." : "Enter command or message..."
-                    }
+                    placeholder={!hasProviderAuth ? "ENTER GATEWAY KEY..." : "Enter command or message..."}
                     className={`w-full rounded-none border-0 bg-black py-3 pl-9 pr-3 font-mono text-sm text-green-400 placeholder:text-green-800 transition-all focus:outline-none ${
                       isInputFocused ? "caret-transparent" : ""
                     }`}
@@ -1470,7 +1486,7 @@ export default function CyberdeckPage() {
                 >
                   AVAILABLE_MODELS:
                 </div>
-                {!providerKeys[activeProvider] ? null : providerModelFetchStatus === "retrieving" ? (
+                {!hasProviderAuth ? null : providerModelFetchStatus === "retrieving" ? (
                   <div className="model-probe-wave font-mono text-[10px]" style={{ color: "#ffaa00" }}>
                     CONNECTING... RETRIEVING_MODELS
                   </div>

@@ -17,9 +17,17 @@ async function streamOpenAiCompatibleResponse(response: Response) {
   if (!contentType.includes("text/event-stream")) {
     return new ReadableStream<Uint8Array>({
       async start(controller) {
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
         try {
-          const text = await response.text();
-          if (text) controller.enqueue(textEncoder.encode(text));
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const text = decoder.decode(value, { stream: true });
+            if (text) controller.enqueue(textEncoder.encode(text));
+          }
+          const rest = decoder.decode();
+          if (rest) controller.enqueue(textEncoder.encode(rest));
         } finally {
           controller.close();
         }
@@ -79,6 +87,23 @@ const CHAT_URL: Record<string, string> = {
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
 };
 
+const DEFAULT_PROVIDER_KEY_ENV: Record<string, string | undefined> = {
+  opencode: process.env.OPENCODE_API_KEY,
+  openai: process.env.OPENAI_API_KEY,
+  openrouter: process.env.OPENROUTER_API_KEY,
+};
+
+function resolveProviderApiKey(provider: string, suppliedApiKey: unknown): string {
+  if (typeof suppliedApiKey === "string" && suppliedApiKey.trim()) {
+    return suppliedApiKey.trim();
+  }
+  const envKey = DEFAULT_PROVIDER_KEY_ENV[provider];
+  if (typeof envKey === "string" && envKey.trim()) {
+    return envKey.trim();
+  }
+  return "";
+}
+
 function defaultModelForProvider(provider: string): string {
   if (provider === "openai") return "gpt-4o-mini";
   if (provider === "openrouter") return "openai/gpt-4o-mini";
@@ -91,16 +116,20 @@ export async function POST(request: Request) {
     const { message, provider, apiKey, testMode, probe, model: modelFromBody } = body;
 
     // Model probe (non-stream), same contract as weyland-yutani transmit chat stream:false
-    if (probe === true && provider && apiKey && modelFromBody) {
+    if (probe === true && provider && modelFromBody) {
       const endpoint = CHAT_URL[provider as string];
+      const resolvedApiKey = resolveProviderApiKey(String(provider), apiKey);
       if (!endpoint) {
         return NextResponse.json({ ok: false, valid: false, status: 400 }, { status: 400 });
+      }
+      if (!resolvedApiKey) {
+        return NextResponse.json({ ok: false, valid: false, status: 401 }, { status: 401 });
       }
       try {
         const res = await fetch(endpoint, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${resolvedApiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -168,9 +197,13 @@ export async function POST(request: Request) {
     const normalizedMsg = typeof message === "string" ? message.toLowerCase().trim() : "";
 
     // User session: stream via selected provider (keys from client)
-    if (provider && apiKey && typeof message === "string" && message.trim()) {
+    if (provider && typeof message === "string" && message.trim()) {
       const endpoint = CHAT_URL[provider as string];
+      const resolvedApiKey = resolveProviderApiKey(String(provider), apiKey);
       if (endpoint) {
+        if (!resolvedApiKey) {
+          return NextResponse.json({ error: "API key required" }, { status: 401 });
+        }
         if (normalizedMsg === "providers" || normalizedMsg === "connect providers" || normalizedMsg === "provider") {
           return NextResponse.json({
             type: "providers",
@@ -211,7 +244,7 @@ export async function POST(request: Request) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${resolvedApiKey}`,
           },
           body: JSON.stringify({
             model,
