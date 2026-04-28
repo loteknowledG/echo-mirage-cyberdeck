@@ -12,7 +12,7 @@ function createWindow() {
 
   // Load your Next.js app (dev server)
   // Keep in sync with package.json dev/start port (avoids clash with Weyland-Yutani on :3000).
-  win.loadURL('http://127.0.0.1:3050');
+  win.loadURL('http://127.0.0.1:3050/cyberdeck');
 }
 
 app.whenReady().then(createWindow);

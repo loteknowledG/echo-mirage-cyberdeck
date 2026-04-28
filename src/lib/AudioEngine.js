@@ -1,9 +1,34 @@
 let audioCtx = null;
 let enabled = true;
+let fallbackClickAudio = null;
+let fallbackChirpAudio = null;
+let masterGainNode = null;
+let masterCompressorNode = null;
+let sonarIntervalId = null;
 
 function getCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
+}
+
+function getOutputNode() {
+  const ctx = getCtx();
+  if (!masterGainNode) {
+    masterCompressorNode = ctx.createDynamicsCompressor();
+    masterCompressorNode.threshold.value = -22;
+    masterCompressorNode.knee.value = 18;
+    masterCompressorNode.ratio.value = 3.5;
+    masterCompressorNode.attack.value = 0.004;
+    masterCompressorNode.release.value = 0.22;
+
+    masterGainNode = ctx.createGain();
+    // Final stage loudness boost so every synth/noise effect is louder.
+    masterGainNode.gain.value = 4.6;
+
+    masterCompressorNode.connect(masterGainNode);
+    masterGainNode.connect(ctx.destination);
+  }
+  return masterCompressorNode;
 }
 
 function rand(min, max) {
@@ -29,7 +54,7 @@ function playTone({
   freqEnd,
   duration,
   type = "square",
-  volume = 0.06,
+  volume = 0.14,
   crunch = false,
 }) {
   if (!enabled) return;
@@ -62,13 +87,13 @@ function playTone({
     osc.connect(gain);
   }
 
-  gain.connect(ctx.destination);
+  gain.connect(getOutputNode());
 
   osc.start(t);
   osc.stop(t + duration + 0.02);
 }
 
-function playNoiseClick({ duration = 0.02, volume = 0.025, filterFreq = 2600 }) {
+function playNoiseClick({ duration = 0.02, volume = 0.07, filterFreq = 2600 }) {
   if (!enabled) return;
 
   const ctx = getCtx();
@@ -97,7 +122,7 @@ function playNoiseClick({ duration = 0.02, volume = 0.025, filterFreq = 2600 }) 
 
   source.connect(filter);
   filter.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(getOutputNode());
 
   source.start(t);
   source.stop(t + duration);
@@ -117,16 +142,38 @@ function classifyKey(key) {
   return "symbol";
 }
 
+function playFallbackClip(kind, volume = 0.4) {
+  if (typeof Audio === "undefined") return;
+  const v = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 0.4));
+  try {
+    const base = kind === "chirp" || kind === "lock" ? "/chime.wav" : "/chime_quiet.wav";
+    const ref = kind === "chirp" || kind === "lock" ? "chirp" : "click";
+    if (ref === "chirp") {
+      if (!fallbackChirpAudio) fallbackChirpAudio = new Audio(base);
+      fallbackChirpAudio.currentTime = 0;
+      fallbackChirpAudio.volume = Math.max(0.75, v);
+      fallbackChirpAudio.play().catch(() => {});
+    } else {
+      if (!fallbackClickAudio) fallbackClickAudio = new Audio(base);
+      fallbackClickAudio.currentTime = 0;
+      fallbackClickAudio.volume = Math.max(0.65, Math.min(1, v));
+      fallbackClickAudio.play().catch(() => {});
+    }
+  } catch {
+    /* ignore fallback audio errors */
+  }
+}
+
 export function playKeySound(key, options = {}) {
   const mode = options.mode || "cyberdeck";
-  const volume = options.volume ?? 1;
+  const volume = (options.volume ?? 1) * 2.6;
   const kind = classifyKey(key);
   const v = (n) => n * volume;
 
   if (mode === "soft") {
     playNoiseClick({
       duration: rand(0.012, 0.025),
-      volume: v(0.018),
+      volume: v(0.024),
       filterFreq: rand(1800, 2800),
     });
     return;
@@ -270,7 +317,7 @@ export function playNavigationSound(variant = "step") {
       freqEnd: rand(880, 1050),
       duration: rand(0.048, 0.068),
       type: "triangle",
-      volume: rand(0.034, 0.046),
+      volume: rand(0.08, 0.11),
     });
     return;
   }
@@ -280,13 +327,13 @@ export function playNavigationSound(variant = "step") {
       freqEnd: rand(280, 380),
       duration: rand(0.052, 0.072),
       type: "triangle",
-      volume: rand(0.028, 0.038),
+      volume: rand(0.07, 0.1),
     });
     return;
   }
   playNoiseClick({
     duration: rand(0.012, 0.02),
-    volume: rand(0.016, 0.026),
+    volume: rand(0.045, 0.07),
     filterFreq: rand(2200, 3400),
   });
 }
@@ -319,13 +366,145 @@ export function unlockKeyboardSfx() {
 }
 
 export function playSystemSound(type = "click", vol = 0.08) {
+  const gain = Math.max(0, Number.isFinite(vol) ? vol : 0.08) * 2.2;
   if (type === "chirp") {
-    playKeySound("Enter");
+    playKeySound("Enter", { volume: Math.max(0.9, gain * 1.7) });
+    playTone({
+      freqStart: rand(760, 920),
+      freqEnd: rand(1200, 1500),
+      duration: 0.08,
+      type: "triangle",
+      volume: Math.max(0.22, gain * 0.62),
+    });
+    playFallbackClip("chirp", Math.max(0.9, gain * 1.35));
   } else if (type === "keypress") {
-    playKeySound("a", { volume: 0.8 });
+    playKeySound("a", { volume: Math.max(0.1, gain) });
+    playFallbackClip("click", gain * 0.9);
   } else if (type === "lock") {
-    playKeySound("Enter", { volume: 0.15 });
+    playKeySound("Enter", { volume: Math.max(1.1, gain * 2) });
+    playTone({
+      freqStart: rand(620, 760),
+      freqEnd: rand(1260, 1600),
+      duration: 0.1,
+      type: "sine",
+      volume: Math.max(0.26, gain * 0.7),
+    });
+    playFallbackClip("lock", Math.max(0.95, gain * 1.4));
   } else {
-    playNoiseClick({ duration: 0.02, volume: 0.025 });
+    playNoiseClick({ duration: 0.02, volume: Math.max(0.04, gain * 0.75) });
+    playFallbackClip("click", gain);
   }
+}
+
+export function playNetworkScanSound(stage = "start") {
+  if (!enabled) return;
+  if (stage === "start") {
+    playTone({
+      freqStart: rand(420, 520),
+      freqEnd: rand(980, 1200),
+      duration: 0.14,
+      type: "square",
+      volume: 0.62,
+      crunch: true,
+    });
+    playNoiseClick({ duration: 0.03, volume: 0.14, filterFreq: 3200 });
+    playFallbackClip("chirp", 1);
+    return;
+  }
+  if (stage === "success") {
+    playSystemSound("lock", 0.9);
+    return;
+  }
+  // fail
+  playTone({
+    freqStart: rand(840, 980),
+    freqEnd: rand(180, 260),
+    duration: 0.16,
+    type: "triangle",
+    volume: 0.52,
+    crunch: true,
+  });
+  playFallbackClip("click", 0.95);
+}
+
+export function playSatelliteUplink() {
+  playNetworkScanSound("start");
+}
+
+export function playSuccess() {
+  playNetworkScanSound("success");
+}
+
+export function playSonarPing(timeOffset = 0) {
+  if (!enabled) return;
+  const ctx = getCtx();
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  const t = Math.max(0, Number.isFinite(timeOffset) ? timeOffset : 0);
+
+  // Main ping + harmonic.
+  playTone({
+    freqStart: 880,
+    duration: 0.08,
+    type: "sine",
+    volume: 0.18,
+  });
+  setTimeout(() => {
+    playTone({
+      freqStart: 1760,
+      duration: 0.06,
+      type: "sine",
+      volume: 0.09,
+    });
+  }, 15 + t * 1000);
+
+  // Echo returns.
+  setTimeout(() => {
+    playTone({
+      freqStart: 440,
+      duration: 0.18,
+      type: "triangle",
+      volume: 0.08,
+    });
+  }, 320 + t * 1000);
+  setTimeout(() => {
+    playTone({
+      freqStart: 330,
+      duration: 0.22,
+      type: "sine",
+      volume: 0.05,
+    });
+  }, 650 + t * 1000);
+
+  // Ambient wash.
+  setTimeout(() => {
+    playNoiseClick({
+      duration: 0.25,
+      volume: 0.02,
+      filterFreq: 1200,
+    });
+  }, 50 + t * 1000);
+}
+
+export function startSonarLoop(interval = 1200) {
+  if (sonarIntervalId) return;
+  const ms = Math.max(350, Number.isFinite(interval) ? interval : 1200);
+  void unlockKeyboardSfx();
+  playSonarPing();
+  sonarIntervalId = window.setInterval(() => {
+    playSonarPing();
+  }, ms);
+}
+
+export function stopSonarLoop() {
+  if (!sonarIntervalId) return;
+  window.clearInterval(sonarIntervalId);
+  sonarIntervalId = null;
+}
+
+export async function satelliteConnectSequence() {
+  await unlockKeyboardSfx();
+  playSatelliteUplink();
+  setTimeout(() => {
+    playSuccess();
+  }, 1900);
 }

@@ -13,6 +13,8 @@ import {
   unlockKeyboardSfx,
   playNavigationSound,
   playSystemSound,
+  playNetworkScanSound,
+  satelliteConnectSequence,
 } from "@/lib/AudioEngine";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
@@ -88,6 +90,10 @@ export default function CyberdeckPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [inputCursorBlinkOn, setInputCursorBlinkOn] = useState(true);
+  const [inputCursorLeft, setInputCursorLeft] = useState(0);
+  const [inputCaretIndex, setInputCaretIndex] = useState(0);
 
   const [activeProvider, setActiveProvider] = useState<string>("opencode");
   /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
@@ -129,6 +135,24 @@ export default function CyberdeckPage() {
   const deckTabNextRef = useRef<"gateway" | "rail">("gateway");
   const prevNavRailRef = useRef<"gateway" | "tabs">("gateway");
 
+  const syncInputCaret = useCallback(() => {
+    const el = messageInputRef.current;
+    if (!el) return;
+    const idx = el.selectionStart ?? 0;
+    setInputCaretIndex(idx);
+
+    // Measure monospace text width before caret to place a block cursor overlay.
+    const computed = window.getComputedStyle(el);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.font = computed.font;
+    const before = input.slice(0, idx);
+    const padLeft = Number.parseFloat(computed.paddingLeft || "0") || 0;
+    const x = padLeft + ctx.measureText(before).width - el.scrollLeft;
+    setInputCursorLeft(Math.max(padLeft, x));
+  }, [input]);
+
   const providers = [
     { id: "opencode" as const, name: "OPENCODE" },
     { id: "openrouter" as const, name: "OPENROUTER" },
@@ -137,6 +161,10 @@ export default function CyberdeckPage() {
 
   const modelID = modelByProvider[activeProvider] || "";
   const providerModelFetchStatus = modelFetchStatusByProvider[activeProvider] || "idle";
+  const networkActivityActive =
+    Boolean(probeInFlightByProvider[activeProvider]) ||
+    providerModelFetchStatus === "retrieving" ||
+    isStreaming;
 
   const inactiveTextColor = "#7a7a7a";
   const inactiveSubtleTextColor = "#6a6a6a";
@@ -213,6 +241,22 @@ export default function CyberdeckPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamText]);
 
+  useEffect(() => {
+    if (!isInputFocused || isStreaming) {
+      setInputCursorBlinkOn(true);
+      return;
+    }
+    const id = window.setInterval(() => {
+      setInputCursorBlinkOn((prev) => !prev);
+    }, 530);
+    return () => window.clearInterval(id);
+  }, [isInputFocused, isStreaming]);
+
+  useLayoutEffect(() => {
+    if (!isInputFocused) return;
+    syncInputCaret();
+  }, [input, inputCaretIndex, isInputFocused, syncInputCaret]);
+
   // When the active gateway has no stored key, mirror Weyland: one [SYS] line per provider (deduped).
   useEffect(() => {
     if (providerKeys[activeProvider]) return;
@@ -234,6 +278,7 @@ export default function CyberdeckPage() {
   const probeSelectedModel = useCallback(
     async (provider: string, model: string, key: string) => {
       if (!provider || !model || !key) return;
+      void satelliteConnectSequence();
       setProbeInFlightByProvider((prev) => ({ ...prev, [provider]: model }));
       setModelHealth(provider, model, "testing");
       try {
@@ -250,6 +295,7 @@ export default function CyberdeckPage() {
         };
         const failHealth = data.rateLimited ? "amber" : "grey";
         if (!res.ok || data.ok === false) {
+          playNetworkScanSound("fail");
           setModelHealth(provider, model, failHealth);
           setMessages((prev) => [
             ...prev,
@@ -262,7 +308,7 @@ export default function CyberdeckPage() {
         }
         const valid = Boolean(data.valid);
         setModelHealth(provider, model, valid ? "green" : "amber");
-        if (valid) playSystemSound("lock");
+        if (!valid) playNetworkScanSound("fail");
         setMessages((prev) => [
           ...prev,
           {
@@ -271,6 +317,7 @@ export default function CyberdeckPage() {
           },
         ]);
       } catch (err) {
+        playNetworkScanSound("fail");
         setModelHealth(provider, model, "grey");
         setMessages((prev) => [
           ...prev,
@@ -746,16 +793,28 @@ export default function CyberdeckPage() {
   }, [activeProvider, providerKeys[activeProvider], probeSelectedModel]);
 
   useEffect(() => {
-    const unlock = () => unlockKeyboardSfx();
-    window.addEventListener("pointerdown", unlock, { once: true });
+    let unlocked = false;
+    const unlock = () => {
+      if (unlocked) return;
+      unlocked = true;
+      void unlockKeyboardSfx();
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+    window.addEventListener("pointerdown", unlock, { passive: true });
+    window.addEventListener("keydown", unlock, { passive: true });
+    window.addEventListener("touchstart", unlock, { passive: true });
 
     const unbind = bindKeyboardSfx(window, {
       mode: "cyberdeck",
-      volume: 0.8,
+      volume: 1.08,
     });
 
     return () => {
       window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      window.removeEventListener("touchstart", unlock);
       unbind();
     };
   }, []);
@@ -920,11 +979,13 @@ export default function CyberdeckPage() {
         <ResizablePanel defaultSize={55} minSize={28}>
           <div
             ref={chatColumnRef}
-            className="flex flex-col h-full min-w-0 border-r border-gray-800 bg-black"
+            className={`cyberdeck-net-pane left flex h-full min-w-0 flex-col border-r border-gray-800 bg-black ${
+              networkActivityActive ? "is-net-active" : ""
+            }`}
           >
             <header className="flex shrink-0 items-end justify-end overflow-visible border-b border-gray-800 bg-black px-6 py-2">
               <pre
-                className="m-0 whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
+                className="cyberdeck-net-logo m-0 whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
                 style={{ textShadow: "0 0 5px #00ff00" }}
               >
                 {`
@@ -1001,14 +1062,36 @@ export default function CyberdeckPage() {
                 <input
                   ref={messageInputRef}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    setInputCaretIndex(e.target.selectionStart ?? e.target.value.length);
+                  }}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                  onKeyUp={syncInputCaret}
+                  onClick={syncInputCaret}
+                  onSelect={syncInputCaret}
+                  onFocus={() => {
+                    setIsInputFocused(true);
+                    syncInputCaret();
+                  }}
+                  onBlur={() => setIsInputFocused(false)}
                   placeholder={
                     !providerKeys[activeProvider] ? "ENTER GATEWAY KEY..." : "Enter command or message..."
                   }
-                  className="w-full rounded-lg border border-gray-700 bg-black py-3 pl-9 pr-3 font-mono text-sm text-green-400 placeholder-gray-600 transition-all focus:border-green-500 focus:outline-none"
+                  className={`w-full rounded-lg border border-gray-700 bg-black py-3 pl-9 pr-3 font-mono text-sm text-green-400 placeholder-gray-600 transition-all focus:border-green-500 focus:outline-none ${
+                    isInputFocused ? "caret-transparent" : ""
+                  }`}
                   disabled={isStreaming}
                 />
+                {isInputFocused && !isStreaming && inputCursorBlinkOn ? (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute top-1/2 -translate-y-1/2 bg-green-400 px-[1px] font-mono text-sm leading-5 text-black"
+                    style={{ left: `${inputCursorLeft}px` }}
+                  >
+                    {input[inputCaretIndex] ? input[inputCaretIndex] : "\u00A0"}
+                  </span>
+                ) : null}
               </div>
             </footer>
           </div>
@@ -1022,11 +1105,13 @@ export default function CyberdeckPage() {
             ref={gatewayColumnRef}
             tabIndex={-1}
             aria-label="Gateway"
-            className="flex h-full min-w-0 flex-col border-l border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            className={`cyberdeck-net-pane right flex h-full min-w-0 flex-col border-l border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
+              networkActivityActive ? "is-net-active" : ""
+            }`}
           >
             <header className="flex shrink-0 items-center overflow-visible border-b border-gray-800 bg-black px-6 py-2">
               <pre
-                className="m-0 whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
+                className="cyberdeck-net-logo m-0 whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
                 style={{ textShadow: "0 0 5px #00ff00" }}
               >
                 {`

@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.28.2",
   "main": "electron/main.js",
   "scripts": {
-    "dev": "next dev -p 3050",
+    "dev": "node scripts/next-dev.mjs",
     "build": "next build",
     "start": "next start -p 3050",
     "electron:dev": "concurrently \"pnpm dev\" \"wait-on http://127.0.0.1:3050 && electron .\"",
