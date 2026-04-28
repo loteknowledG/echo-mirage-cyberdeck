@@ -264,6 +264,32 @@ body,
   cursor: pointer;
 }
 
+.cyberdeck-chat-app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.cyberdeck-chat-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.cyberdeck-message-box {
+  position: sticky;
+  bottom: 0;
+  background: #050708;
+  border-top: 1px solid rgba(57, 255, 136, 0.2);
+  z-index: 5;
+}
+
+@media (max-width: 768px) {
+  .cyberdeck-server-rail .btn-container {
+    margin-bottom: 0;
+    margin-right: 8px;
+  }
+}
+
 .cyberdeck-server-rail .btn-container:hover .ascii-btn {
   transform: translate(1px, 1px) scale(1.02);
   color: #9aa7ff;
@@ -395,6 +421,81 @@ body,
   color: var(--nav-hover-color, var(--nav-color, inherit));
   text-shadow: var(--nav-hover-shadow, var(--nav-shadow, none));
   transform: translateY(-2px);
+}
+
+/* Composer connection status glyphs */
+.connection-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.connection-indicator .connection-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.connection-indicator .connection-bar {
+  width: 7px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.35;
+}
+
+.connection-indicator.connected .connection-dot,
+.connection-indicator.connected .connection-bar {
+  opacity: 0.95;
+  box-shadow: 0 0 8px rgba(54, 255, 115, 0.55);
+}
+
+.connection-indicator.connecting .connection-dot {
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(255, 191, 77, 0.6);
+  animation: connection-pulse 0.8s ease-in-out infinite;
+}
+
+.connection-indicator.connecting .connection-bar {
+  animation: connection-scan 0.9s linear infinite;
+}
+
+.connection-indicator.connecting .connection-bar:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.connection-indicator.connecting .connection-bar:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+.connection-indicator.connecting .connection-bar:nth-child(4) {
+  animation-delay: 0.36s;
+}
+
+@keyframes connection-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes connection-scan {
+  0% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.2;
+  }
 }
 
 /* Cyberdeck network activity animation (text sweep only). */

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, DragEvent as ReactDragEvent } from "react";
+import { Streamdown } from "streamdown";
 import { art } from "@/lib/TerminalArt";
 import {
   ResizableHandle,
@@ -97,7 +98,11 @@ export default function CyberdeckPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
+  const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
+  const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
+  const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [isMobileLayout, setIsMobileLayout] = useState(false);
   const [inputCursorBlinkOn, setInputCursorBlinkOn] = useState(true);
   const [inputCursorLeft, setInputCursorLeft] = useState(0);
   const [inputCaretIndex, setInputCaretIndex] = useState(0);
@@ -135,9 +140,14 @@ export default function CyberdeckPage() {
   const serverRailRef = useRef<HTMLElement | null>(null);
   const chatColumnRef = useRef<HTMLDivElement>(null);
   const gatewayColumnRef = useRef<HTMLDivElement>(null);
+  const gatewayConnectionPanelRef = useRef<HTMLDivElement>(null);
   const cyberdeckRootRef = useRef<HTMLDivElement>(null);
+  const chatAbortRef = useRef<AbortController | null>(null);
   const networkFeedbackDelayRef = useRef<number | null>(null);
   const networkFeedbackRepeatRef = useRef<number | null>(null);
+  const chatSonarDelayRef = useRef<number | null>(null);
+  const chatSonarActiveRef = useRef(false);
+  const offlineAutoOpenedRef = useRef(false);
   const serverRef = useRef(server);
   serverRef.current = server;
   /** Forward Tab from message box alternates: gateway (right) → rail (left) → … */
@@ -176,6 +186,12 @@ export default function CyberdeckPage() {
     Boolean(probeInFlightByProvider[activeProvider]) ||
     providerModelFetchStatus === "retrieving" ||
     isStreaming;
+  const isConnected = Boolean(providerKeys[activeProvider]) && Boolean(modelID) && providerModelFetchStatus === "ready";
+  const connectionState: "offline" | "connecting" | "connected" = scanActivityActive
+    ? "connecting"
+    : isConnected
+      ? "connected"
+      : "offline";
 
   const inactiveTextColor = "#7a7a7a";
   const inactiveSubtleTextColor = "#6a6a6a";
@@ -238,6 +254,14 @@ export default function CyberdeckPage() {
 
   const navRailContextRef = useRef(navRailContext);
   navRailContextRef.current = navRailContext;
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 768px)");
+    const apply = () => setIsMobileLayout(media.matches);
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     const onFocusIn = (e: FocusEvent) => {
@@ -305,6 +329,13 @@ export default function CyberdeckPage() {
 
   useEffect(() => {
     if (isStreaming) {
+      if (chatSonarDelayRef.current == null) {
+        chatSonarDelayRef.current = window.setTimeout(() => {
+          startSonarLoop(3200);
+          chatSonarActiveRef.current = true;
+          chatSonarDelayRef.current = null;
+        }, 7000);
+      }
       if (networkFeedbackDelayRef.current == null) {
         networkFeedbackDelayRef.current = window.setTimeout(() => {
           playBleepBloop();
@@ -314,6 +345,14 @@ export default function CyberdeckPage() {
         }, 2800);
       }
     } else {
+      if (chatSonarDelayRef.current !== null) {
+        window.clearTimeout(chatSonarDelayRef.current);
+        chatSonarDelayRef.current = null;
+      }
+      if (chatSonarActiveRef.current && !scanActivityActive) {
+        stopSonarLoop();
+      }
+      chatSonarActiveRef.current = false;
       if (networkFeedbackDelayRef.current !== null) {
         window.clearTimeout(networkFeedbackDelayRef.current);
         networkFeedbackDelayRef.current = null;
@@ -324,6 +363,10 @@ export default function CyberdeckPage() {
       }
     }
     return () => {
+      if (chatSonarDelayRef.current !== null) {
+        window.clearTimeout(chatSonarDelayRef.current);
+        chatSonarDelayRef.current = null;
+      }
       if (networkFeedbackDelayRef.current !== null) {
         window.clearTimeout(networkFeedbackDelayRef.current);
         networkFeedbackDelayRef.current = null;
@@ -332,8 +375,12 @@ export default function CyberdeckPage() {
         window.clearInterval(networkFeedbackRepeatRef.current);
         networkFeedbackRepeatRef.current = null;
       }
+      if (chatSonarActiveRef.current && !scanActivityActive) {
+        stopSonarLoop();
+      }
+      chatSonarActiveRef.current = false;
     };
-  }, [isStreaming]);
+  }, [isStreaming, scanActivityActive]);
 
   // When the active gateway has no stored key, mirror Weyland: one [SYS] line per provider (deduped).
   useEffect(() => {
@@ -910,6 +957,7 @@ export default function CyberdeckPage() {
 
     // Gateway key registration (weyland: set key + LS, model fetch effect validates)
     if (!providerKeys[activeProvider]) {
+      handleModelLabelClick();
       setProviderKeys((prev) => ({ ...prev, [activeProvider]: userMessage }));
       try {
         localStorage.setItem(`key_${activeProvider}`, userMessage);
@@ -925,6 +973,7 @@ export default function CyberdeckPage() {
     }
 
     if (!modelID) {
+      handleModelLabelClick();
       setMessages((prev) => [
         ...prev,
         { role: "system", text: "NO_MODEL_SELECTED // WAIT_FOR_MODELS_OR_CHECK_KEY" },
@@ -934,9 +983,12 @@ export default function CyberdeckPage() {
     }
 
     try {
+      const abortCtl = new AbortController();
+      chatAbortRef.current = abortCtl;
       const res = await fetch("/api/cyberdeck-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: abortCtl.signal,
         body: JSON.stringify({
           message: userMessage,
           provider: activeProvider,
@@ -1001,37 +1053,97 @@ export default function CyberdeckPage() {
       }
 
       if (fullText.includes("[UI]")) {
-        const uiMatch = fullText.match(/\[UI\](.*?)\[\/UI\]/s);
+        const uiMatch = fullText.match(/\[UI\]([\s\S]*?)\[\/UI\]/);
         if (uiMatch) setGeneratedUI(uiMatch[1].trim());
       }
     } catch (err) {
       const msg = String(err);
+      if (msg.includes("AbortError")) {
+        setMessages((prev) => [...prev, { role: "system", text: "REQUEST_ABORTED // STREAM_HALTED" }]);
+        setStreamText("");
+        return;
+      }
       if (msg.includes("API error")) {
         playWrongDoorShut();
       }
       setMessages((prev) => [...prev, { role: "error", text: String(err) }]);
     } finally {
+      chatAbortRef.current = null;
       setIsStreaming(false);
     }
   };
+
+  const handleStop = useCallback(() => {
+    if (!isStreaming) return;
+    chatAbortRef.current?.abort();
+  }, [isStreaming]);
+
+  const handleModelLabelClick = useCallback(() => {
+    setNavRailContext("gateway");
+    setServerKeyboardHighlightId(null);
+    setProviderKeyboardHighlightId(activeProvider);
+    setModelKeyboardHighlightId(modelID || null);
+    gatewayColumnRef.current?.focus({ preventScroll: true });
+    gatewayConnectionPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeProvider, modelID]);
+
+  useEffect(() => {
+    if (connectionState === "offline" && !offlineAutoOpenedRef.current) {
+      handleModelLabelClick();
+      offlineAutoOpenedRef.current = true;
+      return;
+    }
+    if (connectionState !== "offline") {
+      offlineAutoOpenedRef.current = false;
+    }
+  }, [connectionState, handleModelLabelClick]);
+
+  const handleGatewayDragOver = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsMarkdownDragOver(true);
+  }, []);
+
+  const handleGatewayDragLeave = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsMarkdownDragOver(false);
+  }, []);
+
+  const handleGatewayDrop = useCallback(async (e: ReactDragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsMarkdownDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    const looksMarkdown =
+      file.name.toLowerCase().endsWith(".md") ||
+      file.type === "text/markdown" ||
+      file.type === "text/plain";
+    if (!looksMarkdown) return;
+    try {
+      const text = await file.text();
+      setDroppedMarkdown(text);
+      setDroppedMarkdownName(file.name);
+    } catch {
+      // ignore failed file read
+    }
+  }, []);
 
   /* Weyland: col2 = nav, col3 = terminal. Echo: flipped → col2 = terminal (chat), col3 = nav (gateway). */
   return (
     <div
       ref={cyberdeckRootRef}
-      className="flex h-screen overflow-hidden bg-background text-green-500 font-mono terminal-window"
+      className="terminal-window flex h-screen overflow-hidden bg-background font-mono text-green-500 max-md:flex-col"
     >
       <aside
         ref={serverRailRef}
         tabIndex={-1}
         aria-label="Server rail"
-        className="cyberdeck-server-rail flex flex-col items-center flex-shrink-0 w-16 border-r border-gray-800 bg-gray-900 py-4 z-40 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+        className="cyberdeck-server-rail z-40 flex w-12 flex-shrink-0 flex-col items-center border-r border-gray-800 bg-black py-4 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 max-md:h-auto max-md:w-full max-md:flex-row max-md:justify-start max-md:overflow-x-auto max-md:border-b max-md:border-r-0 max-md:px-2 max-md:py-2"
       >
         {servers.map((btn) => (
           <div
             key={btn.id}
             className="btn-container"
-            style={{ width: "56px", height: "52px", position: "relative" }}
+            style={{ width: "48px", height: "52px", position: "relative" }}
           >
             <pre
               className={`ascii-btn${server === btn.id ? " is-pushed" : ""}${
@@ -1057,12 +1169,15 @@ export default function CyberdeckPage() {
         ))}
       </aside>
 
-      <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0 flex-1">
+      <ResizablePanelGroup
+        orientation={isMobileLayout ? "vertical" : "horizontal"}
+        className="min-h-0 min-w-0 flex-1"
+      >
         {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
-        <ResizablePanel defaultSize={55} minSize={28}>
+        <ResizablePanel defaultSize={isMobileLayout ? 50 : 55} minSize={isMobileLayout ? 32 : 28}>
           <div
             ref={chatColumnRef}
-            className={`cyberdeck-net-pane left flex h-full min-w-0 flex-col border-r border-gray-800 bg-black ${
+            className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full min-w-0 flex-col border-b border-gray-800 bg-black md:border-b-0 md:border-r ${
               networkActivityActive ? "is-net-active" : ""
             }`}
           >
@@ -1088,7 +1203,7 @@ export default function CyberdeckPage() {
             <div
               ref={messageScrollRef}
               tabIndex={-1}
-              className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
+              className="cyberdeck-chat-content custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
             >
               <div className="message-log flex-1 space-y-3">
                 {messages.map((m, i) => (
@@ -1139,58 +1254,119 @@ export default function CyberdeckPage() {
               </div>
             </div>
 
-            <footer className="border-t border-gray-800 bg-gray-900/80 p-4">
-              <div className="relative flex items-center">
-                <span className="pointer-events-none absolute left-3 text-lg font-bold text-green-500">$</span>
-                <input
-                  ref={messageInputRef}
-                  value={input}
-                  onChange={(e) => {
-                    setInput(e.target.value);
-                    setInputCaretIndex(e.target.selectionStart ?? e.target.value.length);
-                  }}
-                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  onKeyUp={syncInputCaret}
-                  onClick={syncInputCaret}
-                  onSelect={syncInputCaret}
-                  onFocus={() => {
-                    setIsInputFocused(true);
-                    syncInputCaret();
-                  }}
-                  onBlur={() => setIsInputFocused(false)}
-                  placeholder={
-                    !providerKeys[activeProvider] ? "ENTER GATEWAY KEY..." : "Enter command or message..."
-                  }
-                  className={`w-full rounded-lg border border-gray-700 bg-black py-3 pl-9 pr-3 font-mono text-sm text-green-400 placeholder-gray-600 transition-all focus:border-green-500 focus:outline-none ${
-                    isInputFocused ? "caret-transparent" : ""
-                  }`}
-                  disabled={isStreaming}
-                />
-                {isInputFocused && !isStreaming && inputCursorBlinkOn ? (
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute top-1/2 -translate-y-1/2 bg-green-400 px-[1px] font-mono text-sm leading-5 text-black"
-                    style={{ left: `${inputCursorLeft}px` }}
+            <footer className="cyberdeck-message-box bg-black p-0">
+              <div className="m-2 rounded-sm border border-green-900/70 bg-black">
+                <div className="relative flex items-center px-2 py-2">
+                  <span className="pointer-events-none absolute left-3 text-lg font-bold text-green-500">$</span>
+                  <input
+                    ref={messageInputRef}
+                    value={input}
+                    onChange={(e) => {
+                      setInput(e.target.value);
+                      setInputCaretIndex(e.target.selectionStart ?? e.target.value.length);
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                    onKeyUp={syncInputCaret}
+                    onClick={syncInputCaret}
+                    onSelect={syncInputCaret}
+                    onFocus={() => {
+                      setIsInputFocused(true);
+                      syncInputCaret();
+                    }}
+                    onBlur={() => setIsInputFocused(false)}
+                    placeholder={
+                      !providerKeys[activeProvider] ? "ENTER GATEWAY KEY..." : "Enter command or message..."
+                    }
+                    className={`w-full rounded-none border-0 bg-black py-3 pl-9 pr-3 font-mono text-sm text-green-400 placeholder:text-green-800 transition-all focus:outline-none ${
+                      isInputFocused ? "caret-transparent" : ""
+                    }`}
+                    disabled={false}
+                  />
+                  {isInputFocused && !isStreaming && inputCursorBlinkOn ? (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute top-1/2 -translate-y-1/2 bg-green-400 px-[1px] font-mono text-sm leading-5 text-black"
+                      style={{ left: `${inputCursorLeft}px` }}
+                    >
+                      {input[inputCaretIndex] ? input[inputCaretIndex] : "\u00A0"}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={handleModelLabelClick}
+                    className={`min-w-0 truncate text-[10px] font-mono ${
+                      connectionState === "connected"
+                        ? "text-green-300"
+                        : connectionState === "connecting"
+                          ? "text-amber-300"
+                          : "text-gray-500"
+                    } cursor-pointer hover:underline`}
+                    title="Open provider connection panel"
                   >
-                    {input[inputCaretIndex] ? input[inputCaretIndex] : "\u00A0"}
-                  </span>
-                ) : null}
+                    {connectionState === "offline"
+                      ? "DISCONNECTED"
+                      : modelID
+                        ? modelID.split("/").pop()
+                        : "UNSET"}{" "}
+                    {isStreaming ? "STREAMING" : ""}
+                  </button>
+                  <div className="flex items-center gap-2">
+                    {!isStreaming ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleSend()}
+                        disabled={!input.trim()}
+                        aria-label="Send"
+                        title="Send"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded border border-green-700 text-green-300 transition hover:border-green-500 hover:text-green-200 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" aria-hidden="true">
+                          <path
+                            d="M3 11.5L20.5 3.5L13.5 20.5L11.2 13.8L3 11.5Z"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path d="M11.3 13.7L20.4 3.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleStop}
+                        aria-label="Stop"
+                        title="Stop"
+                        className="rounded border border-red-700 px-2 py-1 text-[10px] font-mono text-red-300 transition hover:border-red-500 hover:text-red-200"
+                      >
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
+                          <rect x="6.5" y="6.5" width="11" height="11" rx="1.2" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </footer>
           </div>
         </ResizablePanel>
 
-        <ResizableHandle withHandle />
+        <ResizableHandle withHandle className="hidden md:flex" />
 
         {/* COL 3 (flipped): gateway nav — Weyland col2 */}
-        <ResizablePanel defaultSize={45} minSize={22}>
+        <ResizablePanel defaultSize={isMobileLayout ? 50 : 45} minSize={isMobileLayout ? 32 : 22}>
           <div
             ref={gatewayColumnRef}
             tabIndex={-1}
             aria-label="Gateway"
-            className={`cyberdeck-net-pane right flex h-full min-w-0 flex-col border-l border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
+            onDragOver={handleGatewayDragOver}
+            onDragLeave={handleGatewayDragLeave}
+            onDrop={handleGatewayDrop}
+            className={`cyberdeck-net-pane right flex h-full min-w-0 flex-col border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black md:border-l ${
               networkActivityActive ? "is-net-active" : ""
-            }`}
+            } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
           >
             <header className="flex shrink-0 items-center overflow-visible border-b border-gray-800 bg-black px-6 py-2">
               <pre
@@ -1211,7 +1387,29 @@ export default function CyberdeckPage() {
         ╲╱_╱ ╲╱_________╱╲╱_╱    ╲_╲╱╲_╲___╲     ╱____╱_╱╲╱___________╱ ╲╱__________╱`}
               </pre>
             </header>
-            <div className="custom-scrollbar flex-1 overflow-y-auto bg-gray-900 p-4">
+            <div className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
+              {droppedMarkdown ? (
+                <div className="mb-4 rounded-sm border border-amber-700/70 bg-black p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="truncate font-mono text-[10px] text-amber-300">
+                      MARKDOWN: {droppedMarkdownName || "dropped.md"}
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded border border-amber-700 px-2 py-[2px] font-mono text-[10px] text-amber-300 hover:border-amber-500"
+                      onClick={() => {
+                        setDroppedMarkdown(null);
+                        setDroppedMarkdownName("");
+                      }}
+                    >
+                      CLEAR
+                    </button>
+                  </div>
+                  <Streamdown className="prose prose-invert prose-pre:bg-black prose-pre:text-green-300 max-w-none text-[12px] leading-snug text-green-200">
+                    {droppedMarkdown}
+                  </Streamdown>
+                </div>
+              ) : null}
               <div
                 className="pb-2 font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
                 style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
@@ -1258,6 +1456,7 @@ export default function CyberdeckPage() {
               </div>
 
               <div
+                ref={gatewayConnectionPanelRef}
                 className="mt-5 border-t border-[#111] pt-2"
                 style={{
                   pointerEvents: probeInFlightByProvider[activeProvider] ? "none" : "auto",

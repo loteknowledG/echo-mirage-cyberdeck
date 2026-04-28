@@ -399,6 +399,11 @@ export function unlockKeyboardSfx() {
   return Promise.resolve();
 }
 
+export function setupAudio() {
+  // Compatibility init hook for older callers.
+  getCtx();
+}
+
 export function playSystemSound(type = "click", vol = 0.08) {
   const gain = Math.max(0, Number.isFinite(vol) ? vol : 0.08) * 2.2;
   if (type === "chirp") {
