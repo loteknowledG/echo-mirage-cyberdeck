@@ -9,7 +9,7 @@ type MarkdownMode = "editor" | "viewer";
 export function MarkdownExtension({
   extensionColumnRef,
 }: {
-  extensionColumnRef: RefObject<HTMLDivElement | null>;
+  extensionColumnRef: RefObject<HTMLDivElement>;
 }) {
   const [mode, setMode] = useState<MarkdownMode>("editor");
   const [markdownText, setMarkdownText] = useState<string>("");

@@ -5,7 +5,7 @@ import type { RefObject } from "react";
 export function FilesExtension({
   extensionColumnRef,
 }: {
-  extensionColumnRef: RefObject<HTMLDivElement | null>;
+  extensionColumnRef: RefObject<HTMLDivElement>;
 }) {
   return (
     <div

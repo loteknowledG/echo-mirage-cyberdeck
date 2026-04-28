@@ -75,8 +75,8 @@ export function GatewayExtension({
   modelKeyboardHighlightId,
   generatedUI,
 }: {
-  gatewayColumnRef: RefObject<HTMLDivElement | null>;
-  gatewayConnectionPanelRef: RefObject<HTMLDivElement | null>;
+  gatewayColumnRef: RefObject<HTMLDivElement>;
+  gatewayConnectionPanelRef: RefObject<HTMLDivElement>;
   networkActivityActive: boolean;
   isMarkdownDragOver: boolean;
   onDragOver: (e: ReactDragEvent<HTMLDivElement>) => void;
