@@ -106,6 +106,7 @@ export default function CyberdeckPage() {
   const [inputCursorBlinkOn, setInputCursorBlinkOn] = useState(true);
   const [inputCursorLeft, setInputCursorLeft] = useState(0);
   const [inputCaretIndex, setInputCaretIndex] = useState(0);
+  const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
 
   const [activeProvider, setActiveProvider] = useState<string>("opencode");
   /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
@@ -155,8 +156,8 @@ export default function CyberdeckPage() {
   const offlineAutoOpenedRef = useRef(false);
   const serverRef = useRef(server);
   serverRef.current = server;
-  /** Forward Tab from message box alternates: gateway (right) → rail (left) → … */
-  const deckTabNextRef = useRef<"gateway" | "rail">("gateway");
+  /** Forward Tab from message box cycles: gateway (right) → rail (left) → chat log (col2) → … */
+  const deckTabNextRef = useRef<"gateway" | "rail" | "chatlog">("gateway");
   const prevNavRailRef = useRef<"gateway" | "tabs">("gateway");
 
   const syncInputCaret = useCallback(() => {
@@ -522,7 +523,7 @@ export default function CyberdeckPage() {
         },
       };
 
-      // Tab: message box ↔ closest column (gateway / rail); from gateway or rail, Tab returns to message box.
+      // Tab: message box ↔ deck columns/surfaces; includes chat log (col2) in sequencer.
       if (e.key === "Tab" && !e.repeat) {
         const msg = messageInputRef.current;
         if (!msg || msg.disabled) {
@@ -537,27 +538,40 @@ export default function CyberdeckPage() {
           sfxNav.commit();
           msg.focus({ preventScroll: false });
           return;
+        } else if (inChatCol && !inChatInput) {
+          e.preventDefault();
+          sfxNav.commit();
+          msg.focus({ preventScroll: false });
+          return;
         } else if (inChatInput) {
           e.preventDefault();
           sfxNav.commit();
           const next = deckTabNextRef.current;
           if (e.shiftKey) {
             if (next === "gateway") {
+              messageScrollRef.current?.focus({ preventScroll: true });
+              deckTabNextRef.current = "chatlog";
+            } else if (next === "rail") {
+              gatewayColumnRef.current?.focus({ preventScroll: true });
+              deckTabNextRef.current = "gateway";
+            } else {
               serverRailRef.current?.focus({ preventScroll: true });
               setNavRailContext("tabs");
               setServerKeyboardHighlightId(serverRef.current);
-            } else {
-              gatewayColumnRef.current?.focus({ preventScroll: true });
+              deckTabNextRef.current = "rail";
             }
             return;
           }
           if (next === "gateway") {
             gatewayColumnRef.current?.focus({ preventScroll: true });
             deckTabNextRef.current = "rail";
-          } else {
+          } else if (next === "rail") {
             serverRailRef.current?.focus({ preventScroll: true });
             setNavRailContext("tabs");
             setServerKeyboardHighlightId(serverRef.current);
+            deckTabNextRef.current = "chatlog";
+          } else {
+            messageScrollRef.current?.focus({ preventScroll: true });
             deckTabNextRef.current = "gateway";
           }
           return;
@@ -697,30 +711,37 @@ export default function CyberdeckPage() {
       }
 
       if (inChatCol && !inChatInput) {
-        const scrollEl = messageScrollRef.current;
-        if (scrollEl) {
+        const chatRowCount =
+          messages.length + (streamText ? 1 : 0) + (isStreaming && !streamText ? 1 : 0);
+        if (chatRowCount > 0) {
           if (e.key === "ArrowDown") {
             e.preventDefault();
             sfxNav.step();
-            scrollEl.scrollBy({ top: 56, behavior: "smooth" });
+            setChatKeyboardHighlightIndex((prev) => {
+              const current = prev == null ? -1 : Math.min(prev, chatRowCount - 1);
+              return Math.min(current + 1, chatRowCount - 1);
+            });
             return;
           }
           if (e.key === "ArrowUp") {
             e.preventDefault();
             sfxNav.step();
-            scrollEl.scrollBy({ top: -56, behavior: "smooth" });
+            setChatKeyboardHighlightIndex((prev) => {
+              const current = prev == null ? chatRowCount : Math.min(prev, chatRowCount - 1);
+              return Math.max(current - 1, 0);
+            });
             return;
           }
           if (e.key === "Home") {
             e.preventDefault();
             sfxNav.step();
-            scrollEl.scrollTo({ top: 0, behavior: "smooth" });
+            setChatKeyboardHighlightIndex(0);
             return;
           }
           if (e.key === "End") {
             e.preventDefault();
             sfxNav.step();
-            scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: "smooth" });
+            setChatKeyboardHighlightIndex(chatRowCount - 1);
             return;
           }
         }
@@ -838,6 +859,23 @@ export default function CyberdeckPage() {
   ]);
 
   useEffect(() => {
+    const maxIndex = messages.length + (streamText ? 1 : 0) + (isStreaming && !streamText ? 1 : 0) - 1;
+    setChatKeyboardHighlightIndex((prev) => {
+      if (prev == null) return null;
+      if (maxIndex < 0) return null;
+      return Math.min(prev, maxIndex);
+    });
+  }, [isStreaming, messages.length, streamText]);
+
+  useEffect(() => {
+    if (chatKeyboardHighlightIndex == null) return;
+    window.requestAnimationFrame(() => {
+      const row = document.querySelector<HTMLElement>(`[data-chat-row="${chatKeyboardHighlightIndex}"]`);
+      row?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    });
+  }, [chatKeyboardHighlightIndex]);
+
+  useEffect(() => {
     const rail = serverRailRef.current;
     if (!rail) return;
     const onRailFocus = () => {
@@ -847,6 +885,27 @@ export default function CyberdeckPage() {
     rail.addEventListener("focusin", onRailFocus);
     return () => rail.removeEventListener("focusin", onRailFocus);
   }, []);
+
+  useEffect(() => {
+    const scrollToHighlight = (selector: string) => {
+      window.requestAnimationFrame(() => {
+        const el = document.querySelector<HTMLElement>(selector);
+        el?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+      });
+    };
+
+    if (navRailContext === "tabs" && serverKeyboardHighlightId) {
+      scrollToHighlight(`[data-server-tab="${serverKeyboardHighlightId}"]`);
+      return;
+    }
+    if (providerKeyboardHighlightId) {
+      scrollToHighlight(`[data-provider-row="${providerKeyboardHighlightId}"]`);
+      return;
+    }
+    if (modelKeyboardHighlightId) {
+      scrollToHighlight(`[data-model-row="${modelKeyboardHighlightId}"]`);
+    }
+  }, [modelKeyboardHighlightId, navRailContext, providerKeyboardHighlightId, serverKeyboardHighlightId]);
 
   useEffect(() => {
     setModelKeyboardHighlightId((prev) => {
@@ -1164,6 +1223,7 @@ export default function CyberdeckPage() {
             style={{ width: "48px", height: "52px", position: "relative" }}
           >
             <pre
+              data-server-tab={btn.id}
               className={`ascii-btn${server === btn.id ? " is-pushed" : ""}${
                 navRailContext === "tabs" && serverKeyboardHighlightId === btn.id
                   ? " server-rail-kb-hover"
@@ -1225,7 +1285,13 @@ export default function CyberdeckPage() {
             >
               <div className="message-log flex-1 space-y-3">
                 {messages.map((m, i) => (
-                  <div key={i} className="text-xs">
+                  <div
+                    key={i}
+                    data-chat-row={i}
+                    className={`nav-row py-1 text-xs ${
+                      chatKeyboardHighlightIndex === i ? "nav-row-kb-hover" : ""
+                    }`}
+                  >
                     <span
                       className={
                         m.role === "user"
@@ -1257,14 +1323,24 @@ export default function CyberdeckPage() {
                   </div>
                 ))}
                 {streamText && (
-                  <div className="text-xs">
+                  <div
+                    data-chat-row={messages.length}
+                    className={`nav-row py-1 text-xs ${
+                      chatKeyboardHighlightIndex === messages.length ? "nav-row-kb-hover" : ""
+                    }`}
+                  >
                     <span className="text-green-400">[AI] </span>
                     <span className="text-green-300">{streamText}</span>
                     <span className="animate-pulse">█</span>
                   </div>
                 )}
                 {isStreaming && !streamText && (
-                  <div className="text-xs text-green-500/90">
+                  <div
+                    data-chat-row={messages.length}
+                    className={`nav-row py-1 text-xs text-green-500/90 ${
+                      chatKeyboardHighlightIndex === messages.length ? "nav-row-kb-hover" : ""
+                    }`}
+                  >
                     <span className="animate-pulse">█</span> COGITATING...
                   </div>
                 )}
@@ -1289,6 +1365,7 @@ export default function CyberdeckPage() {
                     onSelect={syncInputCaret}
                     onFocus={() => {
                       setIsInputFocused(true);
+                      setChatKeyboardHighlightIndex(null);
                       syncInputCaret();
                     }}
                     onBlur={() => setIsInputFocused(false)}
@@ -1447,6 +1524,7 @@ export default function CyberdeckPage() {
                   return (
                     <div
                       key={p.id}
+                      data-provider-row={p.id}
                       className={`nav-row cursor-pointer py-[5px]${kbHover ? " nav-row-kb-hover" : ""}`}
                       style={
                         {
@@ -1512,6 +1590,7 @@ export default function CyberdeckPage() {
                     return (
                       <div
                         key={m.id}
+                        data-model-row={m.id}
                         className={`${wave ? "model-probe-wave nav-row" : "nav-row"}${modelKb ? " nav-row-kb-hover" : ""}`}
                         role="button"
                         tabIndex={-1}

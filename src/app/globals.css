@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&display=swap');
+@import url("https://cdn.jsdelivr.net/npm/hack-font@3/build/web/hack.css");
 /* Import Mrs Saint Delafield from Google Fonts */
 /* If Google Fonts import is blocked, you can self-host a WOFF2 at /public/fonts/MrsSaintDelafield.woff2 */
 html,
@@ -256,6 +257,21 @@ body,
 .terminal-window {
   /* animation: flicker 0.15s infinite; */
   text-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+}
+
+/* Force cyberdeck mono text to Hack. */
+.terminal-window,
+.terminal-window .font-mono {
+  font-family:
+    "Hack",
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace !important;
 }
 
 /* Cyberdeck server tabs — same hover / press behavior as weyland-yutani `index.css` */
