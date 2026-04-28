@@ -105,6 +105,7 @@ function playNoiseClick({ duration = 0.02, volume = 0.025, filterFreq = 2600 }) 
 
 function classifyKey(key) {
   if (key === "Enter") return "enter";
+  if (key === "Escape") return "escape";
   if (key === "Backspace" || key === "Delete") return "delete";
   if (key === " ") return "space";
   if (key === "Shift" || key === "Control" || key === "Alt" || key === "Meta") {
@@ -186,23 +187,47 @@ export function playKeySound(key, options = {}) {
       break;
 
     case "enter":
+      // base rise
       playTone({
-        freqStart: rand(520, 680),
-        freqEnd: rand(980, 1250),
-        duration: rand(0.09, 0.14),
+        freqStart: rand(480, 620),
+        freqEnd: rand(1100, 1400),
+        duration: rand(0.08, 0.12),
         type: "sine",
-        volume: v(0.075),
+        volume: v(0.08),
       });
 
+      // harmonic sparkle layer
       setTimeout(() => {
         playTone({
-          freqStart: rand(900, 1150),
-          freqEnd: rand(1150, 1500),
-          duration: 0.055,
+          freqStart: rand(900, 1200),
+          freqEnd: rand(1400, 1800),
+          duration: 0.05,
           type: "triangle",
-          volume: v(0.045),
+          volume: v(0.04),
         });
-      }, 45);
+      }, 30);
+
+      // tiny click for tactility
+      playNoiseClick({
+        duration: 0.015,
+        volume: v(0.02),
+        filterFreq: 3000,
+      });
+      break;
+
+    case "escape":
+      playTone({
+        freqStart: rand(420, 560),
+        freqEnd: rand(180, 280),
+        duration: rand(0.06, 0.09),
+        type: "triangle",
+        volume: v(0.05),
+      });
+      playNoiseClick({
+        duration: rand(0.014, 0.022),
+        volume: v(0.016),
+        filterFreq: rand(1400, 2400),
+      });
       break;
 
     case "delete":
@@ -233,6 +258,37 @@ export function playKeySound(key, options = {}) {
         volume: v(0.035),
       });
   }
+}
+
+/** Short feedback for cyberdeck UI keyboard navigation (separate timbre from typing sfx). */
+export function playNavigationSound(variant = "step") {
+  if (!enabled) return;
+  const v = variant || "step";
+  if (v === "commit") {
+    playTone({
+      freqStart: rand(580, 720),
+      freqEnd: rand(880, 1050),
+      duration: rand(0.048, 0.068),
+      type: "triangle",
+      volume: rand(0.034, 0.046),
+    });
+    return;
+  }
+  if (v === "back") {
+    playTone({
+      freqStart: rand(520, 640),
+      freqEnd: rand(280, 380),
+      duration: rand(0.052, 0.072),
+      type: "triangle",
+      volume: rand(0.028, 0.038),
+    });
+    return;
+  }
+  playNoiseClick({
+    duration: rand(0.012, 0.02),
+    volume: rand(0.016, 0.026),
+    filterFreq: rand(2200, 3400),
+  });
 }
 
 export function bindKeyboardSfx(target = window, options = {}) {
@@ -267,6 +323,8 @@ export function playSystemSound(type = "click", vol = 0.08) {
     playKeySound("Enter");
   } else if (type === "keypress") {
     playKeySound("a", { volume: 0.8 });
+  } else if (type === "lock") {
+    playKeySound("Enter", { volume: 0.15 });
   } else {
     playNoiseClick({ duration: 0.02, volume: 0.025 });
   }

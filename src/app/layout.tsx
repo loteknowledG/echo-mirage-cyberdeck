@@ -45,7 +45,7 @@ export default async function RootLayout({
         className={`${GeistSans.className} ${SignatureScript.variable} ${SatisfyScript.variable} h-screen overflow-y-hidden overflow-x-auto`}
       >
         <ThemeProvider attribute="class" forcedTheme="dark">
-          <div className="app-min-width-wrapper">
+          <div className="app-min-width-wrapper min-h-screen bg-background">
             {children}
             <script suppressHydrationWarning={true} />
           </div>

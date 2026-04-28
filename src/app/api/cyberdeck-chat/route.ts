@@ -73,16 +73,222 @@ async function streamOpenAiCompatibleResponse(response: Response) {
   });
 }
 
+const CHAT_URL: Record<string, string> = {
+  opencode: "https://opencode.ai/zen/v1/chat/completions",
+  openai: "https://api.openai.com/v1/chat/completions",
+  openrouter: "https://openrouter.ai/api/v1/chat/completions",
+};
+
+function defaultModelForProvider(provider: string): string {
+  if (provider === "openai") return "gpt-4o-mini";
+  if (provider === "openrouter") return "openai/gpt-4o-mini";
+  return "trinity-large-preview-free";
+}
+
 export async function POST(request: Request) {
   try {
-    const { message } = await request.json();
+    const body = await request.json();
+    const { message, provider, apiKey, testMode, probe, model: modelFromBody } = body;
 
-    if (!message) {
+    // Model probe (non-stream), same contract as weyland-yutani transmit chat stream:false
+    if (probe === true && provider && apiKey && modelFromBody) {
+      const endpoint = CHAT_URL[provider as string];
+      if (!endpoint) {
+        return NextResponse.json({ ok: false, valid: false, status: 400 }, { status: 400 });
+      }
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: modelFromBody,
+            messages: [
+              { role: "system", content: "Reply with exactly OK." },
+              { role: "user", content: "probe" },
+            ],
+            max_tokens: 8,
+            temperature: 0,
+            stream: false,
+          }),
+        });
+        const data = res.ok ? ((await res.json()) as { choices?: { message?: { content?: string } }[] }) : {};
+        const content = String(data?.choices?.[0]?.message?.content || "").trim();
+        return NextResponse.json({
+          ok: res.ok,
+          status: res.status,
+          valid: content.length > 0,
+          rateLimited: res.status === 429,
+        });
+      } catch {
+        return NextResponse.json({ ok: false, valid: false, status: 0 }, { status: 500 });
+      }
+    }
+
+    if (!message && !testMode) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
     }
 
+    // Handle test mode (provider connection validation)
+    if (testMode) {
+      if (!apiKey) {
+        return NextResponse.json({ error: "API key required" }, { status: 400 });
+      }
+      const testEndpoint =
+        provider === "opencode"
+          ? "https://opencode.ai/zen/v1/models"
+          : provider === "openai"
+            ? "https://api.openai.com/v1/models"
+            : provider === "openrouter"
+              ? "https://openrouter.ai/api/v1/models"
+              : provider === "anthropic"
+                ? "https://api.anthropic.com/v1/models"
+                : null;
+      
+      if (!testEndpoint) {
+        return NextResponse.json({ connected: true }, { status: 200 });
+      }
+
+      try {
+        const testRes = await fetch(testEndpoint, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        return NextResponse.json({ 
+          connected: testRes.ok, 
+          status: testRes.status 
+        }, { status: testRes.ok ? 200 : 401 });
+      } catch {
+        return NextResponse.json({ connected: false, error: "Network error" }, { status: 500 });
+      }
+    }
+
+    const normalizedMsg = typeof message === "string" ? message.toLowerCase().trim() : "";
+
+    // User session: stream via selected provider (keys from client)
+    if (provider && apiKey && typeof message === "string" && message.trim()) {
+      const endpoint = CHAT_URL[provider as string];
+      if (endpoint) {
+        if (normalizedMsg === "providers" || normalizedMsg === "connect providers" || normalizedMsg === "provider") {
+          return NextResponse.json({
+            type: "providers",
+            data: [
+              { id: "opencode", name: "OpenCode", description: "Zen uplink", status: "ready" },
+              { id: "openrouter", name: "OpenRouter", description: "Model mesh", status: "config" },
+              { id: "openai", name: "OpenAI", description: "GPT family", status: "config" },
+            ],
+          });
+        }
+
+        if (normalizedMsg === "models" || normalizedMsg === "list models" || normalizedMsg === "available models") {
+          return NextResponse.json({
+            type: "models",
+            data: [
+              { id: "trinity-large-preview-free", name: "Trinity Large", provider: "opencode", status: "active" },
+              { id: "gpt-4o-mini", name: "GPT-4o mini", provider: "openai", status: "active" },
+            ],
+          });
+        }
+
+        if (normalizedMsg === "status" || normalizedMsg === "connection status") {
+          return NextResponse.json({
+            type: "status",
+            data: {
+              provider,
+              model: modelFromBody || defaultModelForProvider(provider),
+              connection: "active",
+              memory: "—",
+            },
+          });
+        }
+
+        const model =
+          (typeof modelFromBody === "string" && modelFromBody.trim()) || defaultModelForProvider(provider);
+
+        const providerResponse = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful.",
+              },
+              { role: "user", content: message },
+            ],
+            stream: true,
+          }),
+        });
+
+        if (!providerResponse.ok) {
+          const text = await providerResponse.text().catch(() => "");
+          return NextResponse.json(
+            { error: `API error ${providerResponse.status}: ${text}` },
+            { status: 502 },
+          );
+        }
+
+        return new Response(await streamOpenAiCompatibleResponse(providerResponse), {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+          },
+        });
+      }
+    }
+
+    // Handle providers command (no user session)
+    if (normalizedMsg === "providers" || normalizedMsg === "connect providers" || normalizedMsg === "provider") {
+      return NextResponse.json({
+        type: "providers",
+        data: [
+          { id: "opencode", name: "OpenCode", description: "Default AI provider", status: "ready" },
+          { id: "openai", name: "OpenAI", description: "GPT-4 and variants", status: "config" },
+          { id: "anthropic", name: "Anthropic", description: "Claude models", status: "config" },
+          { id: "ollama", name: "Ollama", description: "Local models", status: "config" },
+        ],
+      });
+    }
+
+    // Handle models command
+    if (normalizedMsg === "models" || normalizedMsg === "list models" || normalizedMsg === "available models") {
+      return NextResponse.json({
+        type: "models",
+        data: [
+          { id: "trinity-large-preview-free", name: "Trinity Large", provider: "opencode", status: "active" },
+          { id: "gpt-4", name: "GPT-4", provider: "openai", status: "config" },
+          { id: "gpt-4-turbo", name: "GPT-4 Turbo", provider: "openai", status: "config" },
+          { id: "claude-3-opus", name: "Claude 3 Opus", provider: "anthropic", status: "config" },
+          { id: "claude-3-sonnet", name: "Claude 3 Sonnet", provider: "anthropic", status: "config" },
+          { id: "llama3", name: "Llama 3", provider: "ollama", status: "config" },
+          { id: "mistral", name: "Mistral", provider: "ollama", status: "config" },
+        ],
+      });
+    }
+
+    // Handle status command
+    if (normalizedMsg === "status" || normalizedMsg === "connection status") {
+      return NextResponse.json({
+        type: "status",
+        data: {
+          provider: "opencode",
+          model: "trinity-large-preview-free",
+          connection: "active",
+          memory: "12 moments",
+        },
+      });
+    }
+
     // Get API config from env or default to opencode
-    const apiKey = process.env.OPENCODE_API_KEY || "";
+    const envApiKey = process.env.OPENCODE_API_KEY || "";
     const model = process.env.OPENCODE_MODEL || "trinity-large-preview-free";
     const endpoint = "https://opencode.ai/zen/v1/chat/completions";
 
@@ -90,7 +296,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        ...(!envApiKey ? {} : { Authorization: `Bearer ${envApiKey}` }),
       },
       body: JSON.stringify({
         model,

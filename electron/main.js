@@ -11,7 +11,8 @@ function createWindow() {
   });
 
   // Load your Next.js app (dev server)
-  win.loadURL('http://localhost:3000');
+  // Keep in sync with package.json dev/start port (avoids clash with Weyland-Yutani on :3000).
+  win.loadURL('http://127.0.0.1:3050');
 }
 
 app.whenReady().then(createWindow);
