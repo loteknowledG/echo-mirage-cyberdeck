@@ -1273,7 +1273,7 @@ export default function CyberdeckPage() {
             </div>
 
             <footer className="cyberdeck-message-box bg-black p-0">
-              <div className="m-2 rounded-sm border border-green-900/70 bg-black">
+              <div className="m-2 rounded-sm border border-green-900/70 bg-black transition-colors transition-shadow focus-within:border-green-500/80 focus-within:shadow-[0_0_0_1px_rgba(34,197,94,0.45),0_0_18px_rgba(34,197,94,0.2)]">
                 <div className="relative flex items-center px-2 py-2">
                   <span className="pointer-events-none absolute left-3 text-lg font-bold text-green-500">$</span>
                   <input
