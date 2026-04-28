@@ -128,6 +128,40 @@ function playNoiseClick({ duration = 0.02, volume = 0.07, filterFreq = 2600 }) {
   source.stop(t + duration);
 }
 
+function wobble(startFreq, endFreq, duration = 0.45, gain = 0.08, type = "sawtooth") {
+  if (!enabled) return;
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+  const osc = ctx.createOscillator();
+  const amp = ctx.createGain();
+  const lfo = ctx.createOscillator();
+  const lfoGain = ctx.createGain();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(Math.max(30, startFreq), t);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(30, endFreq), t + duration);
+
+  lfo.type = "sine";
+  lfo.frequency.setValueAtTime(9, t);
+  lfoGain.gain.setValueAtTime(45, t);
+  lfo.connect(lfoGain);
+  lfoGain.connect(osc.frequency);
+
+  amp.gain.setValueAtTime(0.0001, t);
+  amp.gain.exponentialRampToValueAtTime(gain, t + 0.01);
+  amp.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+  osc.connect(amp);
+  amp.connect(getOutputNode());
+
+  lfo.start(t);
+  osc.start(t);
+  lfo.stop(t + duration);
+  osc.stop(t + duration + 0.05);
+}
+
 function classifyKey(key) {
   if (key === "Enter") return "enter";
   if (key === "Escape") return "escape";
@@ -435,63 +469,300 @@ export function playSuccess() {
   playNetworkScanSound("success");
 }
 
-export function playSonarPing(timeOffset = 0) {
+export function playCinematicSonarPing(timeOffset = 0) {
   if (!enabled) return;
   const ctx = getCtx();
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
   const t = Math.max(0, Number.isFinite(timeOffset) ? timeOffset : 0);
 
-  // Main ping + harmonic.
+  // Main deep ping + subtle harmonic shimmer.
   playTone({
-    freqStart: 880,
-    duration: 0.08,
+    freqStart: 520,
+    duration: 0.18,
     type: "sine",
-    volume: 0.18,
+    volume: 0.22,
   });
   setTimeout(() => {
     playTone({
-      freqStart: 1760,
-      duration: 0.06,
+      freqStart: 1040,
+      duration: 0.12,
       type: "sine",
-      volume: 0.09,
+      volume: 0.08,
     });
   }, 15 + t * 1000);
 
-  // Echo returns.
+  // Slow cinematic echoes.
   setTimeout(() => {
     playTone({
-      freqStart: 440,
-      duration: 0.18,
+      freqStart: 360,
+      duration: 0.35,
       type: "triangle",
-      volume: 0.08,
+      volume: 0.09,
     });
-  }, 320 + t * 1000);
+  }, 900 + t * 1000);
   setTimeout(() => {
     playTone({
-      freqStart: 330,
-      duration: 0.22,
+      freqStart: 240,
+      duration: 0.6,
       type: "sine",
       volume: 0.05,
     });
-  }, 650 + t * 1000);
+  }, 1800 + t * 1000);
 
-  // Ambient wash.
+  // Long ambient tail.
+  setTimeout(() => {
+    playNoiseClick({
+      duration: 1.2,
+      volume: 0.015,
+      filterFreq: 900,
+    });
+  }, 150 + t * 1000);
+}
+
+export function playSonarPing(timeOffset = 0) {
+  playCinematicSonarPing(timeOffset);
+}
+
+export function playBleepBloop() {
+  if (!enabled) return;
+  const ctx = getCtx();
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+  // Tiny, polite status cue for long-running network waits.
+  const scheduleTone = (delayMs, opts) => {
+    setTimeout(() => {
+      playTone(opts);
+    }, delayMs);
+  };
+
+  scheduleTone(0, {
+    freqStart: 720,
+    duration: 0.06,
+    type: "sine",
+    volume: 0.042,
+  });
+  scheduleTone(120, {
+    freqStart: 520,
+    duration: 0.08,
+    type: "triangle",
+    volume: 0.034,
+  });
+
+  // Keep fallback subtle as well.
+  playFallbackClip("click", 0.12);
+}
+
+export function playWrongDoorShut() {
+  if (!enabled) return;
+  const ctx = getCtx();
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  const now = ctx.currentTime + 0.02;
+
+  // WRONG buzzer: harsh low-mid buzz.
+  playTone({
+    freqStart: 145,
+    freqEnd: 125,
+    duration: 0.32,
+    type: "square",
+    volume: 0.09,
+    crunch: true,
+  });
+
+  // DOOR shut: heavy thud drop.
+  setTimeout(() => {
+    playTone({
+      freqStart: 95,
+      freqEnd: 38,
+      duration: 0.42,
+      type: "sine",
+      volume: 0.28,
+      crunch: false,
+    });
+  }, 340);
+
+  // METAL clack latch.
+  setTimeout(() => {
+    playTone({
+      freqStart: 900,
+      duration: 0.035,
+      type: "square",
+      volume: 0.08,
+    });
+  }, 470);
+  setTimeout(() => {
+    playTone({
+      freqStart: 520,
+      duration: 0.045,
+      type: "square",
+      volume: 0.06,
+    });
+  }, 530);
+
+  // Subtle click tail for tactile finish.
+  playFallbackClip("click", 0.24);
+}
+
+export function playDeclined() {
+  if (!enabled) return;
+  playTone({
+    freqStart: 420,
+    freqEnd: 120,
+    duration: 0.35,
+    type: "sawtooth",
+    volume: 0.08,
+    crunch: true,
+  });
+  setTimeout(() => {
+    playTone({
+      freqStart: 180,
+      duration: 0.06,
+      type: "square",
+      volume: 0.05,
+    });
+  }, 380);
+}
+
+export function playDroidDizzy401() {
+  if (!enabled) return;
+  playTone({ freqStart: 980, duration: 0.05, type: "triangle", volume: 0.08 });
+  setTimeout(() => {
+    playTone({ freqStart: 720, duration: 0.06, type: "square", volume: 0.07 });
+  }, 80);
+  setTimeout(() => {
+    playTone({ freqStart: 1120, duration: 0.05, type: "triangle", volume: 0.07 });
+  }, 160);
+  setTimeout(() => {
+    wobble(760, 260, 0.55, 0.09);
+  }, 240);
+}
+
+export function playDroidDizzy400() {
+  if (!enabled) return;
+  playTone({ freqStart: 640, duration: 0.045, type: "square", volume: 0.075 });
+  setTimeout(() => {
+    playTone({ freqStart: 920, duration: 0.04, type: "triangle", volume: 0.065 });
+  }, 70);
+  setTimeout(() => {
+    playTone({ freqStart: 540, duration: 0.05, type: "square", volume: 0.065 });
+  }, 140);
+  setTimeout(() => {
+    wobble(420, 880, 0.32, 0.07);
+  }, 220);
+  setTimeout(() => {
+    wobble(880, 360, 0.35, 0.065);
+  }, 480);
+}
+
+export function playOutOfGas429() {
+  if (!enabled) return;
+  const ctx = getCtx();
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  const now = ctx.currentTime + 0.02;
+
+  // Engine sputter pulses.
+  const sputters = [0, 0.08, 0.18, 0.32, 0.55];
+  sputters.forEach((offset, i) => {
+    const freq = 220 - i * 25;
+    const volume = Math.max(0.04, 0.12 - i * 0.015);
+    const duration = 0.12 + i * 0.05;
+    const at = now + offset;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(freq, at);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(35, freq * 0.5), at + 0.12);
+
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(volume, at + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+
+    osc.connect(gain);
+    gain.connect(getOutputNode());
+    osc.start(at);
+    osc.stop(at + 0.2);
+  });
+
+  // Final dying wheeze.
+  {
+    const at = now + 0.8;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(180, at);
+    osc.frequency.exponentialRampToValueAtTime(40, at + 0.6);
+
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(0.08, at + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.6);
+
+    osc.connect(gain);
+    gain.connect(getOutputNode());
+    osc.start(at);
+    osc.stop(at + 0.7);
+  }
+
+  // Faint static cough.
   setTimeout(() => {
     playNoiseClick({
       duration: 0.25,
       volume: 0.02,
-      filterFreq: 1200,
+      filterFreq: 1000,
     });
-  }, 50 + t * 1000);
+  }, 950);
 }
 
-export function startSonarLoop(interval = 1200) {
+export function playRaceReadySetGo() {
+  if (!enabled) return;
+  const ctx = getCtx();
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+  // READY (low, spaced)
+  playTone({
+    freqStart: 440,
+    duration: 0.12,
+    type: "sine",
+    volume: 0.08,
+  });
+
+  // SET (mid, closer)
+  setTimeout(() => {
+    playTone({
+      freqStart: 660,
+      duration: 0.1,
+      type: "triangle",
+      volume: 0.085,
+    });
+  }, 280);
+
+  // GO (higher, punchy)
+  setTimeout(() => {
+    playTone({
+      freqStart: 980,
+      duration: 0.14,
+      type: "sine",
+      volume: 0.11,
+    });
+  }, 460);
+
+  // Success sparkle tail
+  setTimeout(() => {
+    playTone({
+      freqStart: 1320,
+      duration: 0.18,
+      type: "triangle",
+      volume: 0.07,
+    });
+  }, 580);
+}
+
+export function startSonarLoop(interval = 3200) {
   if (sonarIntervalId) return;
-  const ms = Math.max(350, Number.isFinite(interval) ? interval : 1200);
+  const ms = Math.max(1200, Number.isFinite(interval) ? interval : 3200);
   void unlockKeyboardSfx();
-  playSonarPing();
+  playCinematicSonarPing();
   sonarIntervalId = window.setInterval(() => {
-    playSonarPing();
+    playCinematicSonarPing();
   }, ms);
 }
 

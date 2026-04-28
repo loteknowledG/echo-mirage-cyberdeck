@@ -13,8 +13,15 @@ import {
   unlockKeyboardSfx,
   playNavigationSound,
   playSystemSound,
-  playNetworkScanSound,
-  satelliteConnectSequence,
+  startSonarLoop,
+  stopSonarLoop,
+  playBleepBloop,
+  playWrongDoorShut,
+  playDeclined,
+  playDroidDizzy400,
+  playDroidDizzy401,
+  playOutOfGas429,
+  playRaceReadySetGo,
 } from "@/lib/AudioEngine";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
@@ -129,6 +136,8 @@ export default function CyberdeckPage() {
   const chatColumnRef = useRef<HTMLDivElement>(null);
   const gatewayColumnRef = useRef<HTMLDivElement>(null);
   const cyberdeckRootRef = useRef<HTMLDivElement>(null);
+  const networkFeedbackDelayRef = useRef<number | null>(null);
+  const networkFeedbackRepeatRef = useRef<number | null>(null);
   const serverRef = useRef(server);
   serverRef.current = server;
   /** Forward Tab from message box alternates: gateway (right) → rail (left) → … */
@@ -161,6 +170,8 @@ export default function CyberdeckPage() {
 
   const modelID = modelByProvider[activeProvider] || "";
   const providerModelFetchStatus = modelFetchStatusByProvider[activeProvider] || "idle";
+  const scanActivityActive =
+    Boolean(probeInFlightByProvider[activeProvider]) || providerModelFetchStatus === "retrieving";
   const networkActivityActive =
     Boolean(probeInFlightByProvider[activeProvider]) ||
     providerModelFetchStatus === "retrieving" ||
@@ -171,6 +182,32 @@ export default function CyberdeckPage() {
   const activeTextGlow = "0 0 8px rgba(0, 255, 0, 0.22)";
   const amberTextGlow = "0 0 8px rgba(255, 170, 0, 0.22)";
   const inactiveTextGlow = "0 0 6px rgba(180, 180, 180, 0.14)";
+
+  const playModelTestErrorSound = useCallback((line: string) => {
+    if (line.includes("VALID_RESPONSE")) {
+      playRaceReadySetGo();
+      return;
+    }
+    if (line.includes("HTTP_401")) {
+      playDroidDizzy401();
+      return;
+    }
+    if (line.includes("HTTP_400")) {
+      playDroidDizzy400();
+      return;
+    }
+    if (line.includes("HTTP_429")) {
+      playOutOfGas429();
+      return;
+    }
+    if (line.includes("EMPTY_RESPONSE")) {
+      playDeclined();
+      return;
+    }
+    if (line.includes("FAILURE")) {
+      playWrongDoorShut();
+    }
+  }, []);
 
   const selectProvider = useCallback((id: string) => {
     setActiveProvider(id);
@@ -257,6 +294,47 @@ export default function CyberdeckPage() {
     syncInputCaret();
   }, [input, inputCaretIndex, isInputFocused, syncInputCaret]);
 
+  useEffect(() => {
+    if (scanActivityActive) {
+      startSonarLoop(3200);
+    } else {
+      stopSonarLoop();
+    }
+    return () => stopSonarLoop();
+  }, [scanActivityActive]);
+
+  useEffect(() => {
+    if (isStreaming) {
+      if (networkFeedbackDelayRef.current == null) {
+        networkFeedbackDelayRef.current = window.setTimeout(() => {
+          playBleepBloop();
+          networkFeedbackRepeatRef.current = window.setInterval(() => {
+            playBleepBloop();
+          }, 7000);
+        }, 2800);
+      }
+    } else {
+      if (networkFeedbackDelayRef.current !== null) {
+        window.clearTimeout(networkFeedbackDelayRef.current);
+        networkFeedbackDelayRef.current = null;
+      }
+      if (networkFeedbackRepeatRef.current !== null) {
+        window.clearInterval(networkFeedbackRepeatRef.current);
+        networkFeedbackRepeatRef.current = null;
+      }
+    }
+    return () => {
+      if (networkFeedbackDelayRef.current !== null) {
+        window.clearTimeout(networkFeedbackDelayRef.current);
+        networkFeedbackDelayRef.current = null;
+      }
+      if (networkFeedbackRepeatRef.current !== null) {
+        window.clearInterval(networkFeedbackRepeatRef.current);
+        networkFeedbackRepeatRef.current = null;
+      }
+    };
+  }, [isStreaming]);
+
   // When the active gateway has no stored key, mirror Weyland: one [SYS] line per provider (deduped).
   useEffect(() => {
     if (providerKeys[activeProvider]) return;
@@ -278,7 +356,6 @@ export default function CyberdeckPage() {
   const probeSelectedModel = useCallback(
     async (provider: string, model: string, key: string) => {
       if (!provider || !model || !key) return;
-      void satelliteConnectSequence();
       setProbeInFlightByProvider((prev) => ({ ...prev, [provider]: model }));
       setModelHealth(provider, model, "testing");
       try {
@@ -295,29 +372,31 @@ export default function CyberdeckPage() {
         };
         const failHealth = data.rateLimited ? "amber" : "grey";
         if (!res.ok || data.ok === false) {
-          playNetworkScanSound("fail");
+          const line = `MODEL_TEST ${provider.toUpperCase()}/${model}: HTTP_${data.status ?? res.status}${data.rateLimited ? " RATE_LIMIT" : " FAILURE"}`;
+          playModelTestErrorSound(line);
           setModelHealth(provider, model, failHealth);
           setMessages((prev) => [
             ...prev,
             {
               role: "system",
-              text: `MODEL_TEST ${provider.toUpperCase()}/${model}: HTTP_${data.status ?? res.status}${data.rateLimited ? " RATE_LIMIT" : " FAILURE"}`,
+              text: line,
             },
           ]);
           return;
         }
         const valid = Boolean(data.valid);
         setModelHealth(provider, model, valid ? "green" : "amber");
-        if (!valid) playNetworkScanSound("fail");
+        const line = `MODEL_TEST ${provider.toUpperCase()}/${model}: ${valid ? "VALID_RESPONSE" : "EMPTY_RESPONSE"}`;
+        playModelTestErrorSound(line);
         setMessages((prev) => [
           ...prev,
           {
             role: "system",
-            text: `MODEL_TEST ${provider.toUpperCase()}/${model}: ${valid ? "VALID_RESPONSE" : "EMPTY_RESPONSE"}`,
+            text: line,
           },
         ]);
       } catch (err) {
-        playNetworkScanSound("fail");
+        playModelTestErrorSound(`MODEL_TEST ${provider.toUpperCase()}/${model}: FAILURE`);
         setModelHealth(provider, model, "grey");
         setMessages((prev) => [
           ...prev,
@@ -333,7 +412,7 @@ export default function CyberdeckPage() {
         });
       }
     },
-    [setModelHealth],
+    [playModelTestErrorSound, setModelHealth],
   );
 
   const activateModelById = useCallback(
@@ -926,6 +1005,10 @@ export default function CyberdeckPage() {
         if (uiMatch) setGeneratedUI(uiMatch[1].trim());
       }
     } catch (err) {
+      const msg = String(err);
+      if (msg.includes("API error")) {
+        playWrongDoorShut();
+      }
       setMessages((prev) => [...prev, { role: "error", text: String(err) }]);
     } finally {
       setIsStreaming(false);
