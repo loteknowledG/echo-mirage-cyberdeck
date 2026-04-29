@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createEmptyToolRegistry, runMuthurCoreLoop } from "@/lib/muthur-core/loop";
 
 const textEncoder = new TextEncoder();
 
@@ -114,6 +115,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { message, provider, apiKey, testMode, probe, model: modelFromBody } = body;
+    const loopState = runMuthurCoreLoop(typeof message === "string" ? message : "", createEmptyToolRegistry());
+    console.debug("[muthur-core] loop step", loopState.steps[0]);
 
     // Model probe (non-stream), same contract as weyland-yutani transmit chat stream:false
     if (probe === true && provider && modelFromBody) {
