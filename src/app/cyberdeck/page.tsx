@@ -26,6 +26,14 @@ import {
 } from "@/lib/AudioEngine";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
+const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
+  opencode:
+    (process.env.NEXT_PUBLIC_OPENCODE_API_KEY ||
+      process.env.NEXT_PUBLIC_ZEN_API_KEY ||
+      "").trim(),
+  openrouter: (process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || "").trim(),
+  openai: (process.env.NEXT_PUBLIC_OPENAI_API_KEY || "").trim(),
+};
 
 const servers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
@@ -57,6 +65,65 @@ const GATEWAY_LINK_HREF: Record<string, string> = {
   "OpenRouter console": "https://openrouter.ai/workspaces/default/keys",
   "OpenCode console": "https://opencode.ai",
 };
+
+class MotherTerminal {
+  private ctx: AudioContext | null = null;
+  private burstThreshold: number;
+
+  constructor({ burstThreshold = 180 }: { burstThreshold?: number } = {}) {
+    this.burstThreshold = burstThreshold;
+  }
+
+  init() {
+    if (this.ctx || typeof window === "undefined") return;
+    const Ctx =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    this.ctx = new Ctx();
+  }
+
+  async unlock() {
+    this.init();
+    if (!this.ctx) return;
+    if (this.ctx.state === "suspended") {
+      await this.ctx.resume();
+    }
+  }
+
+  beep(freq: number, time: number, duration = 0.045, gain = 0.045) {
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+
+    osc.type = "square";
+    osc.frequency.setValueAtTime(freq, time);
+
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.linearRampToValueAtTime(gain, time + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+    osc.connect(g).connect(this.ctx.destination);
+    osc.start(time);
+    osc.stop(time + duration);
+  }
+
+  playBurstSound(charCount = 12) {
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime + 0.02;
+    const pulses = Math.min(24, Math.max(6, Math.floor(charCount / 12)));
+    for (let i = 0; i < pulses; i++) {
+      const t = now + i * 0.025;
+      const freq = 520 + Math.random() * 900;
+      this.beep(freq, t, 0.035, 0.04);
+    }
+  }
+
+  shouldBurst(text: string) {
+    return text.length >= this.burstThreshold;
+  }
+}
 
 function renderGatewayMessageText(text: string) {
   const hasGatewayLink =
@@ -91,6 +158,15 @@ function renderGatewayMessageText(text: string) {
   return text;
 }
 
+function textForSpeech(value: string) {
+  const raw = typeof value === "string" ? value : "";
+  if (!raw.trim()) return "";
+  return raw
+    .replace(/[*\/\\]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function CyberdeckPage() {
   const [server, setServer] = useState("m");
   const [input, setInput] = useState("");
@@ -107,6 +183,7 @@ export default function CyberdeckPage() {
   const [inputCursorLeft, setInputCursorLeft] = useState(0);
   const [inputCaretIndex, setInputCaretIndex] = useState(0);
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
 
   const [activeProvider, setActiveProvider] = useState<string>("opencode");
   /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
@@ -149,6 +226,13 @@ export default function CyberdeckPage() {
   const gatewayConnectionPanelRef = useRef<HTMLDivElement>(null);
   const cyberdeckRootRef = useRef<HTMLDivElement>(null);
   const chatAbortRef = useRef<AbortController | null>(null);
+  const lastSpokenAssistantTextRef = useRef<string>("");
+  const speakQueueActiveRef = useRef(false);
+  const lastVoiceErrorRef = useRef<string>("");
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const activeSourceNodesRef = useRef<AudioBufferSourceNode[]>([]);
+  const motherMasterGainRef = useRef<GainNode | null>(null);
+  const motherTerminalRef = useRef(new MotherTerminal({ burstThreshold: 180 }));
   const networkFeedbackDelayRef = useRef<number | null>(null);
   const networkFeedbackRepeatRef = useRef<number | null>(null);
   const chatSonarDelayRef = useRef<number | null>(null);
@@ -233,6 +317,250 @@ export default function CyberdeckPage() {
     }
   }, []);
 
+  const splitMiragePhrases = useCallback((text: string) => {
+    return text
+      .replace(/\s+/g, " ")
+      .replace(/([,;:])\s*/g, "$1 ")
+      .trim()
+      .split(/(?<=[.!?])\s+|(?<=\u2026)\s+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }, []);
+
+  const stopMirageAudio = useCallback(() => {
+    activeSourceNodesRef.current.forEach((source) => {
+      try {
+        source.stop();
+      } catch {
+        /* ignore */
+      }
+    });
+    activeSourceNodesRef.current = [];
+    speakQueueActiveRef.current = false;
+  }, []);
+
+  const getBrowserVoices = useCallback(async () => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return [];
+    const synth = window.speechSynthesis;
+    let voices = synth.getVoices();
+    if (voices.length > 0) return voices;
+    await new Promise<void>((resolve) => {
+      const timeout = window.setTimeout(resolve, 350);
+      const onVoices = () => {
+        window.clearTimeout(timeout);
+        synth.removeEventListener("voiceschanged", onVoices);
+        resolve();
+      };
+      synth.addEventListener("voiceschanged", onVoices, { once: true });
+    });
+    voices = synth.getVoices();
+    return voices;
+  }, []);
+
+  const playMirageBuffer = useCallback(async (arrayBuffer: ArrayBuffer) => {
+    if (typeof window === "undefined") return false;
+    const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return false;
+
+    const ctx = audioContextRef.current ?? new Ctx();
+    audioContextRef.current = ctx;
+    if (ctx.state === "suspended") {
+      await ctx.resume();
+    }
+
+    const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    const source = ctx.createBufferSource();
+    source.buffer = decoded;
+
+    const dryGain = ctx.createGain();
+    dryGain.gain.value = 0.92;
+
+    const delay = ctx.createDelay();
+    delay.delayTime.value = 0.08;
+    const echoGain = ctx.createGain();
+    echoGain.gain.value = 0.22;
+    delay.connect(echoGain);
+
+    const splitter = ctx.createChannelSplitter(2);
+    const merger = ctx.createChannelMerger(2);
+    const leftGain = ctx.createGain();
+    const rightGain = ctx.createGain();
+    leftGain.gain.value = 1.06;
+    rightGain.gain.value = 1.06;
+
+    source.connect(dryGain);
+    dryGain.connect(splitter);
+    splitter.connect(leftGain, 0);
+    splitter.connect(rightGain, 1);
+    leftGain.connect(merger, 0, 0);
+    rightGain.connect(merger, 0, 1);
+
+    source.connect(delay);
+
+    merger.connect(ctx.destination);
+    echoGain.connect(ctx.destination);
+
+    activeSourceNodesRef.current.push(source);
+    source.start(0);
+
+    await new Promise<void>((resolve) => {
+      source.onended = () => {
+        activeSourceNodesRef.current = activeSourceNodesRef.current.filter((s) => s !== source);
+        resolve();
+      };
+    });
+    return true;
+  }, []);
+
+  const initMotherAudio = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    const Ctx =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return null;
+
+    const ctx = audioContextRef.current ?? new Ctx();
+    audioContextRef.current = ctx;
+    if (!motherMasterGainRef.current) {
+      const master = ctx.createGain();
+      master.gain.value = 0.35;
+      master.connect(ctx.destination);
+      motherMasterGainRef.current = master;
+    }
+    return ctx;
+  }, []);
+
+  const unlockMotherAudio = useCallback(async () => {
+    const ctx = initMotherAudio();
+    if (!ctx) return null;
+    if (ctx.state === "suspended") {
+      await ctx.resume();
+    }
+    return ctx;
+  }, [initMotherAudio]);
+
+  const motherTone = useCallback(
+    (freq: number, time: number, duration: number, gain = 0.04, type: OscillatorType = "sine") => {
+      const ctx = audioContextRef.current;
+      const master = motherMasterGainRef.current;
+      if (!ctx || !master) return;
+
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, time);
+
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(gain, time + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+      osc.connect(g);
+      g.connect(master);
+      osc.start(time);
+      osc.stop(time + duration + 0.05);
+    },
+    [],
+  );
+
+  const motherReverbTail = useCallback(
+    (time: number) => {
+      motherTone(220, time, 1.2, 0.025, "sine");
+      motherTone(330, time + 0.08, 1.4, 0.018, "sine");
+      motherTone(440, time + 0.16, 1.6, 0.012, "triangle");
+    },
+    [motherTone],
+  );
+
+  const synthesizeMirageChunk = useCallback(async (text: string) => {
+    const res = await fetch("/api/cyberdeck-voice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        apiKey: providerKeys.openai || "",
+      }),
+    });
+    if (!res.ok) {
+      if (lastVoiceErrorRef.current !== String(res.status)) {
+        lastVoiceErrorRef.current = String(res.status);
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: `VOICE_ENDPOINT_UNAVAILABLE // HTTP_${res.status} // USING_LOCAL_FALLBACK` },
+        ]);
+      }
+      return null;
+    }
+    lastVoiceErrorRef.current = "";
+    return res.arrayBuffer();
+  }, [providerKeys.openai]);
+
+  const speakInBrowser = useCallback((text: string, profile?: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+    if (!text.trim()) return false;
+    try {
+      const synth = window.speechSynthesis;
+      const utterance = new SpeechSynthesisUtterance(text);
+      const normalizedProfile = (profile || "").toLowerCase();
+      const wantsMuthur = normalizedProfile === "muthur";
+      const voices = synth.getVoices();
+      const preferred = voices.find((voice) => {
+        const name = voice.name.toLowerCase();
+        if (wantsMuthur) {
+          return (
+            name.includes("aria") ||
+            name.includes("jenny") ||
+            name.includes("jeeny") ||
+            name.includes("zira") ||
+            name.includes("susan") ||
+            name.includes("sonia") ||
+            name.includes("female")
+          );
+        }
+        return name.includes("jenny");
+      });
+
+      if (preferred) {
+        utterance.voice = preferred;
+      }
+      utterance.lang = preferred?.lang || "en-US";
+      utterance.rate = wantsMuthur ? 0.78 : 1;
+      utterance.pitch = wantsMuthur ? 0.82 : 1;
+      utterance.volume = wantsMuthur ? 0.85 : 1;
+
+      void unlockMotherAudio().then((ctx) => {
+        if (!ctx) return;
+        motherReverbTail(ctx.currentTime + 0.02);
+      });
+      utterance.addEventListener("end", () => {
+        const ctx = audioContextRef.current;
+        if (!ctx) return;
+        motherReverbTail(ctx.currentTime + 0.02);
+      });
+
+      synth.cancel();
+      synth.speak(utterance);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [motherReverbTail, unlockMotherAudio]);
+
+  const speakMother = useCallback(async (text: string) => {
+    const spoken = speakInBrowser(text, "muthur");
+    if (spoken) return true;
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, profile: "muthur" }),
+      });
+      if (res.ok) return true;
+    } catch {
+      /* fall through */
+    }
+    return false;
+  }, [speakInBrowser]);
+
   const selectProvider = useCallback((id: string) => {
     setActiveProvider(id);
     try {
@@ -290,8 +618,10 @@ export default function CyberdeckPage() {
   useEffect(() => {
     const nextKeys: Record<string, string> = {};
     for (const id of PROVIDER_IDS) {
-      const v = localStorage.getItem(`key_${id}`);
-      if (v) nextKeys[id] = v;
+      const stored = localStorage.getItem(`key_${id}`);
+      const fallback = DEFAULT_CLIENT_PROVIDER_KEYS[id] || "";
+      const value = (stored || fallback || "").trim();
+      if (value) nextKeys[id] = value;
     }
     setProviderKeys(nextKeys);
     const ap = localStorage.getItem("active_provider");
@@ -997,6 +1327,24 @@ export default function CyberdeckPage() {
   }, [activeProvider, probeSelectedModel, providerKeys]);
 
   useEffect(() => {
+    if (!voiceEnabled || isStreaming) return;
+    if (!messages || messages.length === 0) return;
+    const latest = messages[messages.length - 1];
+    if (!latest || latest.role !== "assistant") return;
+    if (latest.text === lastSpokenAssistantTextRef.current) return;
+    if (/^Working on that request\b/i.test(latest.text.trim())) return;
+    lastSpokenAssistantTextRef.current = latest.text;
+    const speechText = textForSpeech(latest.text);
+    if (!speechText) return;
+    if (motherTerminalRef.current.shouldBurst(speechText)) {
+      void motherTerminalRef.current.unlock().then(() => {
+        motherTerminalRef.current.playBurstSound(speechText.length);
+      });
+    }
+    void speakMother(speechText);
+  }, [isStreaming, messages, speakMother, voiceEnabled]);
+
+  useEffect(() => {
     let unlocked = false;
     const unlock = () => {
       if (unlocked) return;
@@ -1420,6 +1768,63 @@ export default function CyberdeckPage() {
                     {isStreaming ? "STREAMING" : ""}
                   </button>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVoiceEnabled((prev) => {
+                          const next = !prev;
+                          if (next) {
+                            void speakMother("Mother online. Signal stable.");
+                          } else {
+                            stopMirageAudio();
+                          }
+                          return next;
+                        });
+                      }}
+                      aria-label={voiceEnabled ? "Voice on" : "Voice off"}
+                      title={voiceEnabled ? "Voice on" : "Voice off"}
+                      className={`rounded border px-2 py-1 text-[10px] font-mono transition ${
+                        voiceEnabled
+                          ? "border-emerald-600 text-emerald-300 hover:border-emerald-500"
+                          : "border-gray-700 text-gray-400 hover:border-gray-500"
+                      }`}
+                    >
+                      {voiceEnabled ? (
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
+                          <path
+                            d="M5 10V14H8L12 18V6L8 10H5Z"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M16 9C16.9 9.7 17.5 10.8 17.5 12C17.5 13.2 16.9 14.3 16 15"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d="M18.5 7C20 8.3 21 10.1 21 12C21 13.9 20 15.7 18.5 17"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
+                          <path
+                            d="M5 10V14H8L12 18V6L8 10H5Z"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path d="M15 9L21 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                          <path d="M21 9L15 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                        </svg>
+                      )}
+                    </button>
                     {!isStreaming ? (
                       <button
                         type="button"

@@ -88,7 +88,7 @@ const CHAT_URL: Record<string, string> = {
 };
 
 const DEFAULT_PROVIDER_KEY_ENV: Record<string, string | undefined> = {
-  opencode: process.env.OPENCODE_API_KEY,
+  opencode: process.env.OPENCODE_API_KEY || process.env.ZEN_API_KEY || process.env.NEXT_PUBLIC_ZEN_API_KEY,
   openai: process.env.OPENAI_API_KEY,
   openrouter: process.env.OPENROUTER_API_KEY,
 };
@@ -321,7 +321,7 @@ export async function POST(request: Request) {
     }
 
     // Get API config from env or default to opencode
-    const envApiKey = process.env.OPENCODE_API_KEY || "";
+    const envApiKey = process.env.OPENCODE_API_KEY || process.env.ZEN_API_KEY || process.env.NEXT_PUBLIC_ZEN_API_KEY || "";
     const model = process.env.OPENCODE_MODEL || "trinity-large-preview-free";
     const endpoint = "https://opencode.ai/zen/v1/chat/completions";
 
