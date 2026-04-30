@@ -23,7 +23,7 @@ function getOutputNode() {
 
     masterGainNode = ctx.createGain();
     // Final stage loudness boost so every synth/noise effect is louder.
-    masterGainNode.gain.value = 4.6;
+    masterGainNode.gain.value = 6.2;
 
     masterCompressorNode.connect(masterGainNode);
     masterGainNode.connect(ctx.destination);
@@ -351,7 +351,7 @@ export function playNavigationSound(variant = "step") {
       freqEnd: rand(880, 1050),
       duration: rand(0.048, 0.068),
       type: "triangle",
-      volume: rand(0.08, 0.11),
+      volume: rand(0.12, 0.16),
     });
     return;
   }
@@ -361,13 +361,13 @@ export function playNavigationSound(variant = "step") {
       freqEnd: rand(280, 380),
       duration: rand(0.052, 0.072),
       type: "triangle",
-      volume: rand(0.07, 0.1),
+      volume: rand(0.11, 0.15),
     });
     return;
   }
   playNoiseClick({
     duration: rand(0.012, 0.02),
-    volume: rand(0.045, 0.07),
+    volume: rand(0.075, 0.11),
     filterFreq: rand(2200, 3400),
   });
 }

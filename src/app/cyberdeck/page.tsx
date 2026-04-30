@@ -1360,7 +1360,7 @@ export default function CyberdeckPage() {
 
     const unbind = bindKeyboardSfx(window, {
       mode: "cyberdeck",
-      volume: 1.08,
+      volume: 1.25,
     });
 
     return () => {
@@ -1423,7 +1423,22 @@ export default function CyberdeckPage() {
         }),
       });
 
-      if (!res.ok) throw new Error("API error");
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const ct = res.headers.get("content-type") || "";
+          if (ct.includes("application/json")) {
+            const payload = (await res.json()) as { error?: string; message?: string };
+            detail = String(payload?.error || payload?.message || "").trim();
+          } else {
+            detail = (await res.text()).trim();
+          }
+        } catch {
+          /* ignore parse errors */
+        }
+        const statusLine = `API error ${res.status}`;
+        throw new Error(detail ? `${statusLine}: ${detail}` : statusLine);
+      }
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -1491,6 +1506,21 @@ export default function CyberdeckPage() {
       }
       if (msg.includes("API error")) {
         playWrongDoorShut();
+        const status = msg.match(/API error\s+(\d{3})/i)?.[1] || "UNKNOWN";
+        const modelLabel = modelID || "UNSET_MODEL";
+        const hint =
+          status === "401" || status === "403"
+            ? "CHECK_API_KEY"
+            : status === "429"
+              ? "RATE_LIMIT_WAIT_AND_RETRY"
+              : "CHECK_PROVIDER_MODEL_OR_NETWORK";
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: `API_FAILURE // ${activeProvider.toUpperCase()} / ${modelLabel} // HTTP_${status} // ${hint}`,
+          },
+        ]);
       }
       setMessages((prev) => [...prev, { role: "error", text: String(err) }]);
     } finally {
@@ -1646,14 +1676,23 @@ export default function CyberdeckPage() {
               className="cyberdeck-chat-content custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
             >
               <div className="message-log flex-1 space-y-3">
-                {messages.map((m, i) => (
-                  <div
-                    key={i}
-                    data-chat-row={i}
-                    className={`nav-row py-1 text-xs ${
-                      chatKeyboardHighlightIndex === i ? "nav-row-kb-hover" : ""
-                    }`}
-                  >
+                {messages.map((m, i) => {
+                  const isModelConnectedLine =
+                    m.role === "system" && typeof m.text === "string" && m.text.includes("MODEL_CONNECTED");
+                  const isSystemFailureLine =
+                    m.role === "system" &&
+                    typeof m.text === "string" &&
+                    /(FAILURE|FAILUER|FAILED|INVALID_KEY|AUTH_REJECTED|UPLINK_ERROR|ERROR|HTTP_[45]\d{2}|EMPTY_RESPONSE)/.test(
+                      m.text,
+                    );
+                  return (
+                    <div
+                      key={i}
+                      data-chat-row={i}
+                      className={`nav-row py-1 text-xs ${
+                        chatKeyboardHighlightIndex === i ? "nav-row-kb-hover" : ""
+                      }`}
+                    >
                     <span
                       className={
                         m.role === "user"
@@ -1661,7 +1700,11 @@ export default function CyberdeckPage() {
                           : m.role === "assistant"
                             ? "text-green-400"
                             : m.role === "system"
-                              ? "text-amber-400/90"
+                              ? isModelConnectedLine
+                                ? "text-green-400"
+                                : isSystemFailureLine
+                                  ? "text-red-400"
+                                  : "text-amber-400/90"
                               : "text-red-400"
                       }
                     >
@@ -1675,7 +1718,15 @@ export default function CyberdeckPage() {
                             : "ERR"}
                       ]{" "}
                     </span>
-                    <span className="text-gray-300">
+                    <span
+                      className={
+                        isModelConnectedLine
+                          ? "text-green-300"
+                          : isSystemFailureLine
+                            ? "text-red-300"
+                            : "text-gray-300"
+                      }
+                    >
                       {m.role === "system" ? (
                         <span className="whitespace-pre-wrap">{renderGatewayMessageText(m.text)}</span>
                       ) : (
@@ -1683,7 +1734,8 @@ export default function CyberdeckPage() {
                       )}
                     </span>
                   </div>
-                ))}
+                  );
+                })}
                 {streamText && (
                   <div
                     data-chat-row={messages.length}
@@ -1783,11 +1835,14 @@ export default function CyberdeckPage() {
                       }}
                       aria-label={voiceEnabled ? "Voice on" : "Voice off"}
                       title={voiceEnabled ? "Voice on" : "Voice off"}
-                      className={`rounded border px-2 py-1 text-[10px] font-mono transition ${
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-sm border text-[10px] font-mono transition ${
                         voiceEnabled
-                          ? "border-emerald-600 text-emerald-300 hover:border-emerald-500"
-                          : "border-gray-700 text-gray-400 hover:border-gray-500"
+                          ? "border-emerald-500/80 bg-emerald-500/10 text-emerald-300 shadow-[0_0_0_1px_rgba(16,185,129,0.24)_inset,0_0_10px_rgba(16,185,129,0.12)]"
+                          : "border-gray-700 bg-black text-gray-400 hover:border-gray-500"
                       }`}
+                      style={{
+                        transform: voiceEnabled ? "translateY(1px)" : "translateY(0)",
+                      }}
                     >
                       {voiceEnabled ? (
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
@@ -1832,9 +1887,16 @@ export default function CyberdeckPage() {
                         disabled={!input.trim()}
                         aria-label="Send"
                         title="Send"
-                        className="inline-flex h-7 w-7 items-center justify-center rounded border border-green-700 text-green-300 transition hover:border-green-500 hover:text-green-200 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-[6px] border border-emerald-700/80 bg-black text-emerald-300 origin-center shadow-[0_0_0_1px_rgba(16,185,129,0.16)_inset,0_3px_10px_rgba(0,0,0,0.5)] transition-[transform,box-shadow,background-color,border-color,color] duration-150 ease-out hover:-translate-y-px hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-200 active:translate-y-px active:scale-[0.98] active:ease-in active:shadow-[0_0_0_1px_rgba(16,185,129,0.18)_inset,0_1px_4px_rgba(0,0,0,0.55)] disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" aria-hidden="true">
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="16"
+                          height="16"
+                          fill="none"
+                          aria-hidden="true"
+                          className="h-4 w-4 shrink-0 transform-none transition-[color,opacity] duration-150 ease-out"
+                        >
                           <path
                             d="M3 11.5L20.5 3.5L13.5 20.5L11.2 13.8L3 11.5Z"
                             stroke="currentColor"

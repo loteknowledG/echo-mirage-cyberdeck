@@ -5,12 +5,7 @@ import { Mrs_Saint_Delafield, Satisfy } from 'next/font/google';
 import './globals.css';
 
 import { ThemeProvider } from '@/components/providers/theme-provider';
-// Register service worker for PWA
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
-}
+import { ChunkReload } from '@/components/providers/chunk-reload';
 
 const SignatureScript = Mrs_Saint_Delafield({
   subsets: ['latin'],
@@ -46,6 +41,7 @@ export default async function RootLayout({
       >
         <ThemeProvider attribute="class" forcedTheme="dark">
           <div className="app-min-width-wrapper min-h-screen bg-background">
+            <ChunkReload />
             {children}
             <script suppressHydrationWarning={true} />
           </div>
