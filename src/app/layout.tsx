@@ -22,8 +22,11 @@ const SatisfyScript = Satisfy({
 });
 
 export const metadata: Metadata = {
-  title: "Echo Mirage Cyberdeck",
-  description: "AI-first hacker terminal",
+  title: {
+    default: "Echo Mirage Cyberdeck",
+    template: "%s · Echo Mirage Cyberdeck",
+  },
+  description: "A floating, voice-locked cyberdeck for operators, agents, and live AI control.",
 };
 
 export default async function RootLayout({

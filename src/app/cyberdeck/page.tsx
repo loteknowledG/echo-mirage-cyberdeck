@@ -27,8 +27,8 @@ import {
 import { applyMuthurEffectChain } from "@/voice/effectsChain";
 import { MUTHUR_PRESET } from "@/voice/muthurPreset";
 import { speakDryFallback } from "@/voice/speakMuthur";
-
-type VoiceHealthState = "idle" | "backend" | "fallback" | "off";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -43,7 +43,7 @@ const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
 const servers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
-  { id: "b", glyph: "§", label: "SAMUS-MANUS" },
+  { id: "b", glyph: "§", label: "SETTINGS" },
 ] as const;
 
 const SERVER_IDS = servers.map((s) => s.id);
@@ -70,6 +70,79 @@ const GATEWAY_LINK_HREF: Record<string, string> = {
   "OpenRouter console": "https://openrouter.ai/workspaces/default/keys",
   "OpenCode console": "https://opencode.ai",
 };
+
+type DroppedOperatorAsset = {
+  kind: "text" | "code" | "markdown" | "image" | "video" | "file";
+  name: string;
+  mimeType: string;
+  size: number;
+  text?: string;
+};
+
+const EDITABLE_TEXT_EXTENSIONS = [
+  ".md",
+  ".markdown",
+  ".txt",
+  ".json",
+  ".jsonc",
+  ".js",
+  ".jsx",
+  ".ts",
+  ".tsx",
+  ".mjs",
+  ".cjs",
+  ".css",
+  ".html",
+  ".htm",
+  ".xml",
+  ".yaml",
+  ".yml",
+  ".toml",
+  ".ini",
+  ".env",
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".py",
+  ".go",
+  ".rs",
+  ".java",
+  ".c",
+  ".cpp",
+  ".h",
+  ".hpp",
+  ".sql",
+  ".csv",
+  ".tsv",
+  ".log",
+];
+
+function isEditableOperatorFile(file: File) {
+  const lowerName = file.name.toLowerCase();
+  const lowerType = (file.type || "").toLowerCase();
+  return (
+    lowerType.startsWith("text/") ||
+    lowerType === "application/json" ||
+    lowerType === "application/xml" ||
+    lowerType === "application/javascript" ||
+    lowerType === "application/typescript" ||
+    lowerType === "application/x-yaml" ||
+    EDITABLE_TEXT_EXTENSIONS.some((ext) => lowerName.endsWith(ext))
+  );
+}
+
+function getOperatorFileKind(file: File): DroppedOperatorAsset["kind"] {
+  const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith(".md") || lowerName.endsWith(".markdown") || file.type === "text/markdown") {
+    return "markdown";
+  }
+  if (isEditableOperatorFile(file)) {
+    return "code";
+  }
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type.startsWith("video/")) return "video";
+  return "file";
+}
 
 class MotherTerminal {
   private ctx: AudioContext | null = null;
@@ -173,7 +246,8 @@ function textForSpeech(value: string) {
 }
 
 export default function CyberdeckPage() {
-  const [server, setServer] = useState("m");
+  // Start on the operator tab; disconnected users are redirected to MAINNET-UPLINK after hydration.
+  const [server, setServer] = useState<(typeof SERVER_IDS)[number]>("m");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -181,6 +255,9 @@ export default function CyberdeckPage() {
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
+  const [operatorDroppedAsset, setOperatorDroppedAsset] = useState<DroppedOperatorAsset | null>(null);
+  const [operatorDocMode, setOperatorDocMode] = useState<"view" | "edit">("view");
+  const [operatorDocNameDraft, setOperatorDocNameDraft] = useState("");
   const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
@@ -189,17 +266,18 @@ export default function CyberdeckPage() {
   const [inputCaretIndex, setInputCaretIndex] = useState(0);
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [voiceHealth, setVoiceHealth] = useState<VoiceHealthState>("idle");
+  const [voiceHealth, setVoiceHealth] = useState<"idle" | "backend" | "fallback" | "off">("idle");
 
   const [activeProvider, setActiveProvider] = useState<string>("opencode");
   /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
   const [providerKeyboardHighlightId, setProviderKeyboardHighlightId] = useState<string | null>(null);
   /** Escape from gateway → tab rail; Escape from tab rail → gateway. Arrows move highlight while on rail. */
   const [navRailContext, setNavRailContext] = useState<"gateway" | "tabs">("gateway");
-  const [serverKeyboardHighlightId, setServerKeyboardHighlightId] = useState<string | null>(null);
+  const [serverKeyboardHighlightId, setServerKeyboardHighlightId] = useState<(typeof SERVER_IDS)[number] | null>(null);
   /** Gateway column: keyboard highlight on model rows (arrows move providers + models as one column). */
   const [modelKeyboardHighlightId, setModelKeyboardHighlightId] = useState<string | null>(null);
   const [providerKeys, setProviderKeys] = useState<Record<string, string>>({});
+  const [didHydrateProviderState, setDidHydrateProviderState] = useState(false);
   const [defaultKeyAvailableByProvider, setDefaultKeyAvailableByProvider] = useState<Record<string, boolean>>({
     opencode: false,
     openrouter: false,
@@ -234,19 +312,22 @@ export default function CyberdeckPage() {
   const chatAbortRef = useRef<AbortController | null>(null);
   const lastSpokenAssistantTextRef = useRef<string>("");
   const speakQueueActiveRef = useRef(false);
+  const speakSequenceRef = useRef(0);
   const lastVoiceErrorRef = useRef<string>("");
   const audioContextRef = useRef<AudioContext | null>(null);
   const activeSourceNodesRef = useRef<AudioBufferSourceNode[]>([]);
   const motherMasterGainRef = useRef<GainNode | null>(null);
   const motherTerminalRef = useRef(new MotherTerminal({ burstThreshold: 180 }));
+  const operatorEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  const operatorNameInputRef = useRef<HTMLInputElement | null>(null);
   const networkFeedbackDelayRef = useRef<number | null>(null);
   const networkFeedbackRepeatRef = useRef<number | null>(null);
   const chatSonarDelayRef = useRef<number | null>(null);
   const chatSonarActiveRef = useRef(false);
   const offlineAutoOpenedRef = useRef(false);
+  const startupRailResolvedRef = useRef(false);
   const prevConnectionStateRef = useRef<"offline" | "connecting" | "connected">("offline");
   const serverRef = useRef(server);
-  serverRef.current = server;
   /** Forward Tab from message box cycles: gateway (right) → rail (left) → chat log (col2) → … */
   const deckTabNextRef = useRef<"gateway" | "rail" | "chatlog">("gateway");
   const prevNavRailRef = useRef<"gateway" | "tabs">("gateway");
@@ -290,6 +371,9 @@ export default function CyberdeckPage() {
     : isConnected
       ? "connected"
       : "offline";
+  const showGatewayPanel = server === "s";
+  const railServer = server;
+  serverRef.current = server;
 
   const inactiveTextColor = "#7a7a7a";
   const inactiveSubtleTextColor = "#6a6a6a";
@@ -478,7 +562,20 @@ export default function CyberdeckPage() {
     if (isJson) {
       const diagnostic = await res.json().catch(() => null);
       if (diagnostic && typeof diagnostic === "object") {
-        console.error("[muthur] render diagnostic", diagnostic);
+        const diagnosticRecord = diagnostic as Record<string, unknown>;
+        const diagnosticKeys = Object.keys(diagnosticRecord);
+        if (diagnosticKeys.length === 0) {
+          console.warn("[muthur] render diagnostic", {
+            status: res.status,
+            note: "empty-json",
+          });
+          if (lastVoiceErrorRef.current !== `empty:${res.status}`) {
+            lastVoiceErrorRef.current = `empty:${res.status}`;
+          }
+          return { kind: "diagnostic" as const, diagnostic: null };
+        }
+
+        console.warn("[muthur] render diagnostic", diagnosticRecord);
         const stage = typeof (diagnostic as { stage?: unknown }).stage === "string"
           ? (diagnostic as { stage: string }).stage
           : "unknown";
@@ -567,11 +664,24 @@ export default function CyberdeckPage() {
   }, [motherReverbTail, unlockMotherAudio]);
 
   const speakMother = useCallback(async (text: string) => {
+    const speakId = ++speakSequenceRef.current;
+    speakQueueActiveRef.current = true;
+    stopMirageAudio();
+    try {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    } catch {
+      /* ignore */
+    }
+
     try {
       const result = await synthesizeMirageChunk(text);
+      if (speakId !== speakSequenceRef.current) return false;
       if (result.kind === "audio") {
         setVoiceHealth("backend");
         await playMirageBuffer(result.audio);
+        if (speakId !== speakSequenceRef.current) return false;
         return true;
       }
       setVoiceHealth("fallback");
@@ -581,13 +691,67 @@ export default function CyberdeckPage() {
     try {
       setVoiceHealth("fallback");
       await speakDryFallback(text);
+      if (speakId !== speakSequenceRef.current) return false;
       return true;
     } catch {
       setVoiceHealth("off");
       /* fall through */
+    } finally {
+      if (speakId === speakSequenceRef.current) {
+        speakQueueActiveRef.current = false;
+      }
     }
     return false;
-  }, [playMirageBuffer, speakDryFallback, synthesizeMirageChunk]);
+  }, [playMirageBuffer, speakDryFallback, stopMirageAudio, synthesizeMirageChunk]);
+
+  const voiceButtonClassName = !voiceEnabled || voiceHealth === "off"
+    ? "border-gray-700 bg-black text-gray-400 hover:border-gray-500"
+    : voiceHealth === "backend"
+      ? "border-emerald-500/90 bg-emerald-500/10 text-emerald-200 shadow-[0_0_0_1px_rgba(16,185,129,0.30)_inset,0_0_14px_rgba(16,185,129,0.22),0_3px_10px_rgba(0,0,0,0.5)]"
+      : voiceHealth === "fallback"
+        ? "border-amber-500/80 bg-amber-500/10 text-amber-300 shadow-[0_0_0_1px_rgba(245,158,11,0.20)_inset,0_0_12px_rgba(245,158,11,0.12),0_3px_10px_rgba(0,0,0,0.5)]"
+        : "border-emerald-700/80 bg-black text-emerald-300 shadow-[0_0_0_1px_rgba(16,185,129,0.16)_inset,0_3px_10px_rgba(0,0,0,0.5)]";
+
+  const voiceButtonTransform = !voiceEnabled || voiceHealth === "off"
+    ? "translateY(0)"
+    : voiceHealth === "backend"
+      ? "translateY(-1px)"
+      : "translateY(0)";
+
+  const operatorSurfaceIsDocument =
+    operatorDroppedAsset?.kind === "text" ||
+    operatorDroppedAsset?.kind === "code" ||
+    operatorDroppedAsset?.kind === "markdown";
+
+  useEffect(() => {
+    setOperatorDocNameDraft(operatorDroppedAsset?.name || "");
+  }, [operatorDroppedAsset?.name]);
+
+  useLayoutEffect(() => {
+    if (!operatorSurfaceIsDocument || operatorDocMode !== "edit") return;
+    const el = operatorEditorRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [operatorDocMode, operatorDroppedAsset?.text, operatorSurfaceIsDocument]);
+
+  useEffect(() => {
+    if (!operatorSurfaceIsDocument || operatorDocMode !== "edit") return;
+    operatorNameInputRef.current?.focus({ preventScroll: true });
+    operatorNameInputRef.current?.select();
+  }, [operatorDocMode, operatorSurfaceIsDocument]);
+
+  const commitOperatorDocName = useCallback(() => {
+    if (!operatorDroppedAsset) return;
+    const nextName = operatorDocNameDraft.trim();
+    if (!nextName) {
+      setOperatorDocNameDraft(operatorDroppedAsset.name);
+      return;
+    }
+    if (nextName === operatorDroppedAsset.name) return;
+    setOperatorDroppedAsset((prev) => (prev ? { ...prev, name: nextName } : prev));
+    setOperatorDocNameDraft(nextName);
+  }, [operatorDocNameDraft, operatorDroppedAsset]);
 
   const selectProvider = useCallback((id: string) => {
     setActiveProvider(id);
@@ -599,7 +763,7 @@ export default function CyberdeckPage() {
     playSystemSound("chirp", 0.05);
   }, []);
 
-  const handleServerClick = useCallback((id: string) => {
+  const handleServerClick = useCallback((id: (typeof SERVER_IDS)[number]) => {
     if (server !== id) {
       setServer(id);
       playSystemSound("chirp");
@@ -662,6 +826,7 @@ export default function CyberdeckPage() {
       }
       return n;
     });
+    setDidHydrateProviderState(true);
   }, []);
 
   useEffect(() => {
@@ -1021,9 +1186,9 @@ export default function CyberdeckPage() {
 
       if (navRailContext === "tabs") {
         if (inRail) {
-          const sids: string[] = [...SERVER_IDS];
+          const sids: (typeof SERVER_IDS)[number][] = [...SERVER_IDS];
           const sPivot =
-            serverKeyboardHighlightId ?? (sids.includes(server) ? server : sids[0]);
+            serverKeyboardHighlightId ?? (sids.includes(railServer) ? railServer : sids[0]);
           let sidx = sids.indexOf(sPivot);
           if (sidx < 0) sidx = 0;
 
@@ -1356,6 +1521,7 @@ export default function CyberdeckPage() {
 
   useEffect(() => {
     if (!voiceEnabled || isStreaming) return;
+    if (speakQueueActiveRef.current) return;
     if (!messages || messages.length === 0) return;
     const latest = messages[messages.length - 1];
     if (!latest || latest.role !== "assistant") return;
@@ -1563,6 +1729,7 @@ export default function CyberdeckPage() {
   }, [isStreaming]);
 
   const handleModelLabelClick = useCallback(() => {
+    setServer("s");
     setNavRailContext("gateway");
     setServerKeyboardHighlightId(null);
     setProviderKeyboardHighlightId(activeProvider);
@@ -1570,6 +1737,20 @@ export default function CyberdeckPage() {
     gatewayColumnRef.current?.focus({ preventScroll: true });
     gatewayConnectionPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [activeProvider, modelID]);
+
+  useEffect(() => {
+    if (!didHydrateProviderState || startupRailResolvedRef.current) return;
+    if (hasProviderAuth) {
+      setServer("m");
+      startupRailResolvedRef.current = true;
+      return;
+    }
+    if (connectionState === "offline") {
+      handleModelLabelClick();
+      offlineAutoOpenedRef.current = true;
+      startupRailResolvedRef.current = true;
+    }
+  }, [connectionState, didHydrateProviderState, handleModelLabelClick, hasProviderAuth]);
 
   useEffect(() => {
     const prevState = prevConnectionStateRef.current;
@@ -1585,7 +1766,7 @@ export default function CyberdeckPage() {
       });
     }
 
-    if (connectionState === "offline" && !offlineAutoOpenedRef.current) {
+    if (didHydrateProviderState && connectionState === "offline" && !offlineAutoOpenedRef.current && !hasProviderAuth) {
       handleModelLabelClick();
       offlineAutoOpenedRef.current = true;
       return;
@@ -1593,34 +1774,87 @@ export default function CyberdeckPage() {
     if (connectionState !== "offline") {
       offlineAutoOpenedRef.current = false;
     }
-  }, [activeProvider, connectionState, handleModelLabelClick, modelID]);
+  }, [activeProvider, connectionState, didHydrateProviderState, handleModelLabelClick, hasProviderAuth, modelID]);
 
-  const handleGatewayDragOver = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
+  const handleThirdColumnDragOver = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
+    if (serverRef.current !== "m" && serverRef.current !== "s") return;
     e.preventDefault();
     setIsMarkdownDragOver(true);
   }, []);
 
-  const handleGatewayDragLeave = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
+  const handleThirdColumnDragLeave = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     setIsMarkdownDragOver(false);
   }, []);
 
-  const handleGatewayDrop = useCallback(async (e: ReactDragEvent<HTMLDivElement>) => {
+  const handleThirdColumnDrop = useCallback(async (e: ReactDragEvent<HTMLDivElement>) => {
+    const activeServer = serverRef.current;
+    if (activeServer !== "m" && activeServer !== "s") return;
+
     e.preventDefault();
     setIsMarkdownDragOver(false);
+
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
-    const looksMarkdown =
-      file.name.toLowerCase().endsWith(".md") ||
-      file.type === "text/markdown" ||
-      file.type === "text/plain";
-    if (!looksMarkdown) return;
-    try {
-      const text = await file.text();
-      setDroppedMarkdown(text);
-      setDroppedMarkdownName(file.name);
-    } catch {
-      // ignore failed file read
+
+    if (activeServer === "s") {
+      const looksText = isEditableOperatorFile(file) || file.type === "text/markdown";
+      if (!looksText) return;
+      try {
+        const text = await file.text();
+        setDroppedMarkdown(text);
+        setDroppedMarkdownName(file.name);
+      } catch {
+        // ignore failed file read
+      }
+      return;
+    }
+
+    if (activeServer === "m") {
+      const kind = getOperatorFileKind(file);
+      const isTextLike = kind === "markdown" || kind === "code" || kind === "text";
+
+      if (isTextLike) {
+        try {
+          const text = await file.text();
+          setOperatorDroppedAsset({
+            kind,
+            name: file.name,
+            mimeType: file.type || "text/plain",
+            size: file.size,
+            text,
+          });
+          setOperatorDocMode("view");
+        } catch {
+          setOperatorDroppedAsset({
+            kind,
+            name: file.name,
+            mimeType: file.type || "text/plain",
+            size: file.size,
+          });
+          setOperatorDocMode("view");
+        }
+        return;
+      }
+
+      if (kind === "image" || kind === "video") {
+        setOperatorDroppedAsset({
+          kind,
+          name: file.name,
+          mimeType: file.type || "application/octet-stream",
+          size: file.size,
+        });
+        setOperatorDocMode("view");
+        return;
+      }
+
+      setOperatorDroppedAsset({
+        kind: "file",
+        name: file.name,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+      });
+      setOperatorDocMode("view");
     }
   }, []);
 
@@ -1644,7 +1878,7 @@ export default function CyberdeckPage() {
           >
             <pre
               data-server-tab={btn.id}
-              className={`ascii-btn${server === btn.id ? " is-pushed" : ""}${
+              className={`ascii-btn${railServer === btn.id ? " is-pushed" : ""}${
                 navRailContext === "tabs" && serverKeyboardHighlightId === btn.id
                   ? " server-rail-kb-hover"
                   : ""
@@ -1661,7 +1895,7 @@ export default function CyberdeckPage() {
                 cursor: "pointer",
               }}
             >
-              {server === btn.id ? art.pushed(btn.glyph) : art.popped(btn.glyph)}
+              {railServer === btn.id ? art.pushed(btn.glyph) : art.popped(btn.glyph)}
             </pre>
           </div>
         ))}
@@ -1851,10 +2085,14 @@ export default function CyberdeckPage() {
                     <button
                       type="button"
                       onClick={() => {
+                        const latestAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant");
                         setVoiceEnabled((prev) => {
                           const next = !prev;
                           if (next) {
                             setVoiceHealth("idle");
+                            if (latestAssistantMessage?.text) {
+                              lastSpokenAssistantTextRef.current = latestAssistantMessage.text;
+                            }
                             void speakMother(MUTHUR_PRESET.testPhrase);
                           } else {
                             setVoiceHealth("off");
@@ -1865,14 +2103,8 @@ export default function CyberdeckPage() {
                       }}
                       aria-label={voiceEnabled ? "Voice on" : "Voice off"}
                       title={voiceEnabled ? "Voice on" : "Voice off"}
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-sm border text-[10px] font-mono transition ${
-                        voiceEnabled
-                          ? "border-emerald-500/80 bg-emerald-500/10 text-emerald-300 shadow-[0_0_0_1px_rgba(16,185,129,0.24)_inset,0_0_10px_rgba(16,185,129,0.12)]"
-                          : "border-gray-700 bg-black text-gray-400 hover:border-gray-500"
-                      }`}
-                      style={{
-                        transform: voiceEnabled ? "translateY(1px)" : "translateY(0)",
-                      }}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-[6px] border text-[10px] font-mono transition-[transform,box-shadow,background-color,border-color,color] duration-150 ease-out hover:-translate-y-px hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-200 active:translate-y-px active:scale-[0.98] ${voiceButtonClassName}`}
+                      style={{ transform: voiceButtonTransform }}
                     >
                       {voiceEnabled ? (
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
@@ -1907,37 +2139,9 @@ export default function CyberdeckPage() {
                           />
                           <path d="M15 9L21 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                           <path d="M21 9L15 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                        </svg>
-                      )}
-                    </button>
-                    <span
-                      className={`inline-flex h-8 items-center rounded-sm border px-2 font-mono text-[9px] tracking-[0.12em] ${
-                        voiceHealth === "backend"
-                          ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
-                          : voiceHealth === "fallback"
-                            ? "border-amber-500/60 bg-amber-500/10 text-amber-300"
-                            : voiceHealth === "off"
-                              ? "border-gray-700 bg-black text-gray-500"
-                              : "border-slate-700 bg-slate-950 text-slate-400"
-                      }`}
-                      title={
-                        voiceHealth === "backend"
-                          ? "MUTHUR is using backend audio"
-                          : voiceHealth === "fallback"
-                            ? "MUTHUR is using DRY_FALLBACK"
-                            : voiceHealth === "off"
-                              ? "Voice is off"
-                              : "Voice state is idle"
-                      }
-                    >
-                      {voiceHealth === "backend"
-                        ? "BACKEND"
-                        : voiceHealth === "fallback"
-                          ? "DRY_FALLBACK"
-                          : voiceHealth === "off"
-                            ? "OFF"
-                            : "IDLE"}
-                    </span>
+                          </svg>
+                        )}
+                      </button>
                     {!isStreaming ? (
                       <button
                         type="button"
@@ -1993,19 +2197,19 @@ export default function CyberdeckPage() {
             ref={gatewayColumnRef}
             tabIndex={-1}
             aria-label="Gateway"
-            onDragOver={handleGatewayDragOver}
-            onDragLeave={handleGatewayDragLeave}
-            onDrop={handleGatewayDrop}
+            onDragOver={handleThirdColumnDragOver}
+            onDragLeave={handleThirdColumnDragLeave}
+            onDrop={handleThirdColumnDrop}
             className={`cyberdeck-net-pane right flex h-full min-w-0 flex-col border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black md:border-l ${
               networkActivityActive ? "is-net-active" : ""
             } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
           >
             <header className="flex shrink-0 items-center overflow-visible border-b border-gray-800 bg-black px-6 py-2">
-              <pre
-                className="cyberdeck-net-logo m-0 whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
-                style={{ textShadow: "0 0 5px #00ff00" }}
-              >
-                {`
+                  <pre
+                    className="cyberdeck-net-logo m-0 whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
+                    style={{ textShadow: "0 0 5px #00ff00" }}
+                  >
+                    {`
         _   _          _          _           _                   _              _      
        ╱╲_╲╱╲_╲ _     ╱╲ ╲       ╱╲ ╲        ╱ ╱╲                ╱╲ ╲           ╱╲ ╲    
       ╱ ╱ ╱ ╱ ╱╱╲_╲   ╲ ╲ ╲     ╱  ╲ ╲      ╱ ╱  ╲              ╱  ╲ ╲         ╱  ╲ ╲   
@@ -2017,179 +2221,307 @@ export default function CyberdeckPage() {
 ╱ ╱ ╱    ╱ ╱ ╱___╱ ╱ ╱__  ╱ ╱ ╱╲ ╲ ╲  ╱ ╱_________╱╲ ╲ ╲  ╱ ╱ ╱_____╱ ╱ ╱╱ ╱ ╱______    
 ╲╱_╱    ╱ ╱ ╱╱╲__╲╱_╱___╲╱ ╱ ╱  ╲ ╲ ╲╱ ╱ ╱_       __╲ ╲_╲╱ ╱ ╱______╲╱ ╱╱ ╱ ╱_______╲   
         ╲╱_╱ ╲╱_________╱╲╱_╱    ╲_╲╱╲_╲___╲     ╱____╱_╱╲╱___________╱ ╲╱__________╱`}
-              </pre>
-            </header>
-            <div className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
-              {droppedMarkdown ? (
-                <div className="mb-4 rounded-sm border border-amber-700/70 bg-black p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="truncate font-mono text-[10px] text-amber-300">
-                      MARKDOWN: {droppedMarkdownName || "dropped.md"}
-                    </div>
-                    <button
-                      type="button"
-                      className="rounded border border-amber-700 px-2 py-[2px] font-mono text-[10px] text-amber-300 hover:border-amber-500"
-                      onClick={() => {
-                        setDroppedMarkdown(null);
-                        setDroppedMarkdownName("");
-                      }}
-                    >
-                      CLEAR
-                    </button>
-                  </div>
-                  <Streamdown className="prose prose-invert prose-pre:bg-black prose-pre:text-green-300 max-w-none text-[12px] leading-snug text-green-200">
-                    {droppedMarkdown}
-                  </Streamdown>
-                </div>
-              ) : null}
-              <div
-                className="pb-2 font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
-                style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-              >
-                MAINNET-UPLINK
-              </div>
-
-              <div
-                className="cursor-default py-1 font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
-                style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-              >
-                # GATEWAY
-              </div>
-
-              <div className="mt-1 flex select-none flex-col font-mono text-[10px] tracking-[0.04em]">
-                {providers.map((p) => {
-                  const selected = activeProvider === p.id;
-                  const kbHover = providerKeyboardHighlightId === p.id;
-                  return (
-                    <div
-                      key={p.id}
-                      data-provider-row={p.id}
-                      className={`nav-row cursor-pointer py-[5px]${kbHover ? " nav-row-kb-hover" : ""}`}
-                      style={
-                        {
-                          "--nav-color": selected ? "#00ff00" : inactiveSubtleTextColor,
-                          "--nav-shadow": selected ? activeTextGlow : inactiveTextGlow,
-                          "--nav-hover-color": selected ? "#36ff73" : "#b0b0b0",
-                          "--nav-hover-shadow": selected
-                            ? "0 0 10px rgba(54, 255, 115, 0.30)"
-                            : inactiveTextGlow,
-                        } as CSSProperties
-                      }
-                      onClick={() => {
-                        selectProvider(p.id);
-                        setProviderKeyboardHighlightId(null);
-                        setModelKeyboardHighlightId(null);
-                      }}
-                    >
-                      {selected ? "[X] " : "[ ] "}
-                      {p.name}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div
-                ref={gatewayConnectionPanelRef}
-                className="mt-5 border-t border-[#111] pt-2"
-                style={{
-                  pointerEvents: probeInFlightByProvider[activeProvider] ? "none" : "auto",
-                  opacity: probeInFlightByProvider[activeProvider] ? 0.7 : 1,
-                  transition: "opacity 0.2s",
-                }}
-              >
-                <div
-                  className="mb-2 font-mono text-[10px]"
-                  style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}
-                >
-                  AVAILABLE_MODELS:
-                </div>
-                {!hasProviderAuth ? null : providerModelFetchStatus === "retrieving" ? (
-                  <div className="model-probe-wave font-mono text-[10px]" style={{ color: "#ffaa00" }}>
-                    CONNECTING... RETRIEVING_MODELS
-                  </div>
-                ) : providerModelFetchStatus === "invalid-key" ? (
-                  <div className="font-mono text-[10px] text-red-400" style={{ textShadow: "0 0 8px rgba(255, 85, 85, 0.3)" }}>
-                    INVALID_KEY // AUTH_REJECTED
-                  </div>
-                ) : providerModelFetchStatus === "error" ? (
-                  <div className="font-mono text-[10px] text-red-300" style={{ textShadow: "0 0 8px rgba(255, 122, 122, 0.3)" }}>
-                    UPLINK_ERROR // RETRY
-                  </div>
-                ) : modelList.length === 0 ? (
-                  <div className="font-mono text-[10px]" style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}>
-                    NO_MODELS_LOADED
-                  </div>
-                ) : (
-                  modelList.map((m) => {
-                    const health = modelHealthByProvider[activeProvider]?.[m.id] || "idle";
-                    const isSel = modelID === m.id;
-                    const isFree = m.id.toLowerCase().includes("free");
-                    const wave = probeInFlightByProvider[activeProvider] === m.id;
-                    const modelKb = modelKeyboardHighlightId === m.id;
-                    return (
-                      <div
-                        key={m.id}
-                        data-model-row={m.id}
-                        className={`${wave ? "model-probe-wave nav-row" : "nav-row"}${modelKb ? " nav-row-kb-hover" : ""}`}
-                        role="button"
-                        tabIndex={-1}
-                        onClick={() => {
-                          setProviderKeyboardHighlightId(null);
-                          setModelKeyboardHighlightId(null);
-                          activateModelById(m.id);
-                        }}
-                        style={
-                          {
-                            cursor: "pointer",
-                            fontSize: "10px",
-                            paddingTop: "4px",
-                            paddingBottom: "4px",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            "--nav-color": isSel
-                              ? health === "green"
-                                ? "#00ff00"
-                                : health === "amber"
-                                  ? "#ffaa00"
-                                  : inactiveTextColor
-                              : isFree
-                                ? "#ffaa00"
-                                : inactiveSubtleTextColor,
-                            "--nav-shadow": isSel
-                              ? health === "green"
-                                ? activeTextGlow
-                                : health === "amber"
-                                  ? amberTextGlow
-                                  : inactiveTextGlow
-                              : isFree
-                                ? amberTextGlow
-                                : inactiveTextGlow,
-                            "--nav-hover-color": isSel ? (health === "green" ? "#36ff73" : "#ffbf4d") : "#b0b0b0",
-                            "--nav-hover-shadow": isSel
-                              ? health === "green"
-                                ? "0 0 10px rgba(54, 255, 115, 0.30)"
-                                : "0 0 10px rgba(255, 191, 77, 0.28)"
-                              : inactiveTextGlow,
-                          } as CSSProperties
-                        }
-                      >
-                        {m.id.split("/").pop()}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {generatedUI ? (
-                <div className="mt-4 rounded-sm border border-green-900/80 bg-black/60 p-3">
-                  <div className="mb-1 font-mono text-[10px] text-green-500/90">// FEED</div>
-                  <pre className="whitespace-pre-wrap font-mono text-[10px] leading-snug text-green-300/95">
-                    {generatedUI}
                   </pre>
+            </header>
+            {showGatewayPanel ? (
+              <div className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
+                  {droppedMarkdown ? (
+                    <div className="mb-4 rounded-sm border border-amber-700/70 bg-black p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="truncate font-mono text-[10px] text-amber-300">
+                          MARKDOWN: {droppedMarkdownName || "dropped.md"}
+                        </div>
+                        <button
+                          type="button"
+                          className="rounded border border-amber-700 px-2 py-[2px] font-mono text-[10px] text-amber-300 hover:border-amber-500"
+                          onClick={() => {
+                            setDroppedMarkdown(null);
+                            setDroppedMarkdownName("");
+                          }}
+                        >
+                          CLEAR
+                        </button>
+                      </div>
+                      <Streamdown className="prose prose-invert prose-pre:bg-black prose-pre:text-green-300 max-w-none text-[12px] leading-snug text-green-200">
+                        {droppedMarkdown}
+                      </Streamdown>
+                    </div>
+                  ) : null}
+                  <div
+                    className="pb-2 font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
+                    style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+                  >
+                    MAINNET-UPLINK
+                  </div>
+
+                  <div
+                    className="cursor-default py-1 font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
+                    style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+                  >
+                    # GATEWAY
+                  </div>
+
+                  <div className="mt-1 flex select-none flex-col font-mono text-[10px] tracking-[0.04em]">
+                    {providers.map((p) => {
+                      const selected = activeProvider === p.id;
+                      const kbHover = providerKeyboardHighlightId === p.id;
+                      return (
+                        <div
+                          key={p.id}
+                          data-provider-row={p.id}
+                          className={`nav-row cursor-pointer py-[5px]${kbHover ? " nav-row-kb-hover" : ""}`}
+                          style={
+                            {
+                              "--nav-color": selected ? "#00ff00" : inactiveSubtleTextColor,
+                              "--nav-shadow": selected ? activeTextGlow : inactiveTextGlow,
+                              "--nav-hover-color": selected ? "#36ff73" : "#b0b0b0",
+                              "--nav-hover-shadow": selected
+                                ? "0 0 10px rgba(54, 255, 115, 0.30)"
+                                : inactiveTextGlow,
+                            } as CSSProperties
+                          }
+                          onClick={() => {
+                            selectProvider(p.id);
+                            setProviderKeyboardHighlightId(null);
+                            setModelKeyboardHighlightId(null);
+                          }}
+                        >
+                          {selected ? "[X] " : "[ ] "}
+                          {p.name}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    ref={gatewayConnectionPanelRef}
+                    className="mt-5 border-t border-[#111] pt-2"
+                    style={{
+                      pointerEvents: probeInFlightByProvider[activeProvider] ? "none" : "auto",
+                      opacity: probeInFlightByProvider[activeProvider] ? 0.7 : 1,
+                      transition: "opacity 0.2s",
+                    }}
+                  >
+                    <div
+                      className="mb-2 font-mono text-[10px]"
+                      style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}
+                    >
+                      AVAILABLE_MODELS:
+                    </div>
+                    {!hasProviderAuth ? null : providerModelFetchStatus === "retrieving" ? (
+                      <div className="model-probe-wave font-mono text-[10px]" style={{ color: "#ffaa00" }}>
+                        CONNECTING... RETRIEVING_MODELS
+                      </div>
+                    ) : providerModelFetchStatus === "invalid-key" ? (
+                      <div className="font-mono text-[10px] text-red-400" style={{ textShadow: "0 0 8px rgba(255, 85, 85, 0.3)" }}>
+                        INVALID_KEY // AUTH_REJECTED
+                      </div>
+                    ) : providerModelFetchStatus === "error" ? (
+                      <div className="font-mono text-[10px] text-red-300" style={{ textShadow: "0 0 8px rgba(255, 122, 122, 0.3)" }}>
+                        UPLINK_ERROR // RETRY
+                      </div>
+                    ) : modelList.length === 0 ? (
+                      <div className="font-mono text-[10px]" style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}>
+                        NO_MODELS_LOADED
+                      </div>
+                    ) : (
+                      modelList.map((m) => {
+                        const health = modelHealthByProvider[activeProvider]?.[m.id] || "idle";
+                        const isSel = modelID === m.id;
+                        const isFree = m.id.toLowerCase().includes("free");
+                        const wave = probeInFlightByProvider[activeProvider] === m.id;
+                        const modelKb = modelKeyboardHighlightId === m.id;
+                        return (
+                          <div
+                            key={m.id}
+                            data-model-row={m.id}
+                            className={`${wave ? "model-probe-wave nav-row" : "nav-row"}${modelKb ? " nav-row-kb-hover" : ""}`}
+                            role="button"
+                            tabIndex={-1}
+                            onClick={() => {
+                              setProviderKeyboardHighlightId(null);
+                              setModelKeyboardHighlightId(null);
+                              activateModelById(m.id);
+                            }}
+                            style={
+                              {
+                                cursor: "pointer",
+                                fontSize: "10px",
+                                paddingTop: "4px",
+                                paddingBottom: "4px",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                "--nav-color": isSel
+                                  ? health === "green"
+                                    ? "#00ff00"
+                                    : health === "amber"
+                                      ? "#ffaa00"
+                                      : inactiveTextColor
+                                  : isFree
+                                    ? "#ffaa00"
+                                    : inactiveSubtleTextColor,
+                                "--nav-shadow": isSel
+                                  ? health === "green"
+                                    ? activeTextGlow
+                                    : health === "amber"
+                                      ? amberTextGlow
+                                      : inactiveTextGlow
+                                  : isFree
+                                    ? amberTextGlow
+                                    : inactiveTextGlow,
+                                "--nav-hover-color": isSel ? (health === "green" ? "#36ff73" : "#ffbf4d") : "#b0b0b0",
+                                "--nav-hover-shadow": isSel
+                                  ? health === "green"
+                                    ? "0 0 10px rgba(54, 255, 115, 0.30)"
+                                    : "0 0 10px rgba(255, 191, 77, 0.28)"
+                                  : inactiveTextGlow,
+                              } as CSSProperties
+                            }
+                          >
+                            {m.id.split("/").pop()}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {generatedUI ? (
+                    <div className="mt-4 rounded-sm border border-green-900/80 bg-black/60 p-3">
+                      <div className="mb-1 font-mono text-[10px] text-green-500/90">// FEED</div>
+                      <pre className="whitespace-pre-wrap font-mono text-[10px] leading-snug text-green-300/95">
+                        {generatedUI}
+                      </pre>
+                    </div>
+                  ) : null}
+              </div>
+            ) : server === "m" ? (
+              <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
+                <div
+                  className={`flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors ${
+                    isMarkdownDragOver ? "border-amber-500/60 ring-2 ring-amber-500/35 ring-inset" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between border-b border-[#141414] px-3 py-2">
+                    <div className="min-w-0 flex-1 pr-3">
+                      {operatorSurfaceIsDocument && operatorDocMode === "edit" ? (
+                        <input
+                          ref={operatorNameInputRef}
+                          value={operatorDocNameDraft}
+                          onChange={(event) => setOperatorDocNameDraft(event.target.value)}
+                          onBlur={commitOperatorDocName}
+                          onKeyDown={(event) => {
+                            if (event.key !== "Enter") return;
+                            event.preventDefault();
+                            commitOperatorDocName();
+                            operatorNameInputRef.current?.blur();
+                          }}
+                          spellCheck={false}
+                          autoCapitalize="off"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          aria-label="Rename operator document"
+                          className="w-full border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]"
+                          style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+                        />
+                      ) : (
+                        <div
+                          className="truncate font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
+                          style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+                        >
+                          {operatorDroppedAsset ? operatorDroppedAsset.name : "OPERATOR_DOC_SURFACE"}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {operatorSurfaceIsDocument ? (
+                        <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+                          <span className={operatorDocMode === "view" ? "text-emerald-200" : ""}>VIEW</span>
+                          <Switch
+                            checked={operatorDocMode === "edit"}
+                            onCheckedChange={(checked) => {
+                              if (!checked) {
+                                commitOperatorDocName();
+                                setOperatorDocMode("view");
+                                return;
+                              }
+                              setOperatorDocMode("edit");
+                            }}
+                            aria-label="Toggle operator view edit mode"
+                            className="data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
+                          />
+                          <span className={operatorDocMode === "edit" ? "text-emerald-200" : ""}>EDIT</span>
+                        </div>
+                      ) : operatorDroppedAsset ? (
+                        <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+                          {operatorDroppedAsset.kind.toUpperCase()}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  {operatorDroppedAsset ? (
+                    <div className="flex-1 overflow-auto p-3">
+                      <div className="mb-4 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
+                        {operatorDroppedAsset.mimeType || "application/octet-stream"} //{" "}
+                        {Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB
+                      </div>
+                      {operatorSurfaceIsDocument ? (
+                        operatorDocMode === "edit" ? (
+                          <Textarea
+                            ref={operatorEditorRef}
+                            value={operatorDroppedAsset.text || ""}
+                            onChange={(event) => {
+                              const nextText = event.target.value;
+                              setOperatorDroppedAsset((prev) =>
+                                prev ? { ...prev, text: nextText } : prev,
+                              );
+                            }}
+                            spellCheck={false}
+                            autoCapitalize="off"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            wrap="off"
+                            className="min-h-0 resize-none overflow-hidden rounded-sm border border-[#1c1c1c] bg-black px-3 py-3 font-mono text-[12px] leading-snug text-green-200 shadow-none focus-visible:ring-1 focus-visible:ring-amber-500/40"
+                            style={
+                              operatorDocMode === "edit"
+                                ? {
+                                    height:
+                                      operatorEditorRef.current?.style.height || "auto",
+                                  }
+                                : undefined
+                            }
+                          />
+                        ) : operatorDroppedAsset.kind === "markdown" ? (
+                          <div className="rounded-sm border border-green-900/70 bg-black/70 p-3">
+                            <Streamdown className="prose prose-invert prose-pre:bg-black prose-pre:text-green-300 max-w-none text-[12px] leading-snug text-green-200">
+                              {operatorDroppedAsset.text || ""}
+                            </Streamdown>
+                          </div>
+                        ) : (
+                          <pre className="min-h-[50vh] whitespace-pre-wrap break-words rounded-sm border border-[#1c1c1c] bg-black p-3 font-mono text-[12px] leading-snug text-green-200">
+                            {operatorDroppedAsset.text || ""}
+                          </pre>
+                        )
+                      ) : (
+                        <div className="rounded-sm border border-dashed border-amber-700/60 bg-black p-4 font-mono text-[10px] leading-snug text-amber-300/90">
+                          {operatorDroppedAsset.kind === "image"
+                            ? "Image preview comes next. Drop a code or text file to edit it here."
+                            : operatorDroppedAsset.kind === "video"
+                              ? "Video preview comes next. Drop a code or text file to edit it here."
+                              : "Drop a code, text, or markdown file to edit it here."}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-1 items-center justify-center p-6 text-center font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
+                      DROP CODE, TEXT, OR MARKDOWN FILES HERE TO VIEW AND EDIT THEM.
+                    </div>
+                  )}
                 </div>
-              ) : null}
-            </div>
+              </div>
+            ) : (
+              <div className="flex flex-1 items-stretch justify-stretch bg-black" />
+            )}
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
