@@ -30,8 +30,9 @@ import { MUTHUR_PRESET } from "@/voice/muthurPreset";
 import {
   buildMuthurVoiceMasterCopy,
   getInitialMuthurVoiceDials,
-  MUTHUR_VOICE_DIALS_STORAGE_KEY,
   muthurBrowserSpeechTuning,
+  restoreMuthurVoiceMasterCopy,
+  saveMuthurVoiceMasterCopy,
   type MuthurVoiceDialState,
 } from "@/voice/muthurVoiceSettings";
 import {
@@ -839,48 +840,21 @@ export default function CyberdeckPage() {
     toast.success("MUTHUR memory cleared");
   }, []);
 
-  const saveMuthurVoiceCopyAsFile = useCallback(async () => {
-    const nextName = "muthur.json";
-    const voiceCopy = buildMuthurVoiceMasterCopy(voiceDialRef.current);
-    const serialized = `${JSON.stringify(voiceCopy, null, 2)}\n`;
-    const fileTypes: SaveFilePickerOptions["types"] = [
-      {
-        description: "MUTHUR voice master",
-        accept: {
-          "application/json": [".json"],
-        },
-      },
-    ];
+  const saveMuthurVoiceCopyToApp = useCallback(() => {
+    saveMuthurVoiceMasterCopy(buildMuthurVoiceMasterCopy(voiceDialRef.current));
+    toast.success("Saved MUTHUR voice copy.");
+  }, []);
 
-    const picker = (window as Window & {
-      showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<SaveFilePickerHandle>;
-    }).showSaveFilePicker;
-
-    try {
-      if (picker) {
-        const handle = await picker({
-          suggestedName: nextName,
-          types: fileTypes,
-          excludeAcceptAllOption: false,
-        });
-        const writable = await handle.createWritable();
-        await writable.write(serialized);
-        await writable.close();
-        toast.success(`Saved "${nextName}".`);
-        return;
-      }
-
-      const blob = new Blob([serialized], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = nextName;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      toast.success(`Downloaded "${nextName}".`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save MUTHUR voice copy.");
+  const restoreMuthurVoiceMaster = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm("Restore MUTHUR voice master?");
+      if (!confirmed) return;
     }
+
+    const restored = restoreMuthurVoiceMasterCopy();
+    setVoiceDial(restored);
+    voiceDialRef.current = restored;
+    toast.success("Restored MUTHUR master.");
   }, []);
 
   const playVoiceTest = useCallback(() => {
@@ -904,7 +878,7 @@ export default function CyberdeckPage() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(MUTHUR_VOICE_DIALS_STORAGE_KEY, JSON.stringify(voiceDial));
+      saveMuthurVoiceMasterCopy(buildMuthurVoiceMasterCopy(voiceDial));
     } catch {
       /* ignore */
     }
@@ -3383,10 +3357,17 @@ export default function CyberdeckPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => void saveMuthurVoiceCopyAsFile()}
+                          onClick={saveMuthurVoiceCopyToApp}
                           className="rounded border border-[#2d2d2d] bg-black px-3 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
                         >
                           SAVE COPY
+                        </button>
+                        <button
+                          type="button"
+                          onClick={restoreMuthurVoiceMaster}
+                          className="rounded border border-[#2d2d2d] bg-black px-3 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                        >
+                          RESTORE MASTER
                         </button>
                       </div>
                     </div>
