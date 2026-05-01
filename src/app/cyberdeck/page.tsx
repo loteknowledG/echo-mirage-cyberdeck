@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import type { CSSProperties, DragEvent as ReactDragEvent } from "react";
 import { Streamdown } from "streamdown";
+import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { art } from "@/lib/TerminalArt";
 import {
   ResizableHandle,
@@ -26,9 +27,26 @@ import {
 } from "@/lib/AudioEngine";
 import { applyMuthurEffectChain } from "@/voice/effectsChain";
 import { MUTHUR_PRESET } from "@/voice/muthurPreset";
+import {
+  buildMuthurVoiceMasterCopy,
+  getInitialMuthurVoiceDials,
+  MUTHUR_VOICE_DIALS_STORAGE_KEY,
+  muthurBrowserSpeechTuning,
+  type MuthurVoiceDialState,
+} from "@/voice/muthurVoiceSettings";
+import {
+  buildMuthurMemoryContext,
+  clearMuthurMemory,
+  createEmptyMuthurMemory,
+  loadMuthurMemory,
+  recordMuthurMemoryTurn,
+  saveMuthurMemory,
+  type MuthurMemoryState,
+} from "@/lib/muthur-memory";
 import { speakDryFallback } from "@/voice/speakMuthur";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { get, set } from "idb-keyval";
+import { Knob } from "@/components/ui/knob";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -92,6 +110,27 @@ type HeapEntry = {
   createdAt: number;
 };
 
+type SaveFilePickerHandle = {
+  createWritable(): Promise<{
+    write(data: Blob | string): Promise<void>;
+    close(): Promise<void>;
+  }>;
+};
+
+type SaveFilePickerOptions = {
+  suggestedName?: string;
+  types?: Array<{
+    description?: string;
+    accept: Record<string, string[]>;
+  }>;
+  excludeAcceptAllOption?: boolean;
+};
+
+type EchoMirageClipboardApi = {
+  readText(): string;
+  writeText(text: string): void;
+};
+
 const EDITABLE_TEXT_EXTENSIONS = [
   ".md",
   ".markdown",
@@ -142,6 +181,24 @@ function isEditableOperatorFile(file: File) {
     lowerType === "application/x-yaml" ||
     EDITABLE_TEXT_EXTENSIONS.some((ext) => lowerName.endsWith(ext))
   );
+}
+
+async function readEchoMirageClipboardText() {
+  const bridge = (window as Window & { echoMirageClipboard?: EchoMirageClipboardApi })
+    .echoMirageClipboard;
+  if (bridge?.readText) {
+    try {
+      return bridge.readText();
+    } catch {
+      /* fall through */
+    }
+  }
+
+  if (typeof navigator !== "undefined" && navigator.clipboard?.readText) {
+    return navigator.clipboard.readText();
+  }
+
+  return "";
 }
 
 function getOperatorFileKind(file: File): DroppedOperatorAsset["kind"] {
@@ -294,7 +351,10 @@ export default function CyberdeckPage() {
   const [inputCaretIndex, setInputCaretIndex] = useState(0);
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceDial, setVoiceDial] = useState<MuthurVoiceDialState>(getInitialMuthurVoiceDials);
   const [voiceHealth, setVoiceHealth] = useState<"idle" | "backend" | "fallback" | "off">("idle");
+  const [muthurMemory, setMuthurMemory] = useState<MuthurMemoryState>(() => createEmptyMuthurMemory());
+  const [muthurMemoryHydrated, setMuthurMemoryHydrated] = useState(false);
   const [heapEntries, setHeapEntries] = useState<HeapEntry[]>([]);
   const [heapNameDraft, setHeapNameDraft] = useState("");
   const [heapTextDraft, setHeapTextDraft] = useState("");
@@ -346,6 +406,8 @@ export default function CyberdeckPage() {
   const speakQueueActiveRef = useRef(false);
   const speakSequenceRef = useRef(0);
   const lastVoiceErrorRef = useRef<string>("");
+  const voiceDialRef = useRef<MuthurVoiceDialState>(getInitialMuthurVoiceDials());
+  const muthurMemoryRef = useRef<MuthurMemoryState>(createEmptyMuthurMemory());
   const audioContextRef = useRef<AudioContext | null>(null);
   const activeSourceNodesRef = useRef<AudioBufferSourceNode[]>([]);
   const motherMasterGainRef = useRef<GainNode | null>(null);
@@ -527,8 +589,7 @@ export default function CyberdeckPage() {
       (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return null;
 
-    const warmedCtx = initMotherAudio();
-    const ctx = audioContextRef.current ?? warmedCtx ?? new Ctx();
+    const ctx = audioContextRef.current ?? new Ctx();
     audioContextRef.current = ctx;
     if (!motherMasterGainRef.current) {
       const master = ctx.createGain();
@@ -658,6 +719,7 @@ export default function CyberdeckPage() {
       const utterance = new SpeechSynthesisUtterance(text);
       const normalizedProfile = (profile || "").toLowerCase();
       const wantsMuthur = normalizedProfile === "muthur";
+      const browserTuning = muthurBrowserSpeechTuning(voiceDialRef.current);
       const voices = synth.getVoices();
       const preferred = voices.find((voice) => {
         const name = voice.name.toLowerCase();
@@ -681,9 +743,9 @@ export default function CyberdeckPage() {
         utterance.voice = preferred;
       }
       utterance.lang = preferred?.lang || "en-US";
-      utterance.rate = wantsMuthur ? 0.78 : 1;
-      utterance.pitch = wantsMuthur ? 0.82 : 1;
-      utterance.volume = wantsMuthur ? 0.85 : 1;
+      utterance.rate = wantsMuthur ? browserTuning.rate : 1;
+      utterance.pitch = wantsMuthur ? browserTuning.pitch : 1;
+      utterance.volume = wantsMuthur ? browserTuning.volume : 1;
 
       void unlockMotherAudio().then((ctx) => {
         if (!ctx) return;
@@ -707,6 +769,7 @@ export default function CyberdeckPage() {
     const speakId = ++speakSequenceRef.current;
     speakQueueActiveRef.current = true;
     stopMirageAudio();
+    const browserTuning = muthurBrowserSpeechTuning(voiceDialRef.current);
     try {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
@@ -730,7 +793,7 @@ export default function CyberdeckPage() {
     }
     try {
       setVoiceHealth("fallback");
-      await speakDryFallback(text);
+      await speakDryFallback(text, browserTuning);
       if (speakId !== speakSequenceRef.current) return false;
       return true;
     } catch {
@@ -743,6 +806,87 @@ export default function CyberdeckPage() {
     }
     return false;
   }, [playMirageBuffer, speakDryFallback, stopMirageAudio, synthesizeMirageChunk]);
+
+  const toggleVoiceEnabled = useCallback(() => {
+    const latestAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant");
+    setVoiceEnabled((prev) => {
+      const next = !prev;
+      if (next) {
+        setVoiceHealth("idle");
+        if (latestAssistantMessage?.text) {
+          lastSpokenAssistantTextRef.current = latestAssistantMessage.text;
+        }
+        void speakMother(MUTHUR_PRESET.testPhrase);
+      } else {
+        setVoiceHealth("off");
+        stopMirageAudio();
+      }
+      return next;
+    });
+  }, [messages, speakMother, stopMirageAudio]);
+
+  const clearMuthurMemoryState = useCallback(async () => {
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm("Clear MUTHUR memory?");
+      if (!confirmed) return;
+    }
+
+    await clearMuthurMemory();
+    const fresh = createEmptyMuthurMemory();
+    muthurMemoryRef.current = fresh;
+    setMuthurMemory(fresh);
+    setMuthurMemoryHydrated(true);
+    toast.success("MUTHUR memory cleared");
+  }, []);
+
+  const saveMuthurVoiceCopyAsFile = useCallback(async () => {
+    const nextName = "muthur.json";
+    const voiceCopy = buildMuthurVoiceMasterCopy(voiceDialRef.current);
+    const serialized = `${JSON.stringify(voiceCopy, null, 2)}\n`;
+    const fileTypes: SaveFilePickerOptions["types"] = [
+      {
+        description: "MUTHUR voice master",
+        accept: {
+          "application/json": [".json"],
+        },
+      },
+    ];
+
+    const picker = (window as Window & {
+      showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<SaveFilePickerHandle>;
+    }).showSaveFilePicker;
+
+    try {
+      if (picker) {
+        const handle = await picker({
+          suggestedName: nextName,
+          types: fileTypes,
+          excludeAcceptAllOption: false,
+        });
+        const writable = await handle.createWritable();
+        await writable.write(serialized);
+        await writable.close();
+        toast.success(`Saved "${nextName}".`);
+        return;
+      }
+
+      const blob = new Blob([serialized], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = nextName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded "${nextName}".`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save MUTHUR voice copy.");
+    }
+  }, []);
+
+  const playVoiceTest = useCallback(() => {
+    if (!voiceEnabled) return;
+    void speakMother(MUTHUR_PRESET.testPhrase);
+  }, [speakMother, voiceEnabled]);
 
   const voiceButtonClassName = !voiceEnabled || voiceHealth === "off"
     ? "border-gray-700 bg-black text-gray-400 hover:border-gray-500"
@@ -757,6 +901,38 @@ export default function CyberdeckPage() {
     : voiceHealth === "backend"
       ? "translateY(-1px)"
       : "translateY(0)";
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(MUTHUR_VOICE_DIALS_STORAGE_KEY, JSON.stringify(voiceDial));
+    } catch {
+      /* ignore */
+    }
+  }, [voiceDial]);
+
+  useEffect(() => {
+    voiceDialRef.current = voiceDial;
+  }, [voiceDial]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const loaded = await loadMuthurMemory();
+      if (cancelled) return;
+      muthurMemoryRef.current = loaded;
+      setMuthurMemory(loaded);
+      setMuthurMemoryHydrated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!muthurMemoryHydrated) return;
+    muthurMemoryRef.current = muthurMemory;
+    void saveMuthurMemory(muthurMemory);
+  }, [muthurMemory, muthurMemoryHydrated]);
 
   const operatorSurfaceIsDocument =
     operatorDroppedAsset?.kind === "text" ||
@@ -846,10 +1022,7 @@ export default function CyberdeckPage() {
 
   const pasteClipboardToHeap = useCallback(async () => {
     try {
-      const clipboardText =
-        typeof navigator !== "undefined" && navigator.clipboard?.readText
-          ? await navigator.clipboard.readText()
-          : "";
+      const clipboardText = await readEchoMirageClipboardText();
 
       if (!clipboardText.trim()) {
         toast.error("Clipboard has no text.");
@@ -878,12 +1051,66 @@ export default function CyberdeckPage() {
     }
   }, [operatorDroppedAsset?.name, operatorDroppedAsset?.text, operatorSurfaceIsDocument]);
 
+  const saveOperatorDocAsFile = useCallback(async () => {
+    const text = operatorDroppedAsset?.text || "";
+    if (!operatorSurfaceIsDocument || !text.trim()) {
+      toast.error("Operator document has no text.");
+      return;
+    }
+
+    const nextName =
+      operatorDroppedAsset?.name?.trim() ||
+      (operatorDroppedAsset?.kind === "markdown" ? "operator-doc.md" : "operator-doc.txt");
+    const fileTypes: SaveFilePickerOptions["types"] = [
+      {
+        description: "Text document",
+        accept: {
+          "text/plain": [".txt", ".md", ".markdown", ".log"],
+          "text/markdown": [".md", ".markdown"],
+          "application/json": [".json", ".jsonc"],
+          "application/javascript": [".js", ".jsx", ".mjs", ".cjs"],
+          "application/typescript": [".ts", ".tsx"],
+          "text/css": [".css"],
+          "text/html": [".html", ".htm"],
+          "text/yaml": [".yaml", ".yml"],
+        },
+      },
+    ];
+
+    const picker = (window as Window & {
+      showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<SaveFilePickerHandle>;
+    }).showSaveFilePicker;
+
+    try {
+      if (picker) {
+        const handle = await picker({
+          suggestedName: nextName,
+          types: fileTypes,
+          excludeAcceptAllOption: false,
+        });
+        const writable = await handle.createWritable();
+        await writable.write(text);
+        await writable.close();
+        toast.success(`Saved "${nextName}".`);
+        return;
+      }
+
+      const blob = new Blob([text], { type: operatorDroppedAsset?.mimeType || "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = nextName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded "${nextName}".`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save operator document.");
+    }
+  }, [operatorDroppedAsset?.kind, operatorDroppedAsset?.mimeType, operatorDroppedAsset?.name, operatorDroppedAsset?.text, operatorSurfaceIsDocument]);
+
   const pasteClipboardToOperator = useCallback(async () => {
     try {
-      const clipboardText =
-        typeof navigator !== "undefined" && navigator.clipboard?.readText
-          ? await navigator.clipboard.readText()
-          : "";
+      const clipboardText = await readEchoMirageClipboardText();
 
       if (!clipboardText.trim()) {
         toast.error("Clipboard has no text.");
@@ -895,17 +1122,17 @@ export default function CyberdeckPage() {
         currentKind === "markdown" || currentKind === "code" || currentKind === "text"
           ? currentKind
           : "text";
-      const nextName = operatorDroppedAsset?.name || "clipboard.txt";
 
       setOperatorDroppedAsset({
         kind: nextKind,
-        name: nextName,
+        name: "",
         mimeType: nextKind === "markdown" ? "text/markdown" : "text/plain",
         size: new Blob([clipboardText]).size,
         text: clipboardText,
       });
+      setOperatorDocNameDraft("");
       setOperatorDocMode("edit");
-      toast.success(`Pasted clipboard into "${nextName}".`);
+      toast.success("Pasted clipboard into a new operator draft.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not paste clipboard text.");
     }
@@ -983,6 +1210,26 @@ export default function CyberdeckPage() {
   const deleteHeapEntry = useCallback((id: string) => {
     setHeapEntries((prev) => prev.filter((entry) => entry.id !== id));
   }, []);
+
+  useEffect(() => {
+    const onContextAction = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (detail === "save-operator") {
+        void saveOperatorDocAsFile();
+        return;
+      }
+      if (detail === "paste-operator") {
+        void pasteClipboardToOperator();
+        return;
+      }
+      if (detail === "copy-operator") {
+        void copyOperatorDocToClipboard();
+      }
+    };
+
+    window.addEventListener("echo-mirage-context-action", onContextAction);
+    return () => window.removeEventListener("echo-mirage-context-action", onContextAction);
+  }, [copyOperatorDocToClipboard, pasteClipboardToOperator, saveOperatorDocAsFile]);
 
   const selectProvider = useCallback((id: string) => {
     setActiveProvider(id);
@@ -1265,6 +1512,25 @@ export default function CyberdeckPage() {
       const inChatCol = !!(chatColumnRef.current && chatColumnRef.current.contains(t));
       const inGateway = !!(gatewayColumnRef.current && gatewayColumnRef.current.contains(t));
       const inChatInput = messageInputRef.current !== null && t === messageInputRef.current;
+      const isEditableTarget =
+        t.isContentEditable ||
+        t.tagName === "INPUT" ||
+        t.tagName === "TEXTAREA" ||
+        t.tagName === "SELECT";
+
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "v" || e.key === "V")) {
+        if (isEditableTarget) return;
+        if (server === "m") {
+          e.preventDefault();
+          void pasteClipboardToOperator();
+          return;
+        }
+        if (server === "h") {
+          e.preventDefault();
+          void pasteClipboardToHeap();
+          return;
+        }
+      }
 
       const sfxNav = {
         step: () => {
@@ -1609,6 +1875,8 @@ export default function CyberdeckPage() {
     navRailContext,
     providerKeyboardHighlightId,
     selectProvider,
+    pasteClipboardToHeap,
+    pasteClipboardToOperator,
     server,
     serverKeyboardHighlightId,
   ]);
@@ -1836,6 +2104,7 @@ export default function CyberdeckPage() {
     try {
       const abortCtl = new AbortController();
       chatAbortRef.current = abortCtl;
+      const memoryContext = buildMuthurMemoryContext(muthurMemoryRef.current, userMessage);
       const res = await fetch("/api/cyberdeck-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1845,6 +2114,7 @@ export default function CyberdeckPage() {
           provider: activeProvider,
           apiKey: providerKeys[activeProvider] || "",
           model: modelID,
+          memoryContext,
         }),
       });
 
@@ -1880,6 +2150,7 @@ export default function CyberdeckPage() {
       }
 
       setMessages((prev) => [...prev, { role: "assistant", text: fullText }]);
+      setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
       setStreamText("");
 
       try {
@@ -2296,23 +2567,7 @@ export default function CyberdeckPage() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        const latestAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant");
-                        setVoiceEnabled((prev) => {
-                          const next = !prev;
-                          if (next) {
-                            setVoiceHealth("idle");
-                            if (latestAssistantMessage?.text) {
-                              lastSpokenAssistantTextRef.current = latestAssistantMessage.text;
-                            }
-                            void speakMother(MUTHUR_PRESET.testPhrase);
-                          } else {
-                            setVoiceHealth("off");
-                            stopMirageAudio();
-                          }
-                          return next;
-                        });
-                      }}
+                      onClick={toggleVoiceEnabled}
                       aria-label={voiceEnabled ? "Voice on" : "Voice off"}
                       title={voiceEnabled ? "Voice on" : "Voice off"}
                       className={`inline-flex h-8 w-8 items-center justify-center rounded-[6px] border text-[10px] font-mono transition-[transform,box-shadow,background-color,border-color,color] duration-150 ease-out hover:-translate-y-px hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-200 active:translate-y-px active:scale-[0.98] ${voiceButtonClassName}`}
@@ -2668,13 +2923,6 @@ export default function CyberdeckPage() {
                       </button>
                       {operatorSurfaceIsDocument ? (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => void copyOperatorDocToClipboard()}
-                            className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                          >
-                            COPY
-                          </button>
                           <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
                             <span className={operatorDocMode === "view" ? "text-emerald-200" : ""}>VIEW</span>
                             <Switch
@@ -2706,6 +2954,28 @@ export default function CyberdeckPage() {
                         {operatorDroppedAsset.mimeType || "application/octet-stream"} //{" "}
                         {Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB
                       </div>
+                      {operatorSurfaceIsDocument ? (
+                        <div className="mb-3 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void saveOperatorDocAsFile()}
+                            aria-label="Save operator document"
+                            title="Save operator document"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                          >
+                            <DownloadIcon className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void copyOperatorDocToClipboard()}
+                            aria-label="Copy operator document"
+                            title="Copy operator document"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                          >
+                            <CopyIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : null}
                       {operatorDroppedAsset.kind === "image" ? (
                         <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
                           <div className="mb-2 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
@@ -2896,7 +3166,233 @@ export default function CyberdeckPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-1 items-stretch justify-stretch bg-black" />
+              <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
+                <div className="flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors">
+                  <div className="flex items-center justify-between border-b border-[#141414] px-3 py-2">
+                    <div className="min-w-0 flex-1 pr-3">
+                      <div
+                        className="truncate font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
+                        style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+                      >
+                        SETTINGS
+                      </div>
+                      <div className="mt-1 font-mono text-[9px] tracking-[0.04em] text-[#6f6f6f]">
+                        LOCAL CONFIG // VOICE DIALS
+                      </div>
+                    </div>
+                    <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+                      {voiceEnabled ? "VOICE ON" : "VOICE OFF"}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col gap-3 overflow-auto p-3">
+                    <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-mono text-[10px] tracking-[0.08em] text-green-200">
+                            VOICE DIALS
+                          </div>
+                          <div className="mt-1 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
+                            MUTHUR // {MUTHUR_PRESET.backend.voiceType} // {MUTHUR_PRESET.backend.language}
+                          </div>
+                        </div>
+                        <div
+                          className={`font-mono text-[9px] tracking-[0.08em] ${
+                            voiceHealth === "backend"
+                              ? "text-emerald-200"
+                              : voiceHealth === "fallback"
+                                ? "text-amber-300"
+                                : voiceHealth === "off"
+                                  ? "text-gray-500"
+                                  : "text-[#8a8a8a]"
+                          }`}
+                        >
+                          {voiceHealth.toUpperCase()}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                        <div className="rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">RATE</div>
+                          <div className="mt-3 flex justify-center">
+                            <Knob
+                              label="Rate"
+                              unit="%"
+                              value={voiceDial.ratePercent}
+                              onValueChange={(ratePercent) =>
+                                setVoiceDial((current) => ({ ...current, ratePercent }))
+                              }
+                              min={-40}
+                              max={0}
+                              step={1}
+                              wheelMultiplier={0.5}
+                              dragMultiplier={0.5}
+                              mode="tuner"
+                              theme="dark"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">PITCH</div>
+                          <div className="mt-3 flex justify-center">
+                            <Knob
+                              label="Pitch"
+                              unit="Hz"
+                              value={voiceDial.pitchHz}
+                              onValueChange={(pitchHz) =>
+                                setVoiceDial((current) => ({ ...current, pitchHz }))
+                              }
+                              min={-20}
+                              max={0}
+                              step={1}
+                              wheelMultiplier={0.5}
+                              dragMultiplier={0.5}
+                              mode="tuner"
+                              theme="dark"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">GAIN</div>
+                          <div className="mt-3 flex justify-center">
+                            <Knob
+                              label="Gain"
+                              unit="x"
+                              value={voiceDial.volume}
+                              onValueChange={(volume) =>
+                                setVoiceDial((current) => ({ ...current, volume }))
+                              }
+                              min={0.25}
+                              max={1.25}
+                              step={0.05}
+                              wheelMultiplier={0.5}
+                              dragMultiplier={0.5}
+                              mode="tuner"
+                              theme="dark"
+                            />
+                          </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-mono text-[10px] tracking-[0.08em] text-green-200">
+                            MUTHUR MEMORY
+                          </div>
+                          <div className="mt-1 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
+                            {muthurMemoryHydrated ? "LOCAL // INDEXEDDB // RETRIEVAL" : "HYDRATING MEMORY..."}
+                          </div>
+                        </div>
+                        <div
+                          className={`font-mono text-[9px] tracking-[0.08em] ${
+                            muthurMemoryHydrated
+                              ? muthurMemory.turnCount > 0
+                                ? "text-emerald-200"
+                                : "text-[#8a8a8a]"
+                              : "text-amber-300"
+                          }`}
+                        >
+                          {muthurMemoryHydrated ? `${muthurMemory.turnCount} TURNS` : "WAIT"}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 rounded-sm border border-[#1c1c1c] bg-black px-3 py-2 font-mono text-[9px] leading-5 tracking-[0.04em] text-[#a3a3a3]">
+                        <div>SUMMARY // {muthurMemory.summary || "No durable notes yet."}</div>
+                        <div>FACTS // {muthurMemory.facts.length}</div>
+                        <div>RECENT // {muthurMemory.recentTurns.length}</div>
+                        <div>
+                          UPDATED //{" "}
+                          {muthurMemoryHydrated ? new Date(muthurMemory.updatedAt).toLocaleString() : "—"}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid gap-3 xl:grid-cols-2">
+                        <div className="rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">FACTS</div>
+                          <div className="mt-2 space-y-1 font-mono text-[9px] leading-5 text-[#a3a3a3]">
+                            {muthurMemory.facts.length > 0 ? (
+                              muthurMemory.facts.slice(-4).map((fact, index) => (
+                                <div key={`${fact}-${index}`} className="truncate">
+                                  {fact}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-[#6f6f6f]">NO FACTS YET</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">RECENT TURNS</div>
+                          <div className="mt-2 space-y-1 font-mono text-[9px] leading-5 text-[#a3a3a3]">
+                            {muthurMemory.recentTurns.length > 0 ? (
+                              muthurMemory.recentTurns.slice(-4).map((turn) => (
+                                <div key={turn.id} className="truncate">
+                                  <span className="text-[#6f6f6f]">
+                                    {turn.role === "assistant" ? "AI" : "USR"}
+                                  </span>{" "}
+                                  {turn.text}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-[#6f6f6f]">NO RECENT TURNS YET</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void clearMuthurMemoryState()}
+                          disabled={!muthurMemoryHydrated}
+                          className="rounded border border-[#2d2d2d] bg-black px-3 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-red-500/60 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          CLEAR MEMORY
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 rounded-sm border border-[#1c1c1c] bg-black px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+                        CURRENT // rate {voiceDial.ratePercent} // pitch {voiceDial.pitchHz} // gain{" "}
+                        {voiceDial.volume.toFixed(2)}
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={toggleVoiceEnabled}
+                          className={`rounded border px-3 py-1 font-mono text-[9px] tracking-[0.08em] transition ${
+                            voiceEnabled
+                              ? "border-emerald-500/70 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400 hover:text-emerald-100"
+                              : "border-[#2d2d2d] bg-black text-[#8a8a8a] hover:border-emerald-500/60 hover:text-emerald-200"
+                          }`}
+                        >
+                          {voiceEnabled ? "VOICE ON" : "VOICE OFF"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void playVoiceTest()}
+                          disabled={!voiceEnabled}
+                          className="rounded border border-[#2d2d2d] bg-black px-3 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          TEST MUTHUR
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void saveMuthurVoiceCopyAsFile()}
+                          className="rounded border border-[#2d2d2d] bg-black px-3 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                        >
+                          SAVE COPY
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </ResizablePanel>

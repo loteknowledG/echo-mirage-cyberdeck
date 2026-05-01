@@ -114,7 +114,11 @@ function defaultModelForProvider(provider: string): string {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { message, provider, apiKey, testMode, probe, model: modelFromBody } = body;
+    const { message, provider, apiKey, testMode, probe, model: modelFromBody, memoryContext } = body;
+    const memoryPrompt =
+      typeof memoryContext === "string" && memoryContext.trim()
+        ? `\n\nPersistent MUTHUR memory:\n${memoryContext.trim()}`
+        : "";
     const loopState = runMuthurCoreLoop(typeof message === "string" ? message : "", createEmptyToolRegistry());
     console.debug("[muthur-core] loop step", loopState.steps[0]);
 
@@ -255,7 +259,8 @@ export async function POST(request: Request) {
               {
                 role: "system",
                 content:
-                  "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful.",
+                  "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
+                  memoryPrompt,
               },
               { role: "user", content: message },
             ],
@@ -339,7 +344,9 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "system",
-            content: "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful.",
+            content:
+              "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
+              memoryPrompt,
           },
           { role: "user", content: message },
         ],

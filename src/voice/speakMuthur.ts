@@ -23,7 +23,13 @@ export function selectMuthurFallbackVoice(): SpeechSynthesisVoice | null {
   return null;
 }
 
-export function speakDryFallback(text: string): Promise<void> {
+export type DryFallbackTuning = {
+  rate?: number;
+  pitch?: number;
+  volume?: number;
+};
+
+export function speakDryFallback(text: string, tuning?: DryFallbackTuning): Promise<void> {
   return new Promise((resolve, reject) => {
     const run = () => {
       const voice = selectMuthurFallbackVoice();
@@ -35,9 +41,9 @@ export function speakDryFallback(text: string): Promise<void> {
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.voice = voice;
-      utterance.rate = MUTHUR_PRESET.fallback.rate;
-      utterance.pitch = MUTHUR_PRESET.fallback.pitch;
-      utterance.volume = MUTHUR_PRESET.fallback.volume;
+      utterance.rate = tuning?.rate ?? MUTHUR_PRESET.fallback.rate;
+      utterance.pitch = tuning?.pitch ?? MUTHUR_PRESET.fallback.pitch;
+      utterance.volume = tuning?.volume ?? MUTHUR_PRESET.fallback.volume;
 
       console.warn("[muthur] DRY_FALLBACK selected voice:", voice.name);
 
