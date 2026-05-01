@@ -24,6 +24,7 @@ import {
   playOutOfGas429,
   playRaceReadySetGo,
 } from "@/lib/AudioEngine";
+import { speakDryFallback } from "@/voice/speakMuthur";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -480,18 +481,52 @@ export default function CyberdeckPage() {
         apiKey: providerKeys.openai || "",
       }),
     });
-    if (!res.ok) {
-      if (lastVoiceErrorRef.current !== String(res.status)) {
-        lastVoiceErrorRef.current = String(res.status);
-        setMessages((prev) => [
-          ...prev,
-          { role: "system", text: `VOICE_ENDPOINT_UNAVAILABLE // HTTP_${res.status} // USING_LOCAL_FALLBACK` },
-        ]);
-      }
-      return null;
+
+    const contentType = res.headers.get("content-type") || "";
+    const isAudio = contentType.startsWith("audio/");
+    const isJson = contentType.includes("application/json");
+
+    if (isAudio) {
+      lastVoiceErrorRef.current = "";
+      return { kind: "audio" as const, audio: await res.arrayBuffer() };
     }
-    lastVoiceErrorRef.current = "";
-    return res.arrayBuffer();
+
+    if (isJson) {
+      const diagnostic = await res.json().catch(() => null);
+      if (diagnostic && typeof diagnostic === "object") {
+        console.error("[muthur] render diagnostic", diagnostic);
+        const stage = typeof (diagnostic as { stage?: unknown }).stage === "string"
+          ? (diagnostic as { stage: string }).stage
+          : "unknown";
+        const message = typeof (diagnostic as { message?: unknown }).message === "string"
+          ? (diagnostic as { message: string }).message
+          : "MUTHUR backend returned a diagnostic";
+        const details = typeof (diagnostic as { details?: unknown }).details === "string"
+          ? (diagnostic as { details: string }).details
+          : "";
+        const signature = `${res.status}:${stage}:${message}`;
+        if (lastVoiceErrorRef.current !== signature) {
+          lastVoiceErrorRef.current = signature;
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: `MUTHUR_BACKEND_DIAGNOSTIC // ${stage.toUpperCase()} // ${message} // ${details}`.slice(0, 240),
+            },
+          ]);
+        }
+        return { kind: "diagnostic" as const, diagnostic };
+      }
+    }
+
+    if (lastVoiceErrorRef.current !== String(res.status)) {
+      lastVoiceErrorRef.current = String(res.status);
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: `VOICE_ENDPOINT_UNAVAILABLE // HTTP_${res.status} // USING_LOCAL_FALLBACK` },
+      ]);
+    }
+    return { kind: "diagnostic" as const, diagnostic: null };
   }, [providerKeys.openai]);
 
   const speakInBrowser = useCallback((text: string, profile?: string) => {
@@ -518,6 +553,10 @@ export default function CyberdeckPage() {
         }
         return name.includes("jenny");
       });
+
+      if (wantsMuthur && !preferred) {
+        return false;
+      }
 
       if (preferred) {
         utterance.voice = preferred;
@@ -546,20 +585,23 @@ export default function CyberdeckPage() {
   }, [motherReverbTail, unlockMotherAudio]);
 
   const speakMother = useCallback(async (text: string) => {
-    const spoken = speakInBrowser(text, "muthur");
-    if (spoken) return true;
     try {
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, profile: "muthur" }),
-      });
-      if (res.ok) return true;
+      const result = await synthesizeMirageChunk(text);
+      if (result.kind === "audio") {
+        await playMirageBuffer(result.audio);
+        return true;
+      }
+    } catch {
+      /* fall through */
+    }
+    try {
+      await speakDryFallback(text);
+      return true;
     } catch {
       /* fall through */
     }
     return false;
-  }, [speakInBrowser]);
+  }, [playMirageBuffer, speakDryFallback, synthesizeMirageChunk]);
 
   const selectProvider = useCallback((id: string) => {
     setActiveProvider(id);
