@@ -24,7 +24,10 @@ import {
   playOutOfGas429,
   playRaceReadySetGo,
 } from "@/lib/AudioEngine";
+import { applyMuthurEffectChain } from "@/voice/effectsChain";
 import { speakDryFallback } from "@/voice/speakMuthur";
+
+type VoiceHealthState = "idle" | "backend" | "fallback" | "off";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -185,6 +188,7 @@ export default function CyberdeckPage() {
   const [inputCaretIndex, setInputCaretIndex] = useState(0);
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceHealth, setVoiceHealth] = useState<VoiceHealthState>("idle");
 
   const [activeProvider, setActiveProvider] = useState<string>("opencode");
   /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
@@ -372,34 +376,19 @@ export default function CyberdeckPage() {
     const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
     const source = ctx.createBufferSource();
     source.buffer = decoded;
+    const output = applyMuthurEffectChain(ctx, source, {
+      highpassHz: 180,
+      lowpassHz: 3600,
+      presenceHz: 2800,
+      presenceGainDb: -0.5,
+      presenceQ: 1.0,
+      reverbWet: 0.06,
+      reverbSeconds: 0.45,
+      reverbDecay: 0.9,
+      compressor: true,
+    });
 
-    const dryGain = ctx.createGain();
-    dryGain.gain.value = 0.92;
-
-    const delay = ctx.createDelay();
-    delay.delayTime.value = 0.08;
-    const echoGain = ctx.createGain();
-    echoGain.gain.value = 0.22;
-    delay.connect(echoGain);
-
-    const splitter = ctx.createChannelSplitter(2);
-    const merger = ctx.createChannelMerger(2);
-    const leftGain = ctx.createGain();
-    const rightGain = ctx.createGain();
-    leftGain.gain.value = 1.06;
-    rightGain.gain.value = 1.06;
-
-    source.connect(dryGain);
-    dryGain.connect(splitter);
-    splitter.connect(leftGain, 0);
-    splitter.connect(rightGain, 1);
-    leftGain.connect(merger, 0, 0);
-    rightGain.connect(merger, 0, 1);
-
-    source.connect(delay);
-
-    merger.connect(ctx.destination);
-    echoGain.connect(ctx.destination);
+    output.connect(ctx.destination);
 
     activeSourceNodesRef.current.push(source);
     source.start(0);
@@ -542,10 +531,8 @@ export default function CyberdeckPage() {
         const name = voice.name.toLowerCase();
         if (wantsMuthur) {
           return (
-            name.includes("aria") ||
-            name.includes("jenny") ||
-            name.includes("jeeny") ||
             name.includes("zira") ||
+            name.includes("aria") ||
             name.includes("susan") ||
             name.includes("sonia") ||
             name.includes("female")
@@ -588,16 +575,20 @@ export default function CyberdeckPage() {
     try {
       const result = await synthesizeMirageChunk(text);
       if (result.kind === "audio") {
+        setVoiceHealth("backend");
         await playMirageBuffer(result.audio);
         return true;
       }
+      setVoiceHealth("fallback");
     } catch {
       /* fall through */
     }
     try {
+      setVoiceHealth("fallback");
       await speakDryFallback(text);
       return true;
     } catch {
+      setVoiceHealth("off");
       /* fall through */
     }
     return false;
@@ -1868,8 +1859,10 @@ export default function CyberdeckPage() {
                         setVoiceEnabled((prev) => {
                           const next = !prev;
                           if (next) {
+                            setVoiceHealth("idle");
                             void speakMother("Mother online. Signal stable.");
                           } else {
+                            setVoiceHealth("off");
                             stopMirageAudio();
                           }
                           return next;
@@ -1922,6 +1915,34 @@ export default function CyberdeckPage() {
                         </svg>
                       )}
                     </button>
+                    <span
+                      className={`inline-flex h-8 items-center rounded-sm border px-2 font-mono text-[9px] tracking-[0.12em] ${
+                        voiceHealth === "backend"
+                          ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
+                          : voiceHealth === "fallback"
+                            ? "border-amber-500/60 bg-amber-500/10 text-amber-300"
+                            : voiceHealth === "off"
+                              ? "border-gray-700 bg-black text-gray-500"
+                              : "border-slate-700 bg-slate-950 text-slate-400"
+                      }`}
+                      title={
+                        voiceHealth === "backend"
+                          ? "MUTHUR is using backend audio"
+                          : voiceHealth === "fallback"
+                            ? "MUTHUR is using DRY_FALLBACK"
+                            : voiceHealth === "off"
+                              ? "Voice is off"
+                              : "Voice state is idle"
+                      }
+                    >
+                      {voiceHealth === "backend"
+                        ? "BACKEND"
+                        : voiceHealth === "fallback"
+                          ? "DRY_FALLBACK"
+                          : voiceHealth === "off"
+                            ? "OFF"
+                            : "IDLE"}
+                    </span>
                     {!isStreaming ? (
                       <button
                         type="button"

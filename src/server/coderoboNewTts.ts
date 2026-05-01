@@ -109,10 +109,10 @@ export async function renderCoderoboNewTts(
   const token = getToken();
   const text = normalizeText(input.text);
   const language = normalizeText(input.language || "en-US");
-  const voiceType = normalizeText(input.voiceType || "JennyNeural");
+  const voiceType = normalizeText(input.voiceType || "AriaNeural");
   const gender = input.gender || "Female";
-  const ratePercent = toIntegerString(input.ratePercent, -14);
-  const pitchHz = toIntegerString(input.pitchHz, -1);
+  const ratePercent = toIntegerString(input.ratePercent, -34);
+  const pitchHz = toIntegerString(input.pitchHz, -7);
   const userIp = getUserIp();
 
   const requestUrl = resolveUrl(baseUrl, endpoint);

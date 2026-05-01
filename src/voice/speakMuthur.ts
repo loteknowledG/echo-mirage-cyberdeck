@@ -3,8 +3,8 @@ export function selectMuthurFallbackVoice(): SpeechSynthesisVoice | null {
 
   const voices = window.speechSynthesis.getVoices();
 
-  const reject = ["david", "mark", "guy", "george", "male"];
-  const prefer = ["jenny", "microsoft jenny", "aria", "zira", "hazel", "susan", "female"];
+  const reject = ["david", "mark", "guy", "george", "male", "jenny"];
+  const prefer = ["zira", "aria", "hazel", "susan", "female"];
 
   const safeVoices = voices.filter((voice) => {
     const name = `${voice.name} ${voice.lang} ${voice.voiceURI}`.toLowerCase();
@@ -33,8 +33,8 @@ export function speakDryFallback(text: string): Promise<void> {
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.voice = voice;
-      utterance.rate = 0.86;
-      utterance.pitch = 0.96;
+      utterance.rate = 0.82;
+      utterance.pitch = 0.94;
       utterance.volume = 1.0;
 
       console.warn("[muthur] DRY_FALLBACK selected voice:", voice.name);

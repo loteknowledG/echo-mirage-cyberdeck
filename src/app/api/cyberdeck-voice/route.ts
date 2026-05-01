@@ -19,10 +19,10 @@ export async function POST(request: Request) {
     const result = await renderCoderoboNewTts({
       text,
       language: "en-US",
-      voiceType: "JennyNeural",
+      voiceType: "AriaNeural",
       gender: "Female",
-      ratePercent: -14,
-      pitchHz: -1,
+      ratePercent: -34,
+      pitchHz: -7,
     });
 
     if (result.ok) {
