@@ -27,8 +27,11 @@ import {
 import { applyMuthurEffectChain } from "@/voice/effectsChain";
 import { MUTHUR_PRESET } from "@/voice/muthurPreset";
 import { speakDryFallback } from "@/voice/speakMuthur";
+import { copyTextToClipboard } from "@/lib/grok-image-prompt";
+import { get, set } from "idb-keyval";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -43,10 +46,12 @@ const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
 const servers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
+  { id: "h", glyph: "H", label: "HEAP" },
   { id: "b", glyph: "§", label: "SETTINGS" },
 ] as const;
 
 const SERVER_IDS = servers.map((s) => s.id);
+const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
 
 /** Gateway SYS lines; link phrases must match `renderGatewayMessageText` splits. */
 function gatewayKeySysMessage(providerId: string): string {
@@ -77,6 +82,14 @@ type DroppedOperatorAsset = {
   mimeType: string;
   size: number;
   text?: string;
+  imageSrc?: string;
+};
+
+type HeapEntry = {
+  id: string;
+  name: string;
+  text: string;
+  createdAt: number;
 };
 
 const EDITABLE_TEXT_EXTENSIONS = [
@@ -142,6 +155,19 @@ function getOperatorFileKind(file: File): DroppedOperatorAsset["kind"] {
   if (file.type.startsWith("image/")) return "image";
   if (file.type.startsWith("video/")) return "video";
   return "file";
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(typeof reader.result === "string" ? reader.result : "");
+    };
+    reader.onerror = () => {
+      reject(reader.error || new Error("Failed to read file."));
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 class MotherTerminal {
@@ -240,6 +266,7 @@ function textForSpeech(value: string) {
   const raw = typeof value === "string" ? value : "";
   if (!raw.trim()) return "";
   return raw
+    .replace(/#/g, "")
     .replace(/[*\/\\]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -259,6 +286,7 @@ export default function CyberdeckPage() {
   const [operatorDocMode, setOperatorDocMode] = useState<"view" | "edit">("view");
   const [operatorDocNameDraft, setOperatorDocNameDraft] = useState("");
   const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
+  const [isOperatorDragOver, setIsOperatorDragOver] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const [inputCursorBlinkOn, setInputCursorBlinkOn] = useState(true);
@@ -267,6 +295,10 @@ export default function CyberdeckPage() {
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voiceHealth, setVoiceHealth] = useState<"idle" | "backend" | "fallback" | "off">("idle");
+  const [heapEntries, setHeapEntries] = useState<HeapEntry[]>([]);
+  const [heapNameDraft, setHeapNameDraft] = useState("");
+  const [heapTextDraft, setHeapTextDraft] = useState("");
+  const [heapHydrated, setHeapHydrated] = useState(false);
 
   const [activeProvider, setActiveProvider] = useState<string>("opencode");
   /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
@@ -357,6 +389,14 @@ export default function CyberdeckPage() {
   ] as const;
 
   const modelID = modelByProvider[activeProvider] || "";
+  const activeTabLabel =
+    server === "m"
+      ? "ØPERATOR"
+      : server === "s"
+        ? "MAINNET-UPLINK"
+        : server === "h"
+          ? "HEAP"
+          : "SETTINGS";
   const providerModelFetchStatus = modelFetchStatusByProvider[activeProvider] || "idle";
   const scanActivityActive =
     Boolean(probeInFlightByProvider[activeProvider]) || providerModelFetchStatus === "retrieving";
@@ -752,6 +792,197 @@ export default function CyberdeckPage() {
     setOperatorDroppedAsset((prev) => (prev ? { ...prev, name: nextName } : prev));
     setOperatorDocNameDraft(nextName);
   }, [operatorDocNameDraft, operatorDroppedAsset]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const saved = (await get<HeapEntry[]>(HEAP_STORAGE_KEY)) || [];
+        if (!mounted) return;
+        setHeapEntries(Array.isArray(saved) ? saved : []);
+      } catch {
+        if (!mounted) return;
+        setHeapEntries([]);
+      } finally {
+        if (mounted) setHeapHydrated(true);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!heapHydrated) return;
+    void set(HEAP_STORAGE_KEY, heapEntries).catch(() => {
+      toast.error("Heap save failed.");
+    });
+  }, [heapEntries, heapHydrated]);
+
+  const saveHeapDraft = useCallback(
+    async (sourceText?: string) => {
+      const text = (sourceText ?? heapTextDraft).trim();
+      if (!text) {
+        toast.error("Heap entry is empty.");
+        return;
+      }
+
+      const nextName = heapNameDraft.trim() || `entry-${heapEntries.length + 1}`;
+      const entry: HeapEntry = {
+        id: crypto.randomUUID(),
+        name: nextName,
+        text: sourceText ?? heapTextDraft,
+        createdAt: Date.now(),
+      };
+
+      setHeapEntries((prev) => [entry, ...prev]);
+      setHeapNameDraft("");
+      setHeapTextDraft("");
+      toast.success(`Saved "${nextName}" to Heap.`);
+    },
+    [heapEntries.length, heapNameDraft, heapTextDraft],
+  );
+
+  const pasteClipboardToHeap = useCallback(async () => {
+    try {
+      const clipboardText =
+        typeof navigator !== "undefined" && navigator.clipboard?.readText
+          ? await navigator.clipboard.readText()
+          : "";
+
+      if (!clipboardText.trim()) {
+        toast.error("Clipboard has no text.");
+        return;
+      }
+
+      setHeapTextDraft(clipboardText);
+      await saveHeapDraft(clipboardText);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not paste clipboard text.");
+    }
+  }, [saveHeapDraft]);
+
+  const copyOperatorDocToClipboard = useCallback(async () => {
+    const text = operatorDroppedAsset?.text || "";
+    if (!operatorSurfaceIsDocument || !text.trim()) {
+      toast.error("Operator document has no text.");
+      return;
+    }
+
+    try {
+      await copyTextToClipboard(text);
+      toast.success(`Copied "${operatorDroppedAsset?.name || "Operator document"}" to clipboard.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not copy operator document.");
+    }
+  }, [operatorDroppedAsset?.name, operatorDroppedAsset?.text, operatorSurfaceIsDocument]);
+
+  const pasteClipboardToOperator = useCallback(async () => {
+    try {
+      const clipboardText =
+        typeof navigator !== "undefined" && navigator.clipboard?.readText
+          ? await navigator.clipboard.readText()
+          : "";
+
+      if (!clipboardText.trim()) {
+        toast.error("Clipboard has no text.");
+        return;
+      }
+
+      const currentKind = operatorDroppedAsset?.kind;
+      const nextKind: DroppedOperatorAsset["kind"] =
+        currentKind === "markdown" || currentKind === "code" || currentKind === "text"
+          ? currentKind
+          : "text";
+      const nextName = operatorDroppedAsset?.name || "clipboard.txt";
+
+      setOperatorDroppedAsset({
+        kind: nextKind,
+        name: nextName,
+        mimeType: nextKind === "markdown" ? "text/markdown" : "text/plain",
+        size: new Blob([clipboardText]).size,
+        text: clipboardText,
+      });
+      setOperatorDocMode("edit");
+      toast.success(`Pasted clipboard into "${nextName}".`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not paste clipboard text.");
+    }
+  }, [operatorDroppedAsset?.kind, operatorDroppedAsset?.name]);
+
+  const loadOperatorAssetFromFile = useCallback(async (file: File) => {
+    const kind = getOperatorFileKind(file);
+    const mimeType = file.type || "application/octet-stream";
+    const baseAsset = {
+      kind,
+      name: file.name,
+      mimeType,
+      size: file.size,
+    } satisfies Pick<DroppedOperatorAsset, "kind" | "name" | "mimeType" | "size">;
+
+    if (kind === "image") {
+      try {
+        const imageSrc = await readFileAsDataUrl(file);
+        setOperatorDroppedAsset({ ...baseAsset, imageSrc });
+      } catch {
+        setOperatorDroppedAsset(baseAsset);
+      }
+      setOperatorDocMode("view");
+      return;
+    }
+
+    if (kind === "video") {
+      setOperatorDroppedAsset(baseAsset);
+      setOperatorDocMode("view");
+      return;
+    }
+
+    if (kind === "markdown" || kind === "code" || kind === "text") {
+      try {
+        const text = await file.text();
+        setOperatorDroppedAsset({ ...baseAsset, text });
+      } catch {
+        setOperatorDroppedAsset(baseAsset);
+      }
+      setOperatorDocMode("view");
+      return;
+    }
+
+    setOperatorDroppedAsset(baseAsset);
+    setOperatorDocMode("view");
+  }, []);
+
+  const copyHeapEntry = useCallback(async (entry: HeapEntry) => {
+    try {
+      await copyTextToClipboard(entry.text);
+      toast.success(`Copied "${entry.name}" to clipboard.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not copy heap entry.");
+    }
+  }, []);
+
+  const openHeapEntryInOperator = useCallback((entry: HeapEntry) => {
+    const text = entry.text || "";
+    const mimeType =
+      entry.name.toLowerCase().endsWith(".md") || text.includes("\n")
+        ? "text/markdown"
+        : "text/plain";
+    setOperatorDroppedAsset({
+      kind: mimeType === "text/markdown" ? "markdown" : "text",
+      name: entry.name,
+        mimeType,
+        size: new Blob([text]).size,
+        text,
+      });
+      setOperatorDocMode("view");
+      setServer("m");
+      setNavRailContext("gateway");
+  }, []);
+
+  const deleteHeapEntry = useCallback((id: string) => {
+    setHeapEntries((prev) => prev.filter((entry) => entry.id !== id));
+  }, []);
 
   const selectProvider = useCallback((id: string) => {
     setActiveProvider(id);
@@ -1811,52 +2042,33 @@ export default function CyberdeckPage() {
     }
 
     if (activeServer === "m") {
-      const kind = getOperatorFileKind(file);
-      const isTextLike = kind === "markdown" || kind === "code" || kind === "text";
-
-      if (isTextLike) {
-        try {
-          const text = await file.text();
-          setOperatorDroppedAsset({
-            kind,
-            name: file.name,
-            mimeType: file.type || "text/plain",
-            size: file.size,
-            text,
-          });
-          setOperatorDocMode("view");
-        } catch {
-          setOperatorDroppedAsset({
-            kind,
-            name: file.name,
-            mimeType: file.type || "text/plain",
-            size: file.size,
-          });
-          setOperatorDocMode("view");
-        }
-        return;
-      }
-
-      if (kind === "image" || kind === "video") {
-        setOperatorDroppedAsset({
-          kind,
-          name: file.name,
-          mimeType: file.type || "application/octet-stream",
-          size: file.size,
-        });
-        setOperatorDocMode("view");
-        return;
-      }
-
-      setOperatorDroppedAsset({
-        kind: "file",
-        name: file.name,
-        mimeType: file.type || "application/octet-stream",
-        size: file.size,
-      });
-      setOperatorDocMode("view");
+      await loadOperatorAssetFromFile(file);
     }
+  }, [loadOperatorAssetFromFile]);
+
+  const handleOperatorDragOver = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
+    if (serverRef.current !== "m") return;
+    e.preventDefault();
+    setIsOperatorDragOver(true);
   }, []);
+
+  const handleOperatorDragLeave = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsOperatorDragOver(false);
+  }, []);
+
+  const handleOperatorDrop = useCallback(async (e: ReactDragEvent<HTMLDivElement>) => {
+    const activeServer = serverRef.current;
+    if (activeServer !== "m") return;
+
+    e.preventDefault();
+    setIsOperatorDragOver(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    await loadOperatorAssetFromFile(file);
+  }, [loadOperatorAssetFromFile]);
 
   /* Weyland: col2 = nav, col3 = terminal. Echo: flipped → col2 = terminal (chat), col3 = nav (gateway). */
   return (
@@ -2204,7 +2416,7 @@ export default function CyberdeckPage() {
               networkActivityActive ? "is-net-active" : ""
             } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
           >
-            <header className="flex shrink-0 items-center overflow-visible border-b border-gray-800 bg-black px-6 py-2">
+            <header className="flex shrink-0 items-start justify-between gap-4 overflow-visible border-b border-gray-800 bg-black px-6 py-2">
                   <pre
                     className="cyberdeck-net-logo m-0 whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
                     style={{ textShadow: "0 0 5px #00ff00" }}
@@ -2222,6 +2434,12 @@ export default function CyberdeckPage() {
 ╲╱_╱    ╱ ╱ ╱╱╲__╲╱_╱___╲╱ ╱ ╱  ╲ ╲ ╲╱ ╱ ╱_       __╲ ╲_╲╱ ╱ ╱______╲╱ ╱╱ ╱ ╱_______╲   
         ╲╱_╱ ╲╱_________╱╲╱_╱    ╲_╲╱╲_╲___╲     ╱____╱_╱╲╱___________╱ ╲╱__________╱`}
                   </pre>
+              <div
+                className="shrink-0 pt-1 text-right font-mono text-[9px] tracking-[0.2em] text-[#8a8a8a]"
+                style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+              >
+                [{activeTabLabel}]
+              </div>
             </header>
             {showGatewayPanel ? (
               <div className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
@@ -2396,10 +2614,17 @@ export default function CyberdeckPage() {
                   ) : null}
               </div>
             ) : server === "m" ? (
-              <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
-                <div
+            <div
+              className={`custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4 ${
+                isOperatorDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""
+              }`}
+              onDragOver={handleOperatorDragOver}
+              onDragLeave={handleOperatorDragLeave}
+              onDrop={handleOperatorDrop}
+            >
+              <div
                   className={`flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors ${
-                    isMarkdownDragOver ? "border-amber-500/60 ring-2 ring-amber-500/35 ring-inset" : ""
+                    isOperatorDragOver ? "border-amber-500/60 ring-2 ring-amber-500/35 ring-inset" : ""
                   }`}
                 >
                   <div className="flex items-center justify-between border-b border-[#141414] px-3 py-2">
@@ -2434,24 +2659,40 @@ export default function CyberdeckPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void pasteClipboardToOperator()}
+                        className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                      >
+                        PASTE
+                      </button>
                       {operatorSurfaceIsDocument ? (
-                        <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                          <span className={operatorDocMode === "view" ? "text-emerald-200" : ""}>VIEW</span>
-                          <Switch
-                            checked={operatorDocMode === "edit"}
-                            onCheckedChange={(checked) => {
-                              if (!checked) {
-                                commitOperatorDocName();
-                                setOperatorDocMode("view");
-                                return;
-                              }
-                              setOperatorDocMode("edit");
-                            }}
-                            aria-label="Toggle operator view edit mode"
-                            className="data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
-                          />
-                          <span className={operatorDocMode === "edit" ? "text-emerald-200" : ""}>EDIT</span>
-                        </div>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => void copyOperatorDocToClipboard()}
+                            className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                          >
+                            COPY
+                          </button>
+                          <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+                            <span className={operatorDocMode === "view" ? "text-emerald-200" : ""}>VIEW</span>
+                            <Switch
+                              checked={operatorDocMode === "edit"}
+                              onCheckedChange={(checked) => {
+                                if (!checked) {
+                                  commitOperatorDocName();
+                                  setOperatorDocMode("view");
+                                  return;
+                                }
+                                setOperatorDocMode("edit");
+                              }}
+                              aria-label="Toggle operator view edit mode"
+                              className="data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
+                            />
+                            <span className={operatorDocMode === "edit" ? "text-emerald-200" : ""}>EDIT</span>
+                          </div>
+                        </>
                       ) : operatorDroppedAsset ? (
                         <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
                           {operatorDroppedAsset.kind.toUpperCase()}
@@ -2465,7 +2706,25 @@ export default function CyberdeckPage() {
                         {operatorDroppedAsset.mimeType || "application/octet-stream"} //{" "}
                         {Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB
                       </div>
-                      {operatorSurfaceIsDocument ? (
+                      {operatorDroppedAsset.kind === "image" ? (
+                        <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
+                          <div className="mb-2 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
+                            IMAGE PREVIEW
+                          </div>
+                          {operatorDroppedAsset.imageSrc ? (
+                            <img
+                              src={operatorDroppedAsset.imageSrc}
+                              alt={operatorDroppedAsset.name}
+                              className="max-h-[72vh] w-full rounded-sm border border-[#1c1c1c] object-contain"
+                              draggable={false}
+                            />
+                          ) : (
+                            <div className="rounded-sm border border-dashed border-[#1c1c1c] bg-black p-4 font-mono text-[10px] leading-snug text-[#8a8a8a]">
+                              Could not load image preview.
+                            </div>
+                          )}
+                        </div>
+                      ) : operatorSurfaceIsDocument ? (
                         operatorDocMode === "edit" ? (
                           <Textarea
                             ref={operatorEditorRef}
@@ -2504,19 +2763,136 @@ export default function CyberdeckPage() {
                         )
                       ) : (
                         <div className="rounded-sm border border-dashed border-amber-700/60 bg-black p-4 font-mono text-[10px] leading-snug text-amber-300/90">
-                          {operatorDroppedAsset.kind === "image"
-                            ? "Image preview comes next. Drop a code or text file to edit it here."
-                            : operatorDroppedAsset.kind === "video"
-                              ? "Video preview comes next. Drop a code or text file to edit it here."
-                              : "Drop a code, text, or markdown file to edit it here."}
+                          {operatorDroppedAsset.kind === "video"
+                            ? "Video preview comes next. Drop a code or text file to edit it here."
+                            : "Drop or paste a code, text, markdown, or image file here to view and edit it."}
                         </div>
                       )}
                     </div>
                   ) : (
                     <div className="flex flex-1 items-center justify-center p-6 text-center font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-                      DROP CODE, TEXT, OR MARKDOWN FILES HERE TO VIEW AND EDIT THEM.
+                      DROP OR PASTE CODE, TEXT, MARKDOWN, OR IMAGE FILES HERE TO VIEW AND EDIT THEM.
                     </div>
                   )}
+                </div>
+              </div>
+            ) : server === "h" ? (
+              <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
+                <div className="flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors">
+                  <div className="flex items-center justify-between border-b border-[#141414] px-3 py-2">
+                    <div className="min-w-0 flex-1 pr-3">
+                      <div
+                        className="truncate font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
+                        style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+                      >
+                        ECHO MIRAGE HEAP
+                      </div>
+                      <div className="mt-1 font-mono text-[9px] tracking-[0.04em] text-[#6f6f6f]">
+                        LOCAL BACKFILE // INDEXEDDB
+                      </div>
+                    </div>
+                    <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+                      {heapEntries.length} ITEMS
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col gap-4 overflow-auto p-3">
+                    <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
+                          NEW HEAP ENTRY
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void pasteClipboardToHeap()}
+                            className="rounded border border-emerald-700/70 bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-emerald-300 transition hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-200"
+                          >
+                            PASTE CLIPBOARD
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void saveHeapDraft()}
+                            className="rounded border border-emerald-700/70 bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-emerald-300 transition hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-200"
+                          >
+                            SAVE
+                          </button>
+                        </div>
+                      </div>
+
+                      <input
+                        value={heapNameDraft}
+                        onChange={(event) => setHeapNameDraft(event.target.value)}
+                        placeholder="entry name / filename"
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        className="mb-2 w-full rounded-sm border border-[#1c1c1c] bg-black px-3 py-2 font-mono text-[10px] text-green-200 outline-none transition-colors placeholder:text-[#5a5a5a] focus:border-emerald-500/60"
+                      />
+
+                      <Textarea
+                        value={heapTextDraft}
+                        onChange={(event) => setHeapTextDraft(event.target.value)}
+                        placeholder="Paste text, markdown, or code here..."
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        wrap="off"
+                        className="min-h-[180px] resize-none overflow-auto rounded-sm border border-[#1c1c1c] bg-black px-3 py-3 font-mono text-[12px] leading-snug text-green-200 shadow-none focus-visible:ring-1 focus-visible:ring-emerald-500/40"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-3">
+                      {heapEntries.length === 0 ? (
+                        <div className="rounded-sm border border-dashed border-[#1c1c1c] bg-black/80 p-4 font-mono text-[10px] leading-snug text-[#8a8a8a] xl:col-span-2 2xl:col-span-3">
+                          HEAP IS EMPTY. PASTE A DOCUMENT OR DROP TEXT HERE TO KEEP IT AFTER REFRESH.
+                        </div>
+                      ) : (
+                        heapEntries.map((entry) => (
+                          <div key={entry.id} className="flex h-full flex-col rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate font-mono text-[10px] tracking-[0.04em] text-green-200">
+                                  {entry.name}
+                                </div>
+                                <div className="mt-1 font-mono text-[9px] tracking-[0.04em] text-[#6f6f6f]">
+                                  {new Date(entry.createdAt).toLocaleString()}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void copyHeapEntry(entry)}
+                                  className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                                >
+                                  COPY
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openHeapEntryInOperator(entry)}
+                                  className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                                >
+                                  OPEN
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteHeapEntry(entry.id)}
+                                  className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-red-500/60 hover:text-red-200"
+                                >
+                                  DEL
+                                </button>
+                              </div>
+                            </div>
+                            <pre className="mt-3 flex-1 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-snug text-green-200">
+                              {entry.text}
+                            </pre>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
