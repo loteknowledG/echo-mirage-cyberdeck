@@ -25,6 +25,7 @@ import {
   playRaceReadySetGo,
 } from "@/lib/AudioEngine";
 import { applyMuthurEffectChain } from "@/voice/effectsChain";
+import { MUTHUR_PRESET } from "@/voice/muthurPreset";
 import { speakDryFallback } from "@/voice/speakMuthur";
 
 type VoiceHealthState = "idle" | "backend" | "fallback" | "off";
@@ -377,18 +378,11 @@ export default function CyberdeckPage() {
     const source = ctx.createBufferSource();
     source.buffer = decoded;
     const output = applyMuthurEffectChain(ctx, source, {
-      highpassHz: 180,
-      lowpassHz: 3600,
-      presenceHz: 2800,
-      presenceGainDb: -0.5,
-      presenceQ: 1.0,
-      reverbWet: 0.06,
-      reverbSeconds: 0.45,
-      reverbDecay: 0.9,
-      compressor: true,
+      ...MUTHUR_PRESET.playback,
     });
 
-    output.connect(ctx.destination);
+    const masterOutput = motherMasterGainRef.current ?? ctx.destination;
+    output.connect(masterOutput);
 
     activeSourceNodesRef.current.push(source);
     source.start(0);
@@ -402,18 +396,19 @@ export default function CyberdeckPage() {
     return true;
   }, []);
 
-  const initMotherAudio = useCallback(() => {
+  const initMotherAudio = useCallback((): AudioContext | null => {
     if (typeof window === "undefined") return null;
     const Ctx =
       window.AudioContext ||
       (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return null;
 
-    const ctx = audioContextRef.current ?? new Ctx();
+    const warmedCtx = initMotherAudio();
+    const ctx = audioContextRef.current ?? warmedCtx ?? new Ctx();
     audioContextRef.current = ctx;
     if (!motherMasterGainRef.current) {
       const master = ctx.createGain();
-      master.gain.value = 0.35;
+      master.gain.value = 0.55;
       master.connect(ctx.destination);
       motherMasterGainRef.current = master;
     }
@@ -1860,7 +1855,7 @@ export default function CyberdeckPage() {
                           const next = !prev;
                           if (next) {
                             setVoiceHealth("idle");
-                            void speakMother("Mother online. Signal stable.");
+                            void speakMother(MUTHUR_PRESET.testPhrase);
                           } else {
                             setVoiceHealth("off");
                             stopMirageAudio();

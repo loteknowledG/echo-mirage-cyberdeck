@@ -1,3 +1,5 @@
+import { MUTHUR_PRESET } from "@/voice/muthurPreset";
+
 export function selectMuthurFallbackVoice(): SpeechSynthesisVoice | null {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
 
@@ -33,9 +35,9 @@ export function speakDryFallback(text: string): Promise<void> {
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.voice = voice;
-      utterance.rate = 0.82;
-      utterance.pitch = 0.94;
-      utterance.volume = 1.0;
+      utterance.rate = MUTHUR_PRESET.fallback.rate;
+      utterance.pitch = MUTHUR_PRESET.fallback.pitch;
+      utterance.volume = MUTHUR_PRESET.fallback.volume;
 
       console.warn("[muthur] DRY_FALLBACK selected voice:", voice.name);
 

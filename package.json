@@ -8,6 +8,8 @@
     "dev": "node scripts/next-dev.mjs",
     "build": "next build",
     "start": "next start -p 3050",
+    "voice:restore": "node scripts/restore-muthur-voice.mjs",
+    "voice:save": "tsx scripts/save-muthur-voice.ts",
     "electron:dev": "concurrently \"pnpm dev\" \"wait-on http://127.0.0.1:3050 && electron .\"",
     "electron:prod": "next build && concurrently \"next start -p 3050\" \"electron .\"",
     "lint": "next lint",

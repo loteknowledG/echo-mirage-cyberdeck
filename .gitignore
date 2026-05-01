@@ -135,3 +135,7 @@ dist
 .yarn/install-state.gz
 .pnp.*
 .vercel
+
+# Voice tuning scratch artifacts
+.tmp_*
+.tmp_whisper/

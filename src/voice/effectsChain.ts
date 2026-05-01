@@ -7,6 +7,12 @@ type MuthurEffectOptions = {
   reverbWet?: number;
   reverbSeconds?: number;
   reverbDecay?: number;
+  tingyTailDelayMs?: number;
+  tingyTailHighpassHz?: number;
+  tingyTailPresenceHz?: number;
+  tingyTailPresenceGainDb?: number;
+  tingyTailPresenceQ?: number;
+  tingyTailGain?: number;
   compressor?: boolean;
 };
 
@@ -34,14 +40,20 @@ export function applyMuthurEffectChain(
   source: AudioBufferSourceNode,
   options: MuthurEffectOptions = {},
 ) {
-  const highpassHz = options.highpassHz ?? 120;
-  const lowpassHz = options.lowpassHz ?? 3600;
-  const presenceHz = options.presenceHz ?? 2800;
-  const presenceGainDb = options.presenceGainDb ?? -0.5;
-  const presenceQ = options.presenceQ ?? 1.0;
-  const reverbWet = options.reverbWet ?? 0.06;
-  const reverbSeconds = options.reverbSeconds ?? 0.45;
-  const reverbDecay = options.reverbDecay ?? 0.9;
+  const highpassHz = options.highpassHz ?? 260;
+  const lowpassHz = options.lowpassHz ?? 2400;
+  const presenceHz = options.presenceHz ?? 1500;
+  const presenceGainDb = options.presenceGainDb ?? 3.0;
+  const presenceQ = options.presenceQ ?? 1.3;
+  const reverbWet = options.reverbWet ?? 0.008;
+  const reverbSeconds = options.reverbSeconds ?? 0.08;
+  const reverbDecay = options.reverbDecay ?? 0.5;
+  const tingyTailDelayMs = options.tingyTailDelayMs ?? 0;
+  const tingyTailHighpassHz = options.tingyTailHighpassHz ?? 0;
+  const tingyTailPresenceHz = options.tingyTailPresenceHz ?? 0;
+  const tingyTailPresenceGainDb = options.tingyTailPresenceGainDb ?? 0;
+  const tingyTailPresenceQ = options.tingyTailPresenceQ ?? 1.0;
+  const tingyTailGain = options.tingyTailGain ?? 0;
   const compressorEnabled = options.compressor ?? true;
 
   const input = ctx.createGain();
@@ -72,11 +84,28 @@ export function applyMuthurEffectChain(
   const convolver = ctx.createConvolver();
   convolver.buffer = createImpulseResponse(ctx, reverbSeconds, reverbDecay);
 
+  const tingyTailDelay = ctx.createDelay(0.05);
+  tingyTailDelay.delayTime.value = Math.max(0, tingyTailDelayMs) / 1000;
+
+  const tingyTailHighpass = ctx.createBiquadFilter();
+  tingyTailHighpass.type = "highpass";
+  tingyTailHighpass.frequency.value = tingyTailHighpassHz;
+  tingyTailHighpass.Q.value = 0.7;
+
+  const tingyTailPresence = ctx.createBiquadFilter();
+  tingyTailPresence.type = "peaking";
+  tingyTailPresence.frequency.value = tingyTailPresenceHz;
+  tingyTailPresence.Q.value = tingyTailPresenceQ;
+  tingyTailPresence.gain.value = tingyTailPresenceGainDb;
+
+  const tingyTailGainNode = ctx.createGain();
+  tingyTailGainNode.gain.value = tingyTailGain;
+
   if (compressorEnabled) {
     const compressor = ctx.createDynamicsCompressor();
-    compressor.threshold.value = -28;
+    compressor.threshold.value = -36;
     compressor.knee.value = 20;
-    compressor.ratio.value = 5.0;
+    compressor.ratio.value = 6.5;
     compressor.attack.value = 0.003;
     compressor.release.value = 0.2;
 
@@ -87,8 +116,13 @@ export function applyMuthurEffectChain(
     presence.connect(dryGain);
     lowpass.connect(convolver);
     convolver.connect(wetGain);
+    wetGain.connect(tingyTailDelay);
+    tingyTailDelay.connect(tingyTailHighpass);
+    tingyTailHighpass.connect(tingyTailPresence);
+    tingyTailPresence.connect(tingyTailGainNode);
     dryGain.connect(compressor);
     wetGain.connect(compressor);
+    tingyTailGainNode.connect(compressor);
     compressor.connect(output);
     return output;
   }
@@ -100,7 +134,12 @@ export function applyMuthurEffectChain(
   presence.connect(dryGain);
   lowpass.connect(convolver);
   convolver.connect(wetGain);
+  wetGain.connect(tingyTailDelay);
+  tingyTailDelay.connect(tingyTailHighpass);
+  tingyTailHighpass.connect(tingyTailPresence);
+  tingyTailPresence.connect(tingyTailGainNode);
   dryGain.connect(output);
   wetGain.connect(output);
+  tingyTailGainNode.connect(output);
   return output;
 }

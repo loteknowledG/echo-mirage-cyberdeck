@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { renderCoderoboNewTts } from "@/server/coderoboNewTts";
+import { MUTHUR_PRESET } from "@/voice/muthurPreset";
 
 export const runtime = "nodejs";
 
@@ -18,11 +19,7 @@ export async function POST(request: Request) {
 
     const result = await renderCoderoboNewTts({
       text,
-      language: "en-US",
-      voiceType: "AriaNeural",
-      gender: "Female",
-      ratePercent: -34,
-      pitchHz: -7,
+      ...MUTHUR_PRESET.backend,
     });
 
     if (result.ok) {
