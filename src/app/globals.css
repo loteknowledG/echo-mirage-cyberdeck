@@ -297,6 +297,10 @@ body,
   border-top: 1px solid rgba(57, 255, 136, 0.2);
 }
 
+.cyberdeck-square-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+}
+
 @media (max-width: 768px) {
   .cyberdeck-server-rail .btn-container {
     margin-bottom: 0;

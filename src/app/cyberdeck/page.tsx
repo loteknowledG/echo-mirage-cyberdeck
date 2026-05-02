@@ -3331,7 +3331,7 @@ export default function CyberdeckPage() {
                         {voiceDial.volume.toFixed(2)}
                       </div>
 
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="cyberdeck-square-grid mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">RATE</div>
                           <div className="mt-3 flex flex-1 items-center justify-center">
@@ -3458,7 +3458,7 @@ export default function CyberdeckPage() {
                         </div>
                       </div>
 
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="cyberdeck-square-grid mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">SUMMARY</div>
                           <div className="mt-2 flex-1 overflow-auto whitespace-pre-wrap break-words font-mono text-[9px] leading-5 text-[#a3a3a3]">
