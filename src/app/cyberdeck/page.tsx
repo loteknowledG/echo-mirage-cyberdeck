@@ -57,6 +57,7 @@ import {
 import { CyberdeckInfoBlockHeader } from "@/components/cyberdeck/info-block-header";
 import { CyberdeckHeapPaneBody } from "@/components/cyberdeck/heap-pane-body";
 import { CyberdeckSquareCardGrid } from "@/components/cyberdeck/square-card-grid";
+import { CyberdeckSquareCard } from "@/components/cyberdeck/square-card";
 import { Knob } from "@/components/ui/knob";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -3220,7 +3221,7 @@ export default function CyberdeckPage() {
                       </div>
 
                       <CyberdeckSquareCardGrid>
-                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <CyberdeckSquareCard>
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">RATE</div>
                           <div className="mt-3 flex flex-1 items-center justify-center">
                             <Knob
@@ -3239,9 +3240,9 @@ export default function CyberdeckPage() {
                               theme="dark"
                             />
                           </div>
-                        </div>
+                        </CyberdeckSquareCard>
 
-                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <CyberdeckSquareCard>
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">PITCH</div>
                           <div className="mt-3 flex flex-1 items-center justify-center">
                             <Knob
@@ -3260,9 +3261,9 @@ export default function CyberdeckPage() {
                               theme="dark"
                             />
                           </div>
-                        </div>
+                        </CyberdeckSquareCard>
 
-                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <CyberdeckSquareCard>
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">GAIN</div>
                           <div className="mt-3 flex flex-1 items-center justify-center">
                             <Knob
@@ -3281,9 +3282,9 @@ export default function CyberdeckPage() {
                               theme="dark"
                             />
                           </div>
-                        </div>
+                        </CyberdeckSquareCard>
 
-                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <CyberdeckSquareCard>
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">ACTIONS</div>
                           <div className="mt-3 grid flex-1 grid-cols-2 gap-2">
                             <button
@@ -3320,7 +3321,7 @@ export default function CyberdeckPage() {
                               RESTORE MASTER
                             </button>
                           </div>
-                        </div>
+                        </CyberdeckSquareCard>
                     </CyberdeckSquareCardGrid>
 
                     <div className="h-full rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
@@ -3340,14 +3341,14 @@ export default function CyberdeckPage() {
                       />
 
                       <CyberdeckSquareCardGrid>
-                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <CyberdeckSquareCard>
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">SUMMARY</div>
                           <div className="mt-2 flex-1 overflow-auto whitespace-pre-wrap break-words font-mono text-[9px] leading-5 text-[#a3a3a3]">
                             {muthurMemory.summary || "No durable notes yet."}
                           </div>
-                        </div>
+                        </CyberdeckSquareCard>
 
-                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <CyberdeckSquareCard>
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">FACTS</div>
                           <div className="mt-2 font-mono text-[9px] tracking-[0.08em] text-green-200">
                             {muthurMemory.facts.length} STORED
@@ -3363,9 +3364,9 @@ export default function CyberdeckPage() {
                               <div className="text-[#6f6f6f]">NO FACTS YET</div>
                             )}
                           </div>
-                        </div>
+                        </CyberdeckSquareCard>
 
-                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <CyberdeckSquareCard>
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">RECENT TURNS</div>
                           <div className="mt-2 font-mono text-[9px] tracking-[0.08em] text-green-200">
                             {muthurMemory.recentTurns.length} IN BUFFER
@@ -3384,9 +3385,9 @@ export default function CyberdeckPage() {
                               <div className="text-[#6f6f6f]">NO RECENT TURNS YET</div>
                             )}
                           </div>
-                        </div>
+                        </CyberdeckSquareCard>
 
-                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <CyberdeckSquareCard>
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">STATUS</div>
                           <div className="mt-2 font-mono text-[9px] leading-5 tracking-[0.04em] text-[#a3a3a3]">
                             <div className="whitespace-pre-wrap break-words">
@@ -3402,7 +3403,7 @@ export default function CyberdeckPage() {
                               HYDRATION // {muthurMemoryHydrated ? "READY" : "LOADING"}
                             </div>
                           </div>
-                        </div>
+                        </CyberdeckSquareCard>
                       </CyberdeckSquareCardGrid>
 
                       <div className="mt-4 flex flex-wrap items-center gap-2">
