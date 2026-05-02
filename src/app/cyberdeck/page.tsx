@@ -54,6 +54,7 @@ import {
   CyberdeckPaneHeaderTitle,
   CyberdeckPaneHeaderValue,
 } from "@/components/cyberdeck/pane-header";
+import { CyberdeckInfoBlockHeader } from "@/components/cyberdeck/info-block-header";
 import { CyberdeckHeapPaneBody } from "@/components/cyberdeck/heap-pane-body";
 import { CyberdeckSquareCardGrid } from "@/components/cyberdeck/square-card-grid";
 import { Knob } from "@/components/ui/knob";
@@ -3198,29 +3199,20 @@ export default function CyberdeckPage() {
 
                   <div className="grid flex-1 gap-3 overflow-auto p-3">
                     <div className="h-full rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-mono text-[10px] tracking-[0.08em] text-green-200">
-                            VOICE DIALS
-                          </div>
-                          <div className="mt-1 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
-                            MUTHUR // {MUTHUR_PRESET.backend.voiceType} // {MUTHUR_PRESET.backend.language}
-                          </div>
-                        </div>
-                        <div
-                          className={`font-mono text-[9px] tracking-[0.08em] ${
-                            voiceHealth === "backend"
-                              ? "text-emerald-200"
-                              : voiceHealth === "fallback"
-                                ? "text-amber-300"
-                                : voiceHealth === "off"
-                                  ? "text-gray-500"
-                                  : "text-[#8a8a8a]"
-                          }`}
-                        >
-                          {voiceHealth.toUpperCase()}
-                        </div>
-                      </div>
+                      <CyberdeckInfoBlockHeader
+                        title="VOICE DIALS"
+                        subtitle={`MUTHUR // ${MUTHUR_PRESET.backend.voiceType} // ${MUTHUR_PRESET.backend.language}`}
+                        status={voiceHealth.toUpperCase()}
+                        statusClassName={`font-mono text-[9px] tracking-[0.08em] ${
+                          voiceHealth === "backend"
+                            ? "text-emerald-200"
+                            : voiceHealth === "fallback"
+                              ? "text-amber-300"
+                              : voiceHealth === "off"
+                                ? "text-gray-500"
+                                : "text-[#8a8a8a]"
+                        }`}
+                      />
 
                       <div className="mt-3 rounded-sm border border-[#1c1c1c] bg-black px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
                         CURRENT // rate {voiceDial.ratePercent} // pitch {voiceDial.pitchHz} // gain{" "}
@@ -3332,27 +3324,20 @@ export default function CyberdeckPage() {
                     </CyberdeckSquareCardGrid>
 
                     <div className="h-full rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-mono text-[10px] tracking-[0.08em] text-green-200">
-                            MUTHUR MEMORY
-                          </div>
-                          <div className="mt-1 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
-                            {muthurMemoryHydrated ? "LOCAL // INDEXEDDB // RETRIEVAL" : "HYDRATING MEMORY..."}
-                          </div>
-                        </div>
-                        <div
-                          className={`font-mono text-[9px] tracking-[0.08em] ${
-                            muthurMemoryHydrated
-                              ? muthurMemory.turnCount > 0
-                                ? "text-emerald-200"
-                                : "text-[#8a8a8a]"
-                              : "text-amber-300"
-                          }`}
-                        >
-                          {muthurMemoryHydrated ? `${muthurMemory.turnCount} TURNS` : "WAIT"}
-                        </div>
-                      </div>
+                      <CyberdeckInfoBlockHeader
+                        title="MUTHUR MEMORY"
+                        subtitle={
+                          muthurMemoryHydrated ? "LOCAL // INDEXEDDB // RETRIEVAL" : "HYDRATING MEMORY..."
+                        }
+                        status={muthurMemoryHydrated ? `${muthurMemory.turnCount} TURNS` : "WAIT"}
+                        statusClassName={`font-mono text-[9px] tracking-[0.08em] ${
+                          muthurMemoryHydrated
+                            ? muthurMemory.turnCount > 0
+                              ? "text-emerald-200"
+                              : "text-[#8a8a8a]"
+                            : "text-amber-300"
+                        }`}
+                      />
 
                       <CyberdeckSquareCardGrid>
                         <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
