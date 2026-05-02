@@ -58,6 +58,7 @@ import { CyberdeckInfoBlockHeader } from "@/components/cyberdeck/info-block-head
 import { CyberdeckHeapPaneBody } from "@/components/cyberdeck/heap-pane-body";
 import { CyberdeckSquareCardGrid } from "@/components/cyberdeck/square-card-grid";
 import { CyberdeckSquareCard } from "@/components/cyberdeck/square-card";
+import { CyberdeckActionButton } from "@/components/cyberdeck/action-button";
 import { Knob } from "@/components/ui/knob";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -3287,39 +3288,32 @@ export default function CyberdeckPage() {
                         <CyberdeckSquareCard>
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">ACTIONS</div>
                           <div className="mt-3 grid flex-1 grid-cols-2 gap-2">
-                            <button
+                            <CyberdeckActionButton
                               type="button"
                               onClick={toggleVoiceEnabled}
-                              className={`rounded border px-2 py-2 font-mono text-[9px] tracking-[0.08em] transition ${
-                                voiceEnabled
-                                  ? "border-emerald-500/70 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400 hover:text-emerald-100"
-                                  : "border-[#2d2d2d] bg-black text-[#8a8a8a] hover:border-emerald-500/60 hover:text-emerald-200"
-                              }`}
+                              variant={voiceEnabled ? "accent" : "neutral"}
                             >
                               {voiceEnabled ? "VOICE ON" : "VOICE OFF"}
-                            </button>
-                            <button
+                            </CyberdeckActionButton>
+                            <CyberdeckActionButton
                               type="button"
                               onClick={() => void playVoiceTest()}
                               disabled={!voiceEnabled}
-                              className="rounded border border-[#2d2d2d] bg-black px-2 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               TEST MUTHUR
-                            </button>
-                            <button
+                            </CyberdeckActionButton>
+                            <CyberdeckActionButton
                               type="button"
                               onClick={saveMuthurVoiceCopyToApp}
-                              className="rounded border border-[#2d2d2d] bg-black px-2 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
                             >
                               SAVE COPY
-                            </button>
-                            <button
+                            </CyberdeckActionButton>
+                            <CyberdeckActionButton
                               type="button"
                               onClick={restoreMuthurVoiceMaster}
-                              className="rounded border border-[#2d2d2d] bg-black px-2 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
                             >
                               RESTORE MASTER
-                            </button>
+                            </CyberdeckActionButton>
                           </div>
                         </CyberdeckSquareCard>
                     </CyberdeckSquareCardGrid>
@@ -3407,14 +3401,15 @@ export default function CyberdeckPage() {
                       </CyberdeckSquareCardGrid>
 
                       <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <button
+                        <CyberdeckActionButton
                           type="button"
                           onClick={() => void clearMuthurMemoryState()}
                           disabled={!muthurMemoryHydrated}
-                          className="rounded border border-[#2d2d2d] bg-black px-3 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-red-500/60 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
+                          variant="danger"
+                          className="px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           CLEAR MEMORY
-                        </button>
+                        </CyberdeckActionButton>
                       </div>
                     </div>
                     </div>
