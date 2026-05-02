@@ -31,6 +31,7 @@ import {
   buildMuthurVoiceMasterCopy,
   getInitialMuthurVoiceDials,
   muthurBrowserSpeechTuning,
+  muthurMasterGain,
   restoreMuthurVoiceMasterCopy,
   saveMuthurVoiceMasterCopy,
   type MuthurVoiceDialState,
@@ -71,6 +72,7 @@ const servers = [
 
 const SERVER_IDS = servers.map((s) => s.id);
 const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
+const CHAT_STORAGE_KEY = "echo-mirage-chat-messages-v1";
 
 /** Gateway SYS lines; link phrases must match `renderGatewayMessageText` splits. */
 function gatewayKeySysMessage(providerId: string): string {
@@ -331,10 +333,12 @@ function textForSpeech(value: string) {
 }
 
 export default function CyberdeckPage() {
+  type ChatMessage = { role: string; text: string };
   // Start on the operator tab; disconnected users are redirected to MAINNET-UPLINK after hydration.
   const [server, setServer] = useState<(typeof SERVER_IDS)[number]>("m");
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatHydrated, setChatHydrated] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
@@ -594,7 +598,7 @@ export default function CyberdeckPage() {
     audioContextRef.current = ctx;
     if (!motherMasterGainRef.current) {
       const master = ctx.createGain();
-      master.gain.value = 0.55;
+      master.gain.value = muthurMasterGain(voiceDialRef.current.volume);
       master.connect(ctx.destination);
       motherMasterGainRef.current = master;
     }
@@ -642,12 +646,13 @@ export default function CyberdeckPage() {
     [motherTone],
   );
 
-  const synthesizeMirageChunk = useCallback(async (text: string) => {
+  const synthesizeMirageChunk = useCallback(async (text: string, voiceTuning: MuthurVoiceDialState) => {
     const res = await fetch("/api/cyberdeck-voice", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text,
+        voiceTuning,
         apiKey: providerKeys.openai || "",
       }),
     });
@@ -770,7 +775,8 @@ export default function CyberdeckPage() {
     const speakId = ++speakSequenceRef.current;
     speakQueueActiveRef.current = true;
     stopMirageAudio();
-    const browserTuning = muthurBrowserSpeechTuning(voiceDialRef.current);
+    const currentVoiceDial = voiceDialRef.current;
+    const browserTuning = muthurBrowserSpeechTuning(currentVoiceDial);
     try {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
@@ -780,7 +786,7 @@ export default function CyberdeckPage() {
     }
 
     try {
-      const result = await synthesizeMirageChunk(text);
+      const result = await synthesizeMirageChunk(text, currentVoiceDial);
       if (speakId !== speakSequenceRef.current) return false;
       if (result.kind === "audio") {
         setVoiceHealth("backend");
@@ -889,6 +895,12 @@ export default function CyberdeckPage() {
   }, [voiceDial]);
 
   useEffect(() => {
+    const master = motherMasterGainRef.current;
+    if (!master) return;
+    master.gain.value = muthurMasterGain(voiceDial.volume);
+  }, [voiceDial.volume]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       const loaded = await loadMuthurMemory();
@@ -907,6 +919,39 @@ export default function CyberdeckPage() {
     muthurMemoryRef.current = muthurMemory;
     void saveMuthurMemory(muthurMemory);
   }, [muthurMemory, muthurMemoryHydrated]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(CHAT_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as unknown;
+        if (Array.isArray(parsed)) {
+          const restored = parsed
+            .filter((item): item is ChatMessage => {
+              if (!item || typeof item !== "object") return false;
+              const candidate = item as Partial<ChatMessage>;
+              return typeof candidate.role === "string" && typeof candidate.text === "string";
+            })
+            .map((item) => ({ role: item.role, text: item.text }));
+          setMessages(restored);
+        }
+      }
+    } catch {
+      /* ignore chat restore errors */
+    } finally {
+      setChatHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!chatHydrated) return;
+    try {
+      window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+    } catch {
+      /* ignore */
+    }
+  }, [messages, chatHydrated]);
 
   const operatorSurfaceIsDocument =
     operatorDroppedAsset?.kind === "text" ||
@@ -3159,8 +3204,8 @@ export default function CyberdeckPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-1 flex-col gap-3 overflow-auto p-3">
-                    <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
+                  <div className="grid flex-1 gap-3 overflow-auto p-3 lg:grid-cols-2">
+                    <div className="h-full rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="font-mono text-[10px] tracking-[0.08em] text-green-200">
@@ -3185,10 +3230,15 @@ export default function CyberdeckPage() {
                         </div>
                       </div>
 
-                      <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                        <div className="rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                      <div className="mt-3 rounded-sm border border-[#1c1c1c] bg-black px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+                        CURRENT // rate {voiceDial.ratePercent} // pitch {voiceDial.pitchHz} // gain{" "}
+                        {voiceDial.volume.toFixed(2)}
+                      </div>
+
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">RATE</div>
-                          <div className="mt-3 flex justify-center">
+                          <div className="mt-3 flex flex-1 items-center justify-center">
                             <Knob
                               label="Rate"
                               unit="%"
@@ -3207,9 +3257,9 @@ export default function CyberdeckPage() {
                           </div>
                         </div>
 
-                        <div className="rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">PITCH</div>
-                          <div className="mt-3 flex justify-center">
+                          <div className="mt-3 flex flex-1 items-center justify-center">
                             <Knob
                               label="Pitch"
                               unit="Hz"
@@ -3228,9 +3278,9 @@ export default function CyberdeckPage() {
                           </div>
                         </div>
 
-                        <div className="rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">GAIN</div>
-                          <div className="mt-3 flex justify-center">
+                          <div className="mt-3 flex flex-1 items-center justify-center">
                             <Knob
                               label="Gain"
                               unit="x"
@@ -3247,10 +3297,49 @@ export default function CyberdeckPage() {
                               theme="dark"
                             />
                           </div>
-                      </div>
+                        </div>
+
+                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">ACTIONS</div>
+                          <div className="mt-3 grid flex-1 grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={toggleVoiceEnabled}
+                              className={`rounded border px-2 py-2 font-mono text-[9px] tracking-[0.08em] transition ${
+                                voiceEnabled
+                                  ? "border-emerald-500/70 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400 hover:text-emerald-100"
+                                  : "border-[#2d2d2d] bg-black text-[#8a8a8a] hover:border-emerald-500/60 hover:text-emerald-200"
+                              }`}
+                            >
+                              {voiceEnabled ? "VOICE ON" : "VOICE OFF"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void playVoiceTest()}
+                              disabled={!voiceEnabled}
+                              className="rounded border border-[#2d2d2d] bg-black px-2 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              TEST MUTHUR
+                            </button>
+                            <button
+                              type="button"
+                              onClick={saveMuthurVoiceCopyToApp}
+                              className="rounded border border-[#2d2d2d] bg-black px-2 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                            >
+                              SAVE COPY
+                            </button>
+                            <button
+                              type="button"
+                              onClick={restoreMuthurVoiceMaster}
+                              className="rounded border border-[#2d2d2d] bg-black px-2 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                            >
+                              RESTORE MASTER
+                            </button>
+                          </div>
+                        </div>
                     </div>
 
-                    <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
+                    <div className="h-full rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="font-mono text-[10px] tracking-[0.08em] text-green-200">
@@ -3273,23 +3362,23 @@ export default function CyberdeckPage() {
                         </div>
                       </div>
 
-                      <div className="mt-3 rounded-sm border border-[#1c1c1c] bg-black px-3 py-2 font-mono text-[9px] leading-5 tracking-[0.04em] text-[#a3a3a3]">
-                        <div>SUMMARY // {muthurMemory.summary || "No durable notes yet."}</div>
-                        <div>FACTS // {muthurMemory.facts.length}</div>
-                        <div>RECENT // {muthurMemory.recentTurns.length}</div>
-                        <div>
-                          UPDATED //{" "}
-                          {muthurMemoryHydrated ? new Date(muthurMemory.updatedAt).toLocaleString() : "—"}
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">SUMMARY</div>
+                          <div className="mt-2 flex-1 overflow-auto whitespace-pre-wrap break-words font-mono text-[9px] leading-5 text-[#a3a3a3]">
+                            {muthurMemory.summary || "No durable notes yet."}
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="mt-3 grid gap-3 xl:grid-cols-2">
-                        <div className="rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">FACTS</div>
-                          <div className="mt-2 space-y-1 font-mono text-[9px] leading-5 text-[#a3a3a3]">
+                          <div className="mt-2 font-mono text-[9px] tracking-[0.08em] text-green-200">
+                            {muthurMemory.facts.length} STORED
+                          </div>
+                          <div className="mt-2 flex-1 overflow-auto space-y-1 font-mono text-[9px] leading-5 text-[#a3a3a3]">
                             {muthurMemory.facts.length > 0 ? (
                               muthurMemory.facts.slice(-4).map((fact, index) => (
-                                <div key={`${fact}-${index}`} className="truncate">
+                                <div key={`${fact}-${index}`} className="whitespace-pre-wrap break-words">
                                   {fact}
                                 </div>
                               ))
@@ -3299,12 +3388,15 @@ export default function CyberdeckPage() {
                           </div>
                         </div>
 
-                        <div className="rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">RECENT TURNS</div>
-                          <div className="mt-2 space-y-1 font-mono text-[9px] leading-5 text-[#a3a3a3]">
+                          <div className="mt-2 font-mono text-[9px] tracking-[0.08em] text-green-200">
+                            {muthurMemory.recentTurns.length} IN BUFFER
+                          </div>
+                          <div className="mt-2 flex-1 overflow-auto space-y-1 font-mono text-[9px] leading-5 text-[#a3a3a3]">
                             {muthurMemory.recentTurns.length > 0 ? (
                               muthurMemory.recentTurns.slice(-4).map((turn) => (
-                                <div key={turn.id} className="truncate">
+                                <div key={turn.id} className="whitespace-pre-wrap break-words">
                                   <span className="text-[#6f6f6f]">
                                     {turn.role === "assistant" ? "AI" : "USR"}
                                   </span>{" "}
@@ -3314,6 +3406,24 @@ export default function CyberdeckPage() {
                             ) : (
                               <div className="text-[#6f6f6f]">NO RECENT TURNS YET</div>
                             )}
+                          </div>
+                        </div>
+
+                        <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
+                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">STATUS</div>
+                          <div className="mt-2 font-mono text-[9px] leading-5 tracking-[0.04em] text-[#a3a3a3]">
+                            <div className="whitespace-pre-wrap break-words">
+                              UPDATED //{" "}
+                              {muthurMemoryHydrated
+                                ? new Date(muthurMemory.updatedAt).toLocaleString()
+                                : "—"}
+                            </div>
+                            <div className="mt-2 whitespace-pre-wrap break-words">
+                              MEMORY // {muthurMemoryHydrated ? `${muthurMemory.turnCount} TURNS` : "WAITING"}
+                            </div>
+                            <div className="mt-2 whitespace-pre-wrap break-words">
+                              HYDRATION // {muthurMemoryHydrated ? "READY" : "LOADING"}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -3333,42 +3443,6 @@ export default function CyberdeckPage() {
                     <div className="mt-3 rounded-sm border border-[#1c1c1c] bg-black px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
                         CURRENT // rate {voiceDial.ratePercent} // pitch {voiceDial.pitchHz} // gain{" "}
                         {voiceDial.volume.toFixed(2)}
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={toggleVoiceEnabled}
-                          className={`rounded border px-3 py-1 font-mono text-[9px] tracking-[0.08em] transition ${
-                            voiceEnabled
-                              ? "border-emerald-500/70 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400 hover:text-emerald-100"
-                              : "border-[#2d2d2d] bg-black text-[#8a8a8a] hover:border-emerald-500/60 hover:text-emerald-200"
-                          }`}
-                        >
-                          {voiceEnabled ? "VOICE ON" : "VOICE OFF"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void playVoiceTest()}
-                          disabled={!voiceEnabled}
-                          className="rounded border border-[#2d2d2d] bg-black px-3 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          TEST MUTHUR
-                        </button>
-                        <button
-                          type="button"
-                          onClick={saveMuthurVoiceCopyToApp}
-                          className="rounded border border-[#2d2d2d] bg-black px-3 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                        >
-                          SAVE COPY
-                        </button>
-                        <button
-                          type="button"
-                          onClick={restoreMuthurVoiceMaster}
-                          className="rounded border border-[#2d2d2d] bg-black px-3 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                        >
-                          RESTORE MASTER
-                        </button>
                       </div>
                     </div>
                   </div>
