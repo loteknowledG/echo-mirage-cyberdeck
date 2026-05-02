@@ -48,6 +48,13 @@ import {
 import { speakDryFallback } from "@/voice/speakMuthur";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { get, set } from "idb-keyval";
+import {
+  CyberdeckPaneHeader,
+  CyberdeckPaneHeaderSubtitle,
+  CyberdeckPaneHeaderTitle,
+  CyberdeckPaneHeaderValue,
+} from "@/components/cyberdeck/pane-header";
+import { CyberdeckSquareCardGrid } from "@/components/cyberdeck/square-card-grid";
 import { Knob } from "@/components/ui/knob";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -2993,41 +3000,39 @@ export default function CyberdeckPage() {
               onDrop={handleOperatorDrop}
             >
               <div
-                  className={`flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors ${
-                    isOperatorDragOver ? "border-amber-500/60 ring-2 ring-amber-500/35 ring-inset" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between border-b border-[#141414] px-3 py-2">
-                    <div className="min-w-0 flex-1 pr-3">
-                      {operatorSurfaceIsDocument && operatorDocMode === "edit" ? (
-                        <input
-                          ref={operatorNameInputRef}
-                          value={operatorDocNameDraft}
-                          onChange={(event) => setOperatorDocNameDraft(event.target.value)}
-                          onBlur={commitOperatorDocName}
-                          onKeyDown={(event) => {
-                            if (event.key !== "Enter") return;
-                            event.preventDefault();
-                            commitOperatorDocName();
-                            operatorNameInputRef.current?.blur();
-                          }}
-                          spellCheck={false}
-                          autoCapitalize="off"
-                          autoComplete="off"
-                          autoCorrect="off"
-                          aria-label="Rename operator document"
-                          className="w-full border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]"
-                          style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-                        />
-                      ) : (
-                        <div
-                          className="truncate font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
-                          style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-                        >
-                          {operatorDroppedAsset ? operatorDroppedAsset.name : "OPERATOR_DOC_SURFACE"}
-                        </div>
-                      )}
-                    </div>
+                className={`flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors ${
+                  isOperatorDragOver ? "border-amber-500/60 ring-2 ring-amber-500/35 ring-inset" : ""
+                }`}
+              >
+                <CyberdeckPaneHeader
+                  left={
+                    operatorSurfaceIsDocument && operatorDocMode === "edit" ? (
+                      <input
+                        ref={operatorNameInputRef}
+                        value={operatorDocNameDraft}
+                        onChange={(event) => setOperatorDocNameDraft(event.target.value)}
+                        onBlur={commitOperatorDocName}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") return;
+                          event.preventDefault();
+                          commitOperatorDocName();
+                          operatorNameInputRef.current?.blur();
+                        }}
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        aria-label="Rename operator document"
+                        className="w-full border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]"
+                        style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+                      />
+                    ) : (
+                      <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
+                        {operatorDroppedAsset ? operatorDroppedAsset.name : "OPERATOR_DOC_SURFACE"}
+                      </CyberdeckPaneHeaderTitle>
+                    )
+                  }
+                  right={
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -3062,7 +3067,8 @@ export default function CyberdeckPage() {
                         </div>
                       ) : null}
                     </div>
-                  </div>
+                  }
+                />
                   {operatorDroppedAsset ? (
                     <div className="flex-1 overflow-auto p-3">
                       <div className="mb-4 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
@@ -3164,22 +3170,17 @@ export default function CyberdeckPage() {
             ) : server === "h" ? (
               <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
                 <div className="flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors">
-                  <div className="flex items-center justify-between border-b border-[#141414] px-3 py-2">
-                    <div className="min-w-0 flex-1 pr-3">
-                      <div
-                        className="truncate font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
-                        style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-                      >
-                        ECHO MIRAGE HEAP
-                      </div>
-                      <div className="mt-1 font-mono text-[9px] tracking-[0.04em] text-[#6f6f6f]">
-                        LOCAL BACKFILE // INDEXEDDB
-                      </div>
-                    </div>
-                    <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                      {heapEntries.length} ITEMS
-                    </div>
-                  </div>
+                  <CyberdeckPaneHeader
+                    left={
+                      <>
+                        <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
+                          ECHO MIRAGE HEAP
+                        </CyberdeckPaneHeaderTitle>
+                        <CyberdeckPaneHeaderSubtitle>LOCAL BACKFILE // INDEXEDDB</CyberdeckPaneHeaderSubtitle>
+                      </>
+                    }
+                    right={<CyberdeckPaneHeaderValue>{heapEntries.length} ITEMS</CyberdeckPaneHeaderValue>}
+                  />
 
                   <div className="flex flex-1 flex-col gap-4 overflow-auto p-3">
                     <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
@@ -3283,22 +3284,17 @@ export default function CyberdeckPage() {
             ) : (
               <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
                 <div className="flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors">
-                  <div className="flex items-center justify-between border-b border-[#141414] px-3 py-2">
-                    <div className="min-w-0 flex-1 pr-3">
-                      <div
-                        className="truncate font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
-                        style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-                      >
-                        SETTINGS
-                      </div>
-                      <div className="mt-1 font-mono text-[9px] tracking-[0.04em] text-[#6f6f6f]">
-                        LOCAL CONFIG // VOICE DIALS
-                      </div>
-                    </div>
-                    <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                      {voiceEnabled ? "VOICE ON" : "VOICE OFF"}
-                    </div>
-                  </div>
+                  <CyberdeckPaneHeader
+                    left={
+                      <>
+                        <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
+                          SETTINGS
+                        </CyberdeckPaneHeaderTitle>
+                        <CyberdeckPaneHeaderSubtitle>LOCAL CONFIG // VOICE DIALS</CyberdeckPaneHeaderSubtitle>
+                      </>
+                    }
+                    right={<CyberdeckPaneHeaderValue>{voiceEnabled ? "VOICE ON" : "VOICE OFF"}</CyberdeckPaneHeaderValue>}
+                  />
 
                   <div className="grid flex-1 gap-3 overflow-auto p-3">
                     <div className="h-full rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
@@ -3331,7 +3327,7 @@ export default function CyberdeckPage() {
                         {voiceDial.volume.toFixed(2)}
                       </div>
 
-                      <div className="cyberdeck-square-grid mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <CyberdeckSquareCardGrid>
                         <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">RATE</div>
                           <div className="mt-3 flex flex-1 items-center justify-center">
@@ -3433,7 +3429,7 @@ export default function CyberdeckPage() {
                             </button>
                           </div>
                         </div>
-                    </div>
+                    </CyberdeckSquareCardGrid>
 
                     <div className="h-full rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
                       <div className="flex items-start justify-between gap-3">
@@ -3458,7 +3454,7 @@ export default function CyberdeckPage() {
                         </div>
                       </div>
 
-                      <div className="cyberdeck-square-grid mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <CyberdeckSquareCardGrid>
                         <div className="flex aspect-square flex-col rounded-sm border border-[#1c1c1c] bg-black px-3 py-3">
                           <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">SUMMARY</div>
                           <div className="mt-2 flex-1 overflow-auto whitespace-pre-wrap break-words font-mono text-[9px] leading-5 text-[#a3a3a3]">
@@ -3522,7 +3518,7 @@ export default function CyberdeckPage() {
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </CyberdeckSquareCardGrid>
 
                       <div className="mt-4 flex flex-wrap items-center gap-2">
                         <button
