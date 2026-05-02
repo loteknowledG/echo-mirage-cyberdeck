@@ -40,6 +40,7 @@ export function ResizablePanelGroup({
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = React.useState(0);
   const [sizes, setSizes] = React.useState<number[]>([]);
+  const initialSizesRef = React.useRef<number[] | null>(null);
 
   const childrenArray = React.Children.toArray(children) as React.ReactElement[];
   const panelCount = Math.ceil(childrenArray.length / 2);
@@ -74,6 +75,7 @@ export function ResizablePanelGroup({
       }
     }
 
+    initialSizesRef.current = initialSizes;
     setSizes(initialSizes);
   }, [panelCount, childrenArray, sizes.length]);
 
@@ -88,6 +90,11 @@ export function ResizablePanelGroup({
   const isHorizontal = orientation === 'horizontal';
 
   const getPanelFraction = (i: number) => sizes[i] ?? 0;
+
+  const resetSizes = React.useCallback(() => {
+    if (!initialSizesRef.current) return;
+    setSizes([...initialSizesRef.current]);
+  }, []);
 
   const updateSizes = (index: number, deltaPx: number) => {
     if (containerSize <= 0) return;
@@ -214,10 +221,16 @@ export function ResizablePanelGroup({
 
         return React.cloneElement(handle, {
           role: 'separator',
+          title: 'Drag to resize. Double-click to reset.',
           onPointerDown: (event: React.PointerEvent) => {
             event.preventDefault();
             event.stopPropagation();
             startDrag(handleIndex, isHorizontal ? event.clientX : event.clientY);
+          },
+          onDoubleClick: (event: React.MouseEvent) => {
+            event.preventDefault();
+            event.stopPropagation();
+            resetSizes();
           },
           style: {
             cursor: isHorizontal ? 'col-resize' : 'row-resize',
@@ -257,20 +270,31 @@ export function ResizablePanel({
 
 export type ResizableHandleProps = {
   withHandle?: boolean;
+  stacked?: boolean;
   className?: string;
   style?: React.CSSProperties;
 } & React.HTMLAttributes<HTMLDivElement>;
 
-export function ResizableHandle({ withHandle = false, className, ...props }: ResizableHandleProps) {
+export function ResizableHandle({ withHandle = false, stacked = false, className, ...props }: ResizableHandleProps) {
   return (
     <div
       className={cn(
-        'flex-none self-stretch h-full flex items-center justify-center bg-transparent hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300',
+        stacked
+          ? 'relative z-20 flex-none self-stretch h-8 w-full flex items-center justify-center border-y border-slate-700/40 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-row-resize touch-none'
+          : 'relative z-20 flex-none self-stretch w-4 flex items-center justify-center bg-transparent hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none',
         className
       )}
       {...props}
     >
-      {withHandle ? <div className="rounded-full bg-slate-400/70 h-full w-1" /> : null}
+      {withHandle ? (
+        stacked ? (
+          <div className="flex h-full w-full items-center justify-center">
+            <div className="h-1.5 w-20 rounded-full bg-slate-300/80 shadow-[0_0_12px_rgba(148,163,184,0.18)]" />
+          </div>
+        ) : (
+          <div className="h-full w-1.5 rounded-full bg-slate-300/80 shadow-[0_0_12px_rgba(148,163,184,0.18)]" />
+        )
+      ) : null}
     </div>
   );
 }

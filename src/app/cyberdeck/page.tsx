@@ -73,6 +73,15 @@ const servers = [
 const SERVER_IDS = servers.map((s) => s.id);
 const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
 const CHAT_STORAGE_KEY = "echo-mirage-chat-messages-v1";
+const CHAT_STREAM_STORAGE_KEY = "echo-mirage-chat-stream-text-v1";
+const INPUT_STORAGE_KEY = "echo-mirage-chat-input-v1";
+const UI_STATE_STORAGE_KEY = "echo-mirage-ui-state-v1";
+
+type CyberdeckUiState = {
+  server: (typeof SERVER_IDS)[number];
+  navRailContext: "gateway" | "tabs";
+  serverKeyboardHighlightId: (typeof SERVER_IDS)[number] | null;
+};
 
 /** Gateway SYS lines; link phrases must match `renderGatewayMessageText` splits. */
 function gatewayKeySysMessage(providerId: string): string {
@@ -381,6 +390,7 @@ export default function CyberdeckPage() {
     openai: false,
   });
   const [modelList, setModelList] = useState<{ id: string }[]>([]);
+  const [deckUiHydrated, setDeckUiHydrated] = useState(false);
   const [modelByProvider, setModelByProvider] = useState<Record<string, string>>({});
   const [modelFetchStatusByProvider, setModelFetchStatusByProvider] = useState<
     Record<string, "idle" | "retrieving" | "invalid-key" | "error" | "ready">
@@ -430,6 +440,7 @@ export default function CyberdeckPage() {
   /** Forward Tab from message box cycles: gateway (right) → rail (left) → chat log (col2) → … */
   const deckTabNextRef = useRef<"gateway" | "rail" | "chatlog">("gateway");
   const prevNavRailRef = useRef<"gateway" | "tabs">("gateway");
+  const uiFocusRestoredRef = useRef(false);
 
   const syncInputCaret = useCallback(() => {
     const el = messageInputRef.current;
@@ -923,6 +934,10 @@ export default function CyberdeckPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
+      const storedInput = window.localStorage.getItem(INPUT_STORAGE_KEY);
+      if (typeof storedInput === "string") {
+        setInput(storedInput);
+      }
       const stored = window.localStorage.getItem(CHAT_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as unknown;
@@ -936,6 +951,10 @@ export default function CyberdeckPage() {
             .map((item) => ({ role: item.role, text: item.text }));
           setMessages(restored);
         }
+      }
+      const storedStreamText = window.localStorage.getItem(CHAT_STREAM_STORAGE_KEY);
+      if (typeof storedStreamText === "string") {
+        setStreamText(storedStreamText);
       }
     } catch {
       /* ignore chat restore errors */
@@ -952,6 +971,82 @@ export default function CyberdeckPage() {
       /* ignore */
     }
   }, [messages, chatHydrated]);
+
+  useEffect(() => {
+    if (!chatHydrated) return;
+    try {
+      window.localStorage.setItem(INPUT_STORAGE_KEY, input);
+    } catch {
+      /* ignore */
+    }
+  }, [input, chatHydrated]);
+
+  useEffect(() => {
+    if (!chatHydrated) return;
+    try {
+      window.localStorage.setItem(CHAT_STREAM_STORAGE_KEY, streamText);
+    } catch {
+      /* ignore */
+    }
+  }, [streamText, chatHydrated]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let restored = false;
+    try {
+      const stored = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as Partial<CyberdeckUiState> | null;
+        if (parsed && SERVER_IDS.includes(parsed.server as (typeof SERVER_IDS)[number])) {
+          setServer(parsed.server as (typeof SERVER_IDS)[number]);
+          restored = true;
+        }
+        if (parsed?.navRailContext === "gateway" || parsed?.navRailContext === "tabs") {
+          setNavRailContext(parsed.navRailContext);
+          restored = true;
+        }
+        const highlightId = parsed?.serverKeyboardHighlightId;
+        if (SERVER_IDS.includes(highlightId as (typeof SERVER_IDS)[number])) {
+          setServerKeyboardHighlightId(highlightId as (typeof SERVER_IDS)[number]);
+          restored = true;
+        }
+      }
+    } catch {
+      /* ignore ui restore errors */
+    } finally {
+      if (restored) {
+        startupRailResolvedRef.current = true;
+      }
+      setDeckUiHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!deckUiHydrated) return;
+    try {
+      const payload: CyberdeckUiState = {
+        server,
+        navRailContext,
+        serverKeyboardHighlightId,
+      };
+      window.localStorage.setItem(UI_STATE_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      /* ignore */
+    }
+  }, [deckUiHydrated, navRailContext, server, serverKeyboardHighlightId]);
+
+  useEffect(() => {
+    if (!deckUiHydrated || uiFocusRestoredRef.current) return;
+    const id = window.requestAnimationFrame(() => {
+      if (navRailContext === "tabs") {
+        serverRailRef.current?.focus({ preventScroll: true });
+      } else {
+        gatewayColumnRef.current?.focus({ preventScroll: true });
+      }
+      uiFocusRestoredRef.current = true;
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [deckUiHydrated, navRailContext]);
 
   const operatorSurfaceIsDocument =
     operatorDroppedAsset?.kind === "text" ||
@@ -2408,14 +2503,20 @@ export default function CyberdeckPage() {
         className="min-h-0 min-w-0 flex-1"
       >
         {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
-        <ResizablePanel defaultSize={isMobileLayout ? 50 : 55} minSize={isMobileLayout ? 32 : 28}>
+        <ResizablePanel defaultSize={isMobileLayout ? 66 : 55} minSize={0}>
           <div
             ref={chatColumnRef}
-            className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full min-w-0 flex-col border-b border-gray-800 bg-black md:border-b-0 md:border-r ${
+            className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full min-w-0 flex-col overflow-hidden border-b border-gray-800 bg-black md:border-b-0 md:border-r ${
               networkActivityActive ? "is-net-active" : ""
             }`}
           >
-            <header className="flex shrink-0 items-end justify-end overflow-visible border-b border-gray-800 bg-black px-6 py-2">
+            <header className="relative flex shrink-0 items-end justify-end overflow-visible border-b border-gray-800 bg-black px-6 py-2">
+              <div
+                className="absolute left-6 top-2 font-mono text-[9px] tracking-[0.2em] text-[#8a8a8a]"
+                style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+              >
+                [{activeTabLabel}]
+              </div>
               <pre
                 className="cyberdeck-net-logo m-0 whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
                 style={{ textShadow: "0 0 5px #00ff00" }}
@@ -2526,7 +2627,7 @@ export default function CyberdeckPage() {
               </div>
             </div>
 
-            <footer className="cyberdeck-message-box bg-black p-0">
+            <footer className="cyberdeck-message-box shrink-0 bg-black p-0">
               <div className="m-2 rounded-sm border border-green-900/70 bg-black transition-colors transition-shadow focus-within:border-green-500/80 focus-within:shadow-[0_0_0_1px_rgba(34,197,94,0.45),0_0_18px_rgba(34,197,94,0.2)]">
                 <div className="relative flex items-center px-2 py-2">
                   <span className="pointer-events-none absolute left-3 text-lg font-bold text-green-500">$</span>
@@ -2675,10 +2776,10 @@ export default function CyberdeckPage() {
           </div>
         </ResizablePanel>
 
-        <ResizableHandle withHandle className="hidden md:flex" />
+        <ResizableHandle withHandle stacked={isMobileLayout} className="flex" />
 
         {/* COL 3 (flipped): gateway nav — Weyland col2 */}
-        <ResizablePanel defaultSize={isMobileLayout ? 50 : 45} minSize={isMobileLayout ? 32 : 22}>
+        <ResizablePanel defaultSize={isMobileLayout ? 34 : 45} minSize={0}>
           <div
             ref={gatewayColumnRef}
             tabIndex={-1}
@@ -2690,8 +2791,8 @@ export default function CyberdeckPage() {
               networkActivityActive ? "is-net-active" : ""
             } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
           >
-            <header className="flex shrink-0 items-start justify-between gap-4 overflow-visible border-b border-gray-800 bg-black px-6 py-2">
-                  <pre
+            <header className="flex shrink-0 flex-col items-start gap-1 overflow-visible border-b border-gray-800 bg-black px-6 py-2">
+              <pre
                     className="cyberdeck-net-logo m-0 whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
                     style={{ textShadow: "0 0 5px #00ff00" }}
                   >
@@ -2708,12 +2809,6 @@ export default function CyberdeckPage() {
 ╲╱_╱    ╱ ╱ ╱╱╲__╲╱_╱___╲╱ ╱ ╱  ╲ ╲ ╲╱ ╱ ╱_       __╲ ╲_╲╱ ╱ ╱______╲╱ ╱╱ ╱ ╱_______╲   
         ╲╱_╱ ╲╱_________╱╲╱_╱    ╲_╲╱╲_╲___╲     ╱____╱_╱╲╱___________╱ ╲╱__________╱`}
                   </pre>
-              <div
-                className="shrink-0 pt-1 text-right font-mono text-[9px] tracking-[0.2em] text-[#8a8a8a]"
-                style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-              >
-                [{activeTabLabel}]
-              </div>
             </header>
             {showGatewayPanel ? (
               <div className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
@@ -3204,7 +3299,7 @@ export default function CyberdeckPage() {
                     </div>
                   </div>
 
-                  <div className="grid flex-1 gap-3 overflow-auto p-3 lg:grid-cols-2">
+                  <div className="grid flex-1 gap-3 overflow-auto p-3">
                     <div className="h-full rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
