@@ -1,8 +1,8 @@
 {
-  "name": "m4trix",
-  "short_name": "m4trix",
-  "description": "A stunning and functional retractable sidebar for Next.js built on top of shadcn/ui.",
-  "start_url": "/",
+  "name": "Echo Mirage Cyberdeck",
+  "short_name": "Cyberdeck",
+  "description": "A floating, voice-locked cyberdeck for operators, agents, and live AI control.",
+  "start_url": "/cyberdeck",
   "display": "standalone",
   "background_color": "#18181b",
   "theme_color": "#18181b",
