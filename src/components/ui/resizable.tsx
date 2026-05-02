@@ -41,6 +41,7 @@ export function ResizablePanelGroup({
   const [containerSize, setContainerSize] = React.useState(0);
   const [sizes, setSizes] = React.useState<number[]>([]);
   const initialSizesRef = React.useRef<number[] | null>(null);
+  const layoutKeyRef = React.useRef<string>("");
 
   const childrenArray = React.Children.toArray(children) as React.ReactElement[];
   const panelCount = Math.ceil(childrenArray.length / 2);
@@ -63,7 +64,8 @@ export function ResizablePanelGroup({
 
   // Initialize sizes from panel props if not already set.
   React.useLayoutEffect(() => {
-    if (sizes.length === panelCount) return;
+    const layoutKey = `${orientation}:${panelCount}`;
+    if (sizes.length === panelCount && layoutKeyRef.current === layoutKey) return;
 
     const initialSizes = Array(panelCount).fill(1 / panelCount);
 
@@ -76,8 +78,9 @@ export function ResizablePanelGroup({
     }
 
     initialSizesRef.current = initialSizes;
+    layoutKeyRef.current = layoutKey;
     setSizes(initialSizes);
-  }, [panelCount, childrenArray, sizes.length]);
+  }, [orientation, panelCount, childrenArray, sizes.length]);
 
   const dragState = React.useRef<{
     index: number;
@@ -281,7 +284,7 @@ export function ResizableHandle({ withHandle = false, stacked = false, className
       className={cn(
         stacked
           ? 'relative z-20 flex-none self-stretch h-8 w-full flex items-center justify-center border-y border-slate-700/40 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-row-resize touch-none'
-          : 'relative z-20 flex-none self-stretch w-4 flex items-center justify-center bg-transparent hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none',
+          : 'relative z-20 flex-none self-stretch w-4 min-w-[14px] flex items-center justify-center border-x border-slate-700/40 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none',
         className
       )}
       {...props}
