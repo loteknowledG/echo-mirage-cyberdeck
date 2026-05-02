@@ -486,11 +486,12 @@ export default function CyberdeckPage() {
   const isConnected = hasProviderAuth && Boolean(modelID) && providerModelFetchStatus === "ready";
   const connectionState: "offline" | "connecting" | "connected" = scanActivityActive
     ? "connecting"
-    : isConnected
-      ? "connected"
-      : "offline";
+      : isConnected
+        ? "connected"
+        : "offline";
   const showGatewayPanel = server === "s";
   const railServer = server;
+  const mobilePanelMinSize = 2;
   serverRef.current = server;
 
   const inactiveTextColor = "#7a7a7a";
@@ -2503,7 +2504,7 @@ export default function CyberdeckPage() {
         className="min-h-0 min-w-0 flex-1"
       >
         {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
-        <ResizablePanel defaultSize={isMobileLayout ? 66 : 55} minSize={0}>
+        <ResizablePanel defaultSize={isMobileLayout ? 98 : 55} minSize={isMobileLayout ? mobilePanelMinSize : 0}>
           <div
             ref={chatColumnRef}
             className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full min-w-0 flex-col overflow-hidden border-b border-gray-800 bg-black md:border-b-0 md:border-r ${
@@ -2779,7 +2780,7 @@ export default function CyberdeckPage() {
         <ResizableHandle withHandle stacked={isMobileLayout} className="flex" />
 
         {/* COL 3 (flipped): gateway nav — Weyland col2 */}
-        <ResizablePanel defaultSize={isMobileLayout ? 34 : 45} minSize={0}>
+        <ResizablePanel defaultSize={isMobileLayout ? 2 : 45} minSize={isMobileLayout ? mobilePanelMinSize : 0}>
           <div
             ref={gatewayColumnRef}
             tabIndex={-1}
