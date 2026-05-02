@@ -3417,11 +3417,6 @@ export default function CyberdeckPage() {
                         </button>
                       </div>
                     </div>
-
-                    <div className="mt-3 rounded-sm border border-[#1c1c1c] bg-black px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                        CURRENT // rate {voiceDial.ratePercent} // pitch {voiceDial.pitchHz} // gain{" "}
-                        {voiceDial.volume.toFixed(2)}
-                      </div>
                     </div>
                   </div>
                 </div>
