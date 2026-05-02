@@ -55,6 +55,7 @@ import {
   CyberdeckPaneHeaderValue,
 } from "@/components/cyberdeck/pane-header";
 import { CyberdeckInfoBlockHeader } from "@/components/cyberdeck/info-block-header";
+import { CyberdeckOperatorPaneBody } from "@/components/cyberdeck/operator-pane-body";
 import { CyberdeckHeapPaneBody } from "@/components/cyberdeck/heap-pane-body";
 import { CyberdeckSquareCardGrid } from "@/components/cyberdeck/square-card-grid";
 import { CyberdeckSquareCard } from "@/components/cyberdeck/square-card";
@@ -2995,182 +2996,25 @@ export default function CyberdeckPage() {
                   ) : null}
               </div>
             ) : server === "m" ? (
-            <div
-              className={`custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4 ${
-                isOperatorDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""
-              }`}
-              onDragOver={handleOperatorDragOver}
-              onDragLeave={handleOperatorDragLeave}
-              onDrop={handleOperatorDrop}
-            >
-              <div
-                className={`flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors ${
-                  isOperatorDragOver ? "border-amber-500/60 ring-2 ring-amber-500/35 ring-inset" : ""
-                }`}
-              >
-                <CyberdeckPaneHeader
-                  left={
-                    operatorSurfaceIsDocument && operatorDocMode === "edit" ? (
-                      <input
-                        ref={operatorNameInputRef}
-                        value={operatorDocNameDraft}
-                        onChange={(event) => setOperatorDocNameDraft(event.target.value)}
-                        onBlur={commitOperatorDocName}
-                        onKeyDown={(event) => {
-                          if (event.key !== "Enter") return;
-                          event.preventDefault();
-                          commitOperatorDocName();
-                          operatorNameInputRef.current?.blur();
-                        }}
-                        spellCheck={false}
-                        autoCapitalize="off"
-                        autoComplete="off"
-                        autoCorrect="off"
-                        aria-label="Rename operator document"
-                        className="w-full border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]"
-                        style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-                      />
-                    ) : (
-                      <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
-                        {operatorDroppedAsset ? operatorDroppedAsset.name : "OPERATOR_DOC_SURFACE"}
-                      </CyberdeckPaneHeaderTitle>
-                    )
-                  }
-                  right={
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void pasteClipboardToOperator()}
-                        className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                      >
-                        PASTE
-                      </button>
-                      {operatorSurfaceIsDocument ? (
-                        <>
-                          <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                            <span className={operatorDocMode === "view" ? "text-emerald-200" : ""}>VIEW</span>
-                            <Switch
-                              checked={operatorDocMode === "edit"}
-                              onCheckedChange={(checked) => {
-                                if (!checked) {
-                                  commitOperatorDocName();
-                                  setOperatorDocMode("view");
-                                  return;
-                                }
-                                setOperatorDocMode("edit");
-                              }}
-                              aria-label="Toggle operator view edit mode"
-                              className="data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
-                            />
-                            <span className={operatorDocMode === "edit" ? "text-emerald-200" : ""}>EDIT</span>
-                          </div>
-                        </>
-                      ) : operatorDroppedAsset ? (
-                        <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                          {operatorDroppedAsset.kind.toUpperCase()}
-                        </div>
-                      ) : null}
-                    </div>
-                  }
-                />
-                  {operatorDroppedAsset ? (
-                    <div className="flex-1 overflow-auto p-3">
-                      <div className="mb-4 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
-                        {operatorDroppedAsset.mimeType || "application/octet-stream"} //{" "}
-                        {Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB
-                      </div>
-                      {operatorSurfaceIsDocument ? (
-                        <div className="mb-3 flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void saveOperatorDocAsFile()}
-                            aria-label="Save operator document"
-                            title="Save operator document"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                          >
-                            <DownloadIcon className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void copyOperatorDocToClipboard()}
-                            aria-label="Copy operator document"
-                            title="Copy operator document"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                          >
-                            <CopyIcon className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ) : null}
-                      {operatorDroppedAsset.kind === "image" ? (
-                        <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
-                          <div className="mb-2 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
-                            IMAGE PREVIEW
-                          </div>
-                          {operatorDroppedAsset.imageSrc ? (
-                            <img
-                              src={operatorDroppedAsset.imageSrc}
-                              alt={operatorDroppedAsset.name}
-                              className="max-h-[72vh] w-full rounded-sm border border-[#1c1c1c] object-contain"
-                              draggable={false}
-                            />
-                          ) : (
-                            <div className="rounded-sm border border-dashed border-[#1c1c1c] bg-black p-4 font-mono text-[10px] leading-snug text-[#8a8a8a]">
-                              Could not load image preview.
-                            </div>
-                          )}
-                        </div>
-                      ) : operatorSurfaceIsDocument ? (
-                        operatorDocMode === "edit" ? (
-                          <Textarea
-                            ref={operatorEditorRef}
-                            value={operatorDroppedAsset.text || ""}
-                            onChange={(event) => {
-                              const nextText = event.target.value;
-                              setOperatorDroppedAsset((prev) =>
-                                prev ? { ...prev, text: nextText } : prev,
-                              );
-                            }}
-                            spellCheck={false}
-                            autoCapitalize="off"
-                            autoComplete="off"
-                            autoCorrect="off"
-                            wrap="off"
-                            className="min-h-0 resize-none overflow-hidden rounded-sm border border-[#1c1c1c] bg-black px-3 py-3 font-mono text-[12px] leading-snug text-green-200 shadow-none focus-visible:ring-1 focus-visible:ring-amber-500/40"
-                            style={
-                              operatorDocMode === "edit"
-                                ? {
-                                    height:
-                                      operatorEditorRef.current?.style.height || "auto",
-                                  }
-                                : undefined
-                            }
-                          />
-                        ) : operatorDroppedAsset.kind === "markdown" ? (
-                          <div className="rounded-sm border border-green-900/70 bg-black/70 p-3">
-                            <Streamdown className="prose prose-invert prose-pre:bg-black prose-pre:text-green-300 max-w-none text-[12px] leading-snug text-green-200">
-                              {operatorDroppedAsset.text || ""}
-                            </Streamdown>
-                          </div>
-                        ) : (
-                          <pre className="min-h-[50vh] whitespace-pre-wrap break-words rounded-sm border border-[#1c1c1c] bg-black p-3 font-mono text-[12px] leading-snug text-green-200">
-                            {operatorDroppedAsset.text || ""}
-                          </pre>
-                        )
-                      ) : (
-                        <div className="rounded-sm border border-dashed border-amber-700/60 bg-black p-4 font-mono text-[10px] leading-snug text-amber-300/90">
-                          {operatorDroppedAsset.kind === "video"
-                            ? "Video preview comes next. Drop a code or text file to edit it here."
-                            : "Drop or paste a code, text, markdown, or image file here to view and edit it."}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex flex-1 items-center justify-center p-6 text-center font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-                      DROP OR PASTE CODE, TEXT, MARKDOWN, OR IMAGE FILES HERE TO VIEW AND EDIT THEM.
-                    </div>
-                  )}
-                </div>
-              </div>
+              <CyberdeckOperatorPaneBody
+                isOperatorDragOver={isOperatorDragOver}
+                operatorDroppedAsset={operatorDroppedAsset}
+                operatorSurfaceIsDocument={operatorSurfaceIsDocument}
+                operatorDocMode={operatorDocMode}
+                operatorDocNameDraft={operatorDocNameDraft}
+                operatorEditorRef={operatorEditorRef}
+                operatorNameInputRef={operatorNameInputRef}
+                onOperatorDragOver={handleOperatorDragOver}
+                onOperatorDragLeave={handleOperatorDragLeave}
+                onOperatorDrop={handleOperatorDrop}
+                onOperatorDocNameDraftChange={setOperatorDocNameDraft}
+                onCommitOperatorDocName={commitOperatorDocName}
+                onSetOperatorDocMode={setOperatorDocMode}
+                onPasteClipboardToOperator={pasteClipboardToOperator}
+                onSaveOperatorDocAsFile={saveOperatorDocAsFile}
+                onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
+                onSetOperatorDroppedAsset={setOperatorDroppedAsset}
+              />
             ) : server === "h" ? (
               <CyberdeckHeapPaneBody
                 heapEntries={heapEntries}
