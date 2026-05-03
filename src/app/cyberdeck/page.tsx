@@ -469,7 +469,8 @@ export default function CyberdeckPage() {
     ctx.font = computed.font;
     const before = input.slice(0, displayIndex);
     const padLeft = Number.parseFloat(computed.paddingLeft || "0") || 0;
-    const x = padLeft + ctx.measureText(before).width - el.scrollLeft;
+    const charWidth = input[displayIndex] ? ctx.measureText(input[displayIndex]).width : 0;
+    const x = padLeft + ctx.measureText(before).width + charWidth - el.scrollLeft;
     setInputCursorLeft(Math.max(padLeft, x));
   }, [input]);
 
@@ -2627,16 +2628,19 @@ export default function CyberdeckPage() {
                     <span className="animate-pulse">█</span>
                   </div>
                 )}
-                {isStreaming && !streamText && (
-                  <div
-                    data-chat-row={messages.length}
-                    className={`nav-row py-1 text-xs text-green-500/90 ${
-                      chatKeyboardHighlightIndex === messages.length ? "nav-row-kb-hover" : ""
-                    }`}
-                  >
-                    <span className="animate-pulse">█</span> COGITATING...
-                  </div>
-                )}
+                  {isStreaming && !streamText && (
+                    <div
+                      data-chat-row={messages.length}
+                      className={`nav-row py-1 text-xs text-green-500/90 ${
+                        chatKeyboardHighlightIndex === messages.length ? "nav-row-kb-hover" : ""
+                      }`}
+                    >
+                      <span className="cyberdeck-cogitating">
+                        <span className="animate-pulse">█</span>
+                        <span className="cyberdeck-cogitating-text">COGITATING...</span>
+                      </span>
+                    </div>
+                  )}
                 <div ref={messagesEndRef} />
               </div>
             </div>
