@@ -56,7 +56,7 @@ import {
 } from "@/components/cyberdeck/pane-header";
 import { CyberdeckInfoBlockHeader } from "@/components/cyberdeck/info-block-header";
 import { CyberdeckOperatorPaneBody } from "@/components/cyberdeck/operator-pane-body";
-import { CyberdeckHeapPaneBody } from "@/components/cyberdeck/heap-pane-body";
+import { CyberdeckDiagnosticPaneBody } from "@/components/cyberdeck/diagnostic-pane-body";
 import { CyberdeckSquareCardGrid } from "@/components/cyberdeck/square-card-grid";
 import { CyberdeckSquareCard } from "@/components/cyberdeck/square-card";
 import { CyberdeckActionButton } from "@/components/cyberdeck/action-button";
@@ -78,7 +78,7 @@ const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
 const servers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
-  { id: "h", glyph: "H", label: "HEAP" },
+    { id: "h", glyph: "π", label: "DIAGNOSTIC" },
   { id: "b", glyph: "§", label: "SETTINGS" },
 ] as const;
 
@@ -485,7 +485,7 @@ export default function CyberdeckPage() {
       : server === "s"
         ? "MAINNET-UPLINK"
         : server === "h"
-          ? "HEAP"
+          ? "DIAGNOSTIC"
           : "SETTINGS";
   const providerModelFetchStatus = modelFetchStatusByProvider[activeProvider] || "idle";
   const scanActivityActive =
@@ -2511,12 +2511,12 @@ export default function CyberdeckPage() {
         ))}
       </aside>
 
-      <ResizablePanelGroup
-        orientation={isMobileLayout ? "vertical" : "horizontal"}
-        className="min-h-0 min-w-0 flex-1"
-      >
-        {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
-        <ResizablePanel defaultSize={isMobileLayout ? 98 : 55} minSize={isMobileLayout ? mobilePanelMinSize : 0}>
+        <ResizablePanelGroup
+          orientation={isMobileLayout ? "vertical" : "horizontal"}
+          className="min-h-0 min-w-0 flex-1"
+        >
+          {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
+          <ResizablePanel defaultSize={isMobileLayout ? 98 : 55} minSize={isMobileLayout ? mobilePanelMinSize : 0}>
           <div
             ref={chatColumnRef}
             className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full min-w-0 flex-col overflow-hidden border-b border-gray-800 bg-black md:border-b-0 md:border-r ${
@@ -2792,7 +2792,7 @@ export default function CyberdeckPage() {
         <ResizableHandle withHandle stacked={isMobileLayout} className="flex" />
 
         {/* COL 3 (flipped): gateway nav — Weyland col2 */}
-        <ResizablePanel defaultSize={isMobileLayout ? 2 : 45} minSize={isMobileLayout ? mobilePanelMinSize : 0}>
+          <ResizablePanel defaultSize={isMobileLayout ? 2 : 45} minSize={isMobileLayout ? mobilePanelMinSize : 0.01}>
           <div
             ref={gatewayColumnRef}
             tabIndex={-1}
@@ -3016,17 +3016,19 @@ export default function CyberdeckPage() {
                 onSetOperatorDroppedAsset={setOperatorDroppedAsset}
               />
             ) : server === "h" ? (
-              <CyberdeckHeapPaneBody
-                heapEntries={heapEntries}
-                heapNameDraft={heapNameDraft}
-                heapTextDraft={heapTextDraft}
-                onHeapNameDraftChange={setHeapNameDraft}
-                onHeapTextDraftChange={setHeapTextDraft}
-                onPasteClipboard={pasteClipboardToHeap}
-                onSaveDraft={saveHeapDraft}
-                onCopyEntry={copyHeapEntry}
-                onOpenEntry={openHeapEntryInOperator}
-                onDeleteEntry={deleteHeapEntry}
+              <CyberdeckDiagnosticPaneBody
+                server={server}
+                connectionState={connectionState}
+                activeProvider={activeProvider}
+                modelID={modelID}
+                providerModelFetchStatus={providerModelFetchStatus}
+                voiceEnabled={voiceEnabled}
+                voiceHealth={voiceHealth}
+                muthurMemoryTurnCount={muthurMemory.turnCount}
+                muthurMemoryUpdatedAt={muthurMemory.updatedAt}
+                memoryContext={buildMuthurMemoryContext(muthurMemory, input.trim() || undefined)}
+                heapCount={heapEntries.length}
+                chatCount={messages.length + (streamText ? 1 : 0)}
               />
             ) : (
               <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">

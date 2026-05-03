@@ -177,6 +177,7 @@ export async function POST(req: NextRequest) {
     agents: agentsOverride,
     story,
     steer,
+    memoryContext,
     coordinatorAgent,
     history,
     coordinatorMode = "tell",
@@ -263,6 +264,7 @@ export async function POST(req: NextRequest) {
         model: providerConfig.model,
         story,
         steer,
+        memoryContext,
         coordinatorAgent,
         coordinatorMode,
         interactionMode,
@@ -332,6 +334,7 @@ export async function POST(req: NextRequest) {
       orchestration: orchestrationMode,
       stateless,
       story,
+      memoryContext,
       coordinatorAgent,
       coordinatorMode,
       interactionMode,
@@ -340,6 +343,7 @@ export async function POST(req: NextRequest) {
         const requestDebug = buildProviderRequest(promptForAgent, agent, {
           ...options,
           steer,
+          memoryContext,
           model: providerConfig.model,
         });
 
@@ -363,6 +367,7 @@ export async function POST(req: NextRequest) {
           apiKey: providerConfig.apiKey || "",
           model: providerConfig.model,
           providerName: effectiveProvider,
+          memoryContext,
         });
       },
     });

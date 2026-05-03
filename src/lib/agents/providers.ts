@@ -107,6 +107,7 @@ export type CallProviderOptions = {
   providerName: string;
   story?: string;
   steer?: string;
+  memoryContext?: string;
   coordinatorAgent?: {
     id: string;
     name: string;
@@ -149,13 +150,23 @@ export function buildProviderRequest(
   agent: { name: string; description: string },
   options: Omit<CallProviderOptions, 'url' | 'apiKey' | 'providerName'>
 ) {
-  const { model, story, steer, coordinatorAgent, coordinatorMode, history, temperature, interactionMode } =
-    options;
+  const {
+    model,
+    story,
+    steer,
+    memoryContext,
+    coordinatorAgent,
+    coordinatorMode,
+    history,
+    temperature,
+    interactionMode,
+  } = options;
 
   const agentDescription = stripHtmlToText(agent.description);
   const coordinatorDescription = stripHtmlToText(coordinatorAgent?.description);
   const storyText = stripHtmlToText(story);
   const steerText = stripHtmlToText(steer);
+  const memoryText = stripHtmlToText(memoryContext);
 
   const systemPromptBase = agentDescription
     ? `You are ${agent.name}. ${agentDescription}`
@@ -165,6 +176,8 @@ export function buildProviderRequest(
   if (storyText) context += `The global story context is: ${storyText}. `;
   if (steerText)
     context += `The user has provided a steering note for the next response: ${steerText}. Follow it unless it conflicts with the story or user intent. `;
+  if (memoryText)
+    context += `Retrieved MUTHUR memory for continuity: ${memoryText}. `;
   if (coordinatorAgent)
     context += `The user is playing the role of ${coordinatorAgent.name}: ${coordinatorDescription}. `;
 

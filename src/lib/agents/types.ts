@@ -68,6 +68,10 @@ export type AgentsRequest = {
    */
   steer?: string;
   /**
+   * Optional retrieved memory block to inject into the system prompt for continuity.
+   */
+  memoryContext?: string;
+  /**
    * Optional agent persona for the coordinator (user acting as a role).
    */
   coordinatorAgent?: Agent;

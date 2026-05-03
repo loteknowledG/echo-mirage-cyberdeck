@@ -1,9 +1,17 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { DEFAULT_LMSTUDIO_URL, normalizeLmstudioUrl } from '@/lib/lmstudio';
 import { AGENTS as DEFAULT_AGENTS } from './default-agents';
 import type { Agent, AgentId, AgentsResponse, ChatMessage } from './types';
 import type { ModelOption, Provider } from './use-character-connections';
+import {
+  buildMuthurMemoryContext,
+  createEmptyMuthurMemory,
+  loadMuthurMemory,
+  recordMuthurMemoryTurn,
+  saveMuthurMemory,
+  type MuthurMemoryState,
+} from '@/lib/muthur-memory';
 
 type PrompterMode = 'tell' | 'do' | 'think';
 
@@ -57,6 +65,22 @@ export function useCharacterChat({
   const [error, setError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const timeoutsRef = useRef<number[]>([]);
+  const muthurMemoryRef = useRef<MuthurMemoryState>(createEmptyMuthurMemory());
+  const [muthurMemory, setMuthurMemory] = useState<MuthurMemoryState>(createEmptyMuthurMemory());
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const loaded = await loadMuthurMemory();
+      if (!active) return;
+      muthurMemoryRef.current = loaded;
+      setMuthurMemory(loaded);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const clearScriptTimeouts = () => {
     if (!timeoutsRef.current.length) return;
@@ -163,6 +187,11 @@ export function useCharacterChat({
 
       const selectedModel = modelOptions.find(o => o.id === model);
       const modelProvider = selectedModel?.provider || activeProvider;
+      const currentMemory = muthurMemoryRef.current;
+      const memoryContext =
+        currentMemory.turnCount > 0 || currentMemory.facts.length > 0 || currentMemory.recentTurns.length > 0
+          ? buildMuthurMemoryContext(currentMemory, effectivePrompt)
+          : '';
 
       const historyForApi = messages.map(m =>
         m.from === 'user'
@@ -194,6 +223,7 @@ export function useCharacterChat({
         orchestration: 'auto' as const,
         interactionMode: 'neutral' as const,
         history: historyForApi,
+        memoryContext,
       };
 
       requestBody.provider = modelProvider;
@@ -302,6 +332,18 @@ export function useCharacterChat({
           await streamMessageText(clientId, msg.text, targetPos, shouldStream);
         }
       }
+
+      const assistantText = mapped
+        .filter(m => m.from !== 'user')
+        .map(m => (m.from ? `${m.from}: ${m.text}` : m.text))
+        .join('\n\n')
+        .trim();
+      if (assistantText) {
+        const nextMemory = recordMuthurMemoryTurn(muthurMemoryRef.current, effectivePrompt, assistantText);
+        muthurMemoryRef.current = nextMemory;
+        setMuthurMemory(nextMemory);
+        void saveMuthurMemory(nextMemory);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Something went wrong';
       setError(msg);
@@ -314,6 +356,7 @@ export function useCharacterChat({
     error,
     isRunning,
     messages,
+    muthurMemory,
     prompt,
     restartConversation,
     runDemo,
