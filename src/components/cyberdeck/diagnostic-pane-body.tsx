@@ -1,14 +1,13 @@
 'use client';
 
+import { useEffect, useRef, useState } from "react";
+
 import {
   CyberdeckPaneHeader,
   CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
   CyberdeckPaneHeaderValue,
 } from "@/components/cyberdeck/pane-header";
-import { CyberdeckInfoBlockHeader } from "@/components/cyberdeck/info-block-header";
-import { CyberdeckSquareCardGrid } from "@/components/cyberdeck/square-card-grid";
-import { CyberdeckSquareCard } from "@/components/cyberdeck/square-card";
 
 type DiagnosticPaneBodyProps = {
   server: string;
@@ -25,37 +24,123 @@ type DiagnosticPaneBodyProps = {
   chatCount: number;
 };
 
-export function CyberdeckDiagnosticPaneBody({
-  server,
-  connectionState,
-  activeProvider,
-  modelID,
-  providerModelFetchStatus,
-  voiceEnabled,
-  voiceHealth,
-  muthurMemoryTurnCount,
-  muthurMemoryUpdatedAt,
-  memoryContext,
-  heapCount,
-  chatCount,
-}: DiagnosticPaneBodyProps) {
-  const connectionTone =
-    connectionState === "connected"
-      ? "text-emerald-200"
-      : connectionState === "connecting"
-        ? "text-amber-300"
-        : "text-[#8a8a8a]";
+declare global {
+  interface Window {
+    __echoMiragePiStorageReady?: boolean;
+  }
+}
 
-  const voiceTone =
-    voiceHealth === "backend"
-      ? "text-emerald-200"
-      : voiceHealth === "fallback"
-        ? "text-amber-300"
-        : voiceHealth === "off"
-          ? "text-gray-500"
-          : "text-[#8a8a8a]";
+async function ensurePiStorage(ui: typeof import("@mariozechner/pi-web-ui")) {
+  if (typeof window === "undefined") return;
+  if (window.__echoMiragePiStorageReady) return;
 
-  const traceTone = memoryContext.trim() ? "text-emerald-200" : "text-[#8a8a8a]";
+  const settings = new ui.SettingsStore();
+  const providerKeys = new ui.ProviderKeysStore();
+  const sessions = new ui.SessionsStore();
+  const customProviders = new ui.CustomProvidersStore();
+
+  const backend = new ui.IndexedDBStorageBackend({
+    dbName: "echo-mirage-pi",
+    version: 1,
+    stores: [
+      settings.getConfig(),
+      providerKeys.getConfig(),
+      sessions.getConfig(),
+      customProviders.getConfig(),
+      ui.SessionsStore.getMetadataConfig(),
+    ],
+  });
+
+  settings.setBackend(backend);
+  providerKeys.setBackend(backend);
+  sessions.setBackend(backend);
+  customProviders.setBackend(backend);
+
+  ui.setAppStorage(new ui.AppStorage(settings, providerKeys, sessions, customProviders, backend));
+  window.__echoMiragePiStorageReady = true;
+}
+
+async function promptForProviderKey(
+  ui: typeof import("@mariozechner/pi-web-ui"),
+  provider: string,
+) {
+  const existingKey = await ui.getAppStorage().providerKeys.get(provider);
+  if (existingKey) return true;
+
+  const enteredKey = window.prompt(`Enter ${provider.toUpperCase()} API key`);
+  const trimmedKey = enteredKey?.trim();
+
+  if (!trimmedKey) return false;
+
+  await ui.getAppStorage().providerKeys.set(provider, trimmedKey);
+  return true;
+}
+
+export function CyberdeckDiagnosticPaneBody({ server }: DiagnosticPaneBodyProps) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [status, setStatus] = useState("BOOTING PI...");
+
+  useEffect(() => {
+    let disposed = false;
+    let panel: HTMLElement | null = null;
+
+    const mountPi = async () => {
+      try {
+        const [{ Agent }, { getModel }, ui] = await Promise.all([
+          import("@mariozechner/pi-agent-core"),
+          import("@mariozechner/pi-ai"),
+          import("@mariozechner/pi-web-ui"),
+        ]);
+
+        await ensurePiStorage(ui);
+        if (disposed || !hostRef.current) return;
+
+        const agent = new Agent({
+          initialState: {
+            systemPrompt:
+              "You are Pi running inside the Echo Mirage Cyberdeck. Be technical, direct, and helpful.",
+            model: getModel("opencode", "big-pickle"),
+            thinkingLevel: "off",
+            messages: [],
+            tools: [],
+          },
+          convertToLlm: ui.defaultConvertToLlm,
+        });
+
+        const chatPanel = new ui.ChatPanel();
+        chatPanel.style.display = "block";
+        chatPanel.style.height = "100%";
+        chatPanel.style.width = "100%";
+        chatPanel.style.background = "transparent";
+
+        await chatPanel.setAgent(agent, {
+          onApiKeyRequired: (provider) => promptForProviderKey(ui, provider),
+          toolsFactory: (_agent, _agentInterface, _artifactsPanel, runtimeProvidersFactory) => {
+            const replTool = ui.createJavaScriptReplTool();
+            replTool.runtimeProvidersFactory = runtimeProvidersFactory;
+            return [replTool, ui.createExtractDocumentTool()];
+          },
+        });
+
+        if (disposed || !hostRef.current) return;
+
+        panel = chatPanel;
+        hostRef.current.replaceChildren(chatPanel);
+        setStatus("PI READY");
+      } catch (error) {
+        console.error("[pi-tab] failed to mount Pi chat", error);
+        setStatus("PI BOOT FAILURE");
+      }
+    };
+
+    void mountPi();
+
+    return () => {
+      disposed = true;
+      panel?.remove();
+      hostRef.current?.replaceChildren();
+    };
+  }, []);
 
   return (
     <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
@@ -64,76 +149,19 @@ export function CyberdeckDiagnosticPaneBody({
           left={
             <>
               <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
-                DIAGNOSTIC
+                PI
               </CyberdeckPaneHeaderTitle>
-              <CyberdeckPaneHeaderSubtitle>SYSTEM HEALTH // MEMORY // UPLINK</CyberdeckPaneHeaderSubtitle>
+              <CyberdeckPaneHeaderSubtitle>CODING AGENT // WORKBENCH</CyberdeckPaneHeaderSubtitle>
             </>
           }
-          right={<CyberdeckPaneHeaderValue>{server.toUpperCase()}</CyberdeckPaneHeaderValue>}
+          right={<CyberdeckPaneHeaderValue>{status || server.toUpperCase()}</CyberdeckPaneHeaderValue>}
         />
 
-        <div className="flex flex-1 flex-col gap-4 overflow-auto p-3">
-          <CyberdeckSquareCardGrid>
-            <CyberdeckSquareCard>
-              <CyberdeckInfoBlockHeader
-                title="CONNECTION"
-                subtitle={`ACTIVE PROVIDER // ${activeProvider.toUpperCase()}`}
-                status={connectionState.toUpperCase()}
-                statusClassName={`font-mono text-[9px] tracking-[0.08em] ${connectionTone}`}
-              />
-              <div className="mt-3 flex-1 font-mono text-[9px] leading-5 text-[#a3a3a3]">
-                <div>MODEL // {modelID || "NO_MODEL"}</div>
-                <div>FETCH // {providerModelFetchStatus.toUpperCase()}</div>
-              </div>
-            </CyberdeckSquareCard>
-
-            <CyberdeckSquareCard>
-              <CyberdeckInfoBlockHeader
-                title="VOICE"
-                subtitle="MUTHUR OUTPUT CHAIN"
-                status={voiceEnabled ? "ON" : "OFF"}
-                statusClassName={`font-mono text-[9px] tracking-[0.08em] ${voiceTone}`}
-              />
-              <div className="mt-3 flex-1 font-mono text-[9px] leading-5 text-[#a3a3a3]">
-                <div>HEALTH // {voiceHealth.toUpperCase()}</div>
-                <div>MUTHUR MEMORY // {muthurMemoryTurnCount} TURNS</div>
-              </div>
-            </CyberdeckSquareCard>
-
-            <CyberdeckSquareCard>
-              <CyberdeckInfoBlockHeader
-                title="TRACE"
-                subtitle="SYSTEM PROMPT // MEMORY INJECT"
-                status={memoryContext.trim() ? "ARMED" : "EMPTY"}
-                statusClassName={`font-mono text-[9px] tracking-[0.08em] ${traceTone}`}
-              />
-              <div className="mt-3 flex flex-1 flex-col overflow-hidden font-mono text-[9px] leading-5 text-[#a3a3a3]">
-                <div className="mb-2 text-[#6f6f6f]">SOURCE // MUTHUR MEMORY + CURRENT QUERY</div>
-                <div className="custom-scrollbar flex-1 overflow-auto whitespace-pre-wrap break-words rounded-sm border border-[#1c1c1c] bg-black/60 p-2">
-                  {memoryContext.trim() || "NO MEMORY CONTEXT"}
-                </div>
-                <div className="mt-2 text-[#6f6f6f]">HEAP // {heapCount} // CHAT // {chatCount}</div>
-                <div className="mt-1 text-[#6f6f6f]">
-                  LAST UPDATE //{" "}
-                  {muthurMemoryUpdatedAt ? new Date(muthurMemoryUpdatedAt).toLocaleString() : "—"}
-                </div>
-              </div>
-            </CyberdeckSquareCard>
-
-            <CyberdeckSquareCard>
-              <CyberdeckInfoBlockHeader
-                title="STATE"
-                subtitle="TAB SLOT REUSED FROM HEAP"
-                status="LIVE"
-                statusClassName="font-mono text-[9px] tracking-[0.08em] text-emerald-200"
-              />
-              <div className="mt-3 flex-1 font-mono text-[9px] leading-5 text-[#a3a3a3]">
-                <div>SERVER // {server.toUpperCase()}</div>
-                <div>READY // YES</div>
-                <div>DIAGNOSTIC // ENABLED</div>
-              </div>
-            </CyberdeckSquareCard>
-          </CyberdeckSquareCardGrid>
+        <div className="min-h-0 flex-1 overflow-hidden p-3">
+          <div
+            ref={hostRef}
+            className="h-full min-h-[60vh] overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80"
+          />
         </div>
       </div>
     </div>

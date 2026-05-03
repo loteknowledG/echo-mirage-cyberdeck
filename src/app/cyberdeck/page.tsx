@@ -458,7 +458,8 @@ export default function CyberdeckPage() {
     const el = messageInputRef.current;
     if (!el) return;
     const idx = el.selectionStart ?? 0;
-    setInputCaretIndex(idx);
+    const displayIndex = input.length === 0 ? 0 : Math.max(0, Math.min(input.length - 1, idx));
+    setInputCaretIndex(displayIndex);
 
     // Measure monospace text width before caret to place a block cursor overlay.
     const computed = window.getComputedStyle(el);
@@ -466,7 +467,7 @@ export default function CyberdeckPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.font = computed.font;
-    const before = input.slice(0, idx);
+    const before = input.slice(0, displayIndex);
     const padLeft = Number.parseFloat(computed.paddingLeft || "0") || 0;
     const x = padLeft + ctx.measureText(before).width - el.scrollLeft;
     setInputCursorLeft(Math.max(padLeft, x));
@@ -2667,14 +2668,14 @@ export default function CyberdeckPage() {
                     }`}
                     disabled={false}
                   />
-                  {isInputFocused && !isStreaming && inputCursorBlinkOn ? (
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute top-1/2 -translate-y-1/2 bg-green-400 px-[1px] font-mono text-sm leading-5 text-black"
-                      style={{ left: `${inputCursorLeft}px` }}
-                    >
-                      {input[inputCaretIndex] ? input[inputCaretIndex] : "\u00A0"}
-                    </span>
+                    {isInputFocused && !isStreaming && inputCursorBlinkOn ? (
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute top-[calc(50%+9px)] -translate-y-1/2 bg-green-400 px-[1px] font-mono text-sm leading-5 text-black"
+                        style={{ left: `${inputCursorLeft}px` }}
+                      >
+                        {input[inputCaretIndex] ? input[inputCaretIndex] : "\u00A0"}
+                      </span>
                   ) : null}
                 </div>
                 <div className="flex items-center justify-between px-3 py-2">
