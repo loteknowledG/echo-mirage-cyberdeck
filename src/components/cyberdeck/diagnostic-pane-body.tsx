@@ -1,13 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from "react";
-
-import {
-  CyberdeckPaneHeader,
-  CyberdeckPaneHeaderSubtitle,
-  CyberdeckPaneHeaderTitle,
-  CyberdeckPaneHeaderValue,
-} from "@/components/cyberdeck/pane-header";
+import type { Context, Message, Model, SimpleStreamOptions } from "@mariozechner/pi-ai";
 
 type DiagnosticPaneBodyProps = {
   server: string;
@@ -76,6 +70,33 @@ async function promptForProviderKey(
   return true;
 }
 
+function createEmptyAssistantMessage(model: Model<any>) {
+  return {
+    role: "assistant" as const,
+    content: [] as Array<{ type: "text"; text: string }>,
+    api: model.api,
+    provider: model.provider,
+    model: model.id,
+    responseModel: model.id,
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        total: 0,
+      },
+    },
+    stopReason: "stop" as const,
+    timestamp: Date.now(),
+  };
+}
+
 export function CyberdeckDiagnosticPaneBody({ server }: DiagnosticPaneBodyProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState("BOOTING PI...");
@@ -86,16 +107,128 @@ export function CyberdeckDiagnosticPaneBody({ server }: DiagnosticPaneBodyProps)
 
     const mountPi = async () => {
       try {
-        const [{ Agent }, { getModel }, ui] = await Promise.all([
+        const [{ Agent }, { createAssistantMessageEventStream, getModel }, ui] = await Promise.all([
           import("@mariozechner/pi-agent-core"),
           import("@mariozechner/pi-ai"),
           import("@mariozechner/pi-web-ui"),
         ]);
+        await import("@mariozechner/mini-lit/dist/MarkdownBlock.js");
 
         await ensurePiStorage(ui);
         if (disposed || !hostRef.current) return;
 
-        const agent = new Agent({
+        let agent: InstanceType<typeof Agent> | null = null;
+        const forceReady = () => {
+          if (!agent) return;
+          (agent.state as any).isStreaming = false;
+          (agent.state as any).streamingMessage = undefined;
+          (agent.state as any).pendingToolCalls = new Set();
+          setStatus("PI READY");
+        };
+
+        const streamFn = async (
+          model: Model<any>,
+          context: Context,
+          options?: SimpleStreamOptions,
+        ) => {
+          const stream = createAssistantMessageEventStream();
+
+          queueMicrotask(async () => {
+            const partial = createEmptyAssistantMessage(model);
+
+            try {
+              console.debug("[pi-tab] stream start", {
+                provider: model.provider,
+                model: model.id,
+                messageCount: context.messages.length,
+              });
+              let apiKey = typeof options?.apiKey === "string" ? options.apiKey : "";
+              if (!apiKey) {
+                const hasKey = await promptForProviderKey(ui, String(model.provider));
+                if (!hasKey) {
+                  throw new Error(`${String(model.provider).toUpperCase()} API key required`);
+                }
+                apiKey = (await ui.getAppStorage().providerKeys.get(String(model.provider))) || "";
+              }
+
+              const response = await fetch("/api/pi-chat", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  provider: model.provider,
+                  apiKey,
+                  model: model.id,
+                  systemPrompt: context.systemPrompt,
+                  messages: context.messages,
+                }),
+                signal: options?.signal,
+              });
+
+              console.debug("[pi-tab] proxy response", response.status);
+
+              if (!response.ok || !response.body) {
+                const errorText = await response.text().catch(() => "");
+                throw new Error(errorText || `Pi proxy error ${response.status}`);
+              }
+
+              partial.timestamp = Date.now();
+              stream.push({ type: "start", partial });
+              stream.push({ type: "text_start", contentIndex: 0, partial });
+
+              const reader = response.body.getReader();
+              const decoder = new TextDecoder();
+              let text = "";
+
+              while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const delta = decoder.decode(value, { stream: true });
+                if (!delta) continue;
+
+                text += delta;
+                partial.content = [{ type: "text", text }];
+                stream.push({ type: "text_delta", contentIndex: 0, delta, partial });
+              }
+
+              const rest = decoder.decode();
+              if (rest) {
+                text += rest;
+                partial.content = [{ type: "text", text }];
+                stream.push({ type: "text_delta", contentIndex: 0, delta: rest, partial });
+              }
+
+              partial.content = [{ type: "text", text }];
+              stream.push({ type: "text_end", contentIndex: 0, content: text, partial });
+              stream.push({ type: "done", reason: "stop", message: partial });
+              stream.end(partial);
+              queueMicrotask(forceReady);
+              console.debug("[pi-tab] stream done", { length: text.length });
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : "Pi proxy request failed";
+              const failed = {
+                ...partial,
+                stopReason: options?.signal?.aborted ? ("aborted" as const) : ("error" as const),
+                errorMessage: message,
+              };
+              console.error("[pi-tab] stream error", failed.errorMessage);
+              stream.push({
+                type: "error",
+                reason: options?.signal?.aborted ? "aborted" : "error",
+                error: failed,
+              });
+              stream.end(failed);
+              queueMicrotask(forceReady);
+            }
+          });
+
+          return stream;
+        };
+
+        agent = new Agent({
           initialState: {
             systemPrompt:
               "You are Pi running inside the Echo Mirage Cyberdeck. Be technical, direct, and helpful.",
@@ -105,6 +238,19 @@ export function CyberdeckDiagnosticPaneBody({ server }: DiagnosticPaneBodyProps)
             tools: [],
           },
           convertToLlm: ui.defaultConvertToLlm,
+          streamFn,
+        });
+
+        agent.subscribe((event) => {
+          if (event.type === "message_end" || event.type === "turn_end" || event.type === "agent_end") {
+            agent.state.messages = [...agent.state.messages];
+          }
+          if (event.type === "agent_start" || event.type === "agent_end" || event.type === "turn_end" || event.type === "message_end") {
+            console.debug("[pi-tab] agent event", event.type, {
+              isStreaming: agent.state.isStreaming,
+              messages: agent.state.messages.length,
+            });
+          }
         });
 
         const chatPanel = new ui.ChatPanel();
@@ -144,25 +290,12 @@ export function CyberdeckDiagnosticPaneBody({ server }: DiagnosticPaneBodyProps)
 
   return (
     <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
-      <div className="flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors">
-        <CyberdeckPaneHeader
-          left={
-            <>
-              <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
-                PI
-              </CyberdeckPaneHeaderTitle>
-              <CyberdeckPaneHeaderSubtitle>CODING AGENT // WORKBENCH</CyberdeckPaneHeaderSubtitle>
-            </>
-          }
-          right={<CyberdeckPaneHeaderValue>{status || server.toUpperCase()}</CyberdeckPaneHeaderValue>}
+      <div className="min-h-0 flex flex-1 overflow-hidden p-3">
+        <div
+          ref={hostRef}
+          className="h-full min-h-[60vh] w-full overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80"
+          data-pi-status={status || server.toUpperCase()}
         />
-
-        <div className="min-h-0 flex-1 overflow-hidden p-3">
-          <div
-            ref={hostRef}
-            className="h-full min-h-[60vh] overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80"
-          />
-        </div>
       </div>
     </div>
   );
