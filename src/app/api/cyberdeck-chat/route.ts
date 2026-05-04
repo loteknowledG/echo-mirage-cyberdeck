@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createEmptyToolRegistry, runMuthurCoreLoop } from "@/lib/muthur-core/loop";
+import { runMuthurCoreLoop } from "@/lib/muthur-core/loop";
+import { createMuthurToolRegistry } from "@/lib/muthur-core/tool-registry";
 
 const textEncoder = new TextEncoder();
 
@@ -105,6 +106,60 @@ function resolveProviderApiKey(provider: string, suppliedApiKey: unknown): strin
   return "";
 }
 
+function formatToolResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] justbash returned no output.";
+  }
+
+  const payload = result as {
+    command?: string;
+    cwd?: string;
+    stdout?: string;
+    stderr?: string;
+    exitCode?: number;
+  };
+
+  const parts = [
+    "[TOOL] JUSTBASH // WORKSPACE MIRROR",
+    payload.command ? `COMMAND // ${payload.command}` : null,
+    payload.cwd ? `CWD // ${payload.cwd}` : null,
+    typeof payload.exitCode === "number" ? `EXIT // ${payload.exitCode}` : null,
+    payload.stdout ? `STDOUT\n${payload.stdout.trimEnd()}` : null,
+    payload.stderr ? `STDERR\n${payload.stderr.trimEnd()}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
+function formatLocalFsResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] LOCALFS returned no output.";
+  }
+
+  const payload = result as {
+    action?: string;
+    path?: string;
+    entries?: string[];
+    content?: string;
+    isDirectory?: boolean;
+    size?: number;
+    modifiedAt?: string;
+  };
+
+  const parts = [
+    "[TOOL] LOCALFS // CLIENT MACHINE",
+    payload.action ? `ACTION // ${payload.action.toUpperCase()}` : null,
+    payload.path ? `PATH // ${payload.path}` : null,
+    Array.isArray(payload.entries) ? `ENTRIES\n${payload.entries.join("\n")}` : null,
+    typeof payload.content === "string" ? `CONTENT\n${payload.content.trimEnd()}` : null,
+    typeof payload.isDirectory === "boolean" ? `DIRECTORY // ${payload.isDirectory ? "YES" : "NO"}` : null,
+    typeof payload.size === "number" ? `SIZE // ${payload.size}` : null,
+    payload.modifiedAt ? `MODIFIED // ${payload.modifiedAt}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
 function defaultModelForProvider(provider: string): string {
   if (provider === "openai") return "gpt-4o-mini";
   if (provider === "openrouter") return "openai/gpt-4o-mini";
@@ -119,8 +174,31 @@ export async function POST(request: Request) {
       typeof memoryContext === "string" && memoryContext.trim()
         ? `\n\nPersistent MUTHUR memory:\n${memoryContext.trim()}`
         : "";
-    const loopState = runMuthurCoreLoop(typeof message === "string" ? message : "", createEmptyToolRegistry());
+    const toolRegistry = createMuthurToolRegistry();
+    const loopState = runMuthurCoreLoop(typeof message === "string" ? message : "", toolRegistry);
     console.debug("[muthur-core] loop step", loopState.steps[0]);
+
+    const firstStep = loopState.steps[0];
+    if (firstStep?.action === "tool" && firstStep.toolCall) {
+      const tool = toolRegistry.tools[firstStep.toolCall.toolName];
+      if (!tool) {
+        return NextResponse.json({ error: `Tool not found: ${firstStep.toolCall.toolName}` }, { status: 500 });
+      }
+
+      const toolResult = await tool.run(firstStep.toolCall);
+      const bodyText = toolResult.ok
+        ? firstStep.toolCall.toolName === "localfs"
+          ? formatLocalFsResult(toolResult.output)
+          : formatToolResult(toolResult.output)
+        : `[TOOL] JUSTBASH FAILURE\n\n${toolResult.error || "Unknown tool error."}`;
+
+      return new Response(bodyText, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+        },
+      });
+    }
 
     // Model probe (non-stream), same contract as weyland-yutani transmit chat stream:false
     if (probe === true && provider && modelFromBody) {

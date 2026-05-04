@@ -297,6 +297,18 @@ body,
   border-top: 1px solid rgba(57, 255, 136, 0.2);
 }
 
+.pi-pane-host message-editor > div {
+  background: rgba(5, 7, 8, 0.9) !important;
+  border-color: rgba(57, 255, 136, 0.16) !important;
+  box-shadow: none !important;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.pi-pane-host message-editor > div:focus-within {
+  border-color: rgba(57, 255, 136, 0.4) !important;
+  box-shadow: 0 0 0 1px rgba(57, 255, 136, 0.18) !important;
+}
+
 .cyberdeck-square-grid {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
 }

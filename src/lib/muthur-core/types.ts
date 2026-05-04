@@ -1,4 +1,4 @@
-export type MuthurLoopAction = "respond" | "defer";
+export type MuthurLoopAction = "respond" | "defer" | "tool";
 
 export interface ToolCall {
   toolName: string;
