@@ -45,6 +45,15 @@ import {
   saveMuthurMemory,
   type MuthurMemoryState,
 } from "@/lib/muthur-memory";
+import {
+  OPERATOR_BROWSER_HOME_URL,
+  deriveOperatorBrowserUrl,
+  looksLikeCaptchaBlock,
+  looksLikeOperatorWebIntent,
+  parseBrowserCommand,
+} from "@/lib/browser-intents";
+import { useBrowserController } from "@/lib/use-browser-controller";
+import { useCustomTabBrowserController } from "@/lib/use-custom-tab-browser-controller";
 import { speakDryFallback } from "@/voice/speakMuthur";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { get, set } from "idb-keyval";
@@ -406,179 +415,6 @@ function textForSpeech(value: string) {
     .trim();
 }
 
-const OPERATOR_BROWSER_HOME_URL = "https://duckduckgo.com/";
-
-function normalizeOperatorBrowserUrl(raw: string) {
-  const value = raw.trim();
-  if (!value) return OPERATOR_BROWSER_HOME_URL;
-  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(value)) return value;
-  if (/^(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/.*)?$/i.test(value)) return `https://${value}`;
-  if (/^[^\s]+\.[^\s/]+(?:\/.*)?$/i.test(value)) return `https://${value}`;
-  return `${OPERATOR_BROWSER_HOME_URL}?q=${encodeURIComponent(value)}`;
-}
-
-function deriveOperatorBrowserUrl(intent: string) {
-  const text = intent.trim();
-  if (!text) return OPERATOR_BROWSER_HOME_URL;
-
-  const explicitMatch = text.match(/^(?:\/web|web:)\s*(.*)$/i);
-  if (explicitMatch) {
-    return normalizeOperatorBrowserUrl(explicitMatch[1] || "");
-  }
-
-  const phraseMatch = text.match(
-    /^(?:use the web(?: to)?(?: find| search| look up)?|browse(?: the)? web(?: for)?|search(?: the)? web(?: for)?|open(?: the)? browser(?: to)?|go to)\s*(.*)$/i,
-  );
-  if (phraseMatch) {
-    return normalizeOperatorBrowserUrl(phraseMatch[1] || text);
-  }
-
-  return normalizeOperatorBrowserUrl(text);
-}
-
-function stripMuthurInvocationPrefix(intent: string) {
-  const text = intent.trim();
-  if (!text) return "";
-
-  const stripped = text.replace(
-    /^(?:muthur|mother|mu\/thur|mu-thur|mu_thur)(?:[:,]|\s+\S+[:,]?)?\s+/i,
-    "",
-  );
-  return stripped.trim() || text;
-}
-
-function stripBrowserSearchPrefix(intent: string) {
-  const text = intent.trim();
-  if (!text) return "";
-
-  const prefixMatch = text.match(
-    /^(?:find|search|look for|look up|show me|show|help me find|help me search for|can you find|can you search for)\s+(?:what\s+)?(.+)$/i,
-  );
-  if (prefixMatch) {
-    return prefixMatch[1].trim();
-  }
-
-  return text;
-}
-
-const KNOWN_CAR_MAKES = [
-  "acura",
-  "audi",
-  "bmw",
-  "buick",
-  "cadillac",
-  "chevrolet",
-  "chevy",
-  "chrysler",
-  "dodge",
-  "fiat",
-  "ford",
-  "genesis",
-  "gmc",
-  "honda",
-  "hyundai",
-  "infiniti",
-  "jaguar",
-  "jeep",
-  "kia",
-  "land rover",
-  "lexus",
-  "lincoln",
-  "mazda",
-  "mercedes",
-  "mercedes-benz",
-  "mini",
-  "mitsubishi",
-  "nissan",
-  "ram",
-  "subaru",
-  "tesla",
-  "toyota",
-  "volkswagen",
-  "volvo",
-] as const;
-
-function deriveCarsComSearchUrl(intent: string) {
-  const text = stripBrowserSearchPrefix(intent).toLowerCase().replace(/[^\w\s-]+/g, " ").replace(/\s+/g, " ").trim();
-  if (!text) return null;
-
-  const searchTerms = new Set<string>();
-
-  const locationMatch = text.match(
-    /\b(?:in|near|around|at)\s+([a-z0-9][a-z0-9\s.-]*?)(?:\s+(?:for sale|on sale|available|in stock|today|now))?$/i,
-  );
-  const location = locationMatch?.[1]?.trim() || "";
-  const searchText = locationMatch ? text.slice(0, locationMatch.index).trim() : text;
-  const isGenericCarSearch =
-    /\b(?:car|cars|vehicle|vehicles|auto|autos)\b/i.test(searchText) &&
-    !/\b(?:used|new|for sale|on sale|available|in stock)\b/i.test(searchText);
-
-  let make = "";
-  let model = "";
-  let makeIndex = -1;
-
-  for (const candidate of KNOWN_CAR_MAKES) {
-    const candidateIndex = searchText.indexOf(candidate);
-    if (candidateIndex === -1) continue;
-    if (makeIndex === -1 || candidateIndex < makeIndex) {
-      make = candidate;
-      makeIndex = candidateIndex;
-    }
-  }
-
-  if (makeIndex === -1) {
-    if (!isGenericCarSearch) return null;
-    searchTerms.add("cars for sale");
-    if (location) searchTerms.add(location);
-    const query = Array.from(searchTerms).join(" ").trim();
-    return `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-  }
-
-  searchTerms.add(make);
-
-  const afterMake = searchText.slice(makeIndex + make.length).trim();
-  const modelMatch = afterMake.match(/^([a-z0-9][a-z0-9\s-]*?)(?:\s+(?:for sale|on sale|available|in stock|used|new))?$/i);
-  if (!modelMatch) return null;
-  model = modelMatch[1].trim();
-  if (!model) return null;
-
-  searchTerms.add(model);
-  searchTerms.add("for sale");
-  if (location) searchTerms.add(location);
-
-  const query = Array.from(searchTerms).join(" ").trim();
-  return `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-}
-
-function looksLikeCaptchaBlock(snapshotText: string) {
-  const text = snapshotText.trim().toLowerCase();
-  if (!text) return false;
-  return (
-    /\bcaptcha\b/.test(text) ||
-    /\byou have been blocked\b/.test(text) ||
-    /\baccess is denied\b/.test(text) ||
-    /\battention required\b/.test(text) ||
-    /\bcloudflare\b/.test(text) ||
-    /\bverify you are human\b/.test(text) ||
-    /\bbot challenge\b/.test(text) ||
-    /\bselect all squares containing\b/.test(text) ||
-    /\bconfirm this search was made by a human\b/.test(text) ||
-    /\bpress and hold\b/.test(text)
-  );
-}
-
-function looksLikeOperatorWebIntent(intent: string) {
-  const text = intent.trim().toLowerCase();
-  if (!text) return false;
-  return (
-    /^(?:\/web|web:)\b/i.test(text) ||
-    /\b(?:use the web|browse the web|search the web|open the browser|go to the web)\b/i.test(text) ||
-    /\b(?:for sale|on sale|available|in stock|dealership|dealer|inventory|used car|used cars|new car|new cars|car lot|auto lot)\b/i.test(
-      text,
-    )
-  );
-}
-
 function normalizeCustomTabGlyph(label: string, glyph?: string) {
   const trimmedGlyph = (glyph || "").trim();
   if (trimmedGlyph) return trimmedGlyph.slice(0, 2);
@@ -655,73 +491,6 @@ function parseCustomTabCommand(input: string) {
       label: label || undefined,
       glyph: glyph || undefined,
     };
-  }
-
-  return null;
-}
-
-type BrowserCommand =
-  | { kind: "goto"; url: string }
-  | { kind: "click"; selector: string }
-  | { kind: "type"; selector: string; value: string }
-  | { kind: "submit"; selector: string }
-  | { kind: "snapshot" }
-  | { kind: "back" }
-  | { kind: "forward" }
-  | { kind: "reload" };
-
-function parseBrowserCommand(input: string): BrowserCommand | null {
-  const text = input.trim();
-  if (!text) return null;
-  const commandText = stripMuthurInvocationPrefix(text);
-
-  const commandMatch = commandText.match(/^(?:\/browser|browser:|\/web|web:)\s*(.+)$/i);
-  const body = (commandMatch?.[1] || commandText).trim();
-  const lower = body.toLowerCase();
-
-  if (/^(?:back|go back)$/i.test(lower)) return { kind: "back" };
-  if (/^(?:forward|go forward)$/i.test(lower)) return { kind: "forward" };
-  if (/^(?:reload|refresh)$/i.test(lower)) return { kind: "reload" };
-  if (/^(?:snapshot|capture|inspect)$/i.test(lower)) return { kind: "snapshot" };
-
-  if (/^(?:click|press|tap)\s+(?:the\s+)?(?:first|1st)\s+(?:result|item|listing|link|match)$/i.test(body)) {
-    return { kind: "click", selector: "a[href], button" };
-  }
-
-  const gotoMatch = body.match(/^(?:goto|go to|open|navigate)\s+(.+)$/i);
-  if (gotoMatch) {
-    return { kind: "goto", url: gotoMatch[1].trim() };
-  }
-
-  const clickMatch = body.match(/^(?:click|press|tap)\s+(.+)$/i);
-  if (clickMatch) {
-    return { kind: "click", selector: clickMatch[1].trim() };
-  }
-
-  const typeMatch = body.match(/^(?:type|enter|fill)\s+(.+?)(?:\s+(?:with|into|=|:)\s+(.+))$/i);
-  if (typeMatch) {
-    return { kind: "type", selector: typeMatch[1].trim(), value: typeMatch[2].trim() };
-  }
-
-  const submitMatch = body.match(/^(?:submit|send)\s+(.+)$/i);
-  if (submitMatch) {
-    return { kind: "submit", selector: submitMatch[1].trim() };
-  }
-
-  const shoppingIntent =
-    /^(?:find|search|look for|look up|show me|show)\b/i.test(body) ||
-    /\b(?:for sale|on sale|available|in stock|dealership|dealer|inventory|used car|used cars|new car|new cars|car lot|auto lot|near me|nearby|in\s+[a-z])/i.test(
-      body,
-    );
-  if (shoppingIntent) {
-    return {
-      kind: "goto",
-      url: deriveCarsComSearchUrl(body) || deriveOperatorBrowserUrl(stripBrowserSearchPrefix(body)),
-    };
-  }
-
-  if (looksLikeOperatorWebIntent(commandText)) {
-    return { kind: "goto", url: deriveOperatorBrowserUrl(stripBrowserSearchPrefix(commandText)) };
   }
 
   return null;
@@ -1497,326 +1266,14 @@ export default function CyberdeckPage() {
     operatorDroppedAsset?.kind === "code" ||
     operatorDroppedAsset?.kind === "markdown";
 
-  const getBrowserBridge = useCallback(() => {
-    if (typeof window === "undefined") return null;
-    return window.echoMirageBrowser || null;
-  }, []);
-
-  const applyBrowserSnapshot = useCallback((snapshot: EchoMirageBrowserSnapshot, fallbackUrl: string) => {
-    if (!snapshot.ok && snapshot.error) {
-      setOperatorBrowserSnapshot(`URL: ${fallbackUrl}\n\nERROR: ${snapshot.error}`);
-      return;
-    }
-
-    const url = (snapshot.url || fallbackUrl || "").trim();
-    const title = (snapshot.title || "").trim();
-    const text = (snapshot.text || "").trim();
-    const parts = [
-      url ? `URL: ${url}` : null,
-      title ? `TITLE: ${title}` : null,
-      text ? `PAGE TEXT:\n${text.slice(0, 6000)}` : null,
-    ].filter(Boolean);
-    setOperatorBrowserSnapshot(parts.join("\n\n") || `URL: ${fallbackUrl}`);
-  }, []);
-
-  const syncBrowserEngineToUrl = useCallback(
-    async (nextUrl: string) => {
-      const normalizedUrl = normalizeOperatorBrowserUrl(nextUrl);
-      const bridge = getBrowserBridge();
-
-      if (!bridge) {
-        const fallback = `URL: ${normalizedUrl}`;
-        setOperatorBrowserSnapshot(fallback);
-        return fallback;
-      }
-
-      try {
-        const snapshot = await bridge.navigate(normalizedUrl);
-        applyBrowserSnapshot(snapshot, normalizedUrl);
-        const url = (snapshot.url || normalizedUrl || "").trim();
-        const title = (snapshot.title || "").trim();
-        const text = (snapshot.text || "").trim();
-        return [
-          url ? `URL: ${url}` : null,
-          title ? `TITLE: ${title}` : null,
-          text ? `PAGE TEXT:\n${text.slice(0, 6000)}` : null,
-        ]
-          .filter(Boolean)
-          .join("\n\n") || `URL: ${normalizedUrl}`;
-      } catch {
-        const fallback = `URL: ${normalizedUrl}`;
-        setOperatorBrowserSnapshot(fallback);
-        return fallback;
-      }
-    },
-    [applyBrowserSnapshot, getBrowserBridge],
-  );
-
-  const openOperatorBrowser = useCallback(
-    async (nextUrl?: string) => {
-      const normalizedUrl = normalizeOperatorBrowserUrl(nextUrl || OPERATOR_BROWSER_HOME_URL);
-
-      setServer("m");
-      setOperatorSurfaceMode("browser");
-      setOperatorBrowserUrl(normalizedUrl);
-      return await syncBrowserEngineToUrl(normalizedUrl);
-    },
-    [syncBrowserEngineToUrl],
-  );
-
-  const executeVisibleBrowserScript = useCallback(async (script: string) => {
-    const view = operatorBrowserRef.current;
-    if (!view) return null;
-    try {
-      return await view.executeJavaScript(script);
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const performBrowserCommand = useCallback(
-    async (command: BrowserCommand) => {
-      const bridge = getBrowserBridge();
-      const view = operatorBrowserRef.current;
-
-      const readVisibleSnapshot = async () => {
-        const url = view?.getURL?.() || operatorBrowserUrl;
-        const title = view?.getTitle?.() || "";
-        let text = "";
-        try {
-          const bodyText = await executeVisibleBrowserScript(
-            "document && document.body ? String(document.body.innerText || document.body.textContent || '') : ''",
-          );
-          text = typeof bodyText === "string" ? bodyText.trim() : "";
-        } catch {
-          text = "";
-        }
-        return {
-          ok: true,
-          url,
-          title,
-          text,
-        } satisfies EchoMirageBrowserSnapshot;
-      };
-
-      if (command.kind === "goto") {
-        const nextUrl = normalizeOperatorBrowserUrl(command.url);
-        const nextSnapshot = await openOperatorBrowser(nextUrl);
-        if (looksLikeCaptchaBlock(nextSnapshot || nextUrl)) {
-          return `${nextSnapshot || `URL: ${nextUrl}`}\n\nCAPTCHA_BLOCKED // MANUAL_COMPLETION_REQUIRED`;
-        }
-        return nextSnapshot || `URL: ${nextUrl}`;
-      }
-
-      const selectorJson = (selector: string) => JSON.stringify(selector.trim());
-      const valueJson = (value: string) => JSON.stringify(value);
-
-      const runDualAction = async (script: string, bridgeAction?: Promise<EchoMirageBrowserSnapshot>) => {
-        await executeVisibleBrowserScript(script);
-        const snapshot = bridgeAction ? await bridgeAction.catch(() => null) : null;
-        if (snapshot) {
-          applyBrowserSnapshot(snapshot, operatorBrowserUrl);
-          if (snapshot.url && snapshot.url !== operatorBrowserUrl) {
-            setOperatorBrowserUrl(snapshot.url);
-          }
-          return [
-            snapshot.url ? `URL: ${snapshot.url}` : null,
-            snapshot.title ? `TITLE: ${snapshot.title}` : null,
-            snapshot.text ? `PAGE TEXT:\n${snapshot.text.slice(0, 6000)}` : null,
-          ]
-            .filter(Boolean)
-            .join("\n\n") || `URL: ${operatorBrowserUrl}`;
-        }
-
-        const visibleSnapshot = await readVisibleSnapshot();
-        applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
-        if (visibleSnapshot.url && visibleSnapshot.url !== operatorBrowserUrl) {
-          setOperatorBrowserUrl(visibleSnapshot.url);
-        }
-        return [
-          visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : null,
-          visibleSnapshot.title ? `TITLE: ${visibleSnapshot.title}` : null,
-          visibleSnapshot.text ? `PAGE TEXT:\n${visibleSnapshot.text.slice(0, 6000)}` : null,
-        ]
-          .filter(Boolean)
-          .join("\n\n") || `URL: ${operatorBrowserUrl}`;
-      };
-
-      if (command.kind === "click") {
-        const selector = command.selector.trim();
-        const script = `
-          (() => {
-            const selector = ${selectorJson(selector)};
-            const el = document.querySelector(selector);
-            if (!el) return { ok: false, error: \`Selector not found: \${selector}\` };
-            if (typeof el.click === "function") el.click();
-            return { ok: true };
-          })()
-        `;
-        return await runDualAction(script, bridge?.click(selector));
-      }
-
-      if (command.kind === "type") {
-        const selector = command.selector.trim();
-        const value = command.value;
-        const script = `
-          (() => {
-            const selector = ${selectorJson(selector)};
-            const value = ${valueJson(value)};
-            const el = document.querySelector(selector);
-            if (!el) return { ok: false, error: \`Selector not found: \${selector}\` };
-            const isInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
-            if (isInput) {
-              const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-              const descriptor = Object.getOwnPropertyDescriptor(proto, "value");
-              if (descriptor && descriptor.set) descriptor.set.call(el, value);
-              else el.value = value;
-              el.dispatchEvent(new Event("input", { bubbles: true }));
-              el.dispatchEvent(new Event("change", { bubbles: true }));
-              return { ok: true };
-            }
-            if (el.isContentEditable) {
-              el.focus();
-              el.innerText = value;
-              el.dispatchEvent(new Event("input", { bubbles: true }));
-              return { ok: true };
-            }
-            return { ok: false, error: \`Selector is not editable: \${selector}\` };
-          })()
-        `;
-        return await runDualAction(script, bridge?.type(selector, value));
-      }
-
-      if (command.kind === "submit") {
-        const selector = command.selector.trim();
-        const script = `
-          (() => {
-            const selector = ${selectorJson(selector)};
-            const el = document.querySelector(selector);
-            if (!el) return { ok: false, error: \`Selector not found: \${selector}\` };
-            const form = el.tagName === "FORM" ? el : el.closest("form");
-            if (form) {
-              if (typeof form.requestSubmit === "function") form.requestSubmit();
-              else if (typeof form.submit === "function") form.submit();
-              return { ok: true };
-            }
-            if (typeof el.click === "function") {
-              el.click();
-              return { ok: true };
-            }
-            return { ok: false, error: \`Selector has no form or click handler: \${selector}\` };
-          })()
-        `;
-        return await runDualAction(script, bridge?.submit(selector));
-      }
-
-      if (command.kind === "back") {
-        const visible = view && view.canGoBack() ? view.goBack() : null;
-        const snapshot = bridge ? await bridge.back().catch(() => null) : null;
-        if (snapshot) {
-          applyBrowserSnapshot(snapshot, operatorBrowserUrl);
-          if (snapshot.url) {
-            setOperatorBrowserUrl(snapshot.url);
-          }
-          return `URL: ${snapshot.url || operatorBrowserUrl}`;
-        }
-        await visible;
-        const visibleSnapshot = await readVisibleSnapshot();
-        applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
-        return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
-      }
-
-      if (command.kind === "forward") {
-        const visible = view && view.canGoForward() ? view.goForward() : null;
-        const snapshot = bridge ? await bridge.forward().catch(() => null) : null;
-        if (snapshot) {
-          applyBrowserSnapshot(snapshot, operatorBrowserUrl);
-          if (snapshot.url) {
-            setOperatorBrowserUrl(snapshot.url);
-          }
-          return `URL: ${snapshot.url || operatorBrowserUrl}`;
-        }
-        await visible;
-        const visibleSnapshot = await readVisibleSnapshot();
-        applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
-        return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
-      }
-
-      if (command.kind === "reload") {
-        const visible = view?.reload?.();
-        const snapshot = bridge ? await bridge.reload().catch(() => null) : null;
-        if (snapshot) {
-          applyBrowserSnapshot(snapshot, operatorBrowserUrl);
-          if (snapshot.url) {
-            setOperatorBrowserUrl(snapshot.url);
-          }
-          return `URL: ${snapshot.url || operatorBrowserUrl}`;
-        }
-        await visible;
-        const visibleSnapshot = await readVisibleSnapshot();
-        applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
-        return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
-      }
-
-      const visibleSnapshot = await readVisibleSnapshot();
-      applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
-      return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
-    },
-    [
-      applyBrowserSnapshot,
-      executeVisibleBrowserScript,
-      getBrowserBridge,
-      openOperatorBrowser,
-      operatorBrowserUrl,
-    ],
-  );
-
-  const captureOperatorBrowserSnapshot = useCallback(async () => {
-    const bridge = getBrowserBridge();
-    if (!bridge) {
-      const view = operatorBrowserRef.current;
-      if (!view) return;
-
-      try {
-        const [title, bodyText] = await Promise.all([
-          Promise.resolve(typeof view.getTitle === "function" ? view.getTitle() : "").catch(() => ""),
-          view.executeJavaScript(
-            "document && document.body ? String(document.body.innerText || document.body.textContent || '') : ''",
-          ),
-        ]);
-
-        const url = typeof view.getURL === "function" ? view.getURL() : operatorBrowserUrl;
-        const text = typeof bodyText === "string" ? bodyText.trim() : "";
-        const parts = [
-          url ? `URL: ${url}` : null,
-          title ? `TITLE: ${title.trim()}` : null,
-          text ? `PAGE TEXT:\n${text.slice(0, 6000)}` : null,
-        ].filter(Boolean);
-        setOperatorBrowserSnapshot(parts.join("\n\n"));
-      } catch {
-        setOperatorBrowserSnapshot(operatorBrowserUrl);
-      }
-      return;
-    }
-
-    try {
-      const snapshot = await bridge.snapshot();
-      applyBrowserSnapshot(snapshot, operatorBrowserUrl);
-      const url = (snapshot.url || operatorBrowserUrl || "").trim();
-      const title = (snapshot.title || "").trim();
-      const text = (snapshot.text || "").trim();
-      return [
-        url ? `URL: ${url}` : null,
-        title ? `TITLE: ${title}` : null,
-        text ? `PAGE TEXT:\n${text.slice(0, 6000)}` : null,
-      ]
-        .filter(Boolean)
-        .join("\n\n") || `URL: ${operatorBrowserUrl}`;
-    } catch {
-      setOperatorBrowserSnapshot(operatorBrowserUrl);
-      return `URL: ${operatorBrowserUrl}`;
-    }
-  }, [applyBrowserSnapshot, getBrowserBridge, operatorBrowserUrl]);
+  const { captureOperatorBrowserSnapshot, openOperatorBrowser, performBrowserCommand } = useBrowserController({
+    operatorBrowserRef,
+    operatorBrowserUrl,
+    setOperatorBrowserUrl,
+    setOperatorSurfaceMode,
+    setServer,
+    setOperatorBrowserSnapshot,
+  });
 
   useEffect(() => {
     setOperatorDocNameDraft(operatorDroppedAsset?.name || "");
@@ -3460,6 +2917,12 @@ export default function CyberdeckPage() {
     setCustomTabs((prev) => prev.map((tab) => (tab.id === tabId ? updater(tab) : tab)));
   }, []);
 
+  const { handleCustomTabBrowserNavigate: customTabBrowserNavigate } = useCustomTabBrowserController({
+    activeCustomTab,
+    operatorBrowserRef,
+    updateCustomTab,
+  });
+
   const loadCustomTabAssetFromFile = useCallback(
     async (tabId: string, file: File) => {
       const kind = getOperatorFileKind(file);
@@ -3513,58 +2976,6 @@ export default function CyberdeckPage() {
     },
     [loadCustomTabAssetFromFile],
   );
-
-  const handleCustomTabBrowserNavigate = useCallback(
-    (tabId: string, nextUrl: string) => {
-      const normalizedUrl = normalizeOperatorBrowserUrl(nextUrl);
-      updateCustomTab(tabId, (tab) => ({
-        ...tab,
-        kind: "web",
-        browserUrl: normalizedUrl,
-        asset: undefined,
-      }));
-      void syncBrowserEngineToUrl(normalizedUrl);
-    },
-    [syncBrowserEngineToUrl, updateCustomTab],
-  );
-
-  useEffect(() => {
-    if (!activeCustomTab || activeCustomTab.kind !== "web") return;
-    const view = operatorBrowserRef.current;
-    if (!view) return;
-
-    view.setAttribute("allowpopups", "");
-
-    const syncUrl = () => {
-      try {
-        const currentUrl = view.getURL();
-        if (currentUrl) {
-          handleCustomTabBrowserNavigate(activeCustomTab.id, currentUrl);
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-
-    const blockDrop = (event: Event) => {
-      event.preventDefault();
-      event.stopPropagation();
-    };
-
-    view.addEventListener("did-navigate", syncUrl as EventListener);
-    view.addEventListener("did-navigate-in-page", syncUrl as EventListener);
-    view.addEventListener("page-title-updated", syncUrl as EventListener);
-    view.addEventListener("dragover", blockDrop);
-    view.addEventListener("drop", blockDrop);
-
-    return () => {
-      view.removeEventListener("did-navigate", syncUrl as EventListener);
-      view.removeEventListener("did-navigate-in-page", syncUrl as EventListener);
-      view.removeEventListener("page-title-updated", syncUrl as EventListener);
-      view.removeEventListener("dragover", blockDrop);
-      view.removeEventListener("drop", blockDrop);
-    };
-  }, [activeCustomTab, handleCustomTabBrowserNavigate, syncBrowserEngineToUrl]);
 
   useEffect(() => {
     if (operatorSurfaceMode !== "browser") return;
@@ -3633,11 +3044,11 @@ export default function CyberdeckPage() {
             <div className="flex items-center gap-2 rounded-sm border border-[#1c1c1c] bg-black/80 p-2">
               <input
                 value={tab.browserUrl || OPERATOR_BROWSER_HOME_URL}
-                onChange={(event) => handleCustomTabBrowserNavigate(tab.id, event.target.value)}
+                onChange={(event) => customTabBrowserNavigate(tab.id, event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key !== "Enter") return;
                   event.preventDefault();
-                  handleCustomTabBrowserNavigate(tab.id, (event.currentTarget as HTMLInputElement).value);
+                  customTabBrowserNavigate(tab.id, (event.currentTarget as HTMLInputElement).value);
                 }}
                 spellCheck={false}
                 autoCapitalize="off"
@@ -3647,7 +3058,7 @@ export default function CyberdeckPage() {
               />
               <button
                 type="button"
-                onClick={() => handleCustomTabBrowserNavigate(tab.id, tab.browserUrl || OPERATOR_BROWSER_HOME_URL)}
+                onClick={() => customTabBrowserNavigate(tab.id, tab.browserUrl || OPERATOR_BROWSER_HOME_URL)}
                 className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
               >
                 OPEN
@@ -3795,7 +3206,7 @@ export default function CyberdeckPage() {
       buildMuthurMemoryContext,
       connectionState,
       deleteActiveTab,
-      handleCustomTabBrowserNavigate,
+      customTabBrowserNavigate,
       handleCustomTabDrop,
       heapEntries.length,
       input,
