@@ -79,7 +79,11 @@ function deriveJustBashCommand(intent: string): string | null {
   const searchMatch = text.match(
     /^(?:search|find|grep|ripgrep|look for|where is|what files mention|which files mention|are there files that mention)\s+(?:for\s+)?["“]?([^"”]+?)["”]?(?:\s+(?:in|inside)\s+([./\w-]+))?\??$/i,
   );
-  if (searchMatch) {
+  const workspaceSearchHint =
+    /\b(?:file|files|code|workspace|repo|repository|src|directory|folder|project|module|function|class|import|reference|mention|readme|package|test|tests)\b/i.test(
+      text,
+    ) || /^[./\\a-zA-Z0-9_-]+$/.test((searchMatch?.[2] || "").trim());
+  if (searchMatch && workspaceSearchHint) {
     const pattern = searchMatch[1].trim();
     const scope = (searchMatch[2] || "src").trim();
     if (pattern) {

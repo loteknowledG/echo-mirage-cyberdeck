@@ -1,5 +1,76 @@
 const path = require('path');
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
+
+let playrightBrowserState = null;
+
+async function ensurePlaywrightBrowserState() {
+  if (playrightBrowserState) {
+    return playrightBrowserState;
+  }
+
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto('about:blank');
+
+  playrightBrowserState = { browser, context, page };
+  return playrightBrowserState;
+}
+
+async function snapshotPage(page) {
+  const [title, url, text] = await Promise.all([
+    page.title().catch(() => ''),
+    Promise.resolve(page.url()),
+    page
+      .evaluate(() => {
+        try {
+          return document && document.body
+            ? String(document.body.innerText || document.body.textContent || '')
+            : '';
+        } catch {
+          return '';
+        }
+      })
+      .catch(() => ''),
+  ]);
+
+  return {
+    ok: true,
+    url: String(url || ''),
+    title: String(title || ''),
+    text: String(text || ''),
+  };
+}
+
+async function navigatePlaywrightBrowser(url) {
+  const { page } = await ensurePlaywrightBrowserState();
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  return snapshotPage(page);
+}
+
+async function snapshotPlaywrightBrowser() {
+  const { page } = await ensurePlaywrightBrowserState();
+  return snapshotPage(page);
+}
+
+async function reloadPlaywrightBrowser() {
+  const { page } = await ensurePlaywrightBrowserState();
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+  return snapshotPage(page);
+}
+
+async function goBackPlaywrightBrowser() {
+  const { page } = await ensurePlaywrightBrowserState();
+  await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => null);
+  return snapshotPage(page);
+}
+
+async function goForwardPlaywrightBrowser() {
+  const { page } = await ensurePlaywrightBrowserState();
+  await page.goForward({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => null);
+  return snapshotPage(page);
+}
 
 function dispatchRendererAction(win, action) {
   const payload = JSON.stringify(String(action || ''));
@@ -69,6 +140,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      webviewTag: true,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
@@ -82,7 +154,59 @@ function createWindow() {
   win.loadURL('http://127.0.0.1:3050/cyberdeck');
 }
 
+ipcMain.handle('echo-mirage-browser:navigate', async (_event, url) => {
+  try {
+    return await navigatePlaywrightBrowser(String(url || 'about:blank'));
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Browser navigate failed.' };
+  }
+});
+
+ipcMain.handle('echo-mirage-browser:snapshot', async () => {
+  try {
+    return await snapshotPlaywrightBrowser();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Browser snapshot failed.' };
+  }
+});
+
+ipcMain.handle('echo-mirage-browser:reload', async () => {
+  try {
+    return await reloadPlaywrightBrowser();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Browser reload failed.' };
+  }
+});
+
+ipcMain.handle('echo-mirage-browser:back', async () => {
+  try {
+    return await goBackPlaywrightBrowser();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Browser back failed.' };
+  }
+});
+
+ipcMain.handle('echo-mirage-browser:forward', async () => {
+  try {
+    return await goForwardPlaywrightBrowser();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Browser forward failed.' };
+  }
+});
+
 app.whenReady().then(createWindow);
+
+app.on('before-quit', async () => {
+  if (playrightBrowserState?.browser) {
+    try {
+      await playrightBrowserState.browser.close();
+    } catch {
+      /* ignore */
+    } finally {
+      playrightBrowserState = null;
+    }
+  }
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

@@ -274,10 +274,14 @@ function defaultModelForProvider(provider: string): string {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { message, provider, apiKey, testMode, probe, model: modelFromBody, memoryContext } = body;
+    const { message, provider, apiKey, testMode, probe, model: modelFromBody, memoryContext, browserContext } = body;
     const memoryPrompt =
       typeof memoryContext === "string" && memoryContext.trim()
         ? `\n\nPersistent MUTHUR memory:\n${memoryContext.trim()}`
+        : "";
+    const browserPrompt =
+      typeof browserContext === "string" && browserContext.trim()
+        ? `\n\nLive browser pane snapshot:\n${browserContext.trim()}`
         : "";
     const toolRegistry = createMuthurToolRegistry();
     const loopState = runMuthurCoreLoop(typeof message === "string" ? message : "", toolRegistry);
@@ -294,7 +298,9 @@ export async function POST(request: Request) {
       const originalMessage = typeof message === "string" ? message.trim() : "";
       const explicitToolUse = /^(?:\/bash|bash:|\/local|local:)\b/i.test(originalMessage);
       const failureLabel =
-        firstStep.toolCall.toolName === "localfs" ? "[TOOL] LOCALFS FAILURE" : "[TOOL] JUSTBASH FAILURE";
+        firstStep.toolCall.toolName === "localfs"
+          ? "[TOOL] LOCALFS FAILURE"
+          : "[TOOL] JUSTBASH FAILURE";
       const bodyText = toolResult.ok
         ? !explicitToolUse
           ? summarizeToolResult(firstStep.toolCall.toolName, originalMessage, toolResult.output)
@@ -457,7 +463,8 @@ export async function POST(request: Request) {
                 role: "system",
                 content:
                   "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
-                  memoryPrompt,
+                  memoryPrompt +
+                  browserPrompt,
               },
               { role: "user", content: message },
             ],

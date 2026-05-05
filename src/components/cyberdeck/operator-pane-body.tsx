@@ -1,5 +1,6 @@
-﻿'use client';
+'use client';
 
+import { useEffect, useState } from "react";
 import type { Dispatch, DragEvent, RefObject, SetStateAction } from "react";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { Streamdown } from "streamdown";
@@ -19,17 +20,21 @@ type DroppedOperatorAsset = {
 type OperatorPaneBodyProps = {
   isOperatorDragOver: boolean;
   operatorDroppedAsset: DroppedOperatorAsset | null;
+  operatorSurfaceMode: "workspace" | "browser";
   operatorSurfaceIsDocument: boolean;
+  operatorBrowserUrl: string;
   operatorDocMode: "view" | "edit";
   operatorDocNameDraft: string;
   operatorEditorRef: RefObject<HTMLTextAreaElement>;
   operatorNameInputRef: RefObject<HTMLInputElement>;
+  operatorBrowserRef: RefObject<HTMLWebViewElement>;
   onOperatorDragOver: (event: DragEvent<HTMLDivElement>) => void;
   onOperatorDragLeave: (event: DragEvent<HTMLDivElement>) => void;
   onOperatorDrop: (event: DragEvent<HTMLDivElement>) => void;
   onOperatorDocNameDraftChange: (nextValue: string) => void;
   onCommitOperatorDocName: () => void;
   onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
+  onOperatorBrowserNavigate: (nextUrl: string) => void;
   onPasteClipboardToOperator: () => void | Promise<void>;
   onSaveOperatorDocAsFile: () => void | Promise<void>;
   onCopyOperatorDocToClipboard: () => void | Promise<void>;
@@ -39,30 +44,93 @@ type OperatorPaneBodyProps = {
 export function CyberdeckOperatorPaneBody({
   isOperatorDragOver,
   operatorDroppedAsset,
+  operatorSurfaceMode,
   operatorSurfaceIsDocument,
+  operatorBrowserUrl,
   operatorDocMode,
   operatorDocNameDraft,
   operatorEditorRef,
   operatorNameInputRef,
+  operatorBrowserRef,
   onOperatorDragOver,
   onOperatorDragLeave,
   onOperatorDrop,
   onOperatorDocNameDraftChange,
   onCommitOperatorDocName,
   onSetOperatorDocMode,
+  onOperatorBrowserNavigate,
   onPasteClipboardToOperator,
   onSaveOperatorDocAsFile,
   onCopyOperatorDocToClipboard,
   onSetOperatorDroppedAsset,
 }: OperatorPaneBodyProps) {
+  const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
+
+  useEffect(() => {
+    setBrowserDraft(operatorBrowserUrl);
+  }, [operatorBrowserUrl]);
+
+  useEffect(() => {
+    if (operatorSurfaceMode !== "browser") return;
+    const view = operatorBrowserRef.current;
+    if (!view) return;
+
+    view.setAttribute("allowpopups", "");
+
+    const blockDrop = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const syncUrl = () => {
+      try {
+        const currentUrl = view.getURL();
+        if (currentUrl) {
+          onOperatorBrowserNavigate(currentUrl);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+
+    view.addEventListener("did-navigate", syncUrl as EventListener);
+    view.addEventListener("did-navigate-in-page", syncUrl as EventListener);
+    view.addEventListener("page-title-updated", syncUrl as EventListener);
+    view.addEventListener("dragover", blockDrop);
+    view.addEventListener("drop", blockDrop);
+
+    return () => {
+      view.removeEventListener("did-navigate", syncUrl as EventListener);
+      view.removeEventListener("did-navigate-in-page", syncUrl as EventListener);
+      view.removeEventListener("page-title-updated", syncUrl as EventListener);
+      view.removeEventListener("dragover", blockDrop);
+      view.removeEventListener("drop", blockDrop);
+    };
+  }, [onOperatorBrowserNavigate, operatorBrowserRef, operatorSurfaceMode]);
+
+  const navigateBrowser = () => {
+    const nextUrl = browserDraft.trim();
+    if (!nextUrl) return;
+    onOperatorBrowserNavigate(nextUrl);
+  };
+
   return (
     <div
       className={`custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4 ${
         isOperatorDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""
       }`}
-      onDragOver={onOperatorDragOver}
-      onDragLeave={onOperatorDragLeave}
-      onDrop={onOperatorDrop}
+      onDragOver={operatorSurfaceMode === "browser" ? (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      } : onOperatorDragOver}
+      onDragLeave={operatorSurfaceMode === "browser" ? (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      } : onOperatorDragLeave}
+      onDrop={operatorSurfaceMode === "browser" ? (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      } : onOperatorDrop}
     >
       <div
         className={`flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors ${
@@ -71,7 +139,11 @@ export function CyberdeckOperatorPaneBody({
       >
         <CyberdeckPaneHeader
           left={
-            operatorSurfaceIsDocument && operatorDocMode === "edit" ? (
+            operatorSurfaceMode === "browser" ? (
+              <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
+                MUTHUR_BROWSER
+              </CyberdeckPaneHeaderTitle>
+            ) : operatorSurfaceIsDocument && operatorDocMode === "edit" ? (
               <input
                 ref={operatorNameInputRef}
                 value={operatorDocNameDraft}
@@ -106,7 +178,11 @@ export function CyberdeckOperatorPaneBody({
               >
                 PASTE
               </button>
-              {operatorSurfaceIsDocument ? (
+              {operatorSurfaceMode === "browser" ? (
+                <div className="font-mono text-[9px] tracking-[0.08em] text-emerald-200">
+                  LIVE WEB
+                </div>
+              ) : operatorSurfaceIsDocument ? (
                 <>
                   <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
                     <span className={operatorDocMode === "view" ? "text-emerald-200" : ""}>VIEW</span>
@@ -134,7 +210,76 @@ export function CyberdeckOperatorPaneBody({
             </div>
           }
         />
-        {operatorDroppedAsset ? (
+        {operatorSurfaceMode === "browser" ? (
+          <div
+            className="flex min-h-0 flex-1 flex-col gap-3 p-3"
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            <div className="flex items-center gap-2 rounded-sm border border-[#1c1c1c] bg-black/80 p-2">
+              <button
+                type="button"
+                onClick={() => operatorBrowserRef.current?.goBack()}
+                disabled={!operatorBrowserRef.current?.canGoBack()}
+                className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                BACK
+              </button>
+              <button
+                type="button"
+                onClick={() => operatorBrowserRef.current?.goForward()}
+                disabled={!operatorBrowserRef.current?.canGoForward()}
+                className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                FORWARD
+              </button>
+              <button
+                type="button"
+                onClick={() => operatorBrowserRef.current?.reload()}
+                className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+              >
+                RELOAD
+              </button>
+              <input
+                value={browserDraft}
+                onChange={(event) => setBrowserDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  navigateBrowser();
+                }}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoComplete="off"
+                autoCorrect="off"
+                aria-label="Browser address"
+                className="min-w-0 flex-1 border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]"
+                style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+              />
+              <button
+                type="button"
+                onClick={navigateBrowser}
+                className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+              >
+                GO
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden rounded-sm border border-[#1c1c1c] bg-black">
+              <webview
+                ref={operatorBrowserRef}
+                src={operatorBrowserUrl}
+                partition="persist:operator-browser"
+                className="h-full w-full"
+              />
+            </div>
+          </div>
+        ) : operatorDroppedAsset ? (
           <div className="flex-1 overflow-auto p-3">
             <div className="mb-4 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
               {operatorDroppedAsset.mimeType || "application/octet-stream"} //{" "}
