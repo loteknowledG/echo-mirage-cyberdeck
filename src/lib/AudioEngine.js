@@ -5,6 +5,8 @@ let fallbackChirpAudio = null;
 let masterGainNode = null;
 let masterCompressorNode = null;
 let sonarIntervalId = null;
+const KEYBOARD_EFFECTS_GAIN = 0.35;
+const KEYBOARD_NAV_GAIN = 0.5;
 
 function getCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -200,7 +202,7 @@ function playFallbackClip(kind, volume = 0.4) {
 
 export function playKeySound(key, options = {}) {
   const mode = options.mode || "cyberdeck";
-  const volume = (options.volume ?? 1) * 2.6;
+  const volume = (options.volume ?? 1) * 2.6 * KEYBOARD_EFFECTS_GAIN;
   const kind = classifyKey(key);
   const v = (n) => n * volume;
 
@@ -344,6 +346,7 @@ export function playKeySound(key, options = {}) {
 /** Short feedback for cyberdeck UI keyboard navigation (separate timbre from typing sfx). */
 export function playNavigationSound(variant = "step") {
   if (!enabled) return;
+  const navGain = KEYBOARD_NAV_GAIN;
   const v = variant || "step";
   if (v === "commit") {
     playTone({
@@ -351,7 +354,7 @@ export function playNavigationSound(variant = "step") {
       freqEnd: rand(880, 1050),
       duration: rand(0.048, 0.068),
       type: "triangle",
-      volume: rand(0.12, 0.16),
+      volume: rand(0.12, 0.16) * navGain,
     });
     return;
   }
@@ -361,13 +364,13 @@ export function playNavigationSound(variant = "step") {
       freqEnd: rand(280, 380),
       duration: rand(0.052, 0.072),
       type: "triangle",
-      volume: rand(0.11, 0.15),
+      volume: rand(0.11, 0.15) * navGain,
     });
     return;
   }
   playNoiseClick({
     duration: rand(0.012, 0.02),
-    volume: rand(0.075, 0.11),
+    volume: rand(0.075, 0.11) * navGain,
     filterFreq: rand(2200, 3400),
   });
 }
