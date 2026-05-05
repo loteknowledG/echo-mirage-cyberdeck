@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
-import type { CSSProperties, DragEvent as ReactDragEvent } from "react";
+import type { CSSProperties, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { Streamdown } from "streamdown";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { art } from "@/lib/TerminalArt";
@@ -521,6 +521,11 @@ export default function CyberdeckPage() {
   const [operatorBrowserSnapshot, setOperatorBrowserSnapshot] = useState("");
   const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
   const [isOperatorDragOver, setIsOperatorDragOver] = useState(false);
+  const [customTabContextMenu, setCustomTabContextMenu] = useState<{
+    tabId: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const [inputCursorBlinkOn, setInputCursorBlinkOn] = useState(true);
@@ -593,6 +598,7 @@ export default function CyberdeckPage() {
   const operatorEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const operatorBrowserRef = useRef<HTMLWebViewElement | null>(null);
   const operatorNameInputRef = useRef<HTMLInputElement | null>(null);
+  const customTabLongPressTimerRef = useRef<number | null>(null);
   const networkFeedbackDelayRef = useRef<number | null>(null);
   const networkFeedbackRepeatRef = useRef<number | null>(null);
   const chatSonarDelayRef = useRef<number | null>(null);
@@ -1583,8 +1589,13 @@ export default function CyberdeckPage() {
     playSystemSound("chirp", 0.05);
   }, []);
 
+  const closeCustomTabContextMenu = useCallback(() => {
+    setCustomTabContextMenu(null);
+  }, []);
+
   const handleTabClick = useCallback(
     (id: string) => {
+      closeCustomTabContextMenu();
       const isCustomTab = customTabs.some((tab) => tab.id === id);
       if (isCustomTab) {
         if (activeCustomTabId !== id) {
@@ -1604,10 +1615,11 @@ export default function CyberdeckPage() {
         playSystemSound("click", 0.05);
       }
     },
-    [activeCustomTabId, customTabs, server],
+    [activeCustomTabId, closeCustomTabContextMenu, customTabs, server],
   );
 
   const createBlankTab = useCallback(() => {
+    closeCustomTabContextMenu();
     const nextIndex = customTabs.length + 1;
     const id = `tab-${crypto.randomUUID()}`;
     const tab: CustomTab = {
@@ -1620,14 +1632,15 @@ export default function CyberdeckPage() {
     setActiveCustomTabId(id);
     setNavRailContext("gateway");
     playSystemSound("chirp", 0.05);
-  }, [customTabs.length]);
+  }, [closeCustomTabContextMenu, customTabs.length]);
 
   const deleteActiveTab = useCallback(() => {
+    closeCustomTabContextMenu();
     if (!activeCustomTabId) return;
     setCustomTabs((prev) => prev.filter((tab) => tab.id !== activeCustomTabId));
     setActiveCustomTabId(null);
     playSystemSound("click", 0.05);
-  }, [activeCustomTabId]);
+  }, [activeCustomTabId, closeCustomTabContextMenu]);
 
   const clearSavedCustomTabState = useCallback(() => {
     const removedCount = customTabs.length;
@@ -2527,30 +2540,10 @@ export default function CyberdeckPage() {
         return;
       }
 
-      updateCustomTab(activeCustomTabId, (tab) => {
-        const nextKind = tabCommand.surfaceKind;
-        const nextLabel = tabCommand.label || tab.label || nextKind.toUpperCase();
-        const nextGlyph =
-          tabCommand.glyph || tab.glyph || defaultCustomTabGlyphForKind(nextKind);
-
-        return {
-          ...tab,
-          kind: nextKind,
-          label: nextLabel,
-          glyph: nextGlyph,
-          browserUrl: nextKind === "web" ? tab.browserUrl || OPERATOR_BROWSER_HOME_URL : undefined,
-          asset: nextKind === "document" ? tab.asset ?? null : null,
-        };
+      convertCustomTab(activeCustomTabId, tabCommand.surfaceKind, {
+        label: tabCommand.label,
+        glyph: tabCommand.glyph,
       });
-      setNavRailContext("tabs");
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "system",
-          text: `TAB_CONVERTED // ${activeCustomTabId} // ${tabCommand.surfaceKind.toUpperCase()}`,
-        },
-      ]);
-      playSystemSound("chirp", 0.05);
       setIsStreaming(false);
       return;
     }
@@ -2917,6 +2910,42 @@ export default function CyberdeckPage() {
     setCustomTabs((prev) => prev.map((tab) => (tab.id === tabId ? updater(tab) : tab)));
   }, []);
 
+  const convertCustomTab = useCallback(
+    (
+      tabId: string,
+      nextKind: CustomTabKind,
+      options?: {
+        label?: string;
+        glyph?: string;
+      },
+    ) => {
+      updateCustomTab(tabId, (tab) => {
+        const nextLabel = options?.label || tab.label || nextKind.toUpperCase();
+        const nextGlyph = options?.glyph || tab.glyph || defaultCustomTabGlyphForKind(nextKind);
+
+        return {
+          ...tab,
+          kind: nextKind,
+          label: nextLabel,
+          glyph: nextGlyph,
+          browserUrl: nextKind === "web" ? tab.browserUrl || OPERATOR_BROWSER_HOME_URL : undefined,
+          asset: nextKind === "document" ? tab.asset ?? null : null,
+        };
+      });
+      setActiveCustomTabId(tabId);
+      setNavRailContext("tabs");
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          text: `TAB_CONVERTED // ${tabId} // ${nextKind.toUpperCase()}`,
+        },
+      ]);
+      playSystemSound("chirp", 0.05);
+    },
+    [updateCustomTab],
+  );
+
   const { handleCustomTabBrowserNavigate: customTabBrowserNavigate } = useCustomTabBrowserController({
     activeCustomTab,
     operatorBrowserRef,
@@ -2977,6 +3006,57 @@ export default function CyberdeckPage() {
     [loadCustomTabAssetFromFile],
   );
 
+  const clearCustomTabLongPressTimer = useCallback(() => {
+    if (customTabLongPressTimerRef.current) {
+      clearTimeout(customTabLongPressTimerRef.current);
+      customTabLongPressTimerRef.current = null;
+    }
+  }, []);
+
+  const openCustomTabContextMenu = useCallback(
+    (tabId: string, clientX: number, clientY: number) => {
+      if (selectedRailTabId !== tabId || typeof window === "undefined") return;
+
+      const menuWidth = 176;
+      const menuHeight = 232;
+      const padding = 8;
+      const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
+      const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
+
+      setCustomTabContextMenu({ tabId, x, y });
+    },
+    [selectedRailTabId],
+  );
+
+  const handleCustomTabContextMenu = useCallback(
+    (tabId: string, event: ReactMouseEvent<HTMLElement>) => {
+      if (selectedRailTabId !== tabId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      clearCustomTabLongPressTimer();
+      openCustomTabContextMenu(tabId, event.clientX, event.clientY);
+    },
+    [clearCustomTabLongPressTimer, openCustomTabContextMenu, selectedRailTabId],
+  );
+
+  const handleCustomTabPointerDown = useCallback(
+    (tabId: string, event: ReactPointerEvent<HTMLElement>) => {
+      if (selectedRailTabId !== tabId) return;
+      if (event.pointerType === "mouse") return;
+
+      clearCustomTabLongPressTimer();
+      const { clientX, clientY } = event;
+      customTabLongPressTimerRef.current = window.setTimeout(() => {
+        openCustomTabContextMenu(tabId, clientX, clientY);
+      }, 450);
+    },
+    [clearCustomTabLongPressTimer, openCustomTabContextMenu, selectedRailTabId],
+  );
+
+  const handleCustomTabPointerUp = useCallback(() => {
+    clearCustomTabLongPressTimer();
+  }, [clearCustomTabLongPressTimer]);
+
   useEffect(() => {
     if (operatorSurfaceMode !== "browser") return;
     const view = operatorBrowserRef.current;
@@ -2997,6 +3077,32 @@ export default function CyberdeckPage() {
       view.removeEventListener("page-title-updated", syncSnapshot as EventListener);
     };
   }, [captureOperatorBrowserSnapshot, operatorSurfaceMode, operatorBrowserUrl]);
+
+  useEffect(() => {
+    if (!customTabContextMenu) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeCustomTabContextMenu();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closeCustomTabContextMenu, customTabContextMenu]);
+
+  useEffect(() => {
+    return () => {
+      clearCustomTabLongPressTimer();
+    };
+  }, [clearCustomTabLongPressTimer]);
+
+  useEffect(() => {
+    if (!customTabContextMenu) return;
+    if (customTabContextMenu.tabId !== activeCustomTabId) {
+      closeCustomTabContextMenu();
+    }
+  }, [activeCustomTabId, closeCustomTabContextMenu, customTabContextMenu]);
 
   const renderCustomTabSurface = useCallback(
     (tab: CustomTab) => {
@@ -3222,12 +3328,89 @@ export default function CyberdeckPage() {
     ],
   );
 
+  const customTabContextMenuActions: Array<
+    | { label: string; kind: CustomTabKind; action: "convert" }
+    | { label: string; action: "settings-pane" | "connection-pane" }
+  > = [
+    { label: "Document", kind: "document", action: "convert" },
+    { label: "Web", kind: "web", action: "convert" },
+    { label: "Pi", kind: "pi", action: "convert" },
+    { label: "Settings", action: "settings-pane" },
+    { label: "Connection", action: "connection-pane" },
+  ];
+
   /* Weyland: col2 = nav, col3 = terminal. Echo: flipped → col2 = terminal (chat), col3 = nav (gateway). */
   return (
     <div
       ref={cyberdeckRootRef}
       className="terminal-window flex h-screen overflow-hidden bg-background font-mono text-green-500 max-md:flex-col"
     >
+      {customTabContextMenu ? (
+        <div
+          className="fixed inset-0 z-[90]"
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            closeCustomTabContextMenu();
+          }}
+          onPointerDown={closeCustomTabContextMenu}
+        >
+          <div
+            role="menu"
+            aria-label="Tab actions"
+            className="absolute min-w-44 rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
+            style={{ left: customTabContextMenu.x, top: customTabContextMenu.y }}
+            onPointerDown={(event) => event.stopPropagation()}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            {customTabContextMenuActions.map((action) =>
+              action.action === "convert" ? (
+                <button
+                  key={action.label}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    convertCustomTab(customTabContextMenu.tabId, action.kind);
+                    closeCustomTabContextMenu();
+                  }}
+                  className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                >
+                  {action.label}
+                </button>
+              ) : (
+                <button
+                  key={action.label}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    closeCustomTabContextMenu();
+                    setActiveCustomTabId(null);
+                    handleTabClick("s");
+                  }}
+                  className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                >
+                  {action.label}
+                </button>
+              ),
+            )}
+            <div className="my-1 h-px bg-[#232323]" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                deleteActiveTab();
+                closeCustomTabContextMenu();
+              }}
+              className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#ff8f8f] transition hover:bg-[#171717] hover:text-red-200"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ) : null}
       <aside
         ref={serverRailRef}
         tabIndex={-1}
@@ -3268,6 +3451,11 @@ export default function CyberdeckPage() {
             key={tab.id}
             className="btn-container"
             style={{ width: "48px", height: "52px", position: "relative" }}
+            onContextMenu={(event) => handleCustomTabContextMenu(tab.id, event)}
+            onPointerDown={(event) => handleCustomTabPointerDown(tab.id, event)}
+            onPointerUp={handleCustomTabPointerUp}
+            onPointerCancel={handleCustomTabPointerUp}
+            onPointerLeave={handleCustomTabPointerUp}
           >
             <pre
               data-server-tab={tab.id}
@@ -3296,17 +3484,9 @@ export default function CyberdeckPage() {
           <button
             type="button"
             onClick={createBlankTab}
-            className="rounded border border-[#2d2d2d] bg-black px-1 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+            className="flex h-8 w-8 items-center justify-center rounded border border-[#2d2d2d] bg-black font-mono text-[9px] leading-none tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
           >
             +
-          </button>
-          <button
-            type="button"
-            onClick={deleteActiveTab}
-            disabled={!activeCustomTabId}
-            className="rounded border border-[#2d2d2d] bg-black px-1 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-red-500/60 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            X
           </button>
         </div>
       </aside>
