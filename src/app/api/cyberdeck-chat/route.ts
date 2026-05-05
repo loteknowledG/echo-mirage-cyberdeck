@@ -160,6 +160,65 @@ function formatLocalFsResult(result: unknown): string {
   return parts.join("\n\n");
 }
 
+function summarizeToolResult(
+  toolName: string,
+  intent: string,
+  output: unknown,
+): string {
+  if (toolName === "localfs" && output && typeof output === "object") {
+    const payload = output as {
+      action?: string;
+      path?: string;
+      entries?: string[];
+      content?: string;
+      isDirectory?: boolean;
+      size?: number;
+      modifiedAt?: string;
+    };
+
+    if (payload.action === "ls" && Array.isArray(payload.entries)) {
+      const preview = payload.entries.slice(0, 12).join(", ");
+      const more = payload.entries.length > 12 ? `, plus ${payload.entries.length - 12} more` : "";
+      return `Acknowledged. I inspected ${payload.path}. ${payload.entries.length} entries visible: ${preview}${more}.`;
+    }
+
+    if (payload.action === "cat" && typeof payload.content === "string") {
+      const snippet = payload.content.trim().slice(0, 500);
+      return `Acknowledged. I opened ${payload.path}.\n\n${snippet}${payload.content.trim().length > snippet.length ? "\n…" : ""}`;
+    }
+
+    if (payload.action === "stat") {
+      return `Acknowledged. ${payload.path} ${payload.isDirectory ? "is a directory" : "is a file"}${typeof payload.size === "number" ? `, size ${payload.size} bytes` : ""}${payload.modifiedAt ? `, modified ${payload.modifiedAt}` : ""}.`;
+    }
+  }
+
+  if (toolName === "justbash" && output && typeof output === "object") {
+    const payload = output as {
+      command?: string;
+      stdout?: string;
+      stderr?: string;
+      exitCode?: number;
+    };
+    const body = (payload.stdout || payload.stderr || "").trim();
+    if ((payload.command || "").startsWith("rg ") && payload.exitCode === 0) {
+      const hits = body
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      if (hits.length === 0) {
+        return "Negative. No matching files were found in the workspace.";
+      }
+      const preview = hits.slice(0, 12).join("\n");
+      const more = hits.length > 12 ? `\n…plus ${hits.length - 12} more.` : "";
+      return `Affirmative. I found ${hits.length} matching file${hits.length === 1 ? "" : "s"} in the workspace.\n\n${preview}${more}`;
+    }
+    const snippet = body.slice(0, 800);
+    return `Acknowledged. I inspected the workspace with \`${payload.command || "just-bash"}\`.\n\n${snippet}${body.length > snippet.length ? "\n…" : ""}`;
+  }
+
+  return `Acknowledged. I used ${toolName} to inspect that request: ${intent}`;
+}
+
 function defaultModelForProvider(provider: string): string {
   if (provider === "openai") return "gpt-4o-mini";
   if (provider === "openrouter") return "openai/gpt-4o-mini";
@@ -186,11 +245,23 @@ export async function POST(request: Request) {
       }
 
       const toolResult = await tool.run(firstStep.toolCall);
+      const originalMessage = typeof message === "string" ? message.trim() : "";
+      const explicitToolUse = /^(?:\/bash|bash:|\/local|local:)\b/i.test(originalMessage);
+      const failureLabel =
+        firstStep.toolCall.toolName === "localfs" ? "[TOOL] LOCALFS FAILURE" : "[TOOL] JUSTBASH FAILURE";
       const bodyText = toolResult.ok
-        ? firstStep.toolCall.toolName === "localfs"
-          ? formatLocalFsResult(toolResult.output)
-          : formatToolResult(toolResult.output)
-        : `[TOOL] JUSTBASH FAILURE\n\n${toolResult.error || "Unknown tool error."}`;
+        ? !explicitToolUse
+          ? summarizeToolResult(firstStep.toolCall.toolName, originalMessage, toolResult.output)
+          : firstStep.toolCall.toolName === "localfs"
+            ? formatLocalFsResult(toolResult.output)
+            : formatToolResult(toolResult.output)
+        : `${failureLabel}\n\n${toolResult.error || "Unknown tool error."}`;
+
+      console.debug("[muthur-tools] response branch", {
+        tool: firstStep.toolCall.toolName,
+        explicitToolUse,
+        preview: bodyText.slice(0, 140),
+      });
 
       return new Response(bodyText, {
         headers: {

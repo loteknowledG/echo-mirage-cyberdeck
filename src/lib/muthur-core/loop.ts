@@ -25,6 +25,15 @@ function deriveLocalFsCall(intent: string) {
     };
   }
 
+  const directCommandMatch = text.match(/^(ls|cat|stat)\s+(.+)$/i);
+  if (directCommandMatch && looksLikeLocalPath(directCommandMatch[2].trim())) {
+    return {
+      action: directCommandMatch[1].toLowerCase(),
+      path: directCommandMatch[2].trim(),
+      explicit: false,
+    };
+  }
+
   const listMatch = text.match(/^(?:list|show)\s+(?:the\s+)?(?:folder|directory|contents?)\s+(?:of|in)\s+(.+)$/i);
   if (listMatch && looksLikeLocalPath(listMatch[1].trim())) {
     return { action: "ls", path: listMatch[1].trim(), explicit: false };
@@ -68,21 +77,13 @@ function deriveJustBashCommand(intent: string): string | null {
   }
 
   const searchMatch = text.match(
-    /^(?:search|find|grep|ripgrep|look for|where is|what files mention)\s+(?:for\s+)?["“]?([^"”]+?)["”]?(?:\s+(?:in|inside)\s+([./\w-]+))?\??$/i,
+    /^(?:search|find|grep|ripgrep|look for|where is|what files mention|which files mention|are there files that mention)\s+(?:for\s+)?["“]?([^"”]+?)["”]?(?:\s+(?:in|inside)\s+([./\w-]+))?\??$/i,
   );
   if (searchMatch) {
     const pattern = searchMatch[1].trim();
     const scope = (searchMatch[2] || "src").trim();
     if (pattern) {
-      return `rg -n ${quoteSingle(pattern)} ${quoteSingle(scope)}`;
-    }
-  }
-
-  const fileMentionMatch = text.match(/^(?:what files mention|which files mention)\s+["“]?([^"”]+?)["”]?\??$/i);
-  if (fileMentionMatch) {
-    const pattern = fileMentionMatch[1].trim();
-    if (pattern) {
-      return `rg -n ${quoteSingle(pattern)} 'src'`;
+      return `rg -i ${quoteSingle(pattern)} ${quoteSingle(scope)} -l`;
     }
   }
 
