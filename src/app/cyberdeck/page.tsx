@@ -3540,7 +3540,7 @@ export default function CyberdeckPage() {
                   const isSystemFailureLine =
                     m.role === "system" &&
                     typeof m.text === "string" &&
-                    /(FAILURE|FAILUER|FAILED|INVALID_KEY|AUTH_REJECTED|UPLINK_ERROR|ERROR|HTTP_[45]\d{2}|EMPTY_RESPONSE)/.test(
+                    /(failure|failuer|failed|invalid_key|auth_rejected|uplink_error|api\s*error|http_[45]\d{2}|empty_response|rate_limit)/i.test(
                       m.text,
                     );
                   return (
@@ -3579,10 +3579,17 @@ export default function CyberdeckPage() {
                     <span
                       className={
                         isModelConnectedLine
-                          ? "text-green-300"
+                          ? "font-medium text-green-300"
                           : isSystemFailureLine
-                            ? "text-red-300"
+                            ? "font-medium text-red-300"
                             : "text-gray-300"
+                      }
+                      style={
+                        isModelConnectedLine
+                          ? { textShadow: "0 0 10px rgba(34, 197, 94, 0.45)" }
+                          : isSystemFailureLine
+                            ? { textShadow: "0 0 8px rgba(248, 113, 113, 0.35)" }
+                            : undefined
                       }
                     >
                       {m.role === "system" ? (
