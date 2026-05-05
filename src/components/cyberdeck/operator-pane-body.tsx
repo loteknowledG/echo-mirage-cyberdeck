@@ -108,21 +108,6 @@ export function CyberdeckOperatorPaneBody({
     };
   }, [onOperatorBrowserNavigate, operatorBrowserRef, operatorSurfaceMode]);
 
-  useEffect(() => {
-    if (operatorSurfaceMode !== "browser") return;
-    const view = operatorBrowserRef.current;
-    const nextUrl = operatorBrowserUrl.trim();
-    if (!view || !nextUrl) return;
-
-    try {
-      const currentUrl = typeof view.getURL === "function" ? view.getURL() : "";
-      if (currentUrl === nextUrl) return;
-      view.loadURL(nextUrl);
-    } catch {
-      /* ignore */
-    }
-  }, [operatorBrowserRef, operatorBrowserUrl, operatorSurfaceMode]);
-
   const navigateBrowser = () => {
     const nextUrl = browserDraft.trim();
     if (!nextUrl) return;

@@ -436,6 +436,17 @@ function deriveOperatorBrowserUrl(intent: string) {
   return normalizeOperatorBrowserUrl(text);
 }
 
+function stripMuthurInvocationPrefix(intent: string) {
+  const text = intent.trim();
+  if (!text) return "";
+
+  const stripped = text.replace(
+    /^(?:muthur|mother|mu\/thur|mu-thur|mu_thur)(?:[:,]|\s+\S+[:,]?)?\s+/i,
+    "",
+  );
+  return stripped.trim() || text;
+}
+
 function stripBrowserSearchPrefix(intent: string) {
   const text = intent.trim();
   if (!text) return "";
@@ -491,11 +502,16 @@ function deriveCarsComSearchUrl(intent: string) {
   const text = stripBrowserSearchPrefix(intent).toLowerCase().replace(/[^\w\s-]+/g, " ").replace(/\s+/g, " ").trim();
   if (!text) return null;
 
+  const searchTerms = new Set<string>();
+
   const locationMatch = text.match(
     /\b(?:in|near|around|at)\s+([a-z0-9][a-z0-9\s.-]*?)(?:\s+(?:for sale|on sale|available|in stock|today|now))?$/i,
   );
   const location = locationMatch?.[1]?.trim() || "";
   const searchText = locationMatch ? text.slice(0, locationMatch.index).trim() : text;
+  const isGenericCarSearch =
+    /\b(?:car|cars|vehicle|vehicles|auto|autos)\b/i.test(searchText) &&
+    !/\b(?:used|new|for sale|on sale|available|in stock)\b/i.test(searchText);
 
   let make = "";
   let model = "";
@@ -510,7 +526,15 @@ function deriveCarsComSearchUrl(intent: string) {
     }
   }
 
-  if (makeIndex === -1) return null;
+  if (makeIndex === -1) {
+    if (!isGenericCarSearch) return null;
+    searchTerms.add("cars for sale");
+    if (location) searchTerms.add(location);
+    const query = Array.from(searchTerms).join(" ").trim();
+    return `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
+  }
+
+  searchTerms.add(make);
 
   const afterMake = searchText.slice(makeIndex + make.length).trim();
   const modelMatch = afterMake.match(/^([a-z0-9][a-z0-9\s-]*?)(?:\s+(?:for sale|on sale|available|in stock|used|new))?$/i);
@@ -518,12 +542,29 @@ function deriveCarsComSearchUrl(intent: string) {
   model = modelMatch[1].trim();
   if (!model) return null;
 
-  const params = new URLSearchParams();
-  params.set("make", make.replace(/\s+/g, "-"));
-  params.set("model", model.replace(/\s+/g, "-"));
-  if (location) params.set("dealers", location);
+  searchTerms.add(model);
+  searchTerms.add("for sale");
+  if (location) searchTerms.add(location);
 
-  return `https://www.cars.com/search/?${params.toString()}`;
+  const query = Array.from(searchTerms).join(" ").trim();
+  return `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
+}
+
+function looksLikeCaptchaBlock(snapshotText: string) {
+  const text = snapshotText.trim().toLowerCase();
+  if (!text) return false;
+  return (
+    /\bcaptcha\b/.test(text) ||
+    /\byou have been blocked\b/.test(text) ||
+    /\baccess is denied\b/.test(text) ||
+    /\battention required\b/.test(text) ||
+    /\bcloudflare\b/.test(text) ||
+    /\bverify you are human\b/.test(text) ||
+    /\bbot challenge\b/.test(text) ||
+    /\bselect all squares containing\b/.test(text) ||
+    /\bconfirm this search was made by a human\b/.test(text) ||
+    /\bpress and hold\b/.test(text)
+  );
 }
 
 function looksLikeOperatorWebIntent(intent: string) {
@@ -632,9 +673,10 @@ type BrowserCommand =
 function parseBrowserCommand(input: string): BrowserCommand | null {
   const text = input.trim();
   if (!text) return null;
+  const commandText = stripMuthurInvocationPrefix(text);
 
-  const commandMatch = text.match(/^(?:\/browser|browser:|\/web|web:)\s*(.+)$/i);
-  const body = (commandMatch?.[1] || text).trim();
+  const commandMatch = commandText.match(/^(?:\/browser|browser:|\/web|web:)\s*(.+)$/i);
+  const body = (commandMatch?.[1] || commandText).trim();
   const lower = body.toLowerCase();
 
   if (/^(?:back|go back)$/i.test(lower)) return { kind: "back" };
@@ -678,8 +720,8 @@ function parseBrowserCommand(input: string): BrowserCommand | null {
     };
   }
 
-  if (looksLikeOperatorWebIntent(text)) {
-    return { kind: "goto", url: deriveOperatorBrowserUrl(stripBrowserSearchPrefix(text)) };
+  if (looksLikeOperatorWebIntent(commandText)) {
+    return { kind: "goto", url: deriveOperatorBrowserUrl(stripBrowserSearchPrefix(commandText)) };
   }
 
   return null;
@@ -1560,6 +1602,9 @@ export default function CyberdeckPage() {
       if (command.kind === "goto") {
         const nextUrl = normalizeOperatorBrowserUrl(command.url);
         const nextSnapshot = await openOperatorBrowser(nextUrl);
+        if (looksLikeCaptchaBlock(nextSnapshot || nextUrl)) {
+          return `${nextSnapshot || `URL: ${nextUrl}`}\n\nCAPTCHA_BLOCKED // MANUAL_COMPLETION_REQUIRED`;
+        }
         return nextSnapshot || `URL: ${nextUrl}`;
       }
 
@@ -1670,7 +1715,9 @@ export default function CyberdeckPage() {
         const snapshot = bridge ? await bridge.back().catch(() => null) : null;
         if (snapshot) {
           applyBrowserSnapshot(snapshot, operatorBrowserUrl);
-          if (snapshot.url) setOperatorBrowserUrl(snapshot.url);
+          if (snapshot.url) {
+            setOperatorBrowserUrl(snapshot.url);
+          }
           return `URL: ${snapshot.url || operatorBrowserUrl}`;
         }
         await visible;
@@ -1684,7 +1731,9 @@ export default function CyberdeckPage() {
         const snapshot = bridge ? await bridge.forward().catch(() => null) : null;
         if (snapshot) {
           applyBrowserSnapshot(snapshot, operatorBrowserUrl);
-          if (snapshot.url) setOperatorBrowserUrl(snapshot.url);
+          if (snapshot.url) {
+            setOperatorBrowserUrl(snapshot.url);
+          }
           return `URL: ${snapshot.url || operatorBrowserUrl}`;
         }
         await visible;
@@ -1698,7 +1747,9 @@ export default function CyberdeckPage() {
         const snapshot = bridge ? await bridge.reload().catch(() => null) : null;
         if (snapshot) {
           applyBrowserSnapshot(snapshot, operatorBrowserUrl);
-          if (snapshot.url) setOperatorBrowserUrl(snapshot.url);
+          if (snapshot.url) {
+            setOperatorBrowserUrl(snapshot.url);
+          }
           return `URL: ${snapshot.url || operatorBrowserUrl}`;
         }
         await visible;
@@ -3067,14 +3118,17 @@ export default function CyberdeckPage() {
     const browserCommand = parseBrowserCommand(userMessage);
     if (browserCommand) {
       const actionResult = await performBrowserCommand(browserCommand);
+      const captchaBlocked = looksLikeCaptchaBlock(actionResult) || actionResult.includes("CAPTCHA_BLOCKED");
       setMessages((prev) => [
         ...prev,
         {
           role: "system",
           text:
-            browserCommand.kind === "snapshot"
-              ? `BROWSER_SNAPSHOT // ${actionResult}`
-              : `BROWSER_ACTION // ${browserCommand.kind.toUpperCase()} // ${actionResult}`,
+            captchaBlocked
+              ? `BROWSER_BLOCKED // CAPTCHA // MANUAL_COMPLETION_REQUIRED\n${actionResult}`
+              : browserCommand.kind === "snapshot"
+                ? `BROWSER_SNAPSHOT // ${actionResult}`
+                : `BROWSER_ACTION // ${browserCommand.kind.toUpperCase()} // ${actionResult}`,
         },
       ]);
       setIsStreaming(false);
