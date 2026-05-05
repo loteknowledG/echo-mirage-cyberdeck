@@ -150,6 +150,36 @@ type CustomTab = {
   asset?: DroppedOperatorAsset | null;
 };
 
+function isCustomTabKind(kind: unknown): kind is CustomTabKind {
+  return typeof kind === "string" && CUSTOM_TAB_KINDS.includes(kind as CustomTabKind);
+}
+
+function sanitizeCustomTabs(value: unknown): CustomTab[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const tab = item as Partial<CustomTab>;
+    const id = typeof tab.id === "string" && tab.id.trim() ? tab.id.trim() : "";
+    const label = typeof tab.label === "string" && tab.label.trim() ? tab.label.trim() : "TAB";
+    const glyph = typeof tab.glyph === "string" && tab.glyph.trim() ? tab.glyph.trim() : "□";
+    const kind = isCustomTabKind(tab.kind) ? tab.kind : "blank";
+    const browserUrl = typeof tab.browserUrl === "string" && tab.browserUrl.trim() ? tab.browserUrl.trim() : undefined;
+    const asset = tab.asset && typeof tab.asset === "object" ? (tab.asset as DroppedOperatorAsset) : null;
+
+    if (!id) return [];
+    return [
+      {
+        id,
+        label,
+        glyph,
+        kind,
+        browserUrl,
+        asset,
+      },
+    ];
+  });
+}
+
 type HeapEntry = {
   id: string;
   name: string;
@@ -406,6 +436,96 @@ function deriveOperatorBrowserUrl(intent: string) {
   return normalizeOperatorBrowserUrl(text);
 }
 
+function stripBrowserSearchPrefix(intent: string) {
+  const text = intent.trim();
+  if (!text) return "";
+
+  const prefixMatch = text.match(
+    /^(?:find|search|look for|look up|show me|show|help me find|help me search for|can you find|can you search for)\s+(?:what\s+)?(.+)$/i,
+  );
+  if (prefixMatch) {
+    return prefixMatch[1].trim();
+  }
+
+  return text;
+}
+
+const KNOWN_CAR_MAKES = [
+  "acura",
+  "audi",
+  "bmw",
+  "buick",
+  "cadillac",
+  "chevrolet",
+  "chevy",
+  "chrysler",
+  "dodge",
+  "fiat",
+  "ford",
+  "genesis",
+  "gmc",
+  "honda",
+  "hyundai",
+  "infiniti",
+  "jaguar",
+  "jeep",
+  "kia",
+  "land rover",
+  "lexus",
+  "lincoln",
+  "mazda",
+  "mercedes",
+  "mercedes-benz",
+  "mini",
+  "mitsubishi",
+  "nissan",
+  "ram",
+  "subaru",
+  "tesla",
+  "toyota",
+  "volkswagen",
+  "volvo",
+] as const;
+
+function deriveCarsComSearchUrl(intent: string) {
+  const text = stripBrowserSearchPrefix(intent).toLowerCase().replace(/[^\w\s-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+
+  const locationMatch = text.match(
+    /\b(?:in|near|around|at)\s+([a-z0-9][a-z0-9\s.-]*?)(?:\s+(?:for sale|on sale|available|in stock|today|now))?$/i,
+  );
+  const location = locationMatch?.[1]?.trim() || "";
+  const searchText = locationMatch ? text.slice(0, locationMatch.index).trim() : text;
+
+  let make = "";
+  let model = "";
+  let makeIndex = -1;
+
+  for (const candidate of KNOWN_CAR_MAKES) {
+    const candidateIndex = searchText.indexOf(candidate);
+    if (candidateIndex === -1) continue;
+    if (makeIndex === -1 || candidateIndex < makeIndex) {
+      make = candidate;
+      makeIndex = candidateIndex;
+    }
+  }
+
+  if (makeIndex === -1) return null;
+
+  const afterMake = searchText.slice(makeIndex + make.length).trim();
+  const modelMatch = afterMake.match(/^([a-z0-9][a-z0-9\s-]*?)(?:\s+(?:for sale|on sale|available|in stock|used|new))?$/i);
+  if (!modelMatch) return null;
+  model = modelMatch[1].trim();
+  if (!model) return null;
+
+  const params = new URLSearchParams();
+  params.set("make", make.replace(/\s+/g, "-"));
+  params.set("model", model.replace(/\s+/g, "-"));
+  if (location) params.set("dealers", location);
+
+  return `https://www.cars.com/search/?${params.toString()}`;
+}
+
 function looksLikeOperatorWebIntent(intent: string) {
   const text = intent.trim().toLowerCase();
   if (!text) return false;
@@ -494,6 +614,72 @@ function parseCustomTabCommand(input: string) {
       label: label || undefined,
       glyph: glyph || undefined,
     };
+  }
+
+  return null;
+}
+
+type BrowserCommand =
+  | { kind: "goto"; url: string }
+  | { kind: "click"; selector: string }
+  | { kind: "type"; selector: string; value: string }
+  | { kind: "submit"; selector: string }
+  | { kind: "snapshot" }
+  | { kind: "back" }
+  | { kind: "forward" }
+  | { kind: "reload" };
+
+function parseBrowserCommand(input: string): BrowserCommand | null {
+  const text = input.trim();
+  if (!text) return null;
+
+  const commandMatch = text.match(/^(?:\/browser|browser:|\/web|web:)\s*(.+)$/i);
+  const body = (commandMatch?.[1] || text).trim();
+  const lower = body.toLowerCase();
+
+  if (/^(?:back|go back)$/i.test(lower)) return { kind: "back" };
+  if (/^(?:forward|go forward)$/i.test(lower)) return { kind: "forward" };
+  if (/^(?:reload|refresh)$/i.test(lower)) return { kind: "reload" };
+  if (/^(?:snapshot|capture|inspect)$/i.test(lower)) return { kind: "snapshot" };
+
+  if (/^(?:click|press|tap)\s+(?:the\s+)?(?:first|1st)\s+(?:result|item|listing|link|match)$/i.test(body)) {
+    return { kind: "click", selector: "a[href], button" };
+  }
+
+  const gotoMatch = body.match(/^(?:goto|go to|open|navigate)\s+(.+)$/i);
+  if (gotoMatch) {
+    return { kind: "goto", url: gotoMatch[1].trim() };
+  }
+
+  const clickMatch = body.match(/^(?:click|press|tap)\s+(.+)$/i);
+  if (clickMatch) {
+    return { kind: "click", selector: clickMatch[1].trim() };
+  }
+
+  const typeMatch = body.match(/^(?:type|enter|fill)\s+(.+?)(?:\s+(?:with|into|=|:)\s+(.+))$/i);
+  if (typeMatch) {
+    return { kind: "type", selector: typeMatch[1].trim(), value: typeMatch[2].trim() };
+  }
+
+  const submitMatch = body.match(/^(?:submit|send)\s+(.+)$/i);
+  if (submitMatch) {
+    return { kind: "submit", selector: submitMatch[1].trim() };
+  }
+
+  const shoppingIntent =
+    /^(?:find|search|look for|look up|show me|show)\b/i.test(body) ||
+    /\b(?:for sale|on sale|available|in stock|dealership|dealer|inventory|used car|used cars|new car|new cars|car lot|auto lot|near me|nearby|in\s+[a-z])/i.test(
+      body,
+    );
+  if (shoppingIntent) {
+    return {
+      kind: "goto",
+      url: deriveCarsComSearchUrl(body) || deriveOperatorBrowserUrl(stripBrowserSearchPrefix(body)),
+    };
+  }
+
+  if (looksLikeOperatorWebIntent(text)) {
+    return { kind: "goto", url: deriveOperatorBrowserUrl(stripBrowserSearchPrefix(text)) };
   }
 
   return null;
@@ -1200,8 +1386,19 @@ export default function CyberdeckPage() {
           setOperatorBrowserUrl(parsed.operatorBrowserUrl);
           restored = true;
         }
-        setCustomTabs([]);
-        setActiveCustomTabId(null);
+        const restoredCustomTabs = sanitizeCustomTabs(parsed?.customTabs);
+        setCustomTabs(restoredCustomTabs);
+        if (
+          typeof parsed?.activeCustomTabId === "string" &&
+          restoredCustomTabs.some((tab) => tab.id === parsed.activeCustomTabId)
+        ) {
+          setActiveCustomTabId(parsed.activeCustomTabId);
+        } else {
+          setActiveCustomTabId(null);
+        }
+        if (restoredCustomTabs.length > 0) {
+          restored = true;
+        }
       }
     } catch {
       /* ignore ui restore errors */
@@ -1323,6 +1520,204 @@ export default function CyberdeckPage() {
       return await syncBrowserEngineToUrl(normalizedUrl);
     },
     [syncBrowserEngineToUrl],
+  );
+
+  const executeVisibleBrowserScript = useCallback(async (script: string) => {
+    const view = operatorBrowserRef.current;
+    if (!view) return null;
+    try {
+      return await view.executeJavaScript(script);
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const performBrowserCommand = useCallback(
+    async (command: BrowserCommand) => {
+      const bridge = getBrowserBridge();
+      const view = operatorBrowserRef.current;
+
+      const readVisibleSnapshot = async () => {
+        const url = view?.getURL?.() || operatorBrowserUrl;
+        const title = view?.getTitle?.() || "";
+        let text = "";
+        try {
+          const bodyText = await executeVisibleBrowserScript(
+            "document && document.body ? String(document.body.innerText || document.body.textContent || '') : ''",
+          );
+          text = typeof bodyText === "string" ? bodyText.trim() : "";
+        } catch {
+          text = "";
+        }
+        return {
+          ok: true,
+          url,
+          title,
+          text,
+        } satisfies EchoMirageBrowserSnapshot;
+      };
+
+      if (command.kind === "goto") {
+        const nextUrl = normalizeOperatorBrowserUrl(command.url);
+        const nextSnapshot = await openOperatorBrowser(nextUrl);
+        return nextSnapshot || `URL: ${nextUrl}`;
+      }
+
+      const selectorJson = (selector: string) => JSON.stringify(selector.trim());
+      const valueJson = (value: string) => JSON.stringify(value);
+
+      const runDualAction = async (script: string, bridgeAction?: Promise<EchoMirageBrowserSnapshot>) => {
+        await executeVisibleBrowserScript(script);
+        const snapshot = bridgeAction ? await bridgeAction.catch(() => null) : null;
+        if (snapshot) {
+          applyBrowserSnapshot(snapshot, operatorBrowserUrl);
+          if (snapshot.url && snapshot.url !== operatorBrowserUrl) {
+            setOperatorBrowserUrl(snapshot.url);
+          }
+          return [
+            snapshot.url ? `URL: ${snapshot.url}` : null,
+            snapshot.title ? `TITLE: ${snapshot.title}` : null,
+            snapshot.text ? `PAGE TEXT:\n${snapshot.text.slice(0, 6000)}` : null,
+          ]
+            .filter(Boolean)
+            .join("\n\n") || `URL: ${operatorBrowserUrl}`;
+        }
+
+        const visibleSnapshot = await readVisibleSnapshot();
+        applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
+        if (visibleSnapshot.url && visibleSnapshot.url !== operatorBrowserUrl) {
+          setOperatorBrowserUrl(visibleSnapshot.url);
+        }
+        return [
+          visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : null,
+          visibleSnapshot.title ? `TITLE: ${visibleSnapshot.title}` : null,
+          visibleSnapshot.text ? `PAGE TEXT:\n${visibleSnapshot.text.slice(0, 6000)}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n\n") || `URL: ${operatorBrowserUrl}`;
+      };
+
+      if (command.kind === "click") {
+        const selector = command.selector.trim();
+        const script = `
+          (() => {
+            const selector = ${selectorJson(selector)};
+            const el = document.querySelector(selector);
+            if (!el) return { ok: false, error: \`Selector not found: \${selector}\` };
+            if (typeof el.click === "function") el.click();
+            return { ok: true };
+          })()
+        `;
+        return await runDualAction(script, bridge?.click(selector));
+      }
+
+      if (command.kind === "type") {
+        const selector = command.selector.trim();
+        const value = command.value;
+        const script = `
+          (() => {
+            const selector = ${selectorJson(selector)};
+            const value = ${valueJson(value)};
+            const el = document.querySelector(selector);
+            if (!el) return { ok: false, error: \`Selector not found: \${selector}\` };
+            const isInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+            if (isInput) {
+              const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+              const descriptor = Object.getOwnPropertyDescriptor(proto, "value");
+              if (descriptor && descriptor.set) descriptor.set.call(el, value);
+              else el.value = value;
+              el.dispatchEvent(new Event("input", { bubbles: true }));
+              el.dispatchEvent(new Event("change", { bubbles: true }));
+              return { ok: true };
+            }
+            if (el.isContentEditable) {
+              el.focus();
+              el.innerText = value;
+              el.dispatchEvent(new Event("input", { bubbles: true }));
+              return { ok: true };
+            }
+            return { ok: false, error: \`Selector is not editable: \${selector}\` };
+          })()
+        `;
+        return await runDualAction(script, bridge?.type(selector, value));
+      }
+
+      if (command.kind === "submit") {
+        const selector = command.selector.trim();
+        const script = `
+          (() => {
+            const selector = ${selectorJson(selector)};
+            const el = document.querySelector(selector);
+            if (!el) return { ok: false, error: \`Selector not found: \${selector}\` };
+            const form = el.tagName === "FORM" ? el : el.closest("form");
+            if (form) {
+              if (typeof form.requestSubmit === "function") form.requestSubmit();
+              else if (typeof form.submit === "function") form.submit();
+              return { ok: true };
+            }
+            if (typeof el.click === "function") {
+              el.click();
+              return { ok: true };
+            }
+            return { ok: false, error: \`Selector has no form or click handler: \${selector}\` };
+          })()
+        `;
+        return await runDualAction(script, bridge?.submit(selector));
+      }
+
+      if (command.kind === "back") {
+        const visible = view && view.canGoBack() ? view.goBack() : null;
+        const snapshot = bridge ? await bridge.back().catch(() => null) : null;
+        if (snapshot) {
+          applyBrowserSnapshot(snapshot, operatorBrowserUrl);
+          if (snapshot.url) setOperatorBrowserUrl(snapshot.url);
+          return `URL: ${snapshot.url || operatorBrowserUrl}`;
+        }
+        await visible;
+        const visibleSnapshot = await readVisibleSnapshot();
+        applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
+        return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
+      }
+
+      if (command.kind === "forward") {
+        const visible = view && view.canGoForward() ? view.goForward() : null;
+        const snapshot = bridge ? await bridge.forward().catch(() => null) : null;
+        if (snapshot) {
+          applyBrowserSnapshot(snapshot, operatorBrowserUrl);
+          if (snapshot.url) setOperatorBrowserUrl(snapshot.url);
+          return `URL: ${snapshot.url || operatorBrowserUrl}`;
+        }
+        await visible;
+        const visibleSnapshot = await readVisibleSnapshot();
+        applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
+        return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
+      }
+
+      if (command.kind === "reload") {
+        const visible = view?.reload?.();
+        const snapshot = bridge ? await bridge.reload().catch(() => null) : null;
+        if (snapshot) {
+          applyBrowserSnapshot(snapshot, operatorBrowserUrl);
+          if (snapshot.url) setOperatorBrowserUrl(snapshot.url);
+          return `URL: ${snapshot.url || operatorBrowserUrl}`;
+        }
+        await visible;
+        const visibleSnapshot = await readVisibleSnapshot();
+        applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
+        return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
+      }
+
+      const visibleSnapshot = await readVisibleSnapshot();
+      applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
+      return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
+    },
+    [
+      applyBrowserSnapshot,
+      executeVisibleBrowserScript,
+      getBrowserBridge,
+      openOperatorBrowser,
+      operatorBrowserUrl,
+    ],
   );
 
   const captureOperatorBrowserSnapshot = useCallback(async () => {
@@ -2665,6 +3060,23 @@ export default function CyberdeckPage() {
           { role: "system", text: "TAB_REMOVE_SKIPPED // NO_ACTIVE_CUSTOM_TAB" },
         ]);
       }
+      setIsStreaming(false);
+      return;
+    }
+
+    const browserCommand = parseBrowserCommand(userMessage);
+    if (browserCommand) {
+      const actionResult = await performBrowserCommand(browserCommand);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          text:
+            browserCommand.kind === "snapshot"
+              ? `BROWSER_SNAPSHOT // ${actionResult}`
+              : `BROWSER_ACTION // ${browserCommand.kind.toUpperCase()} // ${actionResult}`,
+        },
+      ]);
       setIsStreaming(false);
       return;
     }

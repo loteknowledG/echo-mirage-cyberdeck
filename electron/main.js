@@ -43,6 +43,107 @@ async function snapshotPage(page) {
   };
 }
 
+async function runBrowserScript(page, script) {
+  const result = await page.evaluate((code) => {
+    try {
+      // eslint-disable-next-line no-new-func
+      const fn = new Function(`return (${code});`);
+      return fn();
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Script execution failed.' };
+    }
+  }, script);
+
+  if (!result || typeof result !== 'object') {
+    return { ok: false, error: 'Browser script returned no result.' };
+  }
+
+  return result;
+}
+
+async function clickPlaywrightBrowser(selector) {
+  const { page } = await ensurePlaywrightBrowserState();
+  const escaped = JSON.stringify(String(selector || '').trim());
+  const result = await runBrowserScript(page, `
+    (() => {
+      const selector = ${escaped};
+      const el = document.querySelector(selector);
+      if (!el) return { ok: false, error: \`Selector not found: \${selector}\` };
+      if (typeof el.click === 'function') el.click();
+      return { ok: true };
+    })
+  `);
+  if (!result.ok) {
+    throw new Error(result.error || 'Browser click failed.');
+  }
+  return snapshotPage(page);
+}
+
+async function typePlaywrightBrowser(selector, value) {
+  const { page } = await ensurePlaywrightBrowserState();
+  const escapedSelector = JSON.stringify(String(selector || '').trim());
+  const escapedValue = JSON.stringify(String(value || ''));
+  const result = await runBrowserScript(page, `
+    (() => {
+      const selector = ${escapedSelector};
+      const value = ${escapedValue};
+      const el = document.querySelector(selector);
+      if (!el) return { ok: false, error: \`Selector not found: \${selector}\` };
+      const isInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+      if (isInput) {
+        const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+        if (descriptor && descriptor.set) descriptor.set.call(el, value);
+        else el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return { ok: true };
+      }
+      if (el.isContentEditable) {
+        el.focus();
+        el.innerText = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        return { ok: true };
+      }
+      return { ok: false, error: \`Selector is not editable: \${selector}\` };
+    })
+  `);
+  if (!result.ok) {
+    throw new Error(result.error || 'Browser type failed.');
+  }
+  return snapshotPage(page);
+}
+
+async function submitPlaywrightBrowser(selector) {
+  const { page } = await ensurePlaywrightBrowserState();
+  const escaped = JSON.stringify(String(selector || '').trim());
+  const result = await runBrowserScript(page, `
+    (() => {
+      const selector = ${escaped};
+      const el = document.querySelector(selector);
+      if (!el) return { ok: false, error: \`Selector not found: \${selector}\` };
+      const form = el.tagName === 'FORM' ? el : el.closest('form');
+      if (form) {
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else if (typeof form.submit === 'function') {
+          form.submit();
+        }
+        return { ok: true };
+      }
+      if (typeof el.click === 'function') {
+        el.click();
+        return { ok: true };
+      }
+      return { ok: false, error: \`Selector has no form or click handler: \${selector}\` };
+    })
+  `);
+  if (!result.ok) {
+    throw new Error(result.error || 'Browser submit failed.');
+  }
+  return snapshotPage(page);
+}
+
 async function navigatePlaywrightBrowser(url) {
   const { page } = await ensurePlaywrightBrowserState();
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -159,6 +260,30 @@ ipcMain.handle('echo-mirage-browser:navigate', async (_event, url) => {
     return await navigatePlaywrightBrowser(String(url || 'about:blank'));
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Browser navigate failed.' };
+  }
+});
+
+ipcMain.handle('echo-mirage-browser:click', async (_event, selector) => {
+  try {
+    return await clickPlaywrightBrowser(String(selector || ''));
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Browser click failed.' };
+  }
+});
+
+ipcMain.handle('echo-mirage-browser:type', async (_event, selector, value) => {
+  try {
+    return await typePlaywrightBrowser(String(selector || ''), String(value || ''));
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Browser type failed.' };
+  }
+});
+
+ipcMain.handle('echo-mirage-browser:submit', async (_event, selector) => {
+  try {
+    return await submitPlaywrightBrowser(String(selector || ''));
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Browser submit failed.' };
   }
 });
 

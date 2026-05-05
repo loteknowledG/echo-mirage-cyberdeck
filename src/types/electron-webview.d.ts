@@ -34,6 +34,9 @@ declare global {
 
   interface EchoMirageBrowserBridge {
     navigate(url: string): Promise<EchoMirageBrowserSnapshot>;
+    click(selector: string): Promise<EchoMirageBrowserSnapshot>;
+    type(selector: string, value: string): Promise<EchoMirageBrowserSnapshot>;
+    submit(selector: string): Promise<EchoMirageBrowserSnapshot>;
     snapshot(): Promise<EchoMirageBrowserSnapshot>;
     reload(): Promise<EchoMirageBrowserSnapshot>;
     back(): Promise<EchoMirageBrowserSnapshot>;
