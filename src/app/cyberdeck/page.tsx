@@ -358,6 +358,9 @@ export default function CyberdeckPage() {
   // Start on the operator tab; disconnected users are redirected to MAINNET-UPLINK after hydration.
   const [server, setServer] = useState<(typeof SERVER_IDS)[number]>("m");
   const [input, setInput] = useState("");
+  const [inputHistory, setInputHistory] = useState<string[]>([]);
+  const [inputHistoryIndex, setInputHistoryIndex] = useState<number | null>(null);
+  const [inputHistoryDraft, setInputHistoryDraft] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatHydrated, setChatHydrated] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -473,6 +476,19 @@ export default function CyberdeckPage() {
     const x = padLeft + ctx.measureText(before).width + charWidth - el.scrollLeft;
     setInputCursorLeft(Math.max(padLeft, x));
   }, [input]);
+
+  const moveInputCaretToEnd = useCallback((nextValue: string) => {
+    requestAnimationFrame(() => {
+      const el = messageInputRef.current;
+      if (!el) return;
+      const end = nextValue.length;
+      el.focus({ preventScroll: true });
+      el.setSelectionRange(end, end);
+      setInputCaretIndex(nextValue.length === 0 ? 0 : nextValue.length - 1);
+      syncInputCaret();
+    });
+  }, [syncInputCaret]);
+
 
   const providers = [
     { id: "opencode" as const, name: "OPENCODE" },
@@ -2197,6 +2213,9 @@ export default function CyberdeckPage() {
     if (!input.trim() || isStreaming) return;
 
     const userMessage = input.trim();
+    setInputHistory((prev) => [...prev, userMessage]);
+    setInputHistoryIndex(null);
+    setInputHistoryDraft("");
     setInput("");
     setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
     setIsStreaming(true);
@@ -2353,6 +2372,48 @@ export default function CyberdeckPage() {
       setIsStreaming(false);
     }
   };
+
+  const handleInputHistoryKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        handleSend();
+        return;
+      }
+
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (inputHistory.length === 0) return;
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const nextIndex =
+          inputHistoryIndex === null ? inputHistory.length - 1 : Math.max(0, inputHistoryIndex - 1);
+        if (inputHistoryIndex === null) {
+          setInputHistoryDraft(input);
+        }
+        const nextValue = inputHistory[nextIndex] ?? "";
+        setInput(nextValue);
+        setInputHistoryIndex(nextIndex);
+        moveInputCaretToEnd(nextValue);
+        return;
+      }
+
+      if (e.key === "ArrowDown" && inputHistoryIndex !== null) {
+        e.preventDefault();
+        const nextIndex = inputHistoryIndex + 1;
+        if (nextIndex >= inputHistory.length) {
+          setInput(inputHistoryDraft);
+          setInputHistoryIndex(null);
+          moveInputCaretToEnd(inputHistoryDraft);
+          return;
+        }
+        const nextValue = inputHistory[nextIndex] ?? "";
+        setInput(nextValue);
+        setInputHistoryIndex(nextIndex);
+        moveInputCaretToEnd(nextValue);
+      }
+    },
+    [handleSend, input, inputHistory, inputHistoryDraft, inputHistoryIndex, moveInputCaretToEnd],
+  );
 
   const handleStop = useCallback(() => {
     if (!isStreaming) return;
@@ -2654,9 +2715,12 @@ export default function CyberdeckPage() {
                     value={input}
                     onChange={(e) => {
                       setInput(e.target.value);
+                      if (inputHistoryIndex !== null) {
+                        setInputHistoryIndex(null);
+                      }
                       setInputCaretIndex(e.target.selectionStart ?? e.target.value.length);
                     }}
-                    onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                    onKeyDown={handleInputHistoryKeyDown}
                     onKeyUp={syncInputCaret}
                     onClick={syncInputCaret}
                     onSelect={syncInputCaret}

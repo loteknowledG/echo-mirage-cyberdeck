@@ -160,6 +160,31 @@ function formatLocalFsResult(result: unknown): string {
   return parts.join("\n\n");
 }
 
+function formatClockResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] CLOCK returned no output.";
+  }
+
+  const payload = result as {
+    mode?: string;
+    iso?: string;
+    local?: string;
+    time?: string;
+    date?: string;
+  };
+
+  const parts = [
+    "[TOOL] CLOCK // SERVER TIME",
+    payload.mode ? `MODE // ${payload.mode.toUpperCase()}` : null,
+    payload.time ? `TIME // ${payload.time}` : null,
+    payload.date ? `DATE // ${payload.date}` : null,
+    payload.local ? `LOCAL // ${payload.local}` : null,
+    payload.iso ? `ISO // ${payload.iso}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
 function summarizeToolResult(
   toolName: string,
   intent: string,
@@ -216,6 +241,27 @@ function summarizeToolResult(
     return `Acknowledged. I inspected the workspace with \`${payload.command || "just-bash"}\`.\n\n${snippet}${body.length > snippet.length ? "\n…" : ""}`;
   }
 
+  if (toolName === "clock" && output && typeof output === "object") {
+    const payload = output as {
+      mode?: string;
+      local?: string;
+      time?: string;
+      date?: string;
+    };
+
+    if (payload.mode === "time" && payload.time) {
+      return `Current local time: ${payload.time}.`;
+    }
+
+    if (payload.mode === "date" && payload.date) {
+      return `Current local date: ${payload.date}.`;
+    }
+
+    if (payload.local) {
+      return `Current local date and time: ${payload.local}.`;
+    }
+  }
+
   return `Acknowledged. I used ${toolName} to inspect that request: ${intent}`;
 }
 
@@ -254,6 +300,8 @@ export async function POST(request: Request) {
           ? summarizeToolResult(firstStep.toolCall.toolName, originalMessage, toolResult.output)
           : firstStep.toolCall.toolName === "localfs"
             ? formatLocalFsResult(toolResult.output)
+            : firstStep.toolCall.toolName === "clock"
+              ? formatClockResult(toolResult.output)
             : formatToolResult(toolResult.output)
         : `${failureLabel}\n\n${toolResult.error || "Unknown tool error."}`;
 

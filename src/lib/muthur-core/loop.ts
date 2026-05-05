@@ -90,9 +90,54 @@ function deriveJustBashCommand(intent: string): string | null {
   return null;
 }
 
+function deriveClockCall(intent: string) {
+  const text = intent.trim();
+  const lower = text.toLowerCase();
+  if (!lower) return null;
+
+  if (/^(?:what(?:'s| is)? the time|what time is it|current time|time)\??$/.test(lower)) {
+    return { mode: "time" };
+  }
+
+  if (/^(?:what(?:'s| is)? the date|what day is it|current date|date)\??$/.test(lower)) {
+    return { mode: "date" };
+  }
+
+  if (/^(?:what(?:'s| is)? the date and time|what(?:'s| is)? the time and date|current date and time|current time and date|date and time)\??$/.test(lower)) {
+    return { mode: "datetime" };
+  }
+
+  return null;
+}
+
 export function runMuthurCoreLoop(intent: string, _registry: ToolRegistry): MuthurLoopState {
   const normalizedIntent = (intent || "").trim();
   const steps: ToolLoopStep[] = [];
+
+  const clockCall = deriveClockCall(normalizedIntent);
+  if (clockCall) {
+    const step: ToolLoopStep = {
+      index: 0,
+      intent: normalizedIntent,
+      action: "tool",
+      toolCall: {
+        toolName: "clock",
+        args: {
+          mode: clockCall.mode,
+        },
+      },
+      toolResult: null,
+      note: "Phase 1: inferred local clock inspection.",
+    };
+    steps.push(step);
+
+    return {
+      intent: normalizedIntent,
+      steps,
+      finalized: false,
+      finalResponse: "",
+    };
+  }
 
   const localFsCall = deriveLocalFsCall(normalizedIntent);
   if (localFsCall) {

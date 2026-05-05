@@ -110,6 +110,22 @@ async function runLocalFs(call: ToolCall): Promise<ToolResult> {
   }
 }
 
+async function runClock(call: ToolCall): Promise<ToolResult> {
+  const mode = getStringArg(call, "mode").toLowerCase() || "datetime";
+  const now = new Date();
+
+  return {
+    ok: true,
+    output: {
+      mode,
+      iso: now.toISOString(),
+      local: now.toLocaleString(),
+      time: now.toLocaleTimeString(),
+      date: now.toLocaleDateString(),
+    },
+  };
+}
+
 export function createMuthurToolRegistry(): ToolRegistry {
   return {
     tools: {
@@ -124,6 +140,11 @@ export function createMuthurToolRegistry(): ToolRegistry {
         description:
           "Read-only inspection of local machine paths. Supports ls, cat, and stat on real desktop filesystem paths.",
         run: runLocalFs,
+      },
+      clock: {
+        name: "clock",
+        description: "Reports the current local date and/or time from the server machine.",
+        run: runClock,
       },
     },
   };
