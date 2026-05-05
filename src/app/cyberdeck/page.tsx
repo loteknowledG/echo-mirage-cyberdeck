@@ -69,6 +69,8 @@ import { CyberdeckDiagnosticPaneBody } from "@/components/cyberdeck/diagnostic-p
 import { CyberdeckSquareCardGrid } from "@/components/cyberdeck/square-card-grid";
 import { CyberdeckSquareCard } from "@/components/cyberdeck/square-card";
 import { CyberdeckActionButton } from "@/components/cyberdeck/action-button";
+import { EchoHeader } from "@/components/cyberdeck/echo-header";
+import { MirageHeader } from "@/components/cyberdeck/mirage-header";
 import { Knob } from "@/components/ui/knob";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -3503,31 +3505,7 @@ export default function CyberdeckPage() {
               networkActivityActive ? "is-net-active" : ""
             }`}
           >
-            <header className="relative flex shrink-0 items-end justify-end overflow-visible border-b border-gray-800 bg-black px-6 py-2">
-              <div
-                className="absolute left-6 top-2 font-mono text-[9px] tracking-[0.2em] text-[#8a8a8a]"
-                style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-              >
-                [{activeTabLabel}]
-              </div>
-              <pre
-                className="cyberdeck-net-logo m-0 whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
-                style={{ textShadow: "0 0 5px #00ff00" }}
-              >
-                {`
-          _            _             _       _    _       
-        ╱╲ ╲         ╱╲ ╲           ╱ ╱╲    ╱ ╱╲ ╱╲ ╲     
-       ╱  ╲ ╲       ╱  ╲ ╲         ╱ ╱ ╱   ╱ ╱ ╱╱  ╲ ╲    
-      ╱ ╱╲ ╲ ╲     ╱ ╱╲ ╲ ╲       ╱ ╱_╱   ╱ ╱ ╱╱ ╱╲ ╲ ╲   
-     ╱ ╱ ╱╲ ╲_╲   ╱ ╱ ╱╲ ╲ ╲     ╱ ╱╲ ╲__╱ ╱ ╱╱ ╱ ╱╲ ╲ ╲  
-    ╱ ╱_╱_ ╲╱_╱  ╱ ╱ ╱  ╲ ╲_╲   ╱ ╱╲ ╲___╲╱ ╱╱ ╱ ╱  ╲ ╲_╲ 
-   ╱ ╱____╱╲    ╱ ╱ ╱    ╲╱_╱  ╱ ╱ ╱╲╱___╱ ╱╱ ╱ ╱   ╱ ╱ ╱ 
-  ╱ ╱╲____╲╱   ╱ ╱ ╱          ╱ ╱ ╱   ╱ ╱ ╱╱ ╱ ╱   ╱ ╱ ╱  
- ╱ ╱ ╱______  ╱ ╱ ╱________  ╱ ╱ ╱   ╱ ╱ ╱╱ ╱ ╱___╱ ╱ ╱   
-╱ ╱ ╱_______╲╱ ╱ ╱_________╲╱ ╱ ╱   ╱ ╱ ╱╱ ╱ ╱____╲╱ ╱    
-╲╱__________╱╲╱____________╱╲╱_╱    ╲╱_╱ ╲╱_________╱`}
-              </pre>
-            </header>
+            <EchoHeader activeTabLabel={activeTabLabel} />
             <div
               ref={messageScrollRef}
               tabIndex={-1}
@@ -3797,25 +3775,7 @@ export default function CyberdeckPage() {
               networkActivityActive ? "is-net-active" : ""
             } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
           >
-            <header className="flex shrink-0 flex-col items-start gap-1 overflow-visible border-b border-gray-800 bg-black px-6 py-2">
-              <pre
-                    className="cyberdeck-net-logo m-0 whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
-                    style={{ textShadow: "0 0 5px #00ff00" }}
-                  >
-                    {`
-        _   _          _          _           _                   _              _      
-       ╱╲_╲╱╲_╲ _     ╱╲ ╲       ╱╲ ╲        ╱ ╱╲                ╱╲ ╲           ╱╲ ╲    
-      ╱ ╱ ╱ ╱ ╱╱╲_╲   ╲ ╲ ╲     ╱  ╲ ╲      ╱ ╱  ╲              ╱  ╲ ╲         ╱  ╲ ╲   
-     ╱╲ ╲╱ ╲ ╲╱ ╱ ╱   ╱╲ ╲_╲   ╱ ╱╲ ╲ ╲    ╱ ╱ ╱╲ ╲            ╱ ╱╲ ╲_╲       ╱ ╱╲ ╲ ╲  
-    ╱  ╲____╲__╱ ╱   ╱ ╱╲╱_╱  ╱ ╱ ╱╲ ╲_╲  ╱ ╱ ╱╲ ╲ ╲          ╱ ╱ ╱╲╱_╱      ╱ ╱ ╱╲ ╲_╲ 
-   ╱ ╱╲╱________╱   ╱ ╱ ╱    ╱ ╱ ╱_╱ ╱ ╱ ╱ ╱ ╱  ╲ ╲ ╲        ╱ ╱ ╱ ______   ╱ ╱_╱_ ╲╱_╱ 
-  ╱ ╱ ╱╲╱_╱╱ ╱ ╱   ╱ ╱ ╱    ╱ ╱ ╱__╲╱ ╱ ╱ ╱ ╱___╱ ╱╲ ╲      ╱ ╱ ╱ ╱╲_____╲ ╱ ╱____╱╲    
- ╱ ╱ ╱    ╱ ╱ ╱   ╱ ╱ ╱    ╱ ╱ ╱_____╱ ╱ ╱ ╱_____╱ ╱╲ ╲    ╱ ╱ ╱  ╲╱____ ╱╱ ╱╲____╲╱    
-╱ ╱ ╱    ╱ ╱ ╱___╱ ╱ ╱__  ╱ ╱ ╱╲ ╲ ╲  ╱ ╱_________╱╲ ╲ ╲  ╱ ╱ ╱_____╱ ╱ ╱╱ ╱ ╱______    
-╲╱_╱    ╱ ╱ ╱╱╲__╲╱_╱___╲╱ ╱ ╱  ╲ ╲ ╲╱ ╱ ╱_       __╲ ╲_╲╱ ╱ ╱______╲╱ ╱╱ ╱ ╱_______╲   
-        ╲╱_╱ ╲╱_________╱╲╱_╱    ╲_╲╱╲_╲___╲     ╱____╱_╱╲╱___________╱ ╲╱__________╱`}
-                  </pre>
-            </header>
+            <MirageHeader />
             {activeCustomTab ? (
               renderCustomTabSurface(activeCustomTab)
             ) : showGatewayPanel ? (
