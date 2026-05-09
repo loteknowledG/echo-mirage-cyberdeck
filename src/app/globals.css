@@ -309,6 +309,23 @@ body,
   box-shadow: 0 0 0 1px rgba(57, 255, 136, 0.18) !important;
 }
 
+.pi-pane-host > pi-chat-panel {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.pi-pane-host pi-chat-panel > div:last-child {
+  margin-top: auto !important;
+  padding-top: 1px !important;
+}
+
+.pi-pane-host message-editor {
+  margin-top: 0 !important;
+}
+
 .cyberdeck-square-grid {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
 }

@@ -89,6 +89,23 @@ const CHAT_URL: Record<string, string> = {
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
 };
 
+type ChatHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+function normalizeChatHistory(history: unknown, limit = 8): ChatHistoryMessage[] {
+  if (!Array.isArray(history)) return [];
+
+  return history
+    .map((entry) => ({
+      role: entry?.role === "assistant" ? "assistant" : entry?.role === "user" ? "user" : null,
+      content: typeof entry?.content === "string" ? entry.content.trim() : "",
+    }))
+    .filter((entry): entry is ChatHistoryMessage => Boolean(entry.role && entry.content))
+    .slice(-limit);
+}
+
 const DEFAULT_PROVIDER_KEY_ENV: Record<string, string | undefined> = {
   opencode: process.env.OPENCODE_API_KEY || process.env.ZEN_API_KEY || process.env.NEXT_PUBLIC_ZEN_API_KEY,
   openai: process.env.OPENAI_API_KEY,
@@ -274,7 +291,18 @@ function defaultModelForProvider(provider: string): string {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { message, provider, apiKey, testMode, probe, model: modelFromBody, memoryContext, browserContext } = body;
+    const {
+      message,
+      provider,
+      apiKey,
+      testMode,
+      probe,
+      model: modelFromBody,
+      memoryContext,
+      browserContext,
+      history,
+    } = body;
+    const chatHistory = normalizeChatHistory(history);
     const memoryPrompt =
       typeof memoryContext === "string" && memoryContext.trim()
         ? `\n\nPersistent MUTHUR memory:\n${memoryContext.trim()}`
@@ -466,6 +494,7 @@ export async function POST(request: Request) {
                   memoryPrompt +
                   browserPrompt,
               },
+              ...chatHistory,
               { role: "user", content: message },
             ],
             stream: true,
@@ -552,6 +581,7 @@ export async function POST(request: Request) {
               "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
               memoryPrompt,
           },
+          ...chatHistory,
           { role: "user", content: message },
         ],
         stream: true,

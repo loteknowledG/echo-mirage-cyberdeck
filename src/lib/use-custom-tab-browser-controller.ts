@@ -4,7 +4,7 @@ import { useCallback, useEffect } from "react";
 import type { RefObject } from "react";
 import { normalizeOperatorBrowserUrl } from "@/lib/browser-intents";
 
-type CustomTabBrowserKind = "blank" | "document" | "web" | "settings" | "connection" | "pi";
+type CustomTabBrowserKind = "blank" | "document" | "web" | "settings" | "connection" | "pi" | "catelog";
 
 type CustomTabBrowserState = {
   id: string;

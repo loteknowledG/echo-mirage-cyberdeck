@@ -21,6 +21,7 @@ type OperatorPaneBodyProps = {
   isOperatorDragOver: boolean;
   operatorDroppedAsset: DroppedOperatorAsset | null;
   operatorSurfaceMode: "workspace" | "browser";
+  operatorBrowserEngine: string;
   operatorSurfaceIsDocument: boolean;
   operatorBrowserUrl: string;
   operatorDocMode: "view" | "edit";
@@ -35,6 +36,7 @@ type OperatorPaneBodyProps = {
   onCommitOperatorDocName: () => void;
   onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
   onOperatorBrowserNavigate: (nextUrl: string) => void;
+  onOperatorBrowserUrlChange: (nextUrl: string) => void;
   onPasteClipboardToOperator: () => void | Promise<void>;
   onSaveOperatorDocAsFile: () => void | Promise<void>;
   onCopyOperatorDocToClipboard: () => void | Promise<void>;
@@ -45,6 +47,7 @@ export function CyberdeckOperatorPaneBody({
   isOperatorDragOver,
   operatorDroppedAsset,
   operatorSurfaceMode,
+  operatorBrowserEngine,
   operatorSurfaceIsDocument,
   operatorBrowserUrl,
   operatorDocMode,
@@ -59,6 +62,7 @@ export function CyberdeckOperatorPaneBody({
   onCommitOperatorDocName,
   onSetOperatorDocMode,
   onOperatorBrowserNavigate,
+  onOperatorBrowserUrlChange,
   onPasteClipboardToOperator,
   onSaveOperatorDocAsFile,
   onCopyOperatorDocToClipboard,
@@ -86,7 +90,8 @@ export function CyberdeckOperatorPaneBody({
       try {
         const currentUrl = view.getURL();
         if (currentUrl) {
-          onOperatorBrowserNavigate(currentUrl);
+          // Keep browser state in sync with the guest view without re-triggering navigation.
+          onOperatorBrowserUrlChange(currentUrl);
         }
       } catch {
         /* ignore */
@@ -106,7 +111,7 @@ export function CyberdeckOperatorPaneBody({
       view.removeEventListener("dragover", blockDrop);
       view.removeEventListener("drop", blockDrop);
     };
-  }, [onOperatorBrowserNavigate, operatorBrowserRef, operatorSurfaceMode]);
+  }, [onOperatorBrowserUrlChange, operatorBrowserRef, operatorSurfaceMode]);
 
   const navigateBrowser = () => {
     const nextUrl = browserDraft.trim();
@@ -179,8 +184,11 @@ export function CyberdeckOperatorPaneBody({
                 PASTE
               </button>
               {operatorSurfaceMode === "browser" ? (
-                <div className="font-mono text-[9px] tracking-[0.08em] text-emerald-200">
-                  LIVE WEB
+                <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em]">
+                  <span className="text-emerald-200">LIVE WEB</span>
+                  <span className="rounded border border-[#2d2d2d] px-2 py-0.5 text-[#8a8a8a]">
+                    ENGINE: {operatorBrowserEngine}
+                  </span>
                 </div>
               ) : operatorSurfaceIsDocument ? (
                 <>

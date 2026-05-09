@@ -9,9 +9,17 @@ async function ensurePlaywrightBrowserState() {
   }
 
   const { chromium } = require('playwright');
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
-  const page = await context.newPage();
+  const userDataDir = path.join(app.getPath('userData'), 'playwright-profile');
+  const context = await chromium.launchPersistentContext(userDataDir, {
+    headless: false,
+    viewport: { width: 1366, height: 900 },
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    args: ['--disable-blink-features=AutomationControlled'],
+  });
+  const browser = context.browser();
+  const existingPages = context.pages();
+  const page = existingPages.length > 0 ? existingPages[0] : await context.newPage();
   await page.goto('about:blank');
 
   playrightBrowserState = { browser, context, page };

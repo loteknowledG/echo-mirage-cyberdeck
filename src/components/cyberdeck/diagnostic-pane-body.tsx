@@ -289,12 +289,10 @@ export function CyberdeckDiagnosticPaneBody({ server }: DiagnosticPaneBodyProps)
   }, []);
 
   return (
-    <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black px-4">
-      <div
-        ref={hostRef}
-        className="pi-pane-host min-h-[60vh] w-full flex-1 overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80"
-        data-pi-status={status || server.toUpperCase()}
-      />
-    </div>
+    <div
+      ref={hostRef}
+      className="pi-pane-host custom-scrollbar flex h-full min-h-0 w-full flex-col overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80"
+      data-pi-status={status || server.toUpperCase()}
+    />
   );
 }

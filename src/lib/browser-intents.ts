@@ -50,15 +50,46 @@ export type BrowserCommand =
 export function normalizeOperatorBrowserUrl(raw: string) {
   const value = raw.trim();
   if (!value) return OPERATOR_BROWSER_HOME_URL;
-  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(value)) return value;
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(value)) return rewriteSearchEngineUrl(value);
   if (/^(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/.*)?$/i.test(value)) return `https://${value}`;
-  if (/^[^\s]+\.[^\s/]+(?:\/.*)?$/i.test(value)) return `https://${value}`;
+  if (/^[^\s]+\.[^\s/]+(?:\/.*)?$/i.test(value)) return rewriteSearchEngineUrl(`https://${value}`);
+  if (/\bdot\b/i.test(value)) {
+    const dotWordCandidate = value
+      .replace(/\s+dot\s+/gi, ".")
+      .replace(/\s+/g, ".");
+    if (/^[^\s]+\.[^\s/]+(?:\/.*)?$/i.test(dotWordCandidate)) {
+      return rewriteSearchEngineUrl(`https://${dotWordCandidate}`);
+    }
+  }
   return `${OPERATOR_BROWSER_HOME_URL}?q=${encodeURIComponent(value)}`;
+}
+
+function rewriteSearchEngineUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+
+    if (host.endsWith("bing.com") && parsed.pathname.toLowerCase() === "/search") {
+      const query = parsed.searchParams.get("q")?.trim();
+      if (query) {
+        return `${OPERATOR_BROWSER_HOME_URL}?q=${encodeURIComponent(query)}`;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return url;
 }
 
 export function deriveOperatorBrowserUrl(intent: string) {
   const text = intent.trim();
   if (!text) return OPERATOR_BROWSER_HOME_URL;
+
+  const inBrowserMatch = text.match(/^(?:in|on)\s+(?:the\s+)?browser\s+(.*)$/i);
+  if (inBrowserMatch) {
+    return deriveOperatorBrowserUrl(inBrowserMatch[1] || "");
+  }
 
   const explicitMatch = text.match(/^(?:\/web|web:)\s*(.*)$/i);
   if (explicitMatch) {
@@ -66,7 +97,7 @@ export function deriveOperatorBrowserUrl(intent: string) {
   }
 
   const phraseMatch = text.match(
-    /^(?:use the web(?: to)?(?: find| search| look up)?|browse(?: the)? web(?: for)?|search(?: the)? web(?: for)?|open(?: the)? browser(?: to)?|go to)\s*(.*)$/i,
+    /^(?:use the web(?: to)?(?: find| search| look up)?|browse(?: the)? web(?: for)?|search(?: the)? web(?: for)?|open(?: the)? browser(?: to)?|go to|got to)\s*(.*)$/i,
   );
   if (phraseMatch) {
     return normalizeOperatorBrowserUrl(phraseMatch[1] || text);
@@ -89,6 +120,13 @@ export function stripMuthurInvocationPrefix(intent: string) {
 export function stripBrowserSearchPrefix(intent: string) {
   const text = intent.trim();
   if (!text) return "";
+
+  const webPrefixMatch = text.match(
+    /^(?:find|search|look for|look up|show me|show|help me find|help me search for|can you find|can you search for)\s+(?:the\s+)?web(?:\s+for)?\s+(.+)$/i,
+  );
+  if (webPrefixMatch) {
+    return webPrefixMatch[1].trim();
+  }
 
   const prefixMatch = text.match(
     /^(?:find|search|look for|look up|show me|show|help me find|help me search for|can you find|can you search for)\s+(?:what\s+)?(.+)$/i,
@@ -133,7 +171,7 @@ export function deriveCarsComSearchUrl(intent: string) {
     searchTerms.add("cars for sale");
     if (location) searchTerms.add(location);
     const query = Array.from(searchTerms).join(" ").trim();
-    return `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
+    return `${OPERATOR_BROWSER_HOME_URL}?q=${encodeURIComponent(query)}`;
   }
 
   searchTerms.add(make);
@@ -149,7 +187,7 @@ export function deriveCarsComSearchUrl(intent: string) {
   if (location) searchTerms.add(location);
 
   const query = Array.from(searchTerms).join(" ").trim();
-  return `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
+  return `${OPERATOR_BROWSER_HOME_URL}?q=${encodeURIComponent(query)}`;
 }
 
 export function deriveJobsSearchUrl(intent: string) {
@@ -167,7 +205,7 @@ export function deriveJobsSearchUrl(intent: string) {
     .trim();
 
   if (!query) return null;
-  return `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
+  return `${OPERATOR_BROWSER_HOME_URL}?q=${encodeURIComponent(query)}`;
 }
 
 export function looksLikeCaptchaBlock(snapshotText: string) {
@@ -192,10 +230,29 @@ export function looksLikeOperatorWebIntent(intent: string) {
   if (!text) return false;
   return (
     /^(?:\/web|web:)\b/i.test(text) ||
-    /\b(?:use the web|browse the web|search the web|open the browser|go to the web)\b/i.test(text) ||
+    /\b(?:use the web|browse the web|search the web|open the browser|go to the web|in the browser|on the browser)\b/i.test(text) ||
     /\b(?:for sale|on sale|available|in stock|dealership|dealer|inventory|used car|used cars|new car|new cars|car lot|auto lot)\b/i.test(
       text,
     )
+  );
+}
+
+export function looksLikeBrowserSearchOffer(text: string) {
+  const value = text.trim().toLowerCase();
+  if (!value) return false;
+  return (
+    /\b(?:want me to|shall i|should i|i can|i'll|let me)\s+(?:open|start|use)?\s*(?:a\s+)?(?:browser|search|look it up|look that up|search for it|search the web)\b/i.test(
+      value,
+    ) ||
+    /\b(?:open a browser and search|search for it|look it up|look that up|want me to search)\b/i.test(value)
+  );
+}
+
+export function looksLikeAffirmativeReply(text: string) {
+  const value = text.trim().toLowerCase();
+  if (!value) return false;
+  return /^(?:yes|yeah|yep|sure|ok|okay|please|go ahead|do it|open browser|search it|search for it|look it up)(?:[.!?]*)$/i.test(
+    value,
   );
 }
 
@@ -217,9 +274,15 @@ export function parseBrowserCommand(input: string): BrowserCommand | null {
     return { kind: "click", selector: "a[href], button" };
   }
 
-  const gotoMatch = body.match(/^(?:goto|go to|open|navigate)\s+(.+)$/i);
+  const gotoMatch = body.match(/^(?:goto|go to|got to|open|navigate)\s+(.+)$/i);
   if (gotoMatch) {
     return { kind: "goto", url: gotoMatch[1].trim() };
+  }
+  const inBrowserGotoMatch = body.match(
+    /^(?:in|on)\s+(?:the\s+)?browser\s+(?:goto|go to|got to|open|navigate)\s+(.+)$/i,
+  );
+  if (inBrowserGotoMatch) {
+    return { kind: "goto", url: inBrowserGotoMatch[1].trim() };
   }
 
   const clickMatch = body.match(/^(?:click|press|tap)\s+(.+)$/i);
@@ -257,4 +320,48 @@ export function parseBrowserCommand(input: string): BrowserCommand | null {
   }
 
   return null;
+}
+
+export function parseBrowserUseModeCommand(input: string): BrowserCommand | null {
+  const text = stripMuthurInvocationPrefix(input).trim();
+  if (!text) return null;
+
+  const parsed = parseBrowserCommand(text);
+  if (parsed) return parsed;
+
+  if (/^(?:https?:\/\/|localhost|127\.0\.0\.1)(?::\d+)?(?:\/.*)?$/i.test(text)) {
+    return { kind: "goto", url: text };
+  }
+
+  if (/^[^\s]+\.[^\s/]+(?:\/.*)?$/i.test(text)) {
+    return { kind: "goto", url: text };
+  }
+
+  return null;
+}
+
+function stripAssistantDirectiveMarkup(text: string) {
+  return text
+    .trim()
+    .replace(/^```[a-z0-9_-]*\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
+export function extractAssistantBrowserCommand(text: string): BrowserCommand | null {
+  const cleaned = stripAssistantDirectiveMarkup(text);
+  if (!cleaned) return null;
+
+  const lines = cleaned.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const directiveLine = lines[0] || cleaned;
+
+  const directiveMatch = directiveLine.match(
+    /^(?:navigate|go to|goto|open(?: the)? browser(?: and search)?|search the web for)\s*(?:[:=]\s*|\s+)(.+)$/i,
+  );
+  if (!directiveMatch?.[1]) return null;
+
+  const target = directiveMatch[1].trim();
+  if (!target) return null;
+
+  return { kind: "goto", url: rewriteSearchEngineUrl(normalizeOperatorBrowserUrl(target)) };
 }

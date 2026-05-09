@@ -26,6 +26,70 @@ export function useBrowserController({
   setServer,
   setOperatorBrowserSnapshot,
 }: BrowserControllerArgs) {
+  const executeVisibleBrowserScript = useCallback(async (script: string) => {
+    const view = operatorBrowserRef.current;
+    if (!view) return null;
+    try {
+      return await view.executeJavaScript(script);
+    } catch {
+      return null;
+    }
+  }, [operatorBrowserRef]);
+
+  const readVisibleSnapshot = useCallback(async () => {
+    const view = operatorBrowserRef.current;
+    const url = view?.getURL?.() || operatorBrowserUrl;
+    const title = view?.getTitle?.() || "";
+    let text = "";
+    try {
+      const bodyText = await executeVisibleBrowserScript(
+        "document && document.body ? String(document.body.innerText || document.body.textContent || '') : ''",
+      );
+      text = typeof bodyText === "string" ? bodyText.trim() : "";
+    } catch {
+      text = "";
+    }
+    return {
+      ok: true,
+      url,
+      title,
+      text,
+    } satisfies EchoMirageBrowserSnapshot;
+  }, [executeVisibleBrowserScript, operatorBrowserRef, operatorBrowserUrl]);
+
+  const snapshotToText = useCallback((snapshot: EchoMirageBrowserSnapshot, fallbackUrl: string) => {
+    const url = (snapshot.url || fallbackUrl || "").trim();
+    const title = (snapshot.title || "").trim();
+    const text = (snapshot.text || "").trim();
+    return (
+      [
+        url ? `URL: ${url}` : null,
+        title ? `TITLE: ${title}` : null,
+        text ? `PAGE TEXT:\n${text.slice(0, 6000)}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n\n") || `URL: ${fallbackUrl}`
+    );
+  }, []);
+
+  const waitForVisibleNavigation = useCallback(async () => {
+    const view = operatorBrowserRef.current;
+    if (!view) return;
+    await new Promise<void>((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        view.removeEventListener("did-stop-loading", finish as EventListener);
+        view.removeEventListener("dom-ready", finish as EventListener);
+        resolve();
+      };
+      view.addEventListener("did-stop-loading", finish as EventListener);
+      view.addEventListener("dom-ready", finish as EventListener);
+      window.setTimeout(finish, 2500);
+    });
+  }, [operatorBrowserRef]);
+
   const getBrowserBridge = useCallback(() => {
     if (typeof window === "undefined") return null;
     return window.echoMirageBrowser || null;
@@ -54,7 +118,22 @@ export function useBrowserController({
   const syncBrowserEngineToUrl = useCallback(
     async (nextUrl: string) => {
       const normalizedUrl = normalizeOperatorBrowserUrl(nextUrl);
+      const view = operatorBrowserRef.current;
       const bridge = getBrowserBridge();
+
+      if (view) {
+        try {
+          view.loadURL(normalizedUrl);
+          await waitForVisibleNavigation();
+          const visibleSnapshot = await readVisibleSnapshot();
+          applyBrowserSnapshot(visibleSnapshot, normalizedUrl);
+          return `${snapshotToText(visibleSnapshot, normalizedUrl)}\n\nENGINE: WEBPANE_HUMAN`;
+        } catch {
+          const fallback = `URL: ${normalizedUrl}`;
+          setOperatorBrowserSnapshot(fallback);
+          return `${fallback}\n\nENGINE: WEBPANE_HUMAN`;
+        }
+      }
 
       if (!bridge) {
         const fallback = `URL: ${normalizedUrl}`;
@@ -65,23 +144,22 @@ export function useBrowserController({
       try {
         const snapshot = await bridge.navigate(normalizedUrl);
         applyBrowserSnapshot(snapshot, normalizedUrl);
-        const url = (snapshot.url || normalizedUrl || "").trim();
-        const title = (snapshot.title || "").trim();
-        const text = (snapshot.text || "").trim();
-        return [
-          url ? `URL: ${url}` : null,
-          title ? `TITLE: ${title}` : null,
-          text ? `PAGE TEXT:\n${text.slice(0, 6000)}` : null,
-        ]
-          .filter(Boolean)
-          .join("\n\n") || `URL: ${normalizedUrl}`;
+        return `${snapshotToText(snapshot, normalizedUrl)}\n\nENGINE: PLAYWRIGHT`;
       } catch {
         const fallback = `URL: ${normalizedUrl}`;
         setOperatorBrowserSnapshot(fallback);
         return fallback;
       }
     },
-    [applyBrowserSnapshot, getBrowserBridge, setOperatorBrowserSnapshot],
+    [
+      applyBrowserSnapshot,
+      getBrowserBridge,
+      operatorBrowserRef,
+      readVisibleSnapshot,
+      setOperatorBrowserSnapshot,
+      snapshotToText,
+      waitForVisibleNavigation,
+    ],
   );
 
   const openOperatorBrowser = useCallback(
@@ -96,40 +174,11 @@ export function useBrowserController({
     [setOperatorBrowserUrl, setOperatorSurfaceMode, setServer, syncBrowserEngineToUrl],
   );
 
-  const executeVisibleBrowserScript = useCallback(async (script: string) => {
-    const view = operatorBrowserRef.current;
-    if (!view) return null;
-    try {
-      return await view.executeJavaScript(script);
-    } catch {
-      return null;
-    }
-  }, [operatorBrowserRef]);
-
   const performBrowserCommand = useCallback(
     async (command: BrowserCommand) => {
       const bridge = getBrowserBridge();
       const view = operatorBrowserRef.current;
-
-      const readVisibleSnapshot = async () => {
-        const url = view?.getURL?.() || operatorBrowserUrl;
-        const title = view?.getTitle?.() || "";
-        let text = "";
-        try {
-          const bodyText = await executeVisibleBrowserScript(
-            "document && document.body ? String(document.body.innerText || document.body.textContent || '') : ''",
-          );
-          text = typeof bodyText === "string" ? bodyText.trim() : "";
-        } catch {
-          text = "";
-        }
-        return {
-          ok: true,
-          url,
-          title,
-          text,
-        } satisfies EchoMirageBrowserSnapshot;
-      };
+      const engineLabel = view ? "WEBPANE_HUMAN" : bridge ? "PLAYWRIGHT" : "WEBVIEW_DOM_FALLBACK";
 
       if (command.kind === "goto") {
         const nextUrl = normalizeOperatorBrowserUrl(command.url);
@@ -137,7 +186,7 @@ export function useBrowserController({
         if (looksLikeCaptchaBlock(nextSnapshot || nextUrl)) {
           return `${nextSnapshot || `URL: ${nextUrl}`}\n\nCAPTCHA_BLOCKED // MANUAL_COMPLETION_REQUIRED`;
         }
-        return nextSnapshot || `URL: ${nextUrl}`;
+        return nextSnapshot || `URL: ${nextUrl}\n\nENGINE: ${engineLabel}`;
       }
 
       const selectorJson = (selector: string) => JSON.stringify(selector.trim());
@@ -145,7 +194,7 @@ export function useBrowserController({
 
       const runDualAction = async (script: string, bridgeAction?: Promise<EchoMirageBrowserSnapshot>) => {
         await executeVisibleBrowserScript(script);
-        const snapshot = bridgeAction ? await bridgeAction.catch(() => null) : null;
+        const snapshot = view ? null : bridgeAction ? await bridgeAction.catch(() => null) : null;
         if (snapshot) {
           applyBrowserSnapshot(snapshot, operatorBrowserUrl);
           if (snapshot.url && snapshot.url !== operatorBrowserUrl) {
@@ -155,6 +204,7 @@ export function useBrowserController({
             snapshot.url ? `URL: ${snapshot.url}` : null,
             snapshot.title ? `TITLE: ${snapshot.title}` : null,
             snapshot.text ? `PAGE TEXT:\n${snapshot.text.slice(0, 6000)}` : null,
+            `ENGINE: ${engineLabel}`,
           ]
             .filter(Boolean)
             .join("\n\n") || `URL: ${operatorBrowserUrl}`;
@@ -169,6 +219,7 @@ export function useBrowserController({
           visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : null,
           visibleSnapshot.title ? `TITLE: ${visibleSnapshot.title}` : null,
           visibleSnapshot.text ? `PAGE TEXT:\n${visibleSnapshot.text.slice(0, 6000)}` : null,
+          `ENGINE: ${engineLabel}`,
         ]
           .filter(Boolean)
           .join("\n\n") || `URL: ${operatorBrowserUrl}`;
@@ -244,55 +295,63 @@ export function useBrowserController({
 
       if (command.kind === "back") {
         const visible = view && view.canGoBack() ? view.goBack() : null;
-        const snapshot = bridge ? await bridge.back().catch(() => null) : null;
+        const snapshot = view ? null : bridge ? await bridge.back().catch(() => null) : null;
         if (snapshot) {
           applyBrowserSnapshot(snapshot, operatorBrowserUrl);
           if (snapshot.url) {
             setOperatorBrowserUrl(snapshot.url);
           }
-          return `URL: ${snapshot.url || operatorBrowserUrl}`;
+          return `URL: ${snapshot.url || operatorBrowserUrl}\n\nENGINE: ${engineLabel}`;
         }
         await visible;
         const visibleSnapshot = await readVisibleSnapshot();
         applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
-        return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
+        return visibleSnapshot.url
+          ? `URL: ${visibleSnapshot.url}\n\nENGINE: WEBVIEW_DOM_FALLBACK`
+          : `URL: ${operatorBrowserUrl}\n\nENGINE: WEBVIEW_DOM_FALLBACK`;
       }
 
       if (command.kind === "forward") {
         const visible = view && view.canGoForward() ? view.goForward() : null;
-        const snapshot = bridge ? await bridge.forward().catch(() => null) : null;
+        const snapshot = view ? null : bridge ? await bridge.forward().catch(() => null) : null;
         if (snapshot) {
           applyBrowserSnapshot(snapshot, operatorBrowserUrl);
           if (snapshot.url) {
             setOperatorBrowserUrl(snapshot.url);
           }
-          return `URL: ${snapshot.url || operatorBrowserUrl}`;
+          return `URL: ${snapshot.url || operatorBrowserUrl}\n\nENGINE: ${engineLabel}`;
         }
         await visible;
         const visibleSnapshot = await readVisibleSnapshot();
         applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
-        return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
+        return visibleSnapshot.url
+          ? `URL: ${visibleSnapshot.url}\n\nENGINE: WEBVIEW_DOM_FALLBACK`
+          : `URL: ${operatorBrowserUrl}\n\nENGINE: WEBVIEW_DOM_FALLBACK`;
       }
 
       if (command.kind === "reload") {
         const visible = view?.reload?.();
-        const snapshot = bridge ? await bridge.reload().catch(() => null) : null;
+        const snapshot = view ? null : bridge ? await bridge.reload().catch(() => null) : null;
         if (snapshot) {
           applyBrowserSnapshot(snapshot, operatorBrowserUrl);
           if (snapshot.url) {
             setOperatorBrowserUrl(snapshot.url);
           }
-          return `URL: ${snapshot.url || operatorBrowserUrl}`;
+          return `URL: ${snapshot.url || operatorBrowserUrl}\n\nENGINE: ${engineLabel}`;
         }
         await visible;
         const visibleSnapshot = await readVisibleSnapshot();
         applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
-        return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
+        return visibleSnapshot.url
+          ? `URL: ${visibleSnapshot.url}\n\nENGINE: WEBVIEW_DOM_FALLBACK`
+          : `URL: ${operatorBrowserUrl}\n\nENGINE: WEBVIEW_DOM_FALLBACK`;
       }
 
       const visibleSnapshot = await readVisibleSnapshot();
       applyBrowserSnapshot(visibleSnapshot, operatorBrowserUrl);
-      return visibleSnapshot.url ? `URL: ${visibleSnapshot.url}` : `URL: ${operatorBrowserUrl}`;
+      return visibleSnapshot.url
+        ? `URL: ${visibleSnapshot.url}\n\nENGINE: WEBVIEW_DOM_FALLBACK`
+        : `URL: ${operatorBrowserUrl}\n\nENGINE: WEBVIEW_DOM_FALLBACK`;
     },
     [
       applyBrowserSnapshot,
@@ -301,16 +360,15 @@ export function useBrowserController({
       openOperatorBrowser,
       operatorBrowserRef,
       operatorBrowserUrl,
+      readVisibleSnapshot,
       setOperatorBrowserUrl,
     ],
   );
 
   const captureOperatorBrowserSnapshot = useCallback(async () => {
     const bridge = getBrowserBridge();
-    if (!bridge) {
-      const view = operatorBrowserRef.current;
-      if (!view) return;
-
+    const view = operatorBrowserRef.current;
+    if (view) {
       try {
         const [title, bodyText] = await Promise.all([
           Promise.resolve(typeof view.getTitle === "function" ? view.getTitle() : "").catch(() => ""),
@@ -326,10 +384,16 @@ export function useBrowserController({
           title ? `TITLE: ${title.trim()}` : null,
           text ? `PAGE TEXT:\n${text.slice(0, 6000)}` : null,
         ].filter(Boolean);
-        setOperatorBrowserSnapshot(parts.join("\n\n"));
+        const snapshot = parts.join("\n\n") || `URL: ${operatorBrowserUrl}`;
+        setOperatorBrowserSnapshot(snapshot);
+        return snapshot;
       } catch {
         setOperatorBrowserSnapshot(operatorBrowserUrl);
+        return `URL: ${operatorBrowserUrl}`;
       }
+    }
+
+    if (!bridge) {
       return;
     }
 

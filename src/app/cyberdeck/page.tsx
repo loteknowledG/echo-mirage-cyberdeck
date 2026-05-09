@@ -48,9 +48,13 @@ import {
 import {
   OPERATOR_BROWSER_HOME_URL,
   deriveOperatorBrowserUrl,
+  extractAssistantBrowserCommand,
+  looksLikeAffirmativeReply,
+  looksLikeBrowserSearchOffer,
   looksLikeCaptchaBlock,
   looksLikeOperatorWebIntent,
   parseBrowserCommand,
+  parseBrowserUseModeCommand,
 } from "@/lib/browser-intents";
 import { useBrowserController } from "@/lib/use-browser-controller";
 import { useCustomTabBrowserController } from "@/lib/use-custom-tab-browser-controller";
@@ -66,6 +70,7 @@ import {
 import { CyberdeckInfoBlockHeader } from "@/components/cyberdeck/info-block-header";
 import { CyberdeckOperatorPaneBody } from "@/components/cyberdeck/operator-pane-body";
 import { CyberdeckDiagnosticPaneBody } from "@/components/cyberdeck/diagnostic-pane-body";
+import { CyberdeckCatalogPaneBody } from "@/components/cyberdeck/catalog-pane-body";
 import { CyberdeckSquareCardGrid } from "@/components/cyberdeck/square-card-grid";
 import { CyberdeckSquareCard } from "@/components/cyberdeck/square-card";
 import { CyberdeckActionButton } from "@/components/cyberdeck/action-button";
@@ -116,7 +121,7 @@ type CyberdeckUiState = {
   activeCustomTabId?: string | null;
 };
 
-const CUSTOM_TAB_KINDS = ["blank", "document", "web", "settings", "connection", "pi"] as const;
+const CUSTOM_TAB_KINDS = ["blank", "document", "web", "settings", "connection", "pi", "catelog"] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
 
 /** Gateway SYS lines; link phrases must match 
@@ -161,8 +166,13 @@ type CustomTab = {
   asset?: DroppedOperatorAsset | null;
 };
 
+type CyberdeckChatHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 function isCustomTabKind(kind: unknown): kind is CustomTabKind {
-  return typeof kind === "string" && CUSTOM_TAB_KINDS.includes(kind as CustomTabKind);
+  return typeof kind === "string" && normalizeCustomTabKind(kind) !== null;
 }
 
 function sanitizeCustomTabs(value: unknown): CustomTab[] {
@@ -426,10 +436,24 @@ function normalizeCustomTabGlyph(label: string, glyph?: string) {
 
 function normalizeCustomTabKind(kind: string) {
   const nextKind = kind.trim().toLowerCase();
+  if (nextKind === "catalog") {
+    return "catelog" as CustomTabKind;
+  }
   if (CUSTOM_TAB_KINDS.includes(nextKind as CustomTabKind)) {
     return nextKind as CustomTabKind;
   }
   return null;
+}
+
+function buildCyberdeckChatHistory(messages: Array<{ role: string; text: string }>, limit = 8) {
+  return messages
+    .filter((message) => message.role === "user" || message.role === "assistant")
+    .map((message) => ({
+      role: message.role,
+      content: message.text.trim(),
+    }))
+    .filter((message) => Boolean(message.content))
+    .slice(-limit);
 }
 
 function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
@@ -480,7 +504,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|catelog|catalog)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -517,6 +541,7 @@ export default function CyberdeckPage() {
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
   const [operatorDroppedAsset, setOperatorDroppedAsset] = useState<DroppedOperatorAsset | null>(null);
   const [operatorSurfaceMode, setOperatorSurfaceMode] = useState<"workspace" | "browser">("workspace");
+  const [operatorBrowserEngine, setOperatorBrowserEngine] = useState("UNKNOWN");
   const [operatorDocMode, setOperatorDocMode] = useState<"view" | "edit">("view");
   const [operatorDocNameDraft, setOperatorDocNameDraft] = useState("");
   const [operatorBrowserUrl, setOperatorBrowserUrl] = useState(OPERATOR_BROWSER_HOME_URL);
@@ -1282,6 +1307,11 @@ export default function CyberdeckPage() {
     setServer,
     setOperatorBrowserSnapshot,
   });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setOperatorBrowserEngine(window.echoMirageBrowser ? "PLAYWRIGHT" : "WEBVIEW_DOM_FALLBACK");
+  }, []);
 
   useEffect(() => {
     setOperatorDocNameDraft(operatorDroppedAsset?.name || "");
@@ -2567,9 +2597,15 @@ export default function CyberdeckPage() {
       return;
     }
 
-    const browserCommand = parseBrowserCommand(userMessage);
+    const browserCommand =
+      parseBrowserCommand(userMessage) ||
+      (operatorSurfaceMode === "browser" ? parseBrowserUseModeCommand(userMessage) : null);
     if (browserCommand) {
       const actionResult = await performBrowserCommand(browserCommand);
+      const engineMatch = actionResult.match(/ENGINE:\s*([A-Z0-9_ -]+)/i);
+      if (engineMatch?.[1]) {
+        setOperatorBrowserEngine(engineMatch[1].trim().toUpperCase().replace(/\s+/g, "_"));
+      }
       const captchaBlocked = looksLikeCaptchaBlock(actionResult) || actionResult.includes("CAPTCHA_BLOCKED");
       setMessages((prev) => [
         ...prev,
@@ -2627,6 +2663,9 @@ export default function CyberdeckPage() {
       const abortCtl = new AbortController();
       chatAbortRef.current = abortCtl;
       const memoryContext = buildMuthurMemoryContext(muthurMemoryRef.current, userMessage);
+      const history = buildCyberdeckChatHistory(messages);
+      const latestAssistantMessage =
+        [...messages].reverse().find((message) => message.role === "assistant")?.text || "";
       const res = await fetch("/api/cyberdeck-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2638,6 +2677,7 @@ export default function CyberdeckPage() {
           model: modelID,
           memoryContext,
           browserContext: browserContextForRequest,
+          history,
         }),
       });
 
@@ -2670,6 +2710,30 @@ export default function CyberdeckPage() {
           fullText += chunk;
           setStreamText(fullText);
         }
+      }
+
+      const allowBrowserDirective =
+        (looksLikeAffirmativeReply(userMessage) && looksLikeBrowserSearchOffer(latestAssistantMessage));
+
+      const assistantBrowserCommand = allowBrowserDirective
+        ? extractAssistantBrowserCommand(fullText)
+        : null;
+      if (assistantBrowserCommand) {
+        const actionResult = await performBrowserCommand(assistantBrowserCommand);
+        const engineMatch = actionResult.match(/ENGINE:\s*([A-Z0-9_ -]+)/i);
+        if (engineMatch?.[1]) {
+          setOperatorBrowserEngine(engineMatch[1].trim().toUpperCase().replace(/\s+/g, "_"));
+        }
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: `BROWSER_ACTION // ${assistantBrowserCommand.kind.toUpperCase()} // ${actionResult}`,
+          },
+        ]);
+        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, actionResult));
+        setStreamText("");
+        return;
       }
 
       setMessages((prev) => [...prev, { role: "assistant", text: fullText }]);
@@ -3124,13 +3188,20 @@ export default function CyberdeckPage() {
               }
               right={
                 right || (
-                  <button
-                    type="button"
-                    onClick={deleteActiveTab}
-                    className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-red-500/60 hover:text-red-200"
-                  >
-                    DELETE TAB
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {tab.kind === "web" ? (
+                      <div className="rounded border border-[#2d2d2d] px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+                        ENGINE: {operatorBrowserEngine}
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={deleteActiveTab}
+                      className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-red-500/60 hover:text-red-200"
+                    >
+                      DELETE TAB
+                    </button>
+                  </div>
                 )
               }
             />
@@ -3303,9 +3374,13 @@ export default function CyberdeckPage() {
         );
       }
 
+      if (tab.kind === "catelog") {
+        return shell(<CyberdeckCatalogPaneBody />);
+      }
+
       return shell(
         <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-          BLANK TAB // USE CHAT COMMANDS TO CONVERT ME TO DOCUMENT, WEB, SETTINGS, CONNECTION, OR PI.
+          BLANK TAB // USE CHAT COMMANDS TO CONVERT ME TO DOCUMENT, WEB, CATELOG, SETTINGS, CONNECTION, OR PI.
         </div>,
       );
     },
@@ -3321,6 +3396,7 @@ export default function CyberdeckPage() {
       messages.length,
       modelID,
       muthurMemory,
+      operatorBrowserEngine,
       providerModelFetchStatus,
       server,
       streamText,
@@ -3336,6 +3412,7 @@ export default function CyberdeckPage() {
   > = [
     { label: "Document", kind: "document", action: "convert" },
     { label: "Web", kind: "web", action: "convert" },
+    { label: "Catelog", kind: "catelog", action: "convert" },
     { label: "Pi", kind: "pi", action: "convert" },
     { label: "Settings", action: "settings-pane" },
     { label: "Connection", action: "connection-pane" },
@@ -3968,6 +4045,7 @@ export default function CyberdeckPage() {
               isOperatorDragOver={isOperatorDragOver}
               operatorDroppedAsset={operatorDroppedAsset}
               operatorSurfaceMode="workspace"
+              operatorBrowserEngine={operatorBrowserEngine}
               operatorSurfaceIsDocument={operatorSurfaceIsDocument}
               operatorBrowserUrl={operatorBrowserUrl}
               operatorDocMode={operatorDocMode}
@@ -3982,6 +4060,7 @@ export default function CyberdeckPage() {
               onCommitOperatorDocName={commitOperatorDocName}
               onSetOperatorDocMode={setOperatorDocMode}
               onOperatorBrowserNavigate={openOperatorBrowser}
+              onOperatorBrowserUrlChange={setOperatorBrowserUrl}
               onPasteClipboardToOperator={pasteClipboardToOperator}
               onSaveOperatorDocAsFile={saveOperatorDocAsFile}
               onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
