@@ -67,16 +67,12 @@ import {
   CyberdeckPaneHeaderTitle,
   CyberdeckPaneHeaderValue,
 } from "@/components/cyberdeck/pane-header";
-import { CyberdeckInfoBlockHeader } from "@/components/cyberdeck/info-block-header";
 import { CyberdeckOperatorPaneBody } from "@/components/cyberdeck/operator-pane-body";
 import { CyberdeckDiagnosticPaneBody } from "@/components/cyberdeck/diagnostic-pane-body";
 import { CyberdeckCatalogPaneBody } from "@/components/cyberdeck/catalog-pane-body";
-import { CyberdeckSquareCardGrid } from "@/components/cyberdeck/square-card-grid";
-import { CyberdeckSquareCard } from "@/components/cyberdeck/square-card";
-import { CyberdeckActionButton } from "@/components/cyberdeck/action-button";
+import { CyberdeckSettingsPaneBody } from "@/components/cyberdeck/settings-pane-body";
 import { EchoHeader } from "@/components/cyberdeck/echo-header";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
-import { Knob } from "@/components/ui/knob";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -100,16 +96,21 @@ const servers = [
   { id: "b", glyph: "§", label: "SETTINGS" },
 ] as const;
 
-const SERVER_IDS = ["m", "s"] as const;
+const SERVER_IDS = ["m", "s", "b"] as const;
 const fixedServers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
+  { id: "b", glyph: "§", label: "SETTINGS" },
 ] as const;
 const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
 const CHAT_STORAGE_KEY = "echo-mirage-chat-messages-v1";
 const CHAT_STREAM_STORAGE_KEY = "echo-mirage-chat-stream-text-v1";
 const INPUT_STORAGE_KEY = "echo-mirage-chat-input-v1";
 const UI_STATE_STORAGE_KEY = "echo-mirage-ui-state-v1";
+
+/** Cinematic sonar gain while the deck talks to providers (see AudioEngine `startSonarLoop` scale). */
+const CYBERDECK_SONAR_VOL_SCAN = 0.52;
+const CYBERDECK_SONAR_VOL_CHAT_STREAM = 0.22;
 
 type CyberdeckUiState = {
   server: (typeof SERVER_IDS)[number];
@@ -523,7 +524,7 @@ function parseCustomTabCommand(input: string) {
 }
 
 export default function CyberdeckPage() {
-  type ChatMessage = { role: string; text: string };
+  type ChatMessage = { role: string; text: string; toolTrace?: string };
   // Start on the operator tab; disconnected users are redirected to MAINNET-UPLINK after hydration.
   const [server, setServer] = useState<(typeof SERVER_IDS)[number]>("m");
   const [customTabs, setCustomTabs] = useState<CustomTab[]>([]);
@@ -536,6 +537,7 @@ export default function CyberdeckPage() {
   const [chatHydrated, setChatHydrated] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
+  const [streamToolTrace, setStreamToolTrace] = useState("");
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
@@ -610,6 +612,7 @@ export default function CyberdeckPage() {
   const chatColumnRef = useRef<HTMLDivElement>(null);
   const gatewayColumnRef = useRef<HTMLDivElement>(null);
   const gatewayConnectionPanelRef = useRef<HTMLDivElement>(null);
+  const gatewayBlankSettingsRef = useRef<HTMLDivElement>(null);
   const cyberdeckRootRef = useRef<HTMLDivElement>(null);
   const chatAbortRef = useRef<AbortController | null>(null);
   const lastSpokenAssistantTextRef = useRef<string>("");
@@ -684,7 +687,9 @@ export default function CyberdeckPage() {
     ? activeCustomTab.label
     : server === "m"
       ? "ØPERATOR"
-      : "MAINNET-UPLINK";
+      : server === "b"
+        ? "SETTINGS"
+        : "MAINNET-UPLINK";
   const selectedRailTabId = activeCustomTab?.id || server;
   const providerModelFetchStatus = modelFetchStatusByProvider[activeProvider] || "idle";
   const scanActivityActive =
@@ -1160,7 +1165,13 @@ export default function CyberdeckPage() {
               const candidate = item as Partial<ChatMessage>;
               return typeof candidate.role === "string" && typeof candidate.text === "string";
             })
-            .map((item) => ({ role: item.role, text: item.text }));
+            .map((item) => ({
+              role: item.role,
+              text: item.text,
+              ...(typeof item.toolTrace === "string" && item.toolTrace.trim()
+                ? { toolTrace: item.toolTrace.trim() }
+                : {}),
+            }));
           setMessages(restored);
         }
       }
@@ -1789,7 +1800,7 @@ export default function CyberdeckPage() {
 
   useEffect(() => {
     if (scanActivityActive) {
-      startSonarLoop(3200);
+      startSonarLoop(3200, CYBERDECK_SONAR_VOL_SCAN);
     } else {
       stopSonarLoop();
     }
@@ -1800,7 +1811,7 @@ export default function CyberdeckPage() {
     if (isStreaming) {
       if (chatSonarDelayRef.current == null) {
         chatSonarDelayRef.current = window.setTimeout(() => {
-          startSonarLoop(3200);
+          startSonarLoop(3200, CYBERDECK_SONAR_VOL_CHAT_STREAM);
           chatSonarActiveRef.current = true;
           chatSonarDelayRef.current = null;
         }, 7000);
@@ -1822,6 +1833,9 @@ export default function CyberdeckPage() {
         stopSonarLoop();
       }
       chatSonarActiveRef.current = false;
+      if (scanActivityActive) {
+        startSonarLoop(3200, CYBERDECK_SONAR_VOL_SCAN);
+      }
       if (networkFeedbackDelayRef.current !== null) {
         window.clearTimeout(networkFeedbackDelayRef.current);
         networkFeedbackDelayRef.current = null;
@@ -2532,6 +2546,7 @@ export default function CyberdeckPage() {
     setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
     setIsStreaming(true);
     setStreamText("");
+    setStreamToolTrace("");
     setGeneratedUI(null);
 
     if (tabCommand?.kind === "create") {
@@ -2593,6 +2608,17 @@ export default function CyberdeckPage() {
           { role: "system", text: "TAB_REMOVE_SKIPPED // NO_ACTIVE_CUSTOM_TAB" },
         ]);
       }
+      setIsStreaming(false);
+      return;
+    }
+
+    const settingsCmd = userMessage.trim().toLowerCase();
+    if (settingsCmd === "settings" || settingsCmd === "/settings") {
+      handleModelLabelClick("b");
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: "SETTINGS_SURFACE // CONFIG_PLANE" },
+      ]);
       setIsStreaming(false);
       return;
     }
@@ -2697,6 +2723,9 @@ export default function CyberdeckPage() {
         const statusLine = `API error ${res.status}`;
         throw new Error(detail ? `${statusLine}: ${detail}` : statusLine);
       }
+
+      const muthurToolsHeader = res.headers.get("x-muthur-tools-used")?.trim() ?? "";
+      setStreamToolTrace(muthurToolsHeader);
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -2808,6 +2837,7 @@ export default function CyberdeckPage() {
       setMessages((prev) => [...prev, { role: "error", text: String(err) }]);
     } finally {
       chatAbortRef.current = null;
+      setStreamToolTrace("");
       setIsStreaming(false);
     }
   };
@@ -2859,7 +2889,7 @@ export default function CyberdeckPage() {
     chatAbortRef.current?.abort();
   }, [isStreaming]);
 
-  const handleModelLabelClick = useCallback((targetServer: "s" = "s") => {
+  const handleModelLabelClick = useCallback((targetServer: "s" | "b" = "s") => {
     setActiveCustomTabId(null);
     setServer(targetServer);
     setNavRailContext("gateway");
@@ -2867,7 +2897,11 @@ export default function CyberdeckPage() {
     setProviderKeyboardHighlightId(activeProvider);
     setModelKeyboardHighlightId(modelID || null);
     gatewayColumnRef.current?.focus({ preventScroll: true });
-    gatewayConnectionPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (targetServer === "s") {
+      gatewayConnectionPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    } else {
+      gatewayBlankSettingsRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
   }, [activeProvider, modelID]);
 
   useEffect(() => {
@@ -3459,15 +3493,27 @@ export default function CyberdeckPage() {
                 >
                   {action.label}
                 </button>
-              ) : (
+              ) : action.action === "settings-pane" ? (
                 <button
-                  key={action.label}
+                  key="settings-pane"
                   type="button"
                   role="menuitem"
                   onClick={() => {
                     closeCustomTabContextMenu();
-                    setActiveCustomTabId(null);
-                    handleTabClick("s");
+                    handleModelLabelClick("b");
+                  }}
+                  className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                >
+                  {action.label}
+                </button>
+              ) : (
+                <button
+                  key="connection-pane"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    closeCustomTabContextMenu();
+                    handleModelLabelClick("s");
                   }}
                   className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
                 >
@@ -3650,7 +3696,19 @@ export default function CyberdeckPage() {
                       {m.role === "system" ? (
                         <span className="whitespace-pre-wrap">{renderGatewayMessageText(m.text)}</span>
                       ) : (
-                        <span className="whitespace-pre-wrap">{m.text}</span>
+                        <>
+                          {m.role === "assistant" && m.toolTrace ? (
+                            <span className="mb-0.5 block font-mono text-[10px] leading-snug text-amber-500/90">
+                              // TOOLS:{" "}
+                              {m.toolTrace
+                                .split(",")
+                                .map((t) => t.trim())
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </span>
+                          ) : null}
+                          <span className="whitespace-pre-wrap">{m.text}</span>
+                        </>
                       )}
                     </span>
                   </div>
@@ -3664,7 +3722,19 @@ export default function CyberdeckPage() {
                     }`}
                   >
                     <span className="text-green-400">[AI] </span>
-                    <span className="text-green-300">{streamText}</span>
+                    <span className="text-gray-300">
+                      {streamToolTrace ? (
+                        <span className="mb-0.5 block font-mono text-[10px] leading-snug text-amber-500/90">
+                          // TOOLS:{" "}
+                          {streamToolTrace
+                            .split(",")
+                            .map((t) => t.trim())
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      ) : null}
+                      <span className="text-green-300">{streamText}</span>
+                    </span>
                     <span className="animate-pulse">█</span>
                   </div>
                 )}
@@ -4066,239 +4136,11 @@ export default function CyberdeckPage() {
               onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
               onSetOperatorDroppedAsset={setOperatorDroppedAsset}
             />
-            ) : (
-              <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
-                <div className="flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors">
-                  <CyberdeckPaneHeader
-                    left={
-                      <>
-                        <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
-                          SETTINGS
-                        </CyberdeckPaneHeaderTitle>
-                        <CyberdeckPaneHeaderSubtitle>LOCAL CONFIG // VOICE DIALS</CyberdeckPaneHeaderSubtitle>
-                      </>
-                    }
-                    right={<CyberdeckPaneHeaderValue>{voiceEnabled ? "VOICE ON" : "VOICE OFF"}</CyberdeckPaneHeaderValue>}
-                  />
-
-                  <div className="grid flex-1 gap-3 overflow-auto p-3">
-                    <div className="h-full rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
-                      <CyberdeckInfoBlockHeader
-                        title="VOICE DIALS"
-                        subtitle={`MUTHUR // ${MUTHUR_PRESET.backend.voiceType} // ${MUTHUR_PRESET.backend.language}`}
-                        status={voiceHealth.toUpperCase()}
-                        statusClassName={`font-mono text-[9px] tracking-[0.08em] ${
-                          voiceHealth === "backend"
-                            ? "text-emerald-200"
-                            : voiceHealth === "fallback"
-                              ? "text-amber-300"
-                              : voiceHealth === "off"
-                                ? "text-gray-500"
-                                : "text-[#8a8a8a]"
-                        }`}
-                      />
-
-                      <div className="mt-3 rounded-sm border border-[#1c1c1c] bg-black px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                        CURRENT // rate {voiceDial.ratePercent} // pitch {voiceDial.pitchHz} // gain{" "}
-                        {voiceDial.volume.toFixed(2)}
-                      </div>
-
-                      <CyberdeckSquareCardGrid>
-                        <CyberdeckSquareCard>
-                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">RATE</div>
-                          <div className="mt-3 flex flex-1 items-center justify-center">
-                            <Knob
-                              label="Rate"
-                              unit="%"
-                              value={voiceDial.ratePercent}
-                              onValueChange={(ratePercent) =>
-                                setVoiceDial((current) => ({ ...current, ratePercent }))
-                              }
-                              min={-40}
-                              max={0}
-                              step={1}
-                              wheelMultiplier={0.5}
-                              dragMultiplier={0.5}
-                              mode="tuner"
-                              theme="dark"
-                            />
-                          </div>
-                        </CyberdeckSquareCard>
-
-                        <CyberdeckSquareCard>
-                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">PITCH</div>
-                          <div className="mt-3 flex flex-1 items-center justify-center">
-                            <Knob
-                              label="Pitch"
-                              unit="Hz"
-                              value={voiceDial.pitchHz}
-                              onValueChange={(pitchHz) =>
-                                setVoiceDial((current) => ({ ...current, pitchHz }))
-                              }
-                              min={-20}
-                              max={0}
-                              step={1}
-                              wheelMultiplier={0.5}
-                              dragMultiplier={0.5}
-                              mode="tuner"
-                              theme="dark"
-                            />
-                          </div>
-                        </CyberdeckSquareCard>
-
-                        <CyberdeckSquareCard>
-                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">GAIN</div>
-                          <div className="mt-3 flex flex-1 items-center justify-center">
-                            <Knob
-                              label="Gain"
-                              unit="x"
-                              value={voiceDial.volume}
-                              onValueChange={(volume) =>
-                                setVoiceDial((current) => ({ ...current, volume }))
-                              }
-                              min={0.25}
-                              max={1.25}
-                              step={0.05}
-                              wheelMultiplier={0.5}
-                              dragMultiplier={0.5}
-                              mode="tuner"
-                              theme="dark"
-                            />
-                          </div>
-                        </CyberdeckSquareCard>
-
-                        <CyberdeckSquareCard>
-                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">ACTIONS</div>
-                          <div className="mt-3 grid flex-1 grid-cols-2 gap-2">
-                            <CyberdeckActionButton
-                              type="button"
-                              onClick={toggleVoiceEnabled}
-                              variant={voiceEnabled ? "accent" : "neutral"}
-                            >
-                              {voiceEnabled ? "VOICE ON" : "VOICE OFF"}
-                            </CyberdeckActionButton>
-                            <CyberdeckActionButton
-                              type="button"
-                              onClick={() => void playVoiceTest()}
-                              disabled={!voiceEnabled}
-                            >
-                              TEST MUTHUR
-                            </CyberdeckActionButton>
-                            <CyberdeckActionButton
-                              type="button"
-                              onClick={saveMuthurVoiceCopyToApp}
-                            >
-                              SAVE COPY
-                            </CyberdeckActionButton>
-                            <CyberdeckActionButton
-                              type="button"
-                              onClick={restoreMuthurVoiceMaster}
-                            >
-                              RESTORE MASTER
-                            </CyberdeckActionButton>
-                          </div>
-                        </CyberdeckSquareCard>
-                    </CyberdeckSquareCardGrid>
-
-                    <div className="h-full rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
-                      <CyberdeckInfoBlockHeader
-                        title="MUTHUR MEMORY"
-                        subtitle={
-                          muthurMemoryHydrated ? "LOCAL // INDEXEDDB // RETRIEVAL" : "HYDRATING MEMORY..."
-                        }
-                        status={muthurMemoryHydrated ? `${muthurMemory.turnCount} TURNS` : "WAIT"}
-                        statusClassName={`font-mono text-[9px] tracking-[0.08em] ${
-                          muthurMemoryHydrated
-                            ? muthurMemory.turnCount > 0
-                              ? "text-emerald-200"
-                              : "text-[#8a8a8a]"
-                            : "text-amber-300"
-                        }`}
-                      />
-
-                      <CyberdeckSquareCardGrid>
-                        <CyberdeckSquareCard>
-                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">SUMMARY</div>
-                          <div className="mt-2 flex-1 overflow-auto whitespace-pre-wrap break-words font-mono text-[9px] leading-5 text-[#a3a3a3]">
-                            {muthurMemory.summary || "No durable notes yet."}
-                          </div>
-                        </CyberdeckSquareCard>
-
-                        <CyberdeckSquareCard>
-                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">FACTS</div>
-                          <div className="mt-2 font-mono text-[9px] tracking-[0.08em] text-green-200">
-                            {muthurMemory.facts.length} STORED
-                          </div>
-                          <div className="mt-2 flex-1 overflow-auto space-y-1 font-mono text-[9px] leading-5 text-[#a3a3a3]">
-                            {muthurMemory.facts.length > 0 ? (
-                              muthurMemory.facts.slice(-4).map((fact, index) => (
-                                <div key={`${fact}-${index}`} className="whitespace-pre-wrap break-words">
-                                  {fact}
-                                </div>
-                              ))
-                            ) : (
-                              <div className="text-[#6f6f6f]">NO FACTS YET</div>
-                            )}
-                          </div>
-                        </CyberdeckSquareCard>
-
-                        <CyberdeckSquareCard>
-                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">RECENT TURNS</div>
-                          <div className="mt-2 font-mono text-[9px] tracking-[0.08em] text-green-200">
-                            {muthurMemory.recentTurns.length} IN BUFFER
-                          </div>
-                          <div className="mt-2 flex-1 overflow-auto space-y-1 font-mono text-[9px] leading-5 text-[#a3a3a3]">
-                            {muthurMemory.recentTurns.length > 0 ? (
-                              muthurMemory.recentTurns.slice(-4).map((turn) => (
-                                <div key={turn.id} className="whitespace-pre-wrap break-words">
-                                  <span className="text-[#6f6f6f]">
-                                    {turn.role === "assistant" ? "AI" : "USR"}
-                                  </span>{" "}
-                                  {turn.text}
-                                </div>
-                              ))
-                            ) : (
-                              <div className="text-[#6f6f6f]">NO RECENT TURNS YET</div>
-                            )}
-                          </div>
-                        </CyberdeckSquareCard>
-
-                        <CyberdeckSquareCard>
-                          <div className="font-mono text-[9px] tracking-[0.08em] text-[#6f6f6f]">STATUS</div>
-                          <div className="mt-2 font-mono text-[9px] leading-5 tracking-[0.04em] text-[#a3a3a3]">
-                            <div className="whitespace-pre-wrap break-words">
-                              UPDATED //{" "}
-                              {muthurMemoryHydrated
-                                ? new Date(muthurMemory.updatedAt).toLocaleString()
-                                : "—"}
-                            </div>
-                            <div className="mt-2 whitespace-pre-wrap break-words">
-                              MEMORY // {muthurMemoryHydrated ? `${muthurMemory.turnCount} TURNS` : "WAITING"}
-                            </div>
-                            <div className="mt-2 whitespace-pre-wrap break-words">
-                              HYDRATION // {muthurMemoryHydrated ? "READY" : "LOADING"}
-                            </div>
-                          </div>
-                        </CyberdeckSquareCard>
-                      </CyberdeckSquareCardGrid>
-
-                      <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <CyberdeckActionButton
-                          type="button"
-                          onClick={() => void clearMuthurMemoryState()}
-                          disabled={!muthurMemoryHydrated}
-                          variant="danger"
-                          className="px-3 py-1 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          CLEAR MEMORY
-                        </CyberdeckActionButton>
-                      </div>
-                    </div>
-                    </div>
-                  </div>
-                </div>
+            ) : server === "b" ? (
+              <div ref={gatewayBlankSettingsRef} className="flex min-h-0 flex-1 flex-col">
+                <CyberdeckSettingsPaneBody />
               </div>
-            )}
+            ) : null}
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>

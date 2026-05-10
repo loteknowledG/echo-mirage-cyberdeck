@@ -6,6 +6,14 @@ import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 const WORKSPACE_ROOT = path.resolve(process.cwd());
 const WORKSPACE_MOUNT = "/workspace";
 
+function isPathInsideWorkspace(targetPath: string): boolean {
+  const root = path.resolve(WORKSPACE_ROOT);
+  const abs = path.resolve(targetPath);
+  if (abs === root) return true;
+  const prefix = root.endsWith(path.sep) ? root : root + path.sep;
+  return abs.startsWith(prefix);
+}
+
 const overlayFs = new OverlayFs({
   root: WORKSPACE_ROOT,
   mountPoint: WORKSPACE_MOUNT,
@@ -51,6 +59,14 @@ async function runJustBash(call: ToolCall): Promise<ToolResult> {
 function getStringArg(call: ToolCall, key: string): string {
   const raw = call.args[key];
   return typeof raw === "string" ? raw.trim() : "";
+}
+
+function getBoolArg(call: ToolCall, key: string, defaultValue: boolean): boolean {
+  const raw = call.args[key];
+  if (typeof raw === "boolean") return raw;
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  return defaultValue;
 }
 
 async function runLocalFs(call: ToolCall): Promise<ToolResult> {
@@ -101,6 +117,61 @@ async function runLocalFs(call: ToolCall): Promise<ToolResult> {
       };
     }
 
+    if (action === "mkdir") {
+      const abs = path.resolve(targetPath);
+      if (!isPathInsideWorkspace(abs)) {
+        return { ok: false, error: "mkdir is only allowed under the Echo Mirage workspace root." };
+      }
+      const recursive = getBoolArg(call, "recursive", true);
+      await fs.mkdir(abs, { recursive });
+      return {
+        ok: true,
+        output: {
+          action,
+          path: abs,
+          recursive,
+          created: true,
+        },
+      };
+    }
+
+    if (action === "write") {
+      const abs = path.resolve(targetPath);
+      if (!isPathInsideWorkspace(abs)) {
+        return { ok: false, error: "write is only allowed under the Echo Mirage workspace root." };
+      }
+      if (!("content" in call.args)) {
+        return { ok: false, error: 'write requires a "content" field (string; may be empty).' };
+      }
+      const raw = call.args.content;
+      if (typeof raw !== "string") {
+        return { ok: false, error: 'write "content" must be a string.' };
+      }
+      const content = raw;
+      const append = getBoolArg(call, "append", false);
+      const ensureDir = getBoolArg(call, "ensure_parent_dirs", true);
+      if (ensureDir) {
+        await fs.mkdir(path.dirname(abs), { recursive: true });
+      }
+      if (append) {
+        await fs.appendFile(abs, content, "utf8");
+      } else {
+        await fs.writeFile(abs, content, "utf8");
+      }
+      const st = await fs.stat(abs);
+      return {
+        ok: true,
+        output: {
+          action,
+          path: abs,
+          bytesWritten: Buffer.byteLength(content, "utf8"),
+          append,
+          size: st.size,
+          modifiedAt: st.mtime.toISOString(),
+        },
+      };
+    }
+
     return { ok: false, error: `Unsupported local FS action: ${action}` };
   } catch (error) {
     return {
@@ -138,7 +209,7 @@ export function createMuthurToolRegistry(): ToolRegistry {
       localfs: {
         name: "localfs",
         description:
-          "Read-only inspection of local machine paths. Supports ls, cat, and stat on real desktop filesystem paths.",
+          "Access the machine running the dev server: ls, cat, stat anywhere; mkdir and write_text only inside the Echo Mirage workspace directory (project root).",
         run: runLocalFs,
       },
       clock: {

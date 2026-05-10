@@ -5,6 +5,8 @@ let fallbackChirpAudio = null;
 let masterGainNode = null;
 let masterCompressorNode = null;
 let sonarIntervalId = null;
+let sonarLoopIntervalMs = 3200;
+let sonarLoopVolumeScale = 1;
 const KEYBOARD_EFFECTS_GAIN = 0.35;
 const KEYBOARD_NAV_GAIN = 0.5;
 
@@ -477,25 +479,26 @@ export function playSuccess() {
   playNetworkScanSound("success");
 }
 
-export function playCinematicSonarPing(timeOffset = 0) {
+export function playCinematicSonarPing(timeOffset = 0, volumeScale = 1) {
   if (!enabled) return;
   const ctx = getCtx();
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
   const t = Math.max(0, Number.isFinite(timeOffset) ? timeOffset : 0);
+  const s = Math.min(1.5, Math.max(0, Number.isFinite(volumeScale) ? volumeScale : 1));
 
   // Main deep ping + subtle harmonic shimmer.
   playTone({
     freqStart: 520,
     duration: 0.18,
     type: "sine",
-    volume: 0.22,
+    volume: 0.22 * s,
   });
   setTimeout(() => {
     playTone({
       freqStart: 1040,
       duration: 0.12,
       type: "sine",
-      volume: 0.08,
+      volume: 0.08 * s,
     });
   }, 15 + t * 1000);
 
@@ -505,7 +508,7 @@ export function playCinematicSonarPing(timeOffset = 0) {
       freqStart: 360,
       duration: 0.35,
       type: "triangle",
-      volume: 0.09,
+      volume: 0.09 * s,
     });
   }, 900 + t * 1000);
   setTimeout(() => {
@@ -513,7 +516,7 @@ export function playCinematicSonarPing(timeOffset = 0) {
       freqStart: 240,
       duration: 0.6,
       type: "sine",
-      volume: 0.05,
+      volume: 0.05 * s,
     });
   }, 1800 + t * 1000);
 
@@ -521,7 +524,7 @@ export function playCinematicSonarPing(timeOffset = 0) {
   setTimeout(() => {
     playNoiseClick({
       duration: 1.2,
-      volume: 0.015,
+      volume: 0.015 * s,
       filterFreq: 900,
     });
   }, 150 + t * 1000);
@@ -764,13 +767,22 @@ export function playRaceReadySetGo() {
   }, 580);
 }
 
-export function startSonarLoop(interval = 3200) {
-  if (sonarIntervalId) return;
+export function startSonarLoop(interval = 3200, volumeScale = 1) {
   const ms = Math.max(1200, Number.isFinite(interval) ? interval : 3200);
+  const s = Math.min(1.5, Math.max(0.05, Number.isFinite(volumeScale) ? volumeScale : 1));
+  if (sonarIntervalId && sonarLoopIntervalMs === ms && sonarLoopVolumeScale === s) {
+    return;
+  }
+  if (sonarIntervalId) {
+    window.clearInterval(sonarIntervalId);
+    sonarIntervalId = null;
+  }
+  sonarLoopIntervalMs = ms;
+  sonarLoopVolumeScale = s;
   void unlockKeyboardSfx();
-  playCinematicSonarPing();
+  playCinematicSonarPing(0, s);
   sonarIntervalId = window.setInterval(() => {
-    playCinematicSonarPing();
+    playCinematicSonarPing(0, s);
   }, ms);
 }
 
@@ -778,6 +790,8 @@ export function stopSonarLoop() {
   if (!sonarIntervalId) return;
   window.clearInterval(sonarIntervalId);
   sonarIntervalId = null;
+  sonarLoopIntervalMs = 3200;
+  sonarLoopVolumeScale = 1;
 }
 
 export async function satelliteConnectSequence() {
