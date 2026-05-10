@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Project hook (samus-manus; copied from weyland-yutani-cyberdeck): afterAgentResponse -> mechanicus TTS last sentence.
+Project hook (samus-manus; copied from weyland-yutani-cyberdeck): afterAgentResponse -> mechanicus TTS of the **entire last assistant reply** by default (`CURSOR_HOOK_MECHANICUS_EXTRACT=full`).
+Optional: `block` (last paragraph), `sentence` (last sentence). Cap long replies with `CURSOR_HOOK_MECHANICUS_MAX_CHARS` (default 16000).
 
 Cursor: .cursor/hooks.json should call `python -u .cursor/hooks/speak_last_sentence_mechanicus.py`
 (direct Python stdin; the .cmd launcher is only for manual runs — cmd `&&` chains can eat stdin).
@@ -13,6 +14,8 @@ Smoke (real TTS, fixed fixture — not your chat): npm run hook:smoke-mechanicus
 Debug stdin: set CURSOR_HOOK_MECHANICUS_DEBUG=1 for Cursor, then retry once.
 
 Disable: CURSOR_HOOK_MECHANICUS_LAST_SENTENCE=0
+Extraction mode: CURSOR_HOOK_MECHANICUS_EXTRACT=full (default) | block | sentence | entire | all
+Manual “read last response” from this repo: `pnpm run voice:cursor:read-last-response` (sample JSON fixture; real runs use Cursor stdin).
 Cyberdeck (pnpm dev): write `.cursor/hooks/mechanicus-cursor.muted` containing `1` to mute; delete file or `0` to unmute (UI uses dev bridge GET/POST /__cyberdeck/mechanicus-cursor).
 Legacy win32 spawn (full detach; can break default audio on some PCs): CURSOR_HOOK_MECHANICUS_DETACHED=1
 Voice helper resolution:
@@ -227,6 +230,56 @@ def last_sentence(text: str) -> str:
     return out[:500] if len(out) > 500 else out
 
 
+def last_block(text: str) -> str:
+    """Last paragraph (split on blank lines); more context than last_sentence."""
+    if not text or not text.strip():
+        return ""
+    t = _strip_markdownish(text).strip()
+    if not t:
+        return ""
+    parts = re.split(r"\n\s*\n+", t)
+    parts = [p.strip() for p in parts if p.strip()]
+    if not parts:
+        flat = " ".join(t.split())
+        return flat[:4000]
+    out = parts[-1]
+    out = " ".join(out.split())
+    return out[:4000] if len(out) > 4000 else out
+
+
+_FULL_MAX_DEFAULT = 16000
+
+
+def full_response(text: str) -> str:
+    """Entire assistant message: markdown-ish strip + speak-friendly whitespace; capped for TTS."""
+    if not text or not text.strip():
+        return ""
+    t = _strip_markdownish(text).strip()
+    if not t:
+        return ""
+    t = re.sub(r"\s+", " ", t).strip()
+    try:
+        max_c = int(os.environ.get("CURSOR_HOOK_MECHANICUS_MAX_CHARS", str(_FULL_MAX_DEFAULT)))
+    except ValueError:
+        max_c = _FULL_MAX_DEFAULT
+    max_c = max(500, min(max_c, 100_000))
+    if len(t) > max_c:
+        t = t[: max_c - 1] + "…"
+    return t
+
+
+def tts_excerpt(full_text: str, mode: str) -> str:
+    """Dispatch by CURSOR_HOOK_MECHANICUS_EXTRACT. Default is full reply."""
+    m = (mode or "full").strip().lower()
+    if m in ("sentence", "last-sentence"):
+        return last_sentence(full_text)
+    if m in ("block", "last-block", "paragraph"):
+        return last_block(full_text)
+    if m in ("full", "entire", "all", "complete", "response", "whole", "read-last-response"):
+        return full_response(full_text)
+    return full_response(full_text)
+
+
 def self_test() -> int:
     cases = [
         ("First. Last wins.", "Last wins."),
@@ -264,9 +317,10 @@ def dry_run() -> int:
     except json.JSONDecodeError as e:
         print(f"[dry-run] invalid JSON: {e}", file=sys.stderr)
         return 1
-    full = (data.get("text") or "").strip()
-    snippet = last_sentence(full)
-    print(f"[dry-run] last_sentence = {snippet!r}")
+    mode = os.environ.get("CURSOR_HOOK_MECHANICUS_EXTRACT", "full").strip().lower()
+    full = _extract_full_text(data)
+    snippet = tts_excerpt(full, mode)
+    print(f"[dry-run] extract={mode!r} len={len(full)} snippet_head={snippet[:200]!r}…")
     root, vp = _resolve_voice_profile_helper()
     print(f"[dry-run] voice_profile exists: {os.path.isfile(vp)} ({vp})")
     return 0
@@ -301,13 +355,14 @@ def main() -> int:
         return 0
 
     full = _extract_full_text(data)
-    snippet = last_sentence(full)
+    mode = os.environ.get("CURSOR_HOOK_MECHANICUS_EXTRACT", "full").strip().lower()
+    snippet = tts_excerpt(full, mode)
     if not snippet:
         _log(f"main: no snippet (text len={len(full)}) keys={list(data.keys())[:12]}")
         return 0
 
     voice_profile = _read_cursor_hook_voice_profile()
-    _log(f"main: snippet={snippet[:120]!r} voice={voice_profile}")
+    _log(f"main: mode={mode!r} full_len={len(full)} snippet_len={len(snippet)} voice={voice_profile}")
 
     root, vp = _resolve_voice_profile_helper()
     if not os.path.isfile(vp):

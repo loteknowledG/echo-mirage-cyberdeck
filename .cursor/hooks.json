@@ -4,7 +4,7 @@
     "afterAgentResponse": [
       {
         "command": "python -u .cursor/hooks/speak_last_sentence_mechanicus.py",
-        "timeout": 30
+        "timeout": 120
       }
     ]
   }

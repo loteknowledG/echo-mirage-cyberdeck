@@ -5,9 +5,24 @@ import {
   CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
+import { Knob } from "@/components/ui/knob";
+import { Switch } from "@/components/ui/switch";
 
-/** Blank shell for the dedicated SETTINGS rail / `settings` command surface. */
-export function CyberdeckSettingsPaneBody() {
+type CyberdeckSettingsPaneBodyProps = {
+  voiceEnabled: boolean;
+  onVoiceToggle: () => void;
+  /** MUTHUR Web Audio master gain scalar (see `muthurMasterGain`); UI uses 5–125 ≙ 0.05–1.25. */
+  muthurMasterVolume: number;
+  onMuthurMasterVolumeChange: (volume: number) => void;
+};
+
+/** SETTINGS rail / `settings` command surface. */
+export function CyberdeckSettingsPaneBody({
+  voiceEnabled,
+  onVoiceToggle,
+  muthurMasterVolume,
+  onMuthurMasterVolumeChange,
+}: CyberdeckSettingsPaneBodyProps) {
   return (
     <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
       <div className="flex min-h-0 flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors">
@@ -17,12 +32,76 @@ export function CyberdeckSettingsPaneBody() {
               <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
                 SETTINGS
               </CyberdeckPaneHeaderTitle>
-              <CyberdeckPaneHeaderSubtitle>CONFIG PLANE // RESERVED</CyberdeckPaneHeaderSubtitle>
+              <CyberdeckPaneHeaderSubtitle>CONFIG PLANE // LOCAL PARAMETERS</CyberdeckPaneHeaderSubtitle>
             </div>
           }
         />
-        <div className="flex min-h-[min(48vh,420px)] flex-1 items-center justify-center px-6 py-10 font-mono text-[10px] tracking-[0.08em] text-[#5a5a5a]">
-          NO PARAMETERS BOUND // AWAITING ALLOCATION
+        <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-4">
+          <section className="flex flex-col gap-2">
+            <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">VOICE</div>
+            <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">
+              <p className="mb-3">
+                Cyberdeck routes assistant replies through{" "}
+                <span className="text-[#9a9a9a]">MUTHUR</span> in-browser speech (effects chain + preset in{" "}
+                <span className="text-[#9a9a9a]">src/voice/muthurPreset.ts</span>). The toggle below matches the header
+                voice control; when off, playback stops and diagnostics report OFF.
+              </p>
+              <p className="mb-3">
+                Archive or restore the locked preset with{" "}
+                <code className="rounded border border-[#2d2d2d] bg-black px-1 py-0.5 text-[9px] text-[#8a8a8a]">
+                  pnpm voice:save
+                </code>{" "}
+                /{" "}
+                <code className="rounded border border-[#2d2d2d] bg-black px-1 py-0.5 text-[9px] text-[#8a8a8a]">
+                  pnpm voice:restore
+                </code>
+                . Full notes: <span className="text-[#9a9a9a]">docs/MUTHUR_VOICE.md</span>.
+              </p>
+              <p className="mb-3">
+                Optional Cursor IDE hook TTS (Mechanicus): try{" "}
+                <code className="rounded border border-[#2d2d2d] bg-black px-1 py-0.5 text-[9px] text-[#8a8a8a]">
+                  pnpm voice:cursor:read-last-response:dry
+                </code>
+                ; IDE hook voice label is one line in{" "}
+                <span className="text-[#9a9a9a]">.cursor/hooks/cursor-tts-voice.txt</span> (e.g. warp-spider).
+              </p>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#1c1c1c] pt-3">
+                <div className="flex flex-col items-start gap-1.5">
+                  <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">MASTER GAIN // WEB AUDIO BUS</div>
+                  <div className="text-[9px] tracking-[0.04em] text-[#5f5f5f]">
+                    Dial controls MUTHUR master gain (stored with other voice dials). Drag vertically or scroll.
+                  </div>
+                  <Knob
+                    label="VOL"
+                    unit="%"
+                    min={5}
+                    max={125}
+                    step={1}
+                    value={Math.round(muthurMasterVolume * 100)}
+                    onValueChange={(v) => onMuthurMasterVolumeChange(v / 100)}
+                    mode="power"
+                    size="sm"
+                    theme="dark"
+                    className="[&_fieldset]:gap-1 [&_legend]:font-mono [&_legend]:text-[9px] [&_legend]:tracking-[0.08em] [&_legend]:text-[#6a6a6a]"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3">
+                <div className="min-w-0">
+                  <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">CYBERDECK SPEECH</div>
+                  <div className="mt-0.5 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
+                    Speak assistant replies in-browser when enabled.
+                  </div>
+                </div>
+                <Switch
+                  checked={voiceEnabled}
+                  onCheckedChange={() => onVoiceToggle()}
+                  aria-label={voiceEnabled ? "Cyberdeck speech on" : "Cyberdeck speech off"}
+                  className="shrink-0 data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
+                />
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>

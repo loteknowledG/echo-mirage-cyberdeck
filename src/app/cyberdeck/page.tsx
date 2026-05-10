@@ -59,6 +59,7 @@ import {
 import { useBrowserController } from "@/lib/use-browser-controller";
 import { useCustomTabBrowserController } from "@/lib/use-custom-tab-browser-controller";
 import { speakDryFallback } from "@/voice/speakMuthur";
+import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { get, set } from "idb-keyval";
 import {
@@ -562,6 +563,9 @@ export default function CyberdeckPage() {
   const [inputCaretIndex, setInputCaretIndex] = useState(0);
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
+  const [voiceBlockFocusIndex, setVoiceBlockFocusIndex] = useState(0);
+  const [voiceBlockTotal, setVoiceBlockTotal] = useState(0);
   const [voiceDial, setVoiceDial] = useState<MuthurVoiceDialState>(getInitialMuthurVoiceDials);
   const [voiceHealth, setVoiceHealth] = useState<"idle" | "backend" | "fallback" | "off">("idle");
   const [muthurMemory, setMuthurMemory] = useState<MuthurMemoryState>(() => createEmptyMuthurMemory());
@@ -616,6 +620,7 @@ export default function CyberdeckPage() {
   const cyberdeckRootRef = useRef<HTMLDivElement>(null);
   const chatAbortRef = useRef<AbortController | null>(null);
   const lastSpokenAssistantTextRef = useRef<string>("");
+  const assistantVoiceBlocksRef = useRef<string[]>([]);
   const speakQueueActiveRef = useRef(false);
   const speakSequenceRef = useRef(0);
   const lastVoiceErrorRef = useRef<string>("");
@@ -1041,6 +1046,53 @@ export default function CyberdeckPage() {
     }
     return false;
   }, [playMirageBuffer, speakDryFallback, stopMirageAudio, synthesizeMirageChunk]);
+
+  const abortMotherSpeech = useCallback(() => {
+    speakSequenceRef.current += 1;
+    stopMirageAudio();
+    try {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    } catch {
+      /* ignore */
+    }
+    setVoicePlaybackBusy(false);
+  }, [stopMirageAudio]);
+
+  const speakVoiceBlockAtIndex = useCallback(
+    (index: number) => {
+      const blocks = assistantVoiceBlocksRef.current;
+      if (!blocks.length || index < 0 || index >= blocks.length) return;
+      setVoiceBlockFocusIndex(index);
+      const line = blocks[index];
+      if (!line) return;
+      setVoicePlaybackBusy(true);
+      void speakMother(line).finally(() => setVoicePlaybackBusy(false));
+    },
+    [speakMother],
+  );
+
+  const replayFullLastAssistant = useCallback(() => {
+    const assistants = messages.filter((m) => m.role === "assistant");
+    const last = assistants[assistants.length - 1];
+    const t = last?.text ? textForSpeech(last.text) : "";
+    if (!t) return;
+    setVoicePlaybackBusy(true);
+    void speakMother(t).finally(() => setVoicePlaybackBusy(false));
+  }, [messages, speakMother]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (!voicePlaybackBusy) return;
+      e.preventDefault();
+      abortMotherSpeech();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [abortMotherSpeech, voicePlaybackBusy]);
 
   const toggleVoiceEnabled = useCallback(() => {
     const latestAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant");
@@ -2489,6 +2541,15 @@ export default function CyberdeckPage() {
   }, [activeProvider, probeSelectedModel, providerKeys]);
 
   useEffect(() => {
+    const latest = messages[messages.length - 1];
+    if (!latest || latest.role !== "assistant") {
+      assistantVoiceBlocksRef.current = [];
+      setVoiceBlockTotal(0);
+      setVoiceBlockFocusIndex(0);
+    }
+  }, [messages]);
+
+  useEffect(() => {
     if (!voiceEnabled || isStreaming) return;
     if (speakQueueActiveRef.current) return;
     if (!messages || messages.length === 0) return;
@@ -2496,15 +2557,21 @@ export default function CyberdeckPage() {
     if (!latest || latest.role !== "assistant") return;
     if (latest.text === lastSpokenAssistantTextRef.current) return;
     if (/^Working on that request\b/i.test(latest.text.trim())) return;
-    lastSpokenAssistantTextRef.current = latest.text;
     const speechText = textForSpeech(latest.text);
     if (!speechText) return;
+    lastSpokenAssistantTextRef.current = latest.text;
+    const blocks = splitIntoSpeechBlocks(latest.text);
+    assistantVoiceBlocksRef.current = blocks;
+    setVoiceBlockTotal(blocks.length);
+    const focus = blocks.length ? blocks.length - 1 : 0;
+    setVoiceBlockFocusIndex(focus);
     if (motherTerminalRef.current.shouldBurst(speechText)) {
       void motherTerminalRef.current.unlock().then(() => {
         motherTerminalRef.current.playBurstSound(speechText.length);
       });
     }
-    void speakMother(speechText);
+    setVoicePlaybackBusy(true);
+    void speakMother(speechText).finally(() => setVoicePlaybackBusy(false));
   }, [isStreaming, messages, speakMother, voiceEnabled]);
 
   useEffect(() => {
@@ -2886,8 +2953,9 @@ export default function CyberdeckPage() {
 
   const handleStop = useCallback(() => {
     if (!isStreaming) return;
+    abortMotherSpeech();
     chatAbortRef.current?.abort();
-  }, [isStreaming]);
+  }, [abortMotherSpeech, isStreaming]);
 
   const handleModelLabelClick = useCallback((targetServer: "s" | "b" = "s") => {
     setActiveCustomTabId(null);
@@ -3860,6 +3928,53 @@ export default function CyberdeckPage() {
                           </svg>
                         )}
                       </button>
+                    {voiceEnabled && voiceBlockTotal > 0 ? (
+                      <>
+                        <span
+                          className="hidden min-w-[2.5rem] text-right font-mono text-[9px] text-gray-600 sm:inline"
+                          title="Paragraph position (◀ = speak one earlier paragraph only)"
+                        >
+                          {voiceBlockTotal > 1 ? `${voiceBlockFocusIndex + 1}/${voiceBlockTotal}` : `${voiceBlockTotal}`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => abortMotherSpeech()}
+                          disabled={!voicePlaybackBusy}
+                          aria-label="Stop speech"
+                          title="Stop speech (Esc)"
+                          className="inline-flex h-8 min-w-[1.75rem] items-center justify-center rounded-[6px] border border-gray-700 bg-black px-1 font-mono text-[11px] text-gray-400 transition hover:border-amber-600/80 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-35"
+                        >
+                          ‖
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (voiceBlockFocusIndex <= 0) return;
+                            const next = voiceBlockFocusIndex - 1;
+                            abortMotherSpeech();
+                            speakVoiceBlockAtIndex(next);
+                          }}
+                          disabled={voiceBlockFocusIndex <= 0}
+                          aria-label="Speak earlier paragraph"
+                          title="Earlier paragraph (more context)"
+                          className="inline-flex h-8 min-w-[1.75rem] items-center justify-center rounded-[6px] border border-gray-700 bg-black px-1 font-mono text-[11px] text-gray-400 transition hover:border-emerald-600/80 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-35"
+                        >
+                          ◀
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            abortMotherSpeech();
+                            replayFullLastAssistant();
+                          }}
+                          aria-label="Replay full response"
+                          title="Replay entire last reply"
+                          className="inline-flex h-8 min-w-[1.75rem] items-center justify-center rounded-[6px] border border-gray-700 bg-black px-1 font-mono text-[11px] text-gray-400 transition hover:border-emerald-600/80 hover:text-emerald-200"
+                        >
+                          ↻
+                        </button>
+                      </>
+                    ) : null}
                     {!isStreaming ? (
                       <button
                         type="button"
@@ -4138,7 +4253,17 @@ export default function CyberdeckPage() {
             />
             ) : server === "b" ? (
               <div ref={gatewayBlankSettingsRef} className="flex min-h-0 flex-1 flex-col">
-                <CyberdeckSettingsPaneBody />
+                <CyberdeckSettingsPaneBody
+                  voiceEnabled={voiceEnabled}
+                  onVoiceToggle={toggleVoiceEnabled}
+                  muthurMasterVolume={voiceDial.volume}
+                  onMuthurMasterVolumeChange={(volume) =>
+                    setVoiceDial((prev) => ({
+                      ...prev,
+                      volume: Math.min(1.25, Math.max(0.05, volume)),
+                    }))
+                  }
+                />
               </div>
             ) : null}
           </div>
