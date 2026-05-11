@@ -7,6 +7,7 @@ import {
 } from "@/components/cyberdeck/pane-header";
 import { Knob } from "@/components/ui/knob";
 import { Switch } from "@/components/ui/switch";
+import { emitSignal } from "@/lib/cyberdeck/signal-router";
 
 type CyberdeckSettingsPaneBodyProps = {
   voiceEnabled: boolean;
@@ -82,7 +83,15 @@ export function CyberdeckSettingsPaneBody({
                     max={125}
                     step={1}
                     value={Math.round(muthurMasterVolume * 100)}
-                    onValueChange={(v) => onMuthurMasterVolumeChange(v / 100)}
+                    onValueChange={(v) => {
+                      onMuthurMasterVolumeChange(v / 100);
+                      emitSignal({
+                        source: "settings",
+                        type: "updated",
+                        payload: { key: "muthur_master_volume", value: v },
+                        severity: "info",
+                      });
+                    }}
                     mode="power"
                     size="sm"
                     theme="dark"
@@ -99,7 +108,15 @@ export function CyberdeckSettingsPaneBody({
                 </div>
                 <Switch
                   checked={voiceEnabled}
-                  onCheckedChange={() => onVoiceToggle()}
+                  onCheckedChange={() => {
+                    onVoiceToggle();
+                    emitSignal({
+                      source: "settings",
+                      type: "updated",
+                      payload: { key: "voice_enabled", value: !voiceEnabled },
+                      severity: "info",
+                    });
+                  }}
                   aria-label={voiceEnabled ? "Cyberdeck speech on" : "Cyberdeck speech off"}
                   className="shrink-0 data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
                 />
@@ -119,7 +136,16 @@ export function CyberdeckSettingsPaneBody({
                 </div>
                 <Switch
                   checked={deckMode === "ascii"}
-                  onCheckedChange={() => onDeckModeToggle()}
+                  onCheckedChange={() => {
+                    const nextMode = deckMode === "ascii" ? "REALMORPHISM" : "ASCII";
+                    onDeckModeToggle();
+                    emitSignal({
+                      source: "settings",
+                      type: "updated",
+                      payload: { key: "deck_mode", value: nextMode },
+                      severity: "info",
+                    });
+                  }}
                   aria-label={deckMode === "ascii" ? "ASCII mode on" : "Realmorphism mode on"}
                   className="shrink-0 data-[state=checked]:border-amber-500/70 data-[state=checked]:bg-amber-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
                 />

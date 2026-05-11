@@ -7,6 +7,7 @@ import {
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
 import { ATLAS_ENTITIES } from "@/lib/mock/atlas";
+import { emitSignal } from "@/lib/cyberdeck/signal-router";
 
 let lastSelectedEntityId = ATLAS_ENTITIES[0]?.id ?? "";
 
@@ -44,6 +45,12 @@ export function CyberdeckMemoryAtlasPaneBody() {
                   onClick={() => {
                     setSelectedEntityId(entity.id);
                     lastSelectedEntityId = entity.id;
+                    emitSignal({
+                      source: "atlas",
+                      type: "entity_selected",
+                      payload: { id: entity.id, label: entity.label },
+                      severity: "info",
+                    });
                   }}
                   className={`mb-1 block w-full border px-2 py-2 text-left text-[9px] tracking-[0.06em] transition ${
                     selectedEntity?.id === entity.id

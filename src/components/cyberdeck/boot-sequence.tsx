@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { appendFlightLog } from "@/lib/flight-log";
+import { emitSignal } from "@/lib/cyberdeck/signal-router";
 
 const BOOT_KEY = "echo-mirage-boot-completed-v1";
 
@@ -32,11 +32,17 @@ export function CyberdeckBootSequence() {
         const next = prev + 1;
         const line = BOOT_LINES[next - 1];
         if (line) {
-          const payload = line.replace(/^>\s*/, "").split("::").map((part) => part.trim());
-          appendFlightLog({
-            actor: payload[0] || "BOOT",
-            action: (payload[1] || "progress").toLowerCase(),
-            result: payload[2] || "OK",
+          const parts = line.replace(/^>\s*/, "").split("::").map((part) => part.trim());
+          emitSignal({
+            source: "system",
+            type: "boot_line",
+            payload: {
+              actor: parts[0] || "BOOT",
+              action: (parts[1] || "progress").toLowerCase(),
+              result: parts[2] || "OK",
+              line,
+            },
+            severity: "info",
           });
         }
         return Math.min(next, BOOT_LINES.length);

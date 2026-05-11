@@ -1,12 +1,12 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   CyberdeckPaneHeader,
   CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
-import { appendFlightLog } from "@/lib/flight-log";
+import { emitSignal } from "@/lib/cyberdeck/signal-router";
 
 type CommandPaneBodyProps = {
   server: string;
@@ -20,6 +20,15 @@ function clockStamp() {
 export function CyberdeckCommandPaneBody({ server }: CommandPaneBodyProps) {
   const [commandInput, setCommandInput] = useState("");
   const [localLog, setLocalLog] = useState<string[]>([]);
+  const ackTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (ackTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(ackTimerRef.current);
+      }
+    };
+  }, []);
 
   const quickActions = useMemo(
     () => [
@@ -38,11 +47,43 @@ export function CyberdeckCommandPaneBody({ server }: CommandPaneBodyProps) {
     if (!line) return;
     const stamped = `[${clockStamp()}] COMMAND > ${line}`;
     setLocalLog((prev) => [...prev.slice(-39), stamped]);
-    appendFlightLog({
-      actor: "COMMAND",
-      action: line.toLowerCase(),
-      result: "QUEUED",
+    emitSignal({
+      source: "command",
+      type: "submitted",
+      payload: { text: line, server },
+      severity: "info",
     });
+
+    const isOpenAtlas = /^open\s+atlas\b/i.test(line);
+
+    if (typeof window !== "undefined") {
+      if (ackTimerRef.current !== null) {
+        window.clearTimeout(ackTimerRef.current);
+      }
+      const delay = 1100 + Math.floor(Math.random() * 200);
+      ackTimerRef.current = window.setTimeout(() => {
+        ackTimerRef.current = null;
+        emitSignal({
+          source: "operators",
+          type: "acknowledged",
+          payload: {
+            callsign: "ChatGPT // Lead",
+            text: `routing command to Memory Atlas :: ${line}`,
+            ref: line,
+          },
+          severity: "info",
+        });
+        if (isOpenAtlas) {
+          emitSignal({
+            source: "system",
+            type: "navigate",
+            payload: { target: "memory-atlas" },
+            severity: "info",
+          });
+        }
+      }, delay);
+    }
+
     setCommandInput("");
   };
 

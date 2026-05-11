@@ -6,6 +6,7 @@ import {
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
 import { useOperators, type OperatorState } from "@/lib/operators";
+import { emitSignal } from "@/lib/cyberdeck/signal-router";
 
 function statusTone(status: OperatorState) {
   if (status === "ONLINE") return "text-emerald-300 border-emerald-600/50";
@@ -38,10 +39,24 @@ export function CyberdeckOperatorsPaneBody() {
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 md:grid-cols-2">
           {operators.map((operator) => {
             const status = operator.state;
+            const callsignLabel = `${operator.callsign} // ${operator.role}`;
             return (
-              <div
+              <button
                 key={operator.id}
-                className={`rounded-sm border bg-black/80 p-3 font-mono text-[10px] ${statusTone(status)}`}
+                type="button"
+                onClick={() =>
+                  emitSignal({
+                    source: "operators",
+                    type: "operator_selected",
+                    payload: {
+                      id: operator.id,
+                      callsign: callsignLabel,
+                      state: status,
+                    },
+                    severity: "info",
+                  })
+                }
+                className={`text-left rounded-sm border bg-black/80 p-3 font-mono text-[10px] transition hover:border-emerald-500/60 focus:outline-none focus-visible:border-emerald-500/70 ${statusTone(status)}`}
               >
                 <div className="flex items-center justify-between text-[#d8d8d8]">
                   <span>{operator.callsign.toUpperCase()} // {operator.role.toUpperCase()}</span>
@@ -53,7 +68,7 @@ export function CyberdeckOperatorsPaneBody() {
                 <div className="mt-2 border-t border-[#1c1c1c] pt-2 text-[9px] leading-relaxed text-[#a8a8a8]">
                   {operator.activityText}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

@@ -1,11 +1,16 @@
 "use client";
 
+import { subscribeSignals, type DeckSignal, type SignalSeverity } from "@/lib/cyberdeck/signal-router";
+
+export type FlightLogSeverity = SignalSeverity;
+
 export type FlightLogEntry = {
   id: string;
   at: number | null;
   actor: string;
   action: string;
   result: string;
+  severity?: FlightLogSeverity;
 };
 
 type FlightLogListener = (entries: FlightLogEntry[]) => void;
@@ -22,6 +27,7 @@ const seedEntries: FlightLogEntry[] = [
 let entries: FlightLogEntry[] = [...seedEntries];
 let lastEntryAt = 0;
 let syntheticTimer: number | null = null;
+let signalBridgeStarted = false;
 const MIN_ENTRY_GAP_MS = 1000;
 const SYNTHETIC_MIN_MS = 6000;
 const SYNTHETIC_MAX_MS = 14000;
@@ -59,6 +65,7 @@ export function appendFlightLog(entry: Omit<FlightLogEntry, "id" | "at"> & { at?
     actor: entry.actor,
     action: entry.action,
     result: entry.result,
+    severity: entry.severity,
   };
   lastEntryAt = now;
   entries = [...entries.slice(-249), next];
@@ -87,6 +94,126 @@ function scheduleSyntheticEntry() {
   }, syntheticDelay());
 }
 
+function readString(payload: Record<string, unknown> | undefined, key: string): string | null {
+  if (!payload) return null;
+  const value = payload[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/**
+ * Translate a DeckSignal into the actor/action/result shape used by the flight log.
+ * Returns null for signals that should not surface in the formatted log (e.g. UI clicks).
+ */
+export function signalToFlightLog(
+  signal: DeckSignal,
+): Omit<FlightLogEntry, "id" | "at"> | null {
+  const severity = signal.severity ?? "info";
+  const payload = signal.payload;
+
+  switch (`${signal.source}:${signal.type}`) {
+    case "command:submitted": {
+      const text = readString(payload, "text") ?? "(empty)";
+      return { actor: "COMMAND", action: text.toLowerCase(), result: "QUEUED", severity };
+    }
+    case "command:cleared": {
+      return { actor: "COMMAND", action: "buffer cleared", result: "OK", severity };
+    }
+    case "catalog:model_selected": {
+      const label = readString(payload, "label") ?? "unknown";
+      return { actor: "CATALOG", action: "model selected", result: label, severity };
+    }
+    case "catalog:model_configured": {
+      const label = readString(payload, "label") ?? "unknown";
+      return { actor: "CATALOG", action: "model configured", result: label, severity };
+    }
+    case "operators:operator_selected": {
+      const callsign = readString(payload, "callsign") ?? "unknown";
+      return { actor: "OPERATORS", action: "active operator changed", result: callsign, severity };
+    }
+    case "operators:acknowledged": {
+      const callsign = readString(payload, "callsign") ?? "OPERATOR";
+      const text = readString(payload, "text") ?? "acknowledged";
+      return {
+        actor: callsign.toUpperCase(),
+        action: text,
+        result: "ACK",
+        severity,
+      };
+    }
+    case "operators:activity": {
+      const callsign = readString(payload, "callsign") ?? "OPERATOR";
+      const action = readString(payload, "action") ?? "activity";
+      const state = readString(payload, "state") ?? "OK";
+      return { actor: callsign.toUpperCase(), action, result: state, severity };
+    }
+    case "atlas:entity_selected": {
+      const label = readString(payload, "label") ?? "unknown";
+      return { actor: "ATLAS", action: "entity selected", result: label, severity };
+    }
+    case "settings:updated": {
+      const key = readString(payload, "key") ?? "value";
+      const rawValue = payload?.["value"];
+      const value =
+        rawValue === null || rawValue === undefined
+          ? "—"
+          : typeof rawValue === "string"
+            ? rawValue
+            : JSON.stringify(rawValue);
+      return { actor: "SETTINGS", action: `updated :: ${key}`, result: value, severity };
+    }
+    case "system:mode_changed": {
+      const mode = readString(payload, "mode") ?? "unknown";
+      return { actor: "SYSTEM", action: "deck mode changed", result: mode, severity };
+    }
+    case "system:navigate": {
+      const target = readString(payload, "target") ?? "unknown";
+      return { actor: "SYSTEM", action: "navigate", result: target, severity };
+    }
+    case "system:boot_line": {
+      const actor = readString(payload, "actor") ?? "BOOT";
+      const action = readString(payload, "action") ?? "progress";
+      const result = readString(payload, "result") ?? "OK";
+      return { actor, action, result, severity };
+    }
+    case "audio:hum_toggled": {
+      const state = readString(payload, "state") ?? "OFF";
+      return { actor: "AUDIO", action: "hum toggled", result: state, severity };
+    }
+    case "audio:setting_changed": {
+      const key = readString(payload, "key") ?? "audio";
+      const rawValue = payload?.["value"];
+      const value =
+        rawValue === null || rawValue === undefined
+          ? "—"
+          : typeof rawValue === "string"
+            ? rawValue
+            : typeof rawValue === "boolean"
+              ? rawValue ? "ON" : "OFF"
+              : JSON.stringify(rawValue);
+      return { actor: "AUDIO", action: `setting :: ${key}`, result: value, severity };
+    }
+    case "voice:lab_action": {
+      const action = readString(payload, "action") ?? "voice";
+      const detail = readString(payload, "detail") ?? "OK";
+      return { actor: "VOICE", action, result: detail, severity };
+    }
+    default:
+      return null;
+  }
+}
+
+function ensureSignalBridge() {
+  if (signalBridgeStarted) return;
+  if (typeof window === "undefined") return;
+  signalBridgeStarted = true;
+  subscribeSignals((signal) => {
+    const mapped = signalToFlightLog(signal);
+    if (!mapped) return;
+    appendFlightLog(mapped);
+  });
+}
+
 if (typeof window !== "undefined") {
   scheduleSyntheticEntry();
+  ensureSignalBridge();
 }

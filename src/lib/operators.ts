@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { appendFlightLog } from "@/lib/flight-log";
+import { emitSignal } from "@/lib/cyberdeck/signal-router";
 
 export type OperatorState =
   | "ONLINE"
@@ -124,11 +124,15 @@ function advanceOperator(operatorId: string) {
       activityText,
       lastUpdate: now,
     };
-    appendFlightLog({
-      actor: operator.callsign.toUpperCase(),
-      action: activityText.replace(/^.+::\s*/, "").replace(/\.\.\.$/, ""),
-      result: nextState,
-      at: now,
+    emitSignal({
+      source: "operators",
+      type: "activity",
+      payload: {
+        callsign: operator.callsign,
+        action: activityText.replace(/^.+::\s*/, "").replace(/\.\.\.$/, ""),
+        state: nextState,
+      },
+      severity: nextState === "BLOCKED" ? "warning" : "info",
     });
     return next;
   });

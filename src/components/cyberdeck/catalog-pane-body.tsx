@@ -6,6 +6,7 @@ import {
   CyberdeckPaneHeaderTitle,
   CyberdeckPaneHeaderValue,
 } from "@/components/cyberdeck/pane-header";
+import { emitSignal } from "@/lib/cyberdeck/signal-router";
 
 const CATALOG_CARDS = [
   { id: "mk-i", title: "Echo Mirage Mark I", image: "/catalog/echo-mirage-cyberdeck.png" },
@@ -48,10 +49,32 @@ export function CyberdeckCatalogPaneBody() {
               </div>
             </div>
             <div className="mt-2 flex gap-2">
-              <button className="flex-1 rounded-sm border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] text-[#9a9a9a] transition hover:border-emerald-500/60 hover:text-emerald-200">
+              <button
+                type="button"
+                onClick={() =>
+                  emitSignal({
+                    source: "catalog",
+                    type: "model_selected",
+                    payload: { id: card.id, label: card.title },
+                    severity: "info",
+                  })
+                }
+                className="flex-1 rounded-sm border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] text-[#9a9a9a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+              >
                 [VIEW]
               </button>
-              <button className="flex-1 rounded-sm border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] text-[#9a9a9a] transition hover:border-amber-500/60 hover:text-amber-200">
+              <button
+                type="button"
+                onClick={() =>
+                  emitSignal({
+                    source: "catalog",
+                    type: "model_configured",
+                    payload: { id: card.id, label: card.title },
+                    severity: "info",
+                  })
+                }
+                className="flex-1 rounded-sm border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] text-[#9a9a9a] transition hover:border-amber-500/60 hover:text-amber-200"
+              >
                 [CONFIGURE]
               </button>
             </div>

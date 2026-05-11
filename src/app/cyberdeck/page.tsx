@@ -87,9 +87,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { loadDeckMode, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
-import { isMuted, playBack, playClick, playBeep, setMuted, toggleAmbientHum } from "@/lib/deck-audio";
+import { isMuted, playBeep, setMuted, toggleAmbientHum } from "@/lib/deck-audio";
 import { useOperators } from "@/lib/operators";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
+import { emitSignal } from "@/lib/cyberdeck/signal-router";
+import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -798,8 +800,19 @@ export default function CyberdeckPage() {
   const inactiveTextGlow = "0 0 6px rgba(180, 180, 180, 0.14)";
   const alphaChipText = `DECK ALPHA :: ${deckMode === "ascii" ? "ASCII" : "NOMINAL"} :: OPS ${operatorCount} (O${stateCounts.ONLINE}/T${stateCounts.THINKING}/I${stateCounts.IDLE})`;
 
+  useDeckAudioBridge();
+
   const toggleDeckMode = useCallback(() => {
-    setDeckMode((prev) => (prev === "ascii" ? "realmorphism" : "ascii"));
+    setDeckMode((prev) => {
+      const next = prev === "ascii" ? "realmorphism" : "ascii";
+      emitSignal({
+        source: "system",
+        type: "mode_changed",
+        payload: { mode: next === "ascii" ? "ASCII" : "REALMORPHISM" },
+        severity: "info",
+      });
+      return next;
+    });
   }, []);
 
   const toggleAudioMuted = useCallback(() => {
@@ -811,12 +824,24 @@ export default function CyberdeckPage() {
     } else {
       playBeep();
     }
+    emitSignal({
+      source: "audio",
+      type: "setting_changed",
+      payload: { key: "muted", value: nextMuted },
+      severity: "info",
+    });
   }, [audioMuted]);
 
   const handleToggleAmbientHum = useCallback(() => {
     if (audioMuted) return;
     const next = toggleAmbientHum();
     setAmbientHumOn(next);
+    emitSignal({
+      source: "audio",
+      type: "hum_toggled",
+      payload: { state: next ? "ON" : "OFF" },
+      severity: "info",
+    });
   }, [audioMuted]);
 
   const playModelTestErrorSound = useCallback((line: string) => {
@@ -1830,17 +1855,17 @@ export default function CyberdeckPage() {
 
   const closeRailTabContextMenu = useCallback(() => {
     setRailTabContextMenu(null);
-    playBack();
+    emitSignal({ source: "ui", type: "cancel", payload: { target: "rail_tab_menu" }, severity: "info" });
   }, []);
 
   const closeMirageContextMenu = useCallback(() => {
     setMirageContextMenu(null);
-    playBack();
+    emitSignal({ source: "ui", type: "cancel", payload: { target: "mirage_menu" }, severity: "info" });
   }, []);
 
   const closeGatewayPaneContextMenu = useCallback(() => {
     setGatewayPaneContextMenu(null);
-    playBack();
+    emitSignal({ source: "ui", type: "cancel", payload: { target: "gateway_menu" }, severity: "info" });
   }, []);
 
   const handleTabClick = useCallback(
@@ -1852,7 +1877,7 @@ export default function CyberdeckPage() {
       if (isCustomTab) {
         if (activeCustomTabId !== id) {
           setActiveCustomTabId(id);
-          playClick();
+          emitSignal({ source: "ui", type: "select", payload: { tabId: id, kind: "custom" }, severity: "info" });
           playSystemSound("chirp");
         } else {
           playSystemSound("click", 0.05);
@@ -1863,7 +1888,7 @@ export default function CyberdeckPage() {
       setActiveCustomTabId(null);
       if (server !== id) {
         setServer(id as (typeof SERVER_IDS)[number]);
-        playClick();
+        emitSignal({ source: "ui", type: "select", payload: { tabId: id, kind: "fixed" }, severity: "info" });
         playSystemSound("chirp");
       } else {
         playSystemSound("click", 0.05);
@@ -2182,7 +2207,7 @@ export default function CyberdeckPage() {
       const t = e.target as HTMLElement | null;
       if (!t) return;
       if (e.key === "Escape" && !e.repeat) {
-        playBack();
+        emitSignal({ source: "ui", type: "cancel", payload: { via: "escape" }, severity: "info" });
       }
 
       // Browser Find (and find-next): do not intercept — keep default keyboard behavior.
