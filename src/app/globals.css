@@ -331,6 +331,15 @@ body,
 }
 
 @media (max-width: 768px) {
+  .cyberdeck-server-rail {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .cyberdeck-server-rail::-webkit-scrollbar {
+    display: none;
+  }
+
   .cyberdeck-server-rail .btn-container {
     margin-bottom: 0;
     margin-right: 8px;

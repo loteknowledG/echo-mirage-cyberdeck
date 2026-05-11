@@ -1,7 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from "react";
-import type { Context, Message, Model, SimpleStreamOptions } from "@mariozechner/pi-ai";
+import {
+  CyberdeckPaneHeader,
+  CyberdeckPaneHeaderSubtitle,
+  CyberdeckPaneHeaderTitle,
+} from "@/components/cyberdeck/pane-header";
+import { MUTHUR_MEMORY_STORAGE_KEY, type MuthurMemoryState } from "@/lib/muthur-memory";
 
 type DiagnosticPaneBodyProps = {
   server: string;
@@ -11,288 +15,173 @@ type DiagnosticPaneBodyProps = {
   providerModelFetchStatus: "idle" | "retrieving" | "invalid-key" | "error" | "ready";
   voiceEnabled: boolean;
   voiceHealth: "idle" | "backend" | "fallback" | "off";
-  muthurMemoryTurnCount: number;
-  muthurMemoryUpdatedAt: number;
+  muthurMemory: MuthurMemoryState;
+  muthurMemoryHydrated: boolean;
+  muthurMemoryLoadError: string | null;
   memoryContext: string;
   heapCount: number;
   chatCount: number;
 };
 
-declare global {
-  interface Window {
-    __echoMiragePiStorageReady?: boolean;
+const SERVER_LABEL: Record<string, string> = {
+  m: "ØPERATOR",
+  s: "MAINNET-UPLINK",
+  b: "SETTINGS",
+};
+
+function formatMemoryUpdated(at: number) {
+  if (!at) return "—";
+  try {
+    return new Date(at).toISOString();
+  } catch {
+    return String(at);
   }
 }
 
-async function ensurePiStorage(ui: typeof import("@mariozechner/pi-web-ui")) {
-  if (typeof window === "undefined") return;
-  if (window.__echoMiragePiStorageReady) return;
-
-  const settings = new ui.SettingsStore();
-  const providerKeys = new ui.ProviderKeysStore();
-  const sessions = new ui.SessionsStore();
-  const customProviders = new ui.CustomProvidersStore();
-
-  const backend = new ui.IndexedDBStorageBackend({
-    dbName: "echo-mirage-pi",
-    version: 1,
-    stores: [
-      settings.getConfig(),
-      providerKeys.getConfig(),
-      sessions.getConfig(),
-      customProviders.getConfig(),
-      ui.SessionsStore.getMetadataConfig(),
-    ],
-  });
-
-  settings.setBackend(backend);
-  providerKeys.setBackend(backend);
-  sessions.setBackend(backend);
-  customProviders.setBackend(backend);
-
-  ui.setAppStorage(new ui.AppStorage(settings, providerKeys, sessions, customProviders, backend));
-  window.__echoMiragePiStorageReady = true;
+function formatAgeMs(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h`;
+  const d = Math.floor(h / 24);
+  return `${d}d`;
 }
 
-async function promptForProviderKey(
-  ui: typeof import("@mariozechner/pi-web-ui"),
-  provider: string,
-) {
-  const existingKey = await ui.getAppStorage().providerKeys.get(provider);
-  if (existingKey) return true;
-
-  const enteredKey = window.prompt(`Enter ${provider.toUpperCase()} API key`);
-  const trimmedKey = enteredKey?.trim();
-
-  if (!trimmedKey) return false;
-
-  await ui.getAppStorage().providerKeys.set(provider, trimmedKey);
-  return true;
+function truncateLine(text: string, max: number) {
+  const t = (text || "").replace(/\s+/g, " ").trim();
+  if (!t) return "—";
+  return t.length > max ? `${t.slice(0, max)}…` : t;
 }
 
-function createEmptyAssistantMessage(model: Model<any>) {
-  return {
-    role: "assistant" as const,
-    content: [] as Array<{ type: "text"; text: string }>,
-    api: model.api,
-    provider: model.provider,
-    model: model.id,
-    responseModel: model.id,
-    usage: {
-      input: 0,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      totalTokens: 0,
-      cost: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        total: 0,
-      },
-    },
-    stopReason: "stop" as const,
-    timestamp: Date.now(),
-  };
-}
+export function CyberdeckDiagnosticPaneBody({
+  server,
+  connectionState,
+  activeProvider,
+  modelID,
+  providerModelFetchStatus,
+  voiceEnabled,
+  voiceHealth,
+  muthurMemory,
+  muthurMemoryHydrated,
+  muthurMemoryLoadError,
+  memoryContext,
+  heapCount,
+  chatCount,
+}: DiagnosticPaneBodyProps) {
+  const railLabel = SERVER_LABEL[server] ?? server.toUpperCase();
 
-export function CyberdeckDiagnosticPaneBody({ server }: DiagnosticPaneBodyProps) {
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const [status, setStatus] = useState("BOOTING PI...");
-
-  useEffect(() => {
-    let disposed = false;
-    let panel: HTMLElement | null = null;
-
-    const mountPi = async () => {
-      try {
-        const [{ Agent }, { createAssistantMessageEventStream, getModel }, ui] = await Promise.all([
-          import("@mariozechner/pi-agent-core"),
-          import("@mariozechner/pi-ai"),
-          import("@mariozechner/pi-web-ui"),
-        ]);
-        await import("@mariozechner/mini-lit/dist/MarkdownBlock.js");
-
-        await ensurePiStorage(ui);
-        if (disposed || !hostRef.current) return;
-
-        let agent: InstanceType<typeof Agent> | null = null;
-        const forceReady = () => {
-          if (!agent) return;
-          (agent.state as any).isStreaming = false;
-          (agent.state as any).streamingMessage = undefined;
-          (agent.state as any).pendingToolCalls = new Set();
-          setStatus("PI READY");
-        };
-
-        const streamFn = async (
-          model: Model<any>,
-          context: Context,
-          options?: SimpleStreamOptions,
-        ) => {
-          const stream = createAssistantMessageEventStream();
-
-          queueMicrotask(async () => {
-            const partial = createEmptyAssistantMessage(model);
-
-            try {
-              console.debug("[pi-tab] stream start", {
-                provider: model.provider,
-                model: model.id,
-                messageCount: context.messages.length,
-              });
-              let apiKey = typeof options?.apiKey === "string" ? options.apiKey : "";
-              if (!apiKey) {
-                const hasKey = await promptForProviderKey(ui, String(model.provider));
-                if (!hasKey) {
-                  throw new Error(`${String(model.provider).toUpperCase()} API key required`);
-                }
-                apiKey = (await ui.getAppStorage().providerKeys.get(String(model.provider))) || "";
-              }
-
-              const response = await fetch("/api/pi-chat", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  provider: model.provider,
-                  apiKey,
-                  model: model.id,
-                  systemPrompt: context.systemPrompt,
-                  messages: context.messages,
-                }),
-                signal: options?.signal,
-              });
-
-              console.debug("[pi-tab] proxy response", response.status);
-
-              if (!response.ok || !response.body) {
-                const errorText = await response.text().catch(() => "");
-                throw new Error(errorText || `Pi proxy error ${response.status}`);
-              }
-
-              partial.timestamp = Date.now();
-              stream.push({ type: "start", partial });
-              stream.push({ type: "text_start", contentIndex: 0, partial });
-
-              const reader = response.body.getReader();
-              const decoder = new TextDecoder();
-              let text = "";
-
-              while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-
-                const delta = decoder.decode(value, { stream: true });
-                if (!delta) continue;
-
-                text += delta;
-                partial.content = [{ type: "text", text }];
-                stream.push({ type: "text_delta", contentIndex: 0, delta, partial });
-              }
-
-              const rest = decoder.decode();
-              if (rest) {
-                text += rest;
-                partial.content = [{ type: "text", text }];
-                stream.push({ type: "text_delta", contentIndex: 0, delta: rest, partial });
-              }
-
-              partial.content = [{ type: "text", text }];
-              stream.push({ type: "text_end", contentIndex: 0, content: text, partial });
-              stream.push({ type: "done", reason: "stop", message: partial });
-              stream.end(partial);
-              queueMicrotask(forceReady);
-              console.debug("[pi-tab] stream done", { length: text.length });
-            } catch (error) {
-              const message =
-                error instanceof Error ? error.message : "Pi proxy request failed";
-              const failed = {
-                ...partial,
-                stopReason: options?.signal?.aborted ? ("aborted" as const) : ("error" as const),
-                errorMessage: message,
-              };
-              console.error("[pi-tab] stream error", failed.errorMessage);
-              stream.push({
-                type: "error",
-                reason: options?.signal?.aborted ? "aborted" : "error",
-                error: failed,
-              });
-              stream.end(failed);
-              queueMicrotask(forceReady);
-            }
-          });
-
-          return stream;
-        };
-
-        agent = new Agent({
-          initialState: {
-            systemPrompt:
-              "You are Pi running inside the Echo Mirage Cyberdeck. Be technical, direct, and helpful.",
-            model: getModel("opencode", "big-pickle"),
-            thinkingLevel: "off",
-            messages: [],
-            tools: [],
-          },
-          convertToLlm: ui.defaultConvertToLlm,
-          streamFn,
-        });
-
-        agent.subscribe((event) => {
-          if (event.type === "message_end" || event.type === "turn_end" || event.type === "agent_end") {
-            agent.state.messages = [...agent.state.messages];
-          }
-          if (event.type === "agent_start" || event.type === "agent_end" || event.type === "turn_end" || event.type === "message_end") {
-            console.debug("[pi-tab] agent event", event.type, {
-              isStreaming: agent.state.isStreaming,
-              messages: agent.state.messages.length,
-            });
-          }
-        });
-
-        const chatPanel = new ui.ChatPanel();
-        chatPanel.style.display = "block";
-        chatPanel.style.height = "100%";
-        chatPanel.style.width = "100%";
-        chatPanel.style.background = "transparent";
-
-        await chatPanel.setAgent(agent, {
-          onApiKeyRequired: (provider) => promptForProviderKey(ui, provider),
-          toolsFactory: (_agent, _agentInterface, _artifactsPanel, runtimeProvidersFactory) => {
-            const replTool = ui.createJavaScriptReplTool();
-            replTool.runtimeProvidersFactory = runtimeProvidersFactory;
-            return [replTool, ui.createExtractDocumentTool()];
-          },
-        });
-
-        if (disposed || !hostRef.current) return;
-
-        panel = chatPanel;
-        hostRef.current.replaceChildren(chatPanel);
-        setStatus("PI READY");
-      } catch (error) {
-        console.error("[pi-tab] failed to mount Pi chat", error);
-        setStatus("PI BOOT FAILURE");
-      }
-    };
-
-    void mountPi();
-
-    return () => {
-      disposed = true;
-      panel?.remove();
-      hostRef.current?.replaceChildren();
-    };
-  }, []);
+  const factCount = muthurMemory.facts.length;
+  const turnCount = muthurMemory.turnCount;
+  const recentCount = muthurMemory.recentTurns.length;
+  const lastTurn = muthurMemory.recentTurns[recentCount - 1];
+  const lastTurnSnippet = lastTurn
+    ? `${lastTurn.role}: ${truncateLine(lastTurn.text, 96)}`
+    : "—";
+  const summaryPreview = truncateLine(muthurMemory.summary, 140);
+  const freshness =
+    muthurMemoryHydrated && muthurMemory.updatedAt
+      ? `${formatAgeMs(Date.now() - muthurMemory.updatedAt)} ago`
+      : "—";
 
   return (
-    <div
-      ref={hostRef}
-      className="pi-pane-host custom-scrollbar flex h-full min-h-0 w-full flex-col overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80"
-      data-pi-status={status || server.toUpperCase()}
-    />
+    <div className="custom-scrollbar flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-black p-3">
+      <div className="flex min-h-0 flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors">
+        <CyberdeckPaneHeader
+          left={
+            <div className="flex flex-col">
+              <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
+                DIAGNOSTICS
+              </CyberdeckPaneHeaderTitle>
+              <CyberdeckPaneHeaderSubtitle>STATUS PLANE // SESSION TELEMETRY</CyberdeckPaneHeaderSubtitle>
+            </div>
+          }
+        />
+        <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-4">
+          <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3 font-mono text-[10px] leading-snug text-[#8a8a8a]">
+            SERVER RAIL // ACTIVE
+            <div className="mt-2 whitespace-pre-wrap text-[#cfcfcf]">
+              SLOT: {railLabel} ({server.toUpperCase()})
+            </div>
+          </div>
+          <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3 font-mono text-[10px] leading-snug text-[#8a8a8a]">
+            UPLINK
+            <div className="mt-2 text-[#cfcfcf]">
+              STATE: {connectionState.toUpperCase()}
+              <br />
+              PROVIDER: {activeProvider.toUpperCase()}
+              <br />
+              MODEL: {modelID || "UNSET"}
+              <br />
+              PROVIDER_FETCH: {providerModelFetchStatus.toUpperCase()}
+            </div>
+          </div>
+          <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3 font-mono text-[10px] leading-snug text-[#8a8a8a]">
+            VOICE // MUTHUR
+            <div className="mt-2 text-[#cfcfcf]">
+              ENABLED: {voiceEnabled ? "ON" : "OFF"}
+              <br />
+              HEALTH: {voiceHealth.toUpperCase()}
+            </div>
+          </div>
+          <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3 font-mono text-[10px] leading-snug text-[#8a8a8a]">
+            MUTHUR MEMORY
+            <div className="mt-2 text-[#cfcfcf]">
+              STORAGE_KEY: {MUTHUR_MEMORY_STORAGE_KEY}
+              <br />
+              HYDRATED: {muthurMemoryHydrated ? "YES" : "NO"}
+              <br />
+              SCHEMA_VERSION:{" "}
+              {typeof muthurMemory.schemaVersion === "number" ? muthurMemory.schemaVersion : "—"}
+              <br />
+              TURN_COUNT: {turnCount}
+              <br />
+              UPDATED_AT: {formatMemoryUpdated(muthurMemory.updatedAt)}
+              <br />
+              FRESHNESS: {freshness}
+              <br />
+              FACTS: {factCount}
+              <br />
+              RECENT_TURNS: {recentCount}
+              <br />
+              LAST_TURN: {lastTurnSnippet}
+              <br />
+              SUMMARY_PREVIEW: {summaryPreview}
+            </div>
+            {muthurMemoryLoadError ? (
+              <div className="mt-2 rounded-sm border border-amber-900/60 bg-amber-950/30 p-2 text-[9px] leading-relaxed text-amber-200/90">
+                LOAD_ERROR (IndexedDB read): {muthurMemoryLoadError}
+              </div>
+            ) : null}
+            {factCount > 0 ? (
+              <details className="mt-2 border-t border-[#1c1c1c] pt-2 text-[#cfcfcf] [&_summary]:cursor-pointer [&_summary]:text-[9px] [&_summary]:uppercase [&_summary]:tracking-[0.06em] [&_summary]:text-[#9a9a9a]">
+                <summary className="select-none hover:text-[#cfcfcf]">LIST_FACTS ({factCount})</summary>
+                <ul className="mt-1 max-h-[28vh] list-inside list-disc overflow-y-auto break-words pl-1 text-[9px] leading-relaxed text-green-200/85">
+                  {muthurMemory.facts.map((f, i) => (
+                    <li key={`${i}-${f}`}>{f}</li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </div>
+          <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3 font-mono text-[10px] leading-snug text-[#8a8a8a]">
+            LOCAL STORES
+            <div className="mt-2 text-[#cfcfcf]">
+              HEAP_ENTRIES: {heapCount}
+              <br />
+              CHAT_MESSAGES (INCL. STREAM): {chatCount}
+            </div>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col rounded-sm border border-[#1c1c1c] bg-black/80 p-3 font-mono text-[10px] leading-snug text-[#8a8a8a]">
+            MEMORY CONTEXT (BUILD PREVIEW)
+            <pre className="custom-scrollbar mt-2 max-h-[40vh] min-h-[8rem] flex-1 whitespace-pre-wrap break-words rounded-sm border border-[#1c1c1c] bg-black/60 p-2 text-[9px] leading-relaxed text-green-200/90">
+              {memoryContext.trim() ? memoryContext : "—"}
+            </pre>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

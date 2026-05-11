@@ -254,13 +254,25 @@ function normalizeMemory(raw: unknown): MuthurMemoryState {
   };
 }
 
-export async function loadMuthurMemory(): Promise<MuthurMemoryState> {
+export type MuthurMemoryLoadResult = {
+  state: MuthurMemoryState;
+  /** IndexedDB / idb-keyval read failure; state falls back to empty memory. */
+  error: string | null;
+};
+
+export async function loadMuthurMemoryWithResult(): Promise<MuthurMemoryLoadResult> {
   try {
     const stored = await get(MUTHUR_MEMORY_STORAGE_KEY);
-    return normalizeMemory(stored);
-  } catch {
-    return createEmptyMuthurMemory();
+    return { state: normalizeMemory(stored), error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { state: createEmptyMuthurMemory(), error: message };
   }
+}
+
+export async function loadMuthurMemory(): Promise<MuthurMemoryState> {
+  const { state } = await loadMuthurMemoryWithResult();
+  return state;
 }
 
 export async function saveMuthurMemory(memory: MuthurMemoryState): Promise<void> {

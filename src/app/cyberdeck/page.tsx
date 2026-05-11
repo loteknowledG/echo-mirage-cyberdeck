@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
-import type { CSSProperties, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from "react";
 import { Streamdown } from "streamdown";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { art } from "@/lib/TerminalArt";
@@ -40,7 +40,7 @@ import {
   buildMuthurMemoryContext,
   clearMuthurMemory,
   createEmptyMuthurMemory,
-  loadMuthurMemory,
+  loadMuthurMemoryWithResult,
   recordMuthurMemoryTurn,
   saveMuthurMemory,
   type MuthurMemoryState,
@@ -58,6 +58,7 @@ import {
 } from "@/lib/browser-intents";
 import { useBrowserController } from "@/lib/use-browser-controller";
 import { useCustomTabBrowserController } from "@/lib/use-custom-tab-browser-controller";
+import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
 import { speakDryFallback } from "@/voice/speakMuthur";
 import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
@@ -70,6 +71,7 @@ import {
 } from "@/components/cyberdeck/pane-header";
 import { CyberdeckOperatorPaneBody } from "@/components/cyberdeck/operator-pane-body";
 import { CyberdeckDiagnosticPaneBody } from "@/components/cyberdeck/diagnostic-pane-body";
+import { CyberdeckPiChatPaneBody } from "@/components/cyberdeck/pi-chat-pane-body";
 import { CyberdeckCatalogPaneBody } from "@/components/cyberdeck/catalog-pane-body";
 import { CyberdeckSettingsPaneBody } from "@/components/cyberdeck/settings-pane-body";
 import { EchoHeader } from "@/components/cyberdeck/echo-header";
@@ -123,7 +125,16 @@ type CyberdeckUiState = {
   activeCustomTabId?: string | null;
 };
 
-const CUSTOM_TAB_KINDS = ["blank", "document", "web", "settings", "connection", "pi", "catelog"] as const;
+const CUSTOM_TAB_KINDS = [
+  "blank",
+  "document",
+  "web",
+  "settings",
+  "connection",
+  "pi",
+  "diagnostics",
+  "catelog",
+] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
 
 /** Gateway SYS lines; link phrases must match 
@@ -441,6 +452,9 @@ function normalizeCustomTabKind(kind: string) {
   if (nextKind === "catalog") {
     return "catelog" as CustomTabKind;
   }
+  if (nextKind === "diagnostic") {
+    return "diagnostics" as CustomTabKind;
+  }
   if (CUSTOM_TAB_KINDS.includes(nextKind as CustomTabKind)) {
     return nextKind as CustomTabKind;
   }
@@ -463,7 +477,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "document") return "D";
   if (kind === "settings") return "S";
   if (kind === "connection") return "C";
-  if (kind === "pi") return "π";
+  if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
 
@@ -506,7 +520,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|catelog|catalog)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -570,6 +584,7 @@ export default function CyberdeckPage() {
   const [voiceHealth, setVoiceHealth] = useState<"idle" | "backend" | "fallback" | "off">("idle");
   const [muthurMemory, setMuthurMemory] = useState<MuthurMemoryState>(() => createEmptyMuthurMemory());
   const [muthurMemoryHydrated, setMuthurMemoryHydrated] = useState(false);
+  const [muthurMemoryLoadError, setMuthurMemoryLoadError] = useState<string | null>(null);
   const [heapEntries, setHeapEntries] = useState<HeapEntry[]>([]);
   const [heapNameDraft, setHeapNameDraft] = useState("");
   const [heapTextDraft, setHeapTextDraft] = useState("");
@@ -633,7 +648,6 @@ export default function CyberdeckPage() {
   const operatorEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const operatorBrowserRef = useRef<HTMLWebViewElement | null>(null);
   const operatorNameInputRef = useRef<HTMLInputElement | null>(null);
-  const customTabLongPressTimerRef = useRef<number | null>(null);
   const networkFeedbackDelayRef = useRef<number | null>(null);
   const networkFeedbackRepeatRef = useRef<number | null>(null);
   const chatSonarDelayRef = useRef<number | null>(null);
@@ -1183,10 +1197,11 @@ export default function CyberdeckPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const loaded = await loadMuthurMemory();
+      const { state: loaded, error: loadErr } = await loadMuthurMemoryWithResult();
       if (cancelled) return;
       muthurMemoryRef.current = loaded;
       setMuthurMemory(loaded);
+      setMuthurMemoryLoadError(loadErr);
       setMuthurMemoryHydrated(true);
     })();
     return () => {
@@ -2453,6 +2468,14 @@ export default function CyberdeckPage() {
   }, [modelKeyboardHighlightId, navRailContext, providerKeyboardHighlightId, serverKeyboardHighlightId]);
 
   useEffect(() => {
+    window.requestAnimationFrame(() => {
+      const rail = serverRailRef.current;
+      const tabEl = rail?.querySelector<HTMLElement>(`[data-server-tab="${selectedRailTabId}"]`);
+      tabEl?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  }, [selectedRailTabId]);
+
+  useEffect(() => {
     setModelKeyboardHighlightId((prev) => {
       if (prev == null) return null;
       if (!modelList.some((m) => m.id === prev)) return null;
@@ -3174,19 +3197,12 @@ export default function CyberdeckPage() {
     [loadCustomTabAssetFromFile],
   );
 
-  const clearCustomTabLongPressTimer = useCallback(() => {
-    if (customTabLongPressTimerRef.current) {
-      clearTimeout(customTabLongPressTimerRef.current);
-      customTabLongPressTimerRef.current = null;
-    }
-  }, []);
-
   const openCustomTabContextMenu = useCallback(
     (tabId: string, clientX: number, clientY: number) => {
       if (selectedRailTabId !== tabId || typeof window === "undefined") return;
 
       const menuWidth = 176;
-      const menuHeight = 232;
+      const menuHeight = 264;
       const padding = 8;
       const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
       const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
@@ -3196,34 +3212,22 @@ export default function CyberdeckPage() {
     [selectedRailTabId],
   );
 
+  const { createHandlers: createCustomTabLongPressHandlers, consumeClickIfLongPress, cancelLongPressFromContextMenu } =
+    useRailTabLongPress({
+      selectedRailTabId,
+      openMenu: openCustomTabContextMenu,
+    });
+
   const handleCustomTabContextMenu = useCallback(
     (tabId: string, event: ReactMouseEvent<HTMLElement>) => {
       if (selectedRailTabId !== tabId) return;
       event.preventDefault();
       event.stopPropagation();
-      clearCustomTabLongPressTimer();
+      cancelLongPressFromContextMenu();
       openCustomTabContextMenu(tabId, event.clientX, event.clientY);
     },
-    [clearCustomTabLongPressTimer, openCustomTabContextMenu, selectedRailTabId],
+    [cancelLongPressFromContextMenu, openCustomTabContextMenu, selectedRailTabId],
   );
-
-  const handleCustomTabPointerDown = useCallback(
-    (tabId: string, event: ReactPointerEvent<HTMLElement>) => {
-      if (selectedRailTabId !== tabId) return;
-      if (event.pointerType === "mouse") return;
-
-      clearCustomTabLongPressTimer();
-      const { clientX, clientY } = event;
-      customTabLongPressTimerRef.current = window.setTimeout(() => {
-        openCustomTabContextMenu(tabId, clientX, clientY);
-      }, 450);
-    },
-    [clearCustomTabLongPressTimer, openCustomTabContextMenu, selectedRailTabId],
-  );
-
-  const handleCustomTabPointerUp = useCallback(() => {
-    clearCustomTabLongPressTimer();
-  }, [clearCustomTabLongPressTimer]);
 
   useEffect(() => {
     if (operatorSurfaceMode !== "browser") return;
@@ -3258,12 +3262,6 @@ export default function CyberdeckPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [closeCustomTabContextMenu, customTabContextMenu]);
-
-  useEffect(() => {
-    return () => {
-      clearCustomTabLongPressTimer();
-    };
-  }, [clearCustomTabLongPressTimer]);
 
   useEffect(() => {
     if (!customTabContextMenu) return;
@@ -3457,7 +3455,16 @@ export default function CyberdeckPage() {
         );
       }
 
-      if (tab.kind === "pi") {
+      if (tab.kind === "diagnostics") {
+        let lastUserChat = "";
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const m = messages[i];
+          if (m && m.role === "user") {
+            lastUserChat = m.text;
+            break;
+          }
+        }
+        const memoryContextQuery = lastUserChat.trim() || input.trim() || undefined;
         return shell(
           <CyberdeckDiagnosticPaneBody
             server={server}
@@ -3467,13 +3474,18 @@ export default function CyberdeckPage() {
             providerModelFetchStatus={providerModelFetchStatus}
             voiceEnabled={voiceEnabled}
             voiceHealth={voiceHealth}
-            muthurMemoryTurnCount={muthurMemory.turnCount}
-            muthurMemoryUpdatedAt={muthurMemory.updatedAt}
-            memoryContext={buildMuthurMemoryContext(muthurMemory, input.trim() || undefined)}
+            muthurMemory={muthurMemory}
+            muthurMemoryHydrated={muthurMemoryHydrated}
+            muthurMemoryLoadError={muthurMemoryLoadError}
+            memoryContext={buildMuthurMemoryContext(muthurMemory, memoryContextQuery)}
             heapCount={heapEntries.length}
             chatCount={messages.length + (streamText ? 1 : 0)}
           />,
         );
+      }
+
+      if (tab.kind === "pi") {
+        return shell(<CyberdeckPiChatPaneBody server={server} />);
       }
 
       if (tab.kind === "catelog") {
@@ -3482,22 +3494,24 @@ export default function CyberdeckPage() {
 
       return shell(
         <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-          BLANK TAB // USE CHAT COMMANDS TO CONVERT ME TO DOCUMENT, WEB, CATELOG, SETTINGS, CONNECTION, OR PI.
+          BLANK TAB // USE CHAT COMMANDS TO CONVERT ME TO DOCUMENT, WEB, CATELOG, SETTINGS, CONNECTION, DIAGNOSTICS, OR PI.
         </div>,
       );
     },
     [
       activeProvider,
-      buildMuthurMemoryContext,
       connectionState,
       deleteActiveTab,
       customTabBrowserNavigate,
       handleCustomTabDrop,
       heapEntries.length,
       input,
+      messages,
       messages.length,
       modelID,
       muthurMemory,
+      muthurMemoryHydrated,
+      muthurMemoryLoadError,
       operatorBrowserEngine,
       providerModelFetchStatus,
       server,
@@ -3515,6 +3529,7 @@ export default function CyberdeckPage() {
     { label: "Document", kind: "document", action: "convert" },
     { label: "Web", kind: "web", action: "convert" },
     { label: "Catelog", kind: "catelog", action: "convert" },
+    { label: "Diagnostics", kind: "diagnostics", action: "convert" },
     { label: "Pi", kind: "pi", action: "convert" },
     { label: "Settings", action: "settings-pane" },
     { label: "Connection", action: "connection-pane" },
@@ -3524,7 +3539,7 @@ export default function CyberdeckPage() {
   return (
     <div
       ref={cyberdeckRootRef}
-      className="terminal-window flex h-screen overflow-hidden bg-background font-mono text-green-500 max-md:flex-col"
+      className="terminal-window flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:flex-col max-md:overflow-y-auto md:overflow-hidden"
     >
       {customTabContextMenu ? (
         <div
@@ -3608,12 +3623,12 @@ export default function CyberdeckPage() {
         ref={serverRailRef}
         tabIndex={-1}
         aria-label="Server rail"
-        className="cyberdeck-server-rail z-40 flex w-12 flex-shrink-0 flex-col items-center border-r border-gray-800 bg-black py-4 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 max-md:h-auto max-md:w-full max-md:flex-row max-md:justify-start max-md:overflow-x-auto max-md:border-b max-md:border-r-0 max-md:px-2 max-md:py-2"
+        className="cyberdeck-server-rail z-40 flex w-12 flex-shrink-0 flex-col items-center border-r border-gray-800 bg-black py-4 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 md:min-h-0 md:overflow-y-auto md:overscroll-y-contain max-md:sticky max-md:top-[max(0px,env(safe-area-inset-top))] max-md:self-start max-md:bg-black/95 max-md:backdrop-blur-sm max-md:h-auto max-md:w-full max-md:flex-row max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory max-md:border-b max-md:border-r-0 max-md:px-2 max-md:py-2 max-md:touch-pan-x"
       >
         {fixedServers.map((btn) => (
           <div
             key={btn.id}
-            className="btn-container"
+            className="btn-container shrink-0 max-md:snap-start"
             style={{ width: "48px", height: "52px", position: "relative" }}
           >
             <pre
@@ -3642,13 +3657,15 @@ export default function CyberdeckPage() {
         {customTabs.map((tab) => (
           <div
             key={tab.id}
-            className="btn-container"
-            style={{ width: "48px", height: "52px", position: "relative" }}
+            className="btn-container shrink-0 max-md:snap-start select-none"
+            style={{
+              width: "48px",
+              height: "52px",
+              position: "relative",
+              WebkitTouchCallout: "none",
+            }}
             onContextMenu={(event) => handleCustomTabContextMenu(tab.id, event)}
-            onPointerDown={(event) => handleCustomTabPointerDown(tab.id, event)}
-            onPointerUp={handleCustomTabPointerUp}
-            onPointerCancel={handleCustomTabPointerUp}
-            onPointerLeave={handleCustomTabPointerUp}
+            {...createCustomTabLongPressHandlers(tab.id)}
           >
             <pre
               data-server-tab={tab.id}
@@ -3658,6 +3675,7 @@ export default function CyberdeckPage() {
                   : ""
               }`}
               onClick={() => {
+                if (consumeClickIfLongPress(tab.id)) return;
                 setNavRailContext("gateway");
                 setServerKeyboardHighlightId(null);
                 handleTabClick(tab.id);
@@ -3673,7 +3691,7 @@ export default function CyberdeckPage() {
             </pre>
           </div>
         ))}
-        <div className="mt-2 flex w-12 flex-col gap-2 px-2">
+        <div className="mt-2 flex w-12 shrink-0 flex-col gap-2 px-2 max-md:snap-start">
           <button
             type="button"
             onClick={createBlankTab}
@@ -3696,12 +3714,13 @@ export default function CyberdeckPage() {
               networkActivityActive ? "is-net-active" : ""
             }`}
           >
-            <EchoHeader activeTabLabel={activeTabLabel} />
+            {!isMobileLayout ? <EchoHeader activeTabLabel={activeTabLabel} /> : null}
             <div
               ref={messageScrollRef}
               tabIndex={-1}
               className="cyberdeck-chat-content custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
             >
+              {isMobileLayout ? <EchoHeader activeTabLabel={activeTabLabel} /> : null}
               <div className="message-log flex-1 space-y-3">
                 {messages.map((m, i) => {
                   const isModelConnectedLine =
