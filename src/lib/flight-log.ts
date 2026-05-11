@@ -20,6 +20,17 @@ const seedEntries: FlightLogEntry[] = [
 ];
 
 let entries: FlightLogEntry[] = [...seedEntries];
+let lastEntryAt = 0;
+let syntheticTimer: number | null = null;
+const MIN_ENTRY_GAP_MS = 1000;
+const SYNTHETIC_MIN_MS = 6000;
+const SYNTHETIC_MAX_MS = 14000;
+const SYNTHETIC_EVENTS = [
+  { actor: "DECK", action: "ambient telemetry nominal", result: "OK" },
+  { actor: "DECK", action: "scanline drift recalibrated", result: "OK" },
+  { actor: "RAIL", action: "bus pulse synchronized", result: "NOMINAL" },
+  { actor: "SHELL", action: "surface heartbeat steady", result: "OK" },
+];
 
 function emit() {
   for (const listener of listeners) {
@@ -40,14 +51,42 @@ export function subscribeFlightLog(listener: FlightLogListener) {
 }
 
 export function appendFlightLog(entry: Omit<FlightLogEntry, "id" | "at"> & { at?: number | null }) {
+  const now = Date.now();
+  if (now - lastEntryAt < MIN_ENTRY_GAP_MS) return null;
   const next: FlightLogEntry = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    at: entry.at ?? Date.now(),
+    id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
+    at: entry.at ?? now,
     actor: entry.actor,
     action: entry.action,
     result: entry.result,
   };
+  lastEntryAt = now;
   entries = [...entries.slice(-249), next];
   emit();
   return next;
+}
+
+function syntheticDelay() {
+  return SYNTHETIC_MIN_MS + Math.floor(Math.random() * (SYNTHETIC_MAX_MS - SYNTHETIC_MIN_MS + 1));
+}
+
+function scheduleSyntheticEntry() {
+  if (typeof window === "undefined") return;
+  if (syntheticTimer !== null) {
+    window.clearTimeout(syntheticTimer);
+  }
+  syntheticTimer = window.setTimeout(() => {
+    const now = Date.now();
+    if (now - lastEntryAt >= SYNTHETIC_MIN_MS) {
+      const event = SYNTHETIC_EVENTS[Math.floor(Math.random() * SYNTHETIC_EVENTS.length)];
+      if (event) {
+        appendFlightLog({ ...event, at: now });
+      }
+    }
+    scheduleSyntheticEntry();
+  }, syntheticDelay());
+}
+
+if (typeof window !== "undefined") {
+  scheduleSyntheticEntry();
 }

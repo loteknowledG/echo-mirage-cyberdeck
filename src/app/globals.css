@@ -736,3 +736,52 @@ body,
 [data-deck-mode="ascii"] aside {
   border-style: dashed;
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes operator-dot-pulse {
+    0%,
+    100% {
+      opacity: 0.45;
+      transform: scale(0.92);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+  }
+
+  @keyframes cyberdeck-scanline-drift {
+    0% {
+      transform: translateY(0);
+    }
+    100% {
+      transform: translateY(100vh);
+    }
+  }
+
+  .operator-pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    animation: operator-dot-pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  .cyberdeck-scanline-overlay {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 32;
+    overflow: hidden;
+  }
+
+  .cyberdeck-scanline-overlay::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(16, 185, 129, 0.55) 48%, transparent 100%);
+    animation: cyberdeck-scanline-drift 14s linear infinite;
+  }
+}

@@ -79,6 +79,7 @@ import { CyberdeckMemoryAtlasPaneBody } from "@/components/cyberdeck/memory-atla
 import { CyberdeckVoiceLabPaneBody } from "@/components/cyberdeck/voice-lab-pane-body";
 import { CyberdeckFlightLogPaneBody } from "@/components/cyberdeck/flight-log-pane-body";
 import { CyberdeckSettingsPaneBody } from "@/components/cyberdeck/settings-pane-body";
+import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
 import { EchoHeader } from "@/components/cyberdeck/echo-header";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
 import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-tab";
@@ -86,6 +87,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { loadDeckMode, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
+import { isMuted, playBack, playClick, playBeep, setMuted, toggleAmbientHum } from "@/lib/deck-audio";
+import { useOperators } from "@/lib/operators";
+import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -642,6 +646,10 @@ export default function CyberdeckPage() {
   const [heapTextDraft, setHeapTextDraft] = useState("");
   const [heapHydrated, setHeapHydrated] = useState(false);
   const [deckMode, setDeckMode] = useState<DeckMode>("realmorphism");
+  const [audioMuted, setAudioMutedState] = useState<boolean>(() => isMuted());
+  const [ambientHumOn, setAmbientHumOn] = useState(false);
+  const [scanlineEnabled, setScanlineEnabled] = useState(true);
+  const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
 
   const [activeProvider, setActiveProvider] = useState<string>("opencode");
   /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
@@ -752,6 +760,7 @@ export default function CyberdeckPage() {
     { id: "openrouter" as const, name: "OPENROUTER" },
     { id: "openai" as const, name: "OPENAI" },
   ] as const;
+  const { operatorCount, stateCounts } = useOperators();
 
   const modelID = modelByProvider[activeProvider] || "";
   const activeCustomTab = customTabs.find((tab) => tab.id === activeCustomTabId) || null;
@@ -787,12 +796,28 @@ export default function CyberdeckPage() {
   const activeTextGlow = "0 0 8px rgba(0, 255, 0, 0.22)";
   const amberTextGlow = "0 0 8px rgba(255, 170, 0, 0.22)";
   const inactiveTextGlow = "0 0 6px rgba(180, 180, 180, 0.14)";
-  const operatorCount = 4;
-  const alphaChipText = `DECK ALPHA :: ${deckMode === "ascii" ? "ASCII" : "NOMINAL"} :: OPS ${operatorCount}`;
+  const alphaChipText = `DECK ALPHA :: ${deckMode === "ascii" ? "ASCII" : "NOMINAL"} :: OPS ${operatorCount} (O${stateCounts.ONLINE}/T${stateCounts.THINKING}/I${stateCounts.IDLE})`;
 
   const toggleDeckMode = useCallback(() => {
     setDeckMode((prev) => (prev === "ascii" ? "realmorphism" : "ascii"));
   }, []);
+
+  const toggleAudioMuted = useCallback(() => {
+    const nextMuted = !audioMuted;
+    setMuted(nextMuted);
+    setAudioMutedState(nextMuted);
+    if (nextMuted) {
+      setAmbientHumOn(false);
+    } else {
+      playBeep();
+    }
+  }, [audioMuted]);
+
+  const handleToggleAmbientHum = useCallback(() => {
+    if (audioMuted) return;
+    const next = toggleAmbientHum();
+    setAmbientHumOn(next);
+  }, [audioMuted]);
 
   const playModelTestErrorSound = useCallback((line: string) => {
     if (line.includes("VALID_RESPONSE")) {
@@ -1283,6 +1308,12 @@ export default function CyberdeckPage() {
   }, [deckMode]);
 
   useEffect(() => {
+    if (deckMode === "ascii") {
+      setScanlineEnabled(false);
+    }
+  }, [deckMode]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const storedInput = window.localStorage.getItem(INPUT_STORAGE_KEY);
@@ -1351,6 +1382,27 @@ export default function CyberdeckPage() {
     if (typeof window === "undefined") return;
     let restored = false;
     try {
+      const workspaceState = loadWorkspaceState();
+      if (workspaceState) {
+        const restoredWorkspaceTabs = sanitizeCustomTabs(workspaceState.customTabs);
+        setCustomTabs(restoredWorkspaceTabs);
+        if (
+          typeof workspaceState.activeCustomTabId === "string" &&
+          restoredWorkspaceTabs.some((tab) => tab.id === workspaceState.activeCustomTabId)
+        ) {
+          setActiveCustomTabId(workspaceState.activeCustomTabId);
+          restored = true;
+        } else if (
+          typeof workspaceState.activeModuleId === "string" &&
+          isFixedServerTabId(workspaceState.activeModuleId)
+        ) {
+          setServer(workspaceState.activeModuleId);
+          setActiveCustomTabId(null);
+          restored = true;
+        } else {
+          setActiveCustomTabId(null);
+        }
+      }
       const stored = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Partial<CyberdeckUiState> | null;
@@ -1395,6 +1447,7 @@ export default function CyberdeckPage() {
       if (restored) {
         startupRailResolvedRef.current = true;
       }
+      setWorkspaceHydrated(true);
       setDeckUiHydrated(true);
     }
   }, []);
@@ -1425,6 +1478,15 @@ export default function CyberdeckPage() {
     server,
     serverKeyboardHighlightId,
   ]);
+
+  useEffect(() => {
+    if (!workspaceHydrated) return;
+    saveWorkspaceState({
+      activeModuleId: selectedRailTabId,
+      customTabs,
+      activeCustomTabId,
+    });
+  }, [activeCustomTabId, customTabs, selectedRailTabId, workspaceHydrated]);
 
   useEffect(() => {
     if (!deckUiHydrated || uiFocusRestoredRef.current) return;
@@ -1768,14 +1830,17 @@ export default function CyberdeckPage() {
 
   const closeRailTabContextMenu = useCallback(() => {
     setRailTabContextMenu(null);
+    playBack();
   }, []);
 
   const closeMirageContextMenu = useCallback(() => {
     setMirageContextMenu(null);
+    playBack();
   }, []);
 
   const closeGatewayPaneContextMenu = useCallback(() => {
     setGatewayPaneContextMenu(null);
+    playBack();
   }, []);
 
   const handleTabClick = useCallback(
@@ -1787,6 +1852,7 @@ export default function CyberdeckPage() {
       if (isCustomTab) {
         if (activeCustomTabId !== id) {
           setActiveCustomTabId(id);
+          playClick();
           playSystemSound("chirp");
         } else {
           playSystemSound("click", 0.05);
@@ -1797,6 +1863,7 @@ export default function CyberdeckPage() {
       setActiveCustomTabId(null);
       if (server !== id) {
         setServer(id as (typeof SERVER_IDS)[number]);
+        playClick();
         playSystemSound("chirp");
       } else {
         playSystemSound("click", 0.05);
@@ -2114,6 +2181,9 @@ export default function CyberdeckPage() {
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
+      if (e.key === "Escape" && !e.repeat) {
+        playBack();
+      }
 
       // Browser Find (and find-next): do not intercept — keep default keyboard behavior.
       if (e.key === "F3") return;
@@ -3810,8 +3880,11 @@ export default function CyberdeckPage() {
     <div
       ref={cyberdeckRootRef}
       data-deck-mode={deckMode}
+      data-scanline={scanlineEnabled ? "on" : "off"}
       className="terminal-window flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:flex-col max-md:overflow-y-auto md:overflow-hidden"
     >
+      <CyberdeckBootSequence />
+      {scanlineEnabled && deckMode !== "ascii" ? <div className="cyberdeck-scanline-overlay" /> : null}
       {railTabContextMenu || mirageContextMenu || gatewayPaneContextMenu ? (
         <div
           className="fixed inset-0 z-[90]"
@@ -4167,6 +4240,28 @@ export default function CyberdeckPage() {
                   className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#a8a8a8] transition hover:border-emerald-500/60 hover:text-emerald-200"
                 >
                   {deckMode === "ascii" ? "[REALMORPH | ASCII*]" : "[REALMORPH* | ASCII]"}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleAudioMuted}
+                  className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#a8a8a8] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                >
+                  {audioMuted ? "[ AUDIO: MUTED ]" : "[ AUDIO: LIVE ]"}
+                </button>
+                <button
+                  type="button"
+                  disabled={audioMuted}
+                  onClick={handleToggleAmbientHum}
+                  className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#a8a8a8] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  [ HUM {ambientHumOn ? "ON" : "OFF"} ]
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScanlineEnabled((prev) => !prev)}
+                  className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#a8a8a8] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                >
+                  [ SCANLINE {scanlineEnabled ? "ON" : "OFF"} ]
                 </button>
               </div>
             ) : null}
