@@ -707,3 +707,32 @@ body,
   -webkit-text-fill-color: transparent;
   animation: cyberdeck-cogitating-sweep 1.35s linear infinite;
 }
+
+/* Echo Mirage ASCII override mode */
+[data-deck-mode="ascii"] {
+  text-shadow: none !important;
+}
+
+[data-deck-mode="ascii"] .terminal-window,
+[data-deck-mode="ascii"] * {
+  backdrop-filter: none !important;
+}
+
+[data-deck-mode="ascii"] .rounded,
+[data-deck-mode="ascii"] .rounded-sm,
+[data-deck-mode="ascii"] .rounded-\[6px\] {
+  border-radius: 0 !important;
+}
+
+[data-deck-mode="ascii"] .shadow-\[0_12px_30px_rgba\(0\,0\,0\,0\.65\)\],
+[data-deck-mode="ascii"] .shadow-\[0_0_0_1px_rgba\(16\,185\,129\,0\.30\)_inset\,0_0_14px_rgba\(16\,185\,129\,0\.22\)\,0_3px_10px_rgba\(0\,0\,0\,0\.5\)\],
+[data-deck-mode="ascii"] .shadow-\[0_0_0_1px_rgba\(245\,158\,11\,0\.20\)_inset\,0_0_12px_rgba\(245\,158\,11\,0\.12\)\,0_3px_10px_rgba\(0\,0\,0\,0\.5\)\] {
+  box-shadow: none !important;
+}
+
+[data-deck-mode="ascii"] div,
+[data-deck-mode="ascii"] section,
+[data-deck-mode="ascii"] article,
+[data-deck-mode="ascii"] aside {
+  border-style: dashed;
+}

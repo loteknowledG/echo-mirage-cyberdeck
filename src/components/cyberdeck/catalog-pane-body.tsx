@@ -1,22 +1,22 @@
-'use client';
+"use client";
 
-import { useState } from "react";
 import {
   CyberdeckPaneHeader,
   CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
   CyberdeckPaneHeaderValue,
 } from "@/components/cyberdeck/pane-header";
-import { CatalogGrid } from "@/components/cyberdeck/catalog/catalog-grid";
-import { CatalogCard } from "@/components/cyberdeck/catalog/catalog-card";
-import { MomentDetailsModal } from "@/components/cyberdeck/catalog/moment-details-modal";
-import { ECHO_MIRAGE_SERIES_MOMENT } from "@/lib/catalog/echo-mirage-series";
 
-const CATALOG_MOMENTS = [ECHO_MIRAGE_SERIES_MOMENT];
+const CATALOG_CARDS = [
+  { id: "mk-i", title: "Echo Mirage Mark I", image: "/catalog/echo-mirage-cyberdeck.png" },
+  { id: "mk-ii", title: "Echo Mirage Mark II", image: "/catalog/echo-mirage-series-em-series-01.png" },
+  { id: "field", title: "Echo Mirage Field Unit", image: "/catalog/echo-mirage-cyberdeck.png" },
+  { id: "bridge", title: "Echo Mirage Bridge Console", image: "/catalog/echo-mirage-series-em-series-01.png" },
+  { id: "industrial", title: "Echo Mirage Industrial Rig", image: "/catalog/echo-mirage-cyberdeck.png" },
+  { id: "classified", title: "Echo Mirage Classified", image: "/catalog/echo-mirage-series-em-series-01.png" },
+];
 
 export function CyberdeckCatalogPaneBody() {
-  const [detailsOpen, setDetailsOpen] = useState(false);
-
   return (
     <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3">
       <CyberdeckPaneHeader
@@ -25,44 +25,41 @@ export function CyberdeckCatalogPaneBody() {
             <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.15)" }}>
               CATALOG
             </CyberdeckPaneHeaderTitle>
-            <CyberdeckPaneHeaderSubtitle>
-              DEPLOYMENT INDEX // CRAFTWERK CYBERDECK CORPORATION
-            </CyberdeckPaneHeaderSubtitle>
+            <CyberdeckPaneHeaderSubtitle>ECHO MIRAGE SERIES // CRAFTWERK CYBERDECK CORPORATION</CyberdeckPaneHeaderSubtitle>
           </div>
         }
-        right={
-          <CyberdeckPaneHeaderValue>
-            {CATALOG_MOMENTS.length === 1 ? "1 LINE" : `${CATALOG_MOMENTS.length} LINES`}
-          </CyberdeckPaneHeaderValue>
-        }
+        right={<CyberdeckPaneHeaderValue>{CATALOG_CARDS.length} LINES</CyberdeckPaneHeaderValue>}
       />
-
       <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-snug tracking-[0.04em] text-[#707070]">
-        Classified equipment manifest — Echo Mirage production line only. Select a configuration moment for
-        specifications and deployment narrative.
+        Premium deployment index. Classified industrial hardware for bridge, field, and autonomous command environments.
       </div>
-
-      <CatalogGrid>
-        {CATALOG_MOMENTS.map((m) => (
-          <CatalogCard
-            key={m.configurationId}
-            title={m.title}
-            coverImage={m.coverImage}
-            coverAlt={m.coverAlt}
-            configurationId={m.configurationId}
-            onOpen={() => setDetailsOpen(true)}
-          />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {CATALOG_CARDS.map((card) => (
+          <article key={card.id} className="rounded-sm border border-[#1c1c1c] bg-black/70 p-2">
+            <div className="relative aspect-square overflow-hidden rounded-sm border border-[#2a2a2a] bg-black">
+              <img
+                src={card.image}
+                alt={`${card.title} cover`}
+                className="h-full w-full object-cover opacity-80 saturate-[0.85]"
+              />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.16),transparent_48%)]" />
+              <div className="absolute bottom-0 left-0 right-0 border-t border-black/70 bg-black/70 px-2 py-1 font-mono text-[10px] tracking-[0.05em] text-[#d6d6d6]">
+                {card.title}
+              </div>
+            </div>
+            <div className="mt-2 flex gap-2">
+              <button className="flex-1 rounded-sm border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] text-[#9a9a9a] transition hover:border-emerald-500/60 hover:text-emerald-200">
+                [VIEW]
+              </button>
+              <button className="flex-1 rounded-sm border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] text-[#9a9a9a] transition hover:border-amber-500/60 hover:text-amber-200">
+                [CONFIGURE]
+              </button>
+            </div>
+          </article>
         ))}
-      </CatalogGrid>
-
-      <MomentDetailsModal
-        moment={ECHO_MIRAGE_SERIES_MOMENT}
-        open={detailsOpen}
-        onOpenChange={setDetailsOpen}
-      />
+      </div>
     </div>
   );
 }
 
-/** Alias for documentation / future routing to a dedicated catalog module. */
 export { CyberdeckCatalogPaneBody as CatalogPane };

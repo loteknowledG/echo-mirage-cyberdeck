@@ -40,26 +40,31 @@ function getSharedSheet(): CSSStyleSheet {
  * outer layout/Tailwind cannot resize the tab chrome; slotted light-DOM
  * children keep document styles (e.g. `.ascii-btn` in globals.css).
  */
-export class CyberdeckRailTab extends HTMLElement {
-  constructor() {
-    super();
-    const root = this.attachShadow({ mode: "open" });
-    try {
-      root.adoptedStyleSheets = [getSharedSheet()];
-    } catch {
-      const style = document.createElement("style");
-      style.textContent = RAIL_TAB_SHADOW_CSS;
-      root.appendChild(style);
-    }
-    const slot = document.createElement("slot");
-    root.appendChild(slot);
-  }
-}
-
-function registerCyberdeckRailTab(): void {
-  if (typeof window === "undefined" || !customElements) return;
+export function registerCyberdeckRailTab(): void {
+  if (typeof window === "undefined") return;
+  if (typeof HTMLElement === "undefined") return;
+  if (typeof customElements === "undefined") return;
   if (customElements.get("cyberdeck-rail-tab")) return;
+
+  class CyberdeckRailTab extends HTMLElement {
+    constructor() {
+      super();
+      const root = this.attachShadow({ mode: "open" });
+      try {
+        if (typeof CSSStyleSheet !== "undefined") {
+          root.adoptedStyleSheets = [getSharedSheet()];
+        } else {
+          throw new Error("Constructable stylesheets unavailable");
+        }
+      } catch {
+        const style = document.createElement("style");
+        style.textContent = RAIL_TAB_SHADOW_CSS;
+        root.appendChild(style);
+      }
+      const slot = document.createElement("slot");
+      root.appendChild(slot);
+    }
+  }
+
   customElements.define("cyberdeck-rail-tab", CyberdeckRailTab);
 }
-
-registerCyberdeckRailTab();

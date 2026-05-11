@@ -12,7 +12,13 @@ type CustomTabBrowserKind =
   | "connection"
   | "pi"
   | "diagnostics"
-  | "catelog";
+  | "catalog"
+  | "catelog"
+  | "command"
+  | "operators"
+  | "memory-atlas"
+  | "voice-lab"
+  | "flight-log";
 
 type CustomTabBrowserState = {
   id: string;

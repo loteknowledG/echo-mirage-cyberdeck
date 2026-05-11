@@ -73,13 +73,19 @@ import { CyberdeckOperatorPaneBody } from "@/components/cyberdeck/operator-pane-
 import { CyberdeckDiagnosticPaneBody } from "@/components/cyberdeck/diagnostic-pane-body";
 import { CyberdeckPiChatPaneBody } from "@/components/cyberdeck/pi-chat-pane-body";
 import { CyberdeckCatalogPaneBody } from "@/components/cyberdeck/catalog-pane-body";
+import { CyberdeckCommandPaneBody } from "@/components/cyberdeck/command-pane-body";
+import { CyberdeckOperatorsPaneBody } from "@/components/cyberdeck/operators-pane-body";
+import { CyberdeckMemoryAtlasPaneBody } from "@/components/cyberdeck/memory-atlas-pane-body";
+import { CyberdeckVoiceLabPaneBody } from "@/components/cyberdeck/voice-lab-pane-body";
+import { CyberdeckFlightLogPaneBody } from "@/components/cyberdeck/flight-log-pane-body";
 import { CyberdeckSettingsPaneBody } from "@/components/cyberdeck/settings-pane-body";
 import { EchoHeader } from "@/components/cyberdeck/echo-header";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
-import "@/components/cyberdeck/cyberdeck-rail-tab";
+import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-tab";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { loadDeckMode, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -145,6 +151,12 @@ const CUSTOM_TAB_KINDS = [
   "connection",
   "pi",
   "diagnostics",
+  "command",
+  "catalog",
+  "operators",
+  "memory-atlas",
+  "voice-lab",
+  "flight-log",
   "catelog",
 ] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -461,11 +473,23 @@ function normalizeCustomTabGlyph(label: string, glyph?: string) {
 
 function normalizeCustomTabKind(kind: string) {
   const nextKind = kind.trim().toLowerCase();
+  if (nextKind === "catelog") {
+    return "catalog" as CustomTabKind;
+  }
   if (nextKind === "catalog") {
-    return "catelog" as CustomTabKind;
+    return "catalog" as CustomTabKind;
   }
   if (nextKind === "diagnostic") {
     return "diagnostics" as CustomTabKind;
+  }
+  if (nextKind === "memoryatlas" || nextKind === "memory_atlas") {
+    return "memory-atlas" as CustomTabKind;
+  }
+  if (nextKind === "voicelab" || nextKind === "voice_lab") {
+    return "voice-lab" as CustomTabKind;
+  }
+  if (nextKind === "flightlog" || nextKind === "flight_log") {
+    return "flight-log" as CustomTabKind;
   }
   if (CUSTOM_TAB_KINDS.includes(nextKind as CustomTabKind)) {
     return nextKind as CustomTabKind;
@@ -489,6 +513,12 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "document") return "D";
   if (kind === "settings") return "S";
   if (kind === "connection") return "C";
+  if (kind === "command") return ">";
+  if (kind === "catalog") return "K";
+  if (kind === "operators") return "O";
+  if (kind === "memory-atlas") return "M";
+  if (kind === "voice-lab") return "V";
+  if (kind === "flight-log") return "F";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
@@ -532,7 +562,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog|command|operators|memory-atlas|voice-lab|flight-log)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -554,6 +584,10 @@ export default function CyberdeckPage() {
   type ChatMessage = { role: string; text: string; toolTrace?: string };
   // Start on the operator tab; disconnected users are redirected to MAINNET-UPLINK after hydration.
   const [server, setServer] = useState<(typeof SERVER_IDS)[number]>("m");
+  useEffect(() => {
+    registerCyberdeckRailTab();
+  }, []);
+
   const [customTabs, setCustomTabs] = useState<CustomTab[]>([]);
   const [activeCustomTabId, setActiveCustomTabId] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -607,6 +641,7 @@ export default function CyberdeckPage() {
   const [heapNameDraft, setHeapNameDraft] = useState("");
   const [heapTextDraft, setHeapTextDraft] = useState("");
   const [heapHydrated, setHeapHydrated] = useState(false);
+  const [deckMode, setDeckMode] = useState<DeckMode>("realmorphism");
 
   const [activeProvider, setActiveProvider] = useState<string>("opencode");
   /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
@@ -752,6 +787,12 @@ export default function CyberdeckPage() {
   const activeTextGlow = "0 0 8px rgba(0, 255, 0, 0.22)";
   const amberTextGlow = "0 0 8px rgba(255, 170, 0, 0.22)";
   const inactiveTextGlow = "0 0 6px rgba(180, 180, 180, 0.14)";
+  const operatorCount = 4;
+  const alphaChipText = `DECK ALPHA :: ${deckMode === "ascii" ? "ASCII" : "NOMINAL"} :: OPS ${operatorCount}`;
+
+  const toggleDeckMode = useCallback(() => {
+    setDeckMode((prev) => (prev === "ascii" ? "realmorphism" : "ascii"));
+  }, []);
 
   const playModelTestErrorSound = useCallback((line: string) => {
     if (line.includes("VALID_RESPONSE")) {
@@ -1232,6 +1273,14 @@ export default function CyberdeckPage() {
     muthurMemoryRef.current = muthurMemory;
     void saveMuthurMemory(muthurMemory);
   }, [muthurMemory, muthurMemoryHydrated]);
+
+  useEffect(() => {
+    setDeckMode(loadDeckMode());
+  }, []);
+
+  useEffect(() => {
+    saveDeckMode(deckMode);
+  }, [deckMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -3251,7 +3300,7 @@ export default function CyberdeckPage() {
       closeGatewayPaneContextMenu();
 
       const menuWidth = 176;
-      const menuHeight = isFixedServerTabId(tabId) ? 132 : 264;
+      const menuHeight = isFixedServerTabId(tabId) ? 132 : 520;
       const padding = 8;
       const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
       const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
@@ -3603,18 +3652,19 @@ export default function CyberdeckPage() {
 
       if (tab.kind === "settings") {
         return shell(
-          <div className="grid flex-1 gap-3 overflow-auto p-3">
-            <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3 font-mono text-[10px] leading-snug text-[#8a8a8a]">
-              SETTINGS TAB // LOCAL CONFIG
-              <div className="mt-2 text-[#cfcfcf]">
-                ACTIVE_PROVIDER: {activeProvider.toUpperCase()}
-                <br />
-                VOICE: {voiceEnabled ? "ON" : "OFF"}
-                <br />
-                CONNECTION: {connectionState.toUpperCase()}
-              </div>
-            </div>
-          </div>,
+          <CyberdeckSettingsPaneBody
+            voiceEnabled={voiceEnabled}
+            onVoiceToggle={toggleVoiceEnabled}
+            muthurMasterVolume={voiceDial.volume}
+            onMuthurMasterVolumeChange={(volume) =>
+              setVoiceDial((prev) => ({
+                ...prev,
+                volume: Math.min(1.25, Math.max(0.05, volume)),
+              }))
+            }
+            deckMode={deckMode}
+            onDeckModeToggle={toggleDeckMode}
+          />,
         );
       }
 
@@ -3668,13 +3718,45 @@ export default function CyberdeckPage() {
         return shell(<CyberdeckPiChatPaneBody server={server} />);
       }
 
-      if (tab.kind === "catelog") {
+      if (tab.kind === "catelog" || tab.kind === "catalog") {
         return shell(<CyberdeckCatalogPaneBody />);
+      }
+
+      if (tab.kind === "command") {
+        return shell(<CyberdeckCommandPaneBody server={server} />);
+      }
+
+      if (tab.kind === "operators") {
+        return shell(<CyberdeckOperatorsPaneBody />);
+      }
+
+      if (tab.kind === "memory-atlas") {
+        return shell(<CyberdeckMemoryAtlasPaneBody />);
+      }
+
+      if (tab.kind === "voice-lab") {
+        return shell(
+          <CyberdeckVoiceLabPaneBody
+            voiceEnabled={voiceEnabled}
+            onVoiceToggle={toggleVoiceEnabled}
+            muthurMasterVolume={voiceDial.volume}
+            onMuthurMasterVolumeChange={(volume) =>
+              setVoiceDial((prev) => ({
+                ...prev,
+                volume: Math.min(1.25, Math.max(0.05, volume)),
+              }))
+            }
+          />,
+        );
+      }
+
+      if (tab.kind === "flight-log") {
+        return shell(<CyberdeckFlightLogPaneBody />);
       }
 
       return shell(
         <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-          BLANK TAB // USE CHAT COMMANDS TO CONVERT ME TO DOCUMENT, WEB, CATELOG, SETTINGS, CONNECTION, DIAGNOSTICS, OR PI.
+          BLANK TAB // USE CHAT COMMANDS TO CONVERT TO DOCUMENT, WEB, CATALOG, COMMAND, OPERATORS, MEMORY-ATLAS, VOICE-LAB, FLIGHT-LOG, SETTINGS, CONNECTION, DIAGNOSTICS, OR PI.
         </div>,
       );
     },
@@ -3696,7 +3778,10 @@ export default function CyberdeckPage() {
       providerModelFetchStatus,
       server,
       streamText,
+      toggleDeckMode,
+      toggleVoiceEnabled,
       updateCustomTab,
+      voiceDial.volume,
       voiceEnabled,
       voiceHealth,
     ],
@@ -3706,9 +3791,14 @@ export default function CyberdeckPage() {
     | { label: string; kind: CustomTabKind; action: "convert" }
     | { label: string; action: "settings-pane" | "connection-pane" }
   > = [
+    { label: "Command", kind: "command", action: "convert" },
     { label: "Document", kind: "document", action: "convert" },
     { label: "Web", kind: "web", action: "convert" },
-    { label: "Catelog", kind: "catelog", action: "convert" },
+    { label: "Catalog", kind: "catalog", action: "convert" },
+    { label: "Operators", kind: "operators", action: "convert" },
+    { label: "Memory Atlas", kind: "memory-atlas", action: "convert" },
+    { label: "Voice Lab", kind: "voice-lab", action: "convert" },
+    { label: "Flight Log", kind: "flight-log", action: "convert" },
     { label: "Diagnostics", kind: "diagnostics", action: "convert" },
     { label: "Pi", kind: "pi", action: "convert" },
     { label: "Settings", action: "settings-pane" },
@@ -3719,6 +3809,7 @@ export default function CyberdeckPage() {
   return (
     <div
       ref={cyberdeckRootRef}
+      data-deck-mode={deckMode}
       className="terminal-window flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:flex-col max-md:overflow-y-auto md:overflow-hidden"
     >
       {railTabContextMenu || mirageContextMenu || gatewayPaneContextMenu ? (
@@ -3743,7 +3834,7 @@ export default function CyberdeckPage() {
             aria-label={
               railTabContextMenu.variant === "fixed" ? "Fixed server tab actions" : "Tab actions"
             }
-            className="absolute min-w-44 rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
+            className="absolute max-h-[70vh] min-w-44 overflow-y-auto rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
             style={{ left: railTabContextMenu.x, top: railTabContextMenu.y }}
             onPointerDown={(event) => event.stopPropagation()}
             onContextMenu={(event) => {
@@ -4062,13 +4153,47 @@ export default function CyberdeckPage() {
               networkActivityActive ? "is-net-active" : ""
             }`}
           >
-            {!isMobileLayout ? <EchoHeader activeTabLabel={activeTabLabel} /> : null}
+            {!isMobileLayout ? (
+              <div className="flex items-center gap-2 border-b border-[#1a1a1a] px-2 py-1">
+                <div className="min-w-0 flex-1">
+                  <EchoHeader activeTabLabel={activeTabLabel} />
+                </div>
+                <div className="rounded border border-[#2d2d2d] px-2 py-1 font-mono text-[9px] tracking-[0.06em] text-[#8a8a8a]">
+                  {alphaChipText}
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleDeckMode}
+                  className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#a8a8a8] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                >
+                  {deckMode === "ascii" ? "[REALMORPH | ASCII*]" : "[REALMORPH* | ASCII]"}
+                </button>
+              </div>
+            ) : null}
+            <div className="mx-4 mb-2 rounded border border-[#2d2d2d] px-2 py-2 font-mono text-[10px] leading-relaxed tracking-[0.06em] text-[#9c9c9c]">
+              MODULES :: Command | Catalog | Operators | Memory Atlas | Voice Lab | Flight Log | Settings :: Craftwerk
+              Cyberdeck Corporation :: OPERATORS :: ChatGPT // Lead | Cursor // Dev | Codex // Test | Samus-Manus //
+              Memory :: MODE :: ASCII
+            </div>
             <div
               ref={messageScrollRef}
               tabIndex={-1}
               className="cyberdeck-chat-content custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
             >
-              {isMobileLayout ? <EchoHeader activeTabLabel={activeTabLabel} /> : null}
+              {isMobileLayout ? (
+                <div className="mb-2 flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <EchoHeader activeTabLabel={activeTabLabel} />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleDeckMode}
+                    className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#a8a8a8]"
+                  >
+                    {deckMode === "ascii" ? "[REALMORPH | ASCII*]" : "[REALMORPH* | ASCII]"}
+                  </button>
+                </div>
+              ) : null}
               <div className="message-log flex-1 space-y-3">
                 {messages.map((m, i) => {
                   const isModelConnectedLine =
@@ -4631,6 +4756,8 @@ export default function CyberdeckPage() {
                       volume: Math.min(1.25, Math.max(0.05, volume)),
                     }))
                   }
+                  deckMode={deckMode}
+                  onDeckModeToggle={toggleDeckMode}
                 />
               </div>
             ) : null}

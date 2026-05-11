@@ -14,6 +14,8 @@ type CyberdeckSettingsPaneBodyProps = {
   /** MUTHUR Web Audio master gain scalar (see `muthurMasterGain`); UI uses 5–125 ≙ 0.05–1.25. */
   muthurMasterVolume: number;
   onMuthurMasterVolumeChange: (volume: number) => void;
+  deckMode: "realmorphism" | "ascii";
+  onDeckModeToggle: () => void;
 };
 
 /** SETTINGS rail / `settings` command surface. */
@@ -22,6 +24,8 @@ export function CyberdeckSettingsPaneBody({
   onVoiceToggle,
   muthurMasterVolume,
   onMuthurMasterVolumeChange,
+  deckMode,
+  onDeckModeToggle,
 }: CyberdeckSettingsPaneBodyProps) {
   return (
     <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
@@ -98,6 +102,26 @@ export function CyberdeckSettingsPaneBody({
                   onCheckedChange={() => onVoiceToggle()}
                   aria-label={voiceEnabled ? "Cyberdeck speech on" : "Cyberdeck speech off"}
                   className="shrink-0 data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
+                />
+              </div>
+            </div>
+          </section>
+          <section className="flex flex-col gap-2">
+            <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">DECK MODE</div>
+            <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">
+              <div className="mb-2 text-[9px] tracking-[0.06em] text-[#8a8a8a]">REALMORPHISM / ASCII OVERRIDE</div>
+              <div className="flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3">
+                <div className="min-w-0">
+                  <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">ACTIVE MODE</div>
+                  <div className="mt-0.5 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
+                    {deckMode === "ascii" ? "ASCII wireframe frame style" : "Realmorphism cinematic style"}
+                  </div>
+                </div>
+                <Switch
+                  checked={deckMode === "ascii"}
+                  onCheckedChange={() => onDeckModeToggle()}
+                  aria-label={deckMode === "ascii" ? "ASCII mode on" : "Realmorphism mode on"}
+                  className="shrink-0 data-[state=checked]:border-amber-500/70 data-[state=checked]:bg-amber-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
                 />
               </div>
             </div>
