@@ -3,7 +3,7 @@
 export const art = {
   // Classic 3D tab art with the Latin glyph centered inside the button.
   popped: (symbol) => `┌───┐\n│ ${symbol} │▓\n└───┘▓\n▓▓▓▓▓`,
-  pushed: (symbol) => `\n┌───┐\n│ ${symbol} │\n└───┘`
+  pushed: (symbol) => `┌───┐\n│ ${symbol} │\n└───┘`
 };
 
 // The main boot screen logo

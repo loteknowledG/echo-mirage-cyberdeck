@@ -76,6 +76,7 @@ import { CyberdeckCatalogPaneBody } from "@/components/cyberdeck/catalog-pane-bo
 import { CyberdeckSettingsPaneBody } from "@/components/cyberdeck/settings-pane-body";
 import { EchoHeader } from "@/components/cyberdeck/echo-header";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
+import "@/components/cyberdeck/cyberdeck-rail-tab";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -3978,20 +3979,13 @@ export default function CyberdeckPage() {
         className="cyberdeck-server-rail z-40 flex w-12 flex-shrink-0 flex-col items-center border-r border-gray-800 bg-black py-4 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 md:min-h-0 md:overflow-y-auto md:overscroll-y-contain max-md:sticky max-md:top-[max(0px,env(safe-area-inset-top))] max-md:self-start max-md:bg-black/95 max-md:backdrop-blur-sm max-md:h-auto max-md:w-full max-md:flex-row max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory max-md:border-b max-md:border-r-0 max-md:px-2 max-md:py-2 max-md:touch-pan-x"
       >
         {fixedServers.map((btn) => (
-          <div
+          <cyberdeck-rail-tab
             key={btn.id}
-            className="btn-container shrink-0 max-md:snap-start select-none"
-            style={{
-              width: "48px",
-              height: "52px",
-              position: "relative",
-              WebkitTouchCallout: "none",
-            }}
+            data-server-tab={btn.id}
             onContextMenu={(event) => handleRailTabContextMenu(btn.id, event)}
             {...createRailTabLongPressHandlers(btn.id)}
           >
             <pre
-              data-server-tab={btn.id}
               className={`ascii-btn${railServer === btn.id ? " is-pushed" : ""}${
                 navRailContext === "tabs" && serverKeyboardHighlightId === btn.id
                   ? " server-rail-kb-hover"
@@ -4012,23 +4006,16 @@ export default function CyberdeckPage() {
             >
               {railServer === btn.id ? art.pushed(btn.glyph) : art.popped(btn.glyph)}
             </pre>
-          </div>
+          </cyberdeck-rail-tab>
         ))}
         {customTabs.map((tab) => (
-          <div
+          <cyberdeck-rail-tab
             key={tab.id}
-            className="btn-container shrink-0 max-md:snap-start select-none"
-            style={{
-              width: "48px",
-              height: "52px",
-              position: "relative",
-              WebkitTouchCallout: "none",
-            }}
+            data-server-tab={tab.id}
             onContextMenu={(event) => handleRailTabContextMenu(tab.id, event)}
             {...createRailTabLongPressHandlers(tab.id)}
           >
             <pre
-              data-server-tab={tab.id}
               className={`ascii-btn${selectedRailTabId === tab.id ? " is-pushed" : ""}${
                 navRailContext === "tabs" && serverKeyboardHighlightId === tab.id
                   ? " server-rail-kb-hover"
@@ -4049,9 +4036,9 @@ export default function CyberdeckPage() {
             >
               {selectedRailTabId === tab.id ? art.pushed(tab.glyph) : art.popped(tab.glyph)}
             </pre>
-          </div>
+          </cyberdeck-rail-tab>
         ))}
-        <div className="mt-2 flex w-12 shrink-0 flex-col gap-2 px-2 max-md:snap-start">
+        <div className="flex w-12 shrink-0 flex-col gap-2 px-2 max-md:mt-0 max-md:snap-start md:mt-2">
           <button
             type="button"
             onClick={createBlankTab}

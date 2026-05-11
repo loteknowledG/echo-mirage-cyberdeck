@@ -275,7 +275,7 @@ body,
 }
 
 /* Cyberdeck server tabs — same hover / press behavior as weyland-yutani `index.css` */
-.cyberdeck-server-rail .btn-container {
+.cyberdeck-server-rail cyberdeck-rail-tab {
   margin-bottom: 8px;
   cursor: pointer;
 }
@@ -340,19 +340,19 @@ body,
     display: none;
   }
 
-  .cyberdeck-server-rail .btn-container {
+  .cyberdeck-server-rail cyberdeck-rail-tab {
     margin-bottom: 0;
     margin-right: 8px;
   }
 }
 
-.cyberdeck-server-rail .btn-container:hover .ascii-btn {
+.cyberdeck-server-rail cyberdeck-rail-tab:hover .ascii-btn {
   transform: translate(1px, 1px) scale(1.02);
   color: #9aa7ff;
   text-shadow: 0 0 10px rgba(114, 137, 218, 0.35);
 }
 
-.cyberdeck-server-rail .btn-container:hover .ascii-btn.is-pushed {
+.cyberdeck-server-rail cyberdeck-rail-tab:hover .ascii-btn.is-pushed {
   color: #36ff73;
   text-shadow: 0 0 12px rgba(54, 255, 115, 0.38);
 }
@@ -381,14 +381,14 @@ body,
 }
 
 /* Keyboard focus on tab rail (after .ascii-btn / .is-pushed so it wins the cascade) */
-.cyberdeck-server-rail .btn-container .ascii-btn.server-rail-kb-hover {
+.cyberdeck-server-rail cyberdeck-rail-tab .ascii-btn.server-rail-kb-hover {
   transform: translate(1px, 1px) scale(1.02);
   color: #9aa7ff;
   text-shadow: 0 0 10px rgba(114, 137, 218, 0.35);
   opacity: 1;
 }
 
-.cyberdeck-server-rail .btn-container .ascii-btn.server-rail-kb-hover.is-pushed {
+.cyberdeck-server-rail cyberdeck-rail-tab .ascii-btn.server-rail-kb-hover.is-pushed {
   color: #36ff73;
   text-shadow: 0 0 12px rgba(54, 255, 115, 0.38);
 }
