@@ -100,6 +100,17 @@ const servers = [
 ] as const;
 
 const SERVER_IDS = ["m", "s", "b"] as const;
+
+function isFixedServerTabId(id: string): id is (typeof SERVER_IDS)[number] {
+  return (SERVER_IDS as readonly string[]).includes(id);
+}
+
+function contextMenuTargetIsTextField(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return Boolean(target.closest("input, textarea, select"));
+}
+
 const fixedServers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
@@ -565,11 +576,17 @@ export default function CyberdeckPage() {
   const [operatorBrowserSnapshot, setOperatorBrowserSnapshot] = useState("");
   const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
   const [isOperatorDragOver, setIsOperatorDragOver] = useState(false);
-  const [customTabContextMenu, setCustomTabContextMenu] = useState<{
-    tabId: string;
-    x: number;
-    y: number;
-  } | null>(null);
+  const [railTabContextMenu, setRailTabContextMenu] = useState<
+    | { variant: "custom"; tabId: string; x: number; y: number }
+    | { variant: "fixed"; serverId: (typeof SERVER_IDS)[number]; x: number; y: number }
+    | null
+  >(null);
+  /** Right-click menu for the main chat / Echo Mirage pane (viewport-clamped like rail tabs). */
+  const [mirageContextMenu, setMirageContextMenu] = useState<{ x: number; y: number } | null>(null);
+  /** Right-click menu for gateway column surfaces (settings, operator, connection, custom tabs). */
+  const [gatewayPaneContextMenu, setGatewayPaneContextMenu] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const [inputCursorBlinkOn, setInputCursorBlinkOn] = useState(true);
@@ -1699,13 +1716,23 @@ export default function CyberdeckPage() {
     playSystemSound("chirp", 0.05);
   }, []);
 
-  const closeCustomTabContextMenu = useCallback(() => {
-    setCustomTabContextMenu(null);
+  const closeRailTabContextMenu = useCallback(() => {
+    setRailTabContextMenu(null);
+  }, []);
+
+  const closeMirageContextMenu = useCallback(() => {
+    setMirageContextMenu(null);
+  }, []);
+
+  const closeGatewayPaneContextMenu = useCallback(() => {
+    setGatewayPaneContextMenu(null);
   }, []);
 
   const handleTabClick = useCallback(
     (id: string) => {
-      closeCustomTabContextMenu();
+      closeRailTabContextMenu();
+      closeMirageContextMenu();
+      closeGatewayPaneContextMenu();
       const isCustomTab = customTabs.some((tab) => tab.id === id);
       if (isCustomTab) {
         if (activeCustomTabId !== id) {
@@ -1725,11 +1752,13 @@ export default function CyberdeckPage() {
         playSystemSound("click", 0.05);
       }
     },
-    [activeCustomTabId, closeCustomTabContextMenu, customTabs, server],
+    [activeCustomTabId, closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu, customTabs, server],
   );
 
   const createBlankTab = useCallback(() => {
-    closeCustomTabContextMenu();
+    closeRailTabContextMenu();
+    closeMirageContextMenu();
+    closeGatewayPaneContextMenu();
     const nextIndex = customTabs.length + 1;
     const id = `tab-${crypto.randomUUID()}`;
     const tab: CustomTab = {
@@ -1742,15 +1771,17 @@ export default function CyberdeckPage() {
     setActiveCustomTabId(id);
     setNavRailContext("gateway");
     playSystemSound("chirp", 0.05);
-  }, [closeCustomTabContextMenu, customTabs.length]);
+  }, [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu, customTabs.length]);
 
   const deleteActiveTab = useCallback(() => {
-    closeCustomTabContextMenu();
+    closeRailTabContextMenu();
+    closeMirageContextMenu();
+    closeGatewayPaneContextMenu();
     if (!activeCustomTabId) return;
     setCustomTabs((prev) => prev.filter((tab) => tab.id !== activeCustomTabId));
     setActiveCustomTabId(null);
     playSystemSound("click", 0.05);
-  }, [activeCustomTabId, closeCustomTabContextMenu]);
+  }, [activeCustomTabId, closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
 
   const clearSavedCustomTabState = useCallback(() => {
     const removedCount = customTabs.length;
@@ -2995,6 +3026,21 @@ export default function CyberdeckPage() {
     }
   }, [activeProvider, modelID]);
 
+  const focusFixedServerPanel = useCallback(
+    (serverId: (typeof SERVER_IDS)[number]) => {
+      if (serverId === "s") {
+        handleModelLabelClick("s");
+        return;
+      }
+      if (serverId === "b") {
+        handleModelLabelClick("b");
+        return;
+      }
+      gatewayColumnRef.current?.focus({ preventScroll: true });
+    },
+    [handleModelLabelClick],
+  );
+
   useEffect(() => {
     if (!didHydrateProviderState || startupRailResolvedRef.current) return;
     if (hasProviderAuth) {
@@ -3197,36 +3243,151 @@ export default function CyberdeckPage() {
     [loadCustomTabAssetFromFile],
   );
 
-  const openCustomTabContextMenu = useCallback(
+  const openRailTabContextMenu = useCallback(
     (tabId: string, clientX: number, clientY: number) => {
       if (selectedRailTabId !== tabId || typeof window === "undefined") return;
+      closeMirageContextMenu();
+      closeGatewayPaneContextMenu();
 
       const menuWidth = 176;
-      const menuHeight = 264;
+      const menuHeight = isFixedServerTabId(tabId) ? 132 : 264;
       const padding = 8;
       const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
       const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
 
-      setCustomTabContextMenu({ tabId, x, y });
+      setRailTabContextMenu(
+        isFixedServerTabId(tabId)
+          ? { variant: "fixed", serverId: tabId, x, y }
+          : { variant: "custom", tabId, x, y },
+      );
     },
-    [selectedRailTabId],
+    [closeGatewayPaneContextMenu, closeMirageContextMenu, selectedRailTabId],
   );
 
-  const { createHandlers: createCustomTabLongPressHandlers, consumeClickIfLongPress, cancelLongPressFromContextMenu } =
+  const openMirageContextMenu = useCallback(
+    (clientX: number, clientY: number) => {
+      if (typeof window === "undefined") return;
+      closeRailTabContextMenu();
+      closeGatewayPaneContextMenu();
+      const menuWidth = 176;
+      const menuHeight = 236;
+      const padding = 8;
+      const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
+      const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
+      setMirageContextMenu({ x, y });
+    },
+    [closeGatewayPaneContextMenu, closeRailTabContextMenu],
+  );
+
+  const openGatewayPaneContextMenu = useCallback(
+    (clientX: number, clientY: number) => {
+      if (typeof window === "undefined") return;
+      closeRailTabContextMenu();
+      closeMirageContextMenu();
+      const menuWidth = 176;
+      const menuHeight = 200;
+      const padding = 8;
+      const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
+      const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
+      setGatewayPaneContextMenu({ x, y });
+    },
+    [closeMirageContextMenu, closeRailTabContextMenu],
+  );
+
+  const handleMiragePaneContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLElement>) => {
+      if (contextMenuTargetIsTextField(event.target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openMirageContextMenu(event.clientX, event.clientY);
+    },
+    [openMirageContextMenu],
+  );
+
+  const handleGatewayPaneContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLElement>) => {
+      if (contextMenuTargetIsTextField(event.target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openGatewayPaneContextMenu(event.clientX, event.clientY);
+    },
+    [openGatewayPaneContextMenu],
+  );
+
+  const copyMirageLastAssistant = useCallback(async () => {
+    let text = streamText.trim();
+    if (!text) {
+      const last = [...messages].reverse().find((m) => m.role === "assistant");
+      text = typeof last?.text === "string" ? last.text.trim() : "";
+    }
+    if (!text) {
+      toast.error("No assistant message to copy.");
+      return;
+    }
+    try {
+      await copyTextToClipboard(text);
+      toast.success("Copied last assistant message.");
+    } catch {
+      toast.error("Could not copy.");
+    }
+  }, [messages, streamText]);
+
+  const copyMirageSelectionOrLastMessage = useCallback(async () => {
+    const sel = typeof window !== "undefined" ? window.getSelection()?.toString().trim() ?? "" : "";
+    let text = sel;
+    if (!text) {
+      const last = messages[messages.length - 1];
+      text = typeof last?.text === "string" ? last.text.trim() : "";
+      if (!text) text = streamText.trim();
+    }
+    if (!text) {
+      toast.error("Nothing to copy.");
+      return;
+    }
+    try {
+      await copyTextToClipboard(text);
+      toast.success(sel ? "Copied selected text." : "Copied last message.");
+    } catch {
+      toast.error("Could not copy.");
+    }
+  }, [messages, streamText]);
+
+  const openOrFocusDiagnosticsTab = useCallback(() => {
+    const existing = customTabs.find((t) => t.kind === "diagnostics");
+    if (existing) {
+      setActiveCustomTabId(existing.id);
+      setNavRailContext("tabs");
+      playSystemSound("chirp", 0.05);
+      return;
+    }
+    const id = `tab-${crypto.randomUUID()}`;
+    const tab: CustomTab = {
+      id,
+      label: "DIAGNOSTICS",
+      glyph: defaultCustomTabGlyphForKind("diagnostics"),
+      kind: "diagnostics",
+    };
+    setCustomTabs((prev) => [...prev, tab]);
+    setActiveCustomTabId(id);
+    setNavRailContext("tabs");
+    playSystemSound("chirp", 0.05);
+  }, [customTabs]);
+
+  const { createHandlers: createRailTabLongPressHandlers, consumeClickIfLongPress, cancelLongPressFromContextMenu } =
     useRailTabLongPress({
       selectedRailTabId,
-      openMenu: openCustomTabContextMenu,
+      openMenu: openRailTabContextMenu,
     });
 
-  const handleCustomTabContextMenu = useCallback(
+  const handleRailTabContextMenu = useCallback(
     (tabId: string, event: ReactMouseEvent<HTMLElement>) => {
       if (selectedRailTabId !== tabId) return;
       event.preventDefault();
       event.stopPropagation();
       cancelLongPressFromContextMenu();
-      openCustomTabContextMenu(tabId, event.clientX, event.clientY);
+      openRailTabContextMenu(tabId, event.clientX, event.clientY);
     },
-    [cancelLongPressFromContextMenu, openCustomTabContextMenu, selectedRailTabId],
+    [cancelLongPressFromContextMenu, openRailTabContextMenu, selectedRailTabId],
   );
 
   useEffect(() => {
@@ -3251,24 +3412,42 @@ export default function CyberdeckPage() {
   }, [captureOperatorBrowserSnapshot, operatorSurfaceMode, operatorBrowserUrl]);
 
   useEffect(() => {
-    if (!customTabContextMenu) return;
+    if (!railTabContextMenu && !mirageContextMenu && !gatewayPaneContextMenu) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        closeCustomTabContextMenu();
+        closeRailTabContextMenu();
+        closeMirageContextMenu();
+        closeGatewayPaneContextMenu();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [closeCustomTabContextMenu, customTabContextMenu]);
+  }, [
+    closeGatewayPaneContextMenu,
+    closeMirageContextMenu,
+    closeRailTabContextMenu,
+    gatewayPaneContextMenu,
+    mirageContextMenu,
+    railTabContextMenu,
+  ]);
 
   useEffect(() => {
-    if (!customTabContextMenu) return;
-    if (customTabContextMenu.tabId !== activeCustomTabId) {
-      closeCustomTabContextMenu();
+    if (!railTabContextMenu) return;
+    if (railTabContextMenu.variant !== "custom") return;
+    if (railTabContextMenu.tabId !== activeCustomTabId) {
+      closeRailTabContextMenu();
     }
-  }, [activeCustomTabId, closeCustomTabContextMenu, customTabContextMenu]);
+  }, [activeCustomTabId, closeRailTabContextMenu, railTabContextMenu]);
+
+  useEffect(() => {
+    if (!railTabContextMenu) return;
+    if (railTabContextMenu.variant !== "fixed") return;
+    if (railTabContextMenu.serverId !== selectedRailTabId) {
+      closeRailTabContextMenu();
+    }
+  }, [closeRailTabContextMenu, railTabContextMenu, selectedRailTabId]);
 
   const renderCustomTabSurface = useCallback(
     (tab: CustomTab) => {
@@ -3541,82 +3720,255 @@ export default function CyberdeckPage() {
       ref={cyberdeckRootRef}
       className="terminal-window flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:flex-col max-md:overflow-y-auto md:overflow-hidden"
     >
-      {customTabContextMenu ? (
+      {railTabContextMenu || mirageContextMenu || gatewayPaneContextMenu ? (
         <div
           className="fixed inset-0 z-[90]"
           onContextMenu={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            closeCustomTabContextMenu();
+            closeRailTabContextMenu();
+            closeMirageContextMenu();
+            closeGatewayPaneContextMenu();
           }}
-          onPointerDown={closeCustomTabContextMenu}
+          onPointerDown={() => {
+            closeRailTabContextMenu();
+            closeMirageContextMenu();
+            closeGatewayPaneContextMenu();
+          }}
         >
+          {railTabContextMenu ? (
           <div
             role="menu"
-            aria-label="Tab actions"
+            aria-label={
+              railTabContextMenu.variant === "fixed" ? "Fixed server tab actions" : "Tab actions"
+            }
             className="absolute min-w-44 rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
-            style={{ left: customTabContextMenu.x, top: customTabContextMenu.y }}
+            style={{ left: railTabContextMenu.x, top: railTabContextMenu.y }}
             onPointerDown={(event) => event.stopPropagation()}
             onContextMenu={(event) => {
               event.preventDefault();
               event.stopPropagation();
             }}
           >
-            {customTabContextMenuActions.map((action) =>
-              action.action === "convert" ? (
+            {railTabContextMenu.variant === "fixed" ? (
+              <>
                 <button
-                  key={action.label}
                   type="button"
                   role="menuitem"
                   onClick={() => {
-                    convertCustomTab(customTabContextMenu.tabId, action.kind);
-                    closeCustomTabContextMenu();
+                    const id = railTabContextMenu.serverId;
+                    closeRailTabContextMenu();
+                    focusFixedServerPanel(id);
                   }}
                   className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
                 >
-                  {action.label}
+                  {railTabContextMenu.serverId === "m"
+                    ? "Focus operator panel"
+                    : railTabContextMenu.serverId === "s"
+                      ? "Focus connection panel"
+                      : "Focus settings panel"}
                 </button>
-              ) : action.action === "settings-pane" ? (
                 <button
-                  key="settings-pane"
                   type="button"
                   role="menuitem"
                   onClick={() => {
-                    closeCustomTabContextMenu();
-                    handleModelLabelClick("b");
+                    const id = railTabContextMenu.serverId;
+                    closeRailTabContextMenu();
+                    void navigator.clipboard
+                      .writeText(id)
+                      .then(() => toast.success(`Copied server id: ${id}`))
+                      .catch(() => toast.error("Could not copy."));
                   }}
                   className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
                 >
-                  {action.label}
+                  Copy server id
                 </button>
-              ) : (
+              </>
+            ) : (
+              <>
+                {customTabContextMenuActions.map((action) =>
+                  action.action === "convert" ? (
+                    <button
+                      key={action.label}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        convertCustomTab(railTabContextMenu.tabId, action.kind);
+                        closeRailTabContextMenu();
+                      }}
+                      className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                    >
+                      {action.label}
+                    </button>
+                  ) : action.action === "settings-pane" ? (
+                    <button
+                      key="settings-pane"
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        closeRailTabContextMenu();
+                        handleModelLabelClick("b");
+                      }}
+                      className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                    >
+                      {action.label}
+                    </button>
+                  ) : (
+                    <button
+                      key="connection-pane"
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        closeRailTabContextMenu();
+                        handleModelLabelClick("s");
+                      }}
+                      className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                    >
+                      {action.label}
+                    </button>
+                  ),
+                )}
+                <div className="my-1 h-px bg-[#232323]" />
                 <button
-                  key="connection-pane"
                   type="button"
                   role="menuitem"
                   onClick={() => {
-                    closeCustomTabContextMenu();
-                    handleModelLabelClick("s");
+                    deleteActiveTab();
+                    closeRailTabContextMenu();
                   }}
-                  className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                  className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#ff8f8f] transition hover:bg-[#171717] hover:text-red-200"
                 >
-                  {action.label}
+                  Delete
                 </button>
-              ),
+              </>
             )}
-            <div className="my-1 h-px bg-[#232323]" />
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                deleteActiveTab();
-                closeCustomTabContextMenu();
-              }}
-              className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#ff8f8f] transition hover:bg-[#171717] hover:text-red-200"
-            >
-              Delete
-            </button>
           </div>
+          ) : mirageContextMenu ? (
+            <div
+              role="menu"
+              aria-label="Mirage chat actions"
+              className="absolute min-w-44 rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
+              style={{ left: mirageContextMenu.x, top: mirageContextMenu.y }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeMirageContextMenu();
+                  replayFullLastAssistant();
+                }}
+                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+              >
+                Speak last message
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeMirageContextMenu();
+                  void copyMirageLastAssistant();
+                }}
+                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+              >
+                Copy last assistant message
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeMirageContextMenu();
+                  void copyMirageSelectionOrLastMessage();
+                }}
+                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+              >
+                Copy selection or last message
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeMirageContextMenu();
+                  handleModelLabelClick("b");
+                }}
+                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+              >
+                Open Settings
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeMirageContextMenu();
+                  handleModelLabelClick("s");
+                }}
+                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+              >
+                Open connection panel
+              </button>
+            </div>
+          ) : gatewayPaneContextMenu ? (
+            <div
+              role="menu"
+              aria-label="Gateway pane actions"
+              className="absolute min-w-44 rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
+              style={{ left: gatewayPaneContextMenu.x, top: gatewayPaneContextMenu.y }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeGatewayPaneContextMenu();
+                  void copyMirageSelectionOrLastMessage();
+                }}
+                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+              >
+                Copy selection or last message
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeGatewayPaneContextMenu();
+                  handleModelLabelClick("b");
+                }}
+                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+              >
+                Open Settings
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeGatewayPaneContextMenu();
+                  handleModelLabelClick("s");
+                }}
+                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+              >
+                Open connection panel
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeGatewayPaneContextMenu();
+                  openOrFocusDiagnosticsTab();
+                }}
+                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+              >
+                Open Diagnostics tab
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
       <aside
@@ -3628,8 +3980,15 @@ export default function CyberdeckPage() {
         {fixedServers.map((btn) => (
           <div
             key={btn.id}
-            className="btn-container shrink-0 max-md:snap-start"
-            style={{ width: "48px", height: "52px", position: "relative" }}
+            className="btn-container shrink-0 max-md:snap-start select-none"
+            style={{
+              width: "48px",
+              height: "52px",
+              position: "relative",
+              WebkitTouchCallout: "none",
+            }}
+            onContextMenu={(event) => handleRailTabContextMenu(btn.id, event)}
+            {...createRailTabLongPressHandlers(btn.id)}
           >
             <pre
               data-server-tab={btn.id}
@@ -3639,6 +3998,7 @@ export default function CyberdeckPage() {
                   : ""
               }`}
               onClick={() => {
+                if (consumeClickIfLongPress(btn.id)) return;
                 setNavRailContext("gateway");
                 setServerKeyboardHighlightId(null);
                 handleTabClick(btn.id);
@@ -3664,8 +4024,8 @@ export default function CyberdeckPage() {
               position: "relative",
               WebkitTouchCallout: "none",
             }}
-            onContextMenu={(event) => handleCustomTabContextMenu(tab.id, event)}
-            {...createCustomTabLongPressHandlers(tab.id)}
+            onContextMenu={(event) => handleRailTabContextMenu(tab.id, event)}
+            {...createRailTabLongPressHandlers(tab.id)}
           >
             <pre
               data-server-tab={tab.id}
@@ -3710,6 +4070,7 @@ export default function CyberdeckPage() {
           <ResizablePanel defaultSize={isMobileLayout ? 98 : 55} minSize={isMobileLayout ? mobilePanelMinSize : 0}>
           <div
             ref={chatColumnRef}
+            onContextMenu={handleMiragePaneContextMenu}
             className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full min-w-0 flex-col overflow-hidden border-b border-gray-800 bg-black md:border-b-0 md:border-r ${
               networkActivityActive ? "is-net-active" : ""
             }`}
@@ -4049,6 +4410,7 @@ export default function CyberdeckPage() {
             ref={gatewayColumnRef}
             tabIndex={-1}
             aria-label="Gateway"
+            onContextMenu={handleGatewayPaneContextMenu}
             onDragOver={handleThirdColumnDragOver}
             onDragLeave={handleThirdColumnDragLeave}
             onDrop={handleThirdColumnDrop}
