@@ -90,8 +90,9 @@ import { loadDeckMode, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
 import { isMuted, playBeep, setMuted, toggleAmbientHum } from "@/lib/deck-audio";
 import { useOperators } from "@/lib/operators";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
-import { emitSignal } from "@/lib/cyberdeck/signal-router";
+import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
+import { useOperatorOrchestrator } from "@/lib/cyberdeck/operator-orchestrator";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -529,6 +530,13 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   return "□";
 }
 
+function defaultCustomTabLabelForKind(kind: CustomTabKind) {
+  if (kind === "memory-atlas") return "MEMORY ATLAS";
+  if (kind === "voice-lab") return "VOICE LAB";
+  if (kind === "flight-log") return "FLIGHT LOG";
+  return kind.toUpperCase();
+}
+
 function parseCustomTabCommand(input: string) {
   const text = input.trim();
   if (!text) return null;
@@ -801,6 +809,7 @@ export default function CyberdeckPage() {
   const alphaChipText = `DECK ALPHA :: ${deckMode === "ascii" ? "ASCII" : "NOMINAL"} :: OPS ${operatorCount} (O${stateCounts.ONLINE}/T${stateCounts.THINKING}/I${stateCounts.IDLE})`;
 
   useDeckAudioBridge();
+  useOperatorOrchestrator();
 
   const toggleDeckMode = useCallback(() => {
     setDeckMode((prev) => {
@@ -3517,6 +3526,73 @@ export default function CyberdeckPage() {
     setNavRailContext("tabs");
     playSystemSound("chirp", 0.05);
   }, [customTabs]);
+
+  const openOrFocusModuleTab = useCallback(
+    (target: "memory-atlas" | "catalog" | "operators" | "flight-log" | "voice-lab" | "settings" | "command") => {
+      const existing = customTabs.find((tab) => tab.kind === target);
+      if (existing) {
+        setActiveCustomTabId(existing.id);
+        setNavRailContext("tabs");
+        playSystemSound("chirp", 0.05);
+        emitSignal({
+          source: "system",
+          type: "focused_module",
+          payload: { target },
+          severity: "info",
+        });
+        return true;
+      }
+      const id = `tab-${crypto.randomUUID()}`;
+      const tab: CustomTab = {
+        id,
+        label: defaultCustomTabLabelForKind(target),
+        glyph: defaultCustomTabGlyphForKind(target),
+        kind: target,
+      };
+      setCustomTabs((prev) => [...prev, tab]);
+      setActiveCustomTabId(id);
+      setNavRailContext("tabs");
+      playSystemSound("chirp", 0.05);
+      emitSignal({
+        source: "system",
+        type: "focused_module",
+        payload: { target },
+        severity: "info",
+      });
+      return true;
+    },
+    [customTabs],
+  );
+
+  const handleModuleFocusSignal = useCallback(
+    (signal: DeckSignal) => {
+      if (signal.source !== "system" || signal.type !== "module_focus_requested") return;
+      const target = signal.payload?.["target"];
+      if (typeof target !== "string") return;
+      if (
+        target !== "memory-atlas" &&
+        target !== "catalog" &&
+        target !== "operators" &&
+        target !== "flight-log" &&
+        target !== "voice-lab" &&
+        target !== "settings" &&
+        target !== "command"
+      ) {
+        return;
+      }
+      const focused = openOrFocusModuleTab(target);
+      if (focused) return;
+      emitSignal({
+        source: "system",
+        type: "navigate_recommendation",
+        payload: { target },
+        severity: "info",
+      });
+    },
+    [openOrFocusModuleTab],
+  );
+
+  useDeckSignal(handleModuleFocusSignal);
 
   const { createHandlers: createRailTabLongPressHandlers, consumeClickIfLongPress, cancelLongPressFromContextMenu } =
     useRailTabLongPress({

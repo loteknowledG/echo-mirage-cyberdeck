@@ -100,6 +100,22 @@ function readString(payload: Record<string, unknown> | undefined, key: string): 
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function actorFromCallsign(callsign: string): string {
+  const primary = callsign.split("//")[0]?.trim() || callsign;
+  return primary.toUpperCase();
+}
+
+function formatModuleLabel(target: string): string {
+  if (target === "memory-atlas") return "Memory Atlas";
+  if (target === "flight-log") return "Flight Log";
+  if (target === "voice-lab") return "Voice Lab";
+  if (target === "catalog") return "Catalog";
+  if (target === "operators") return "Operators";
+  if (target === "settings") return "Settings";
+  if (target === "command") return "Command";
+  return target;
+}
+
 /**
  * Translate a DeckSignal into the actor/action/result shape used by the flight log.
  * Returns null for signals that should not surface in the formatted log (e.g. UI clicks).
@@ -146,6 +162,17 @@ export function signalToFlightLog(
       const state = readString(payload, "state") ?? "OK";
       return { actor: callsign.toUpperCase(), action, result: state, severity };
     }
+    case "operators:reaction": {
+      const callsign = readString(payload, "callsign") ?? "OPERATOR";
+      const action = readString(payload, "action") ?? "acknowledged";
+      const ref = readString(payload, "ref");
+      return {
+        actor: actorFromCallsign(callsign),
+        action,
+        result: ref ? "SUCCESS" : "ACK",
+        severity,
+      };
+    }
     case "atlas:entity_selected": {
       const label = readString(payload, "label") ?? "unknown";
       return { actor: "ATLAS", action: "entity selected", result: label, severity };
@@ -168,6 +195,22 @@ export function signalToFlightLog(
     case "system:navigate": {
       const target = readString(payload, "target") ?? "unknown";
       return { actor: "SYSTEM", action: "navigate", result: target, severity };
+    }
+    case "system:module_focus_requested": {
+      const target = readString(payload, "target") ?? "unknown";
+      return { actor: "SYSTEM", action: "module focus requested", result: formatModuleLabel(target), severity };
+    }
+    case "system:focused_module": {
+      const target = readString(payload, "target") ?? "unknown";
+      return { actor: "SYSTEM", action: "focused module", result: formatModuleLabel(target), severity };
+    }
+    case "system:navigate_recommendation": {
+      const target = readString(payload, "target") ?? "unknown";
+      return { actor: "SYSTEM", action: "navigate recommendation", result: formatModuleLabel(target), severity };
+    }
+    case "system:orchestrator_dropped": {
+      const reason = readString(payload, "reason") ?? "unknown";
+      return { actor: "SYSTEM", action: "orchestrator drop", result: reason, severity };
     }
     case "system:boot_line": {
       const actor = readString(payload, "actor") ?? "BOOT";

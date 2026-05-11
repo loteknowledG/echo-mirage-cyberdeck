@@ -8,6 +8,7 @@ export type OperatorState =
   | "THINKING"
   | "INDEXING"
   | "REVIEWING"
+  | "ACKNOWLEDGED"
   | "IDLE"
   | "ROUTING"
   | "MEMORY_SYNC"
@@ -100,6 +101,7 @@ let operators: OperatorStatus[] = [
 
 let runtimeStarted = false;
 let runtimeIntervals: number[] = [];
+const pulseTimeouts = new Map<string, number>();
 
 function emit() {
   for (const listener of listeners) {
@@ -158,6 +160,61 @@ export function subscribeOperators(listener: OperatorListener) {
   return () => {
     listeners.delete(listener);
   };
+}
+
+function rosterCallsign(operator: OperatorStatus): string {
+  return `${operator.callsign} // ${operator.role}`;
+}
+
+export function pulseOperatorState(
+  callsign: string,
+  transientState: "ROUTING" | "REVIEWING" | "MEMORY_SYNC" | "ACKNOWLEDGED" | "INDEXING",
+  durationMs: number = 1500,
+): boolean {
+  if (typeof window === "undefined") return false;
+  const normalizedCallsign = callsign.trim();
+  if (!normalizedCallsign) return false;
+  const index = operators.findIndex(
+    (operator) => rosterCallsign(operator) === normalizedCallsign || operator.callsign === normalizedCallsign,
+  );
+  if (index < 0) return false;
+
+  const target = operators[index];
+  if (!target) return false;
+  const previousState = target.state;
+  const now = Date.now();
+  operators = operators.map((operator, operatorIndex) =>
+    operatorIndex === index
+      ? {
+          ...operator,
+          state: transientState,
+          lastUpdate: now,
+        }
+      : operator,
+  );
+  emit();
+
+  const existingTimer = pulseTimeouts.get(target.id);
+  if (typeof existingTimer === "number") {
+    window.clearTimeout(existingTimer);
+  }
+
+  const clampedDuration = Math.max(200, durationMs);
+  const restoreTimer = window.setTimeout(() => {
+    pulseTimeouts.delete(target.id);
+    operators = operators.map((operator) =>
+      operator.id === target.id
+        ? {
+            ...operator,
+            state: previousState,
+            lastUpdate: Date.now(),
+          }
+        : operator,
+    );
+    emit();
+  }, clampedDuration);
+  pulseTimeouts.set(target.id, restoreTimer);
+  return true;
 }
 
 export function useOperators() {
