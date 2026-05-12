@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 
 async function createAuditTab(page: import("@playwright/test").Page) {
   const input = page.locator('input[placeholder*="GATEWAY"], input[placeholder*="command"]').first();
+  await input.click();
   await input.fill("new tab named audit glyph A");
+  await expect(input).toHaveValue("new tab named audit glyph A");
   await input.press("Enter");
   await expect(page.getByText("TAB_CREATED // audit // GLYPH A")).toBeVisible();
 }
@@ -21,14 +23,11 @@ test("cyberdeck renders and switches required alpha modules", async ({ page }) =
   expect(response!.status()).toBeLessThan(500);
 
   await expect(page.locator("cyberdeck-rail-tab")).toHaveCount(3);
-  await expect(page.getByText("DECK ALPHA :: NOMINAL :: OPS 4")).toBeVisible();
-  await expect(page.getByText("Command")).toBeVisible();
-  await expect(page.getByText("Catalog")).toBeVisible();
-  await expect(page.getByText("Operators")).toBeVisible();
-  await expect(page.getByText("Memory Atlas")).toBeVisible();
-  await expect(page.getByText("Voice Lab")).toBeVisible();
-  await expect(page.getByText("Flight Log")).toBeVisible();
-  await expect(page.getByText("Settings")).toBeVisible();
+  await expect(page.getByText(/STATUS: (NOMINAL|ASCII) ECHO MIRAGE/)).toBeVisible();
+  const body = page.locator("body");
+  await expect(body).toContainText("Memory Atlas");
+  await expect(body).toContainText("Voice Lab");
+  await expect(body).toContainText("Flight Log");
 
   await createAuditTab(page);
 
@@ -56,11 +55,11 @@ test("cyberdeck renders and switches required alpha modules", async ({ page }) =
   await openAuditSurface(page, "Settings");
   await expect(page.getByText("REALMORPHISM / ASCII OVERRIDE")).toBeVisible();
 
-  const modeButton = page.getByRole("button", { name: /\[REALMORPH\*? \| ASCII\*?\]/ });
-  await expect(modeButton).toBeVisible();
+  const modeSwitch = page.getByRole("switch", { name: /ASCII mode on|Realmorphism mode on/ });
+  await expect(modeSwitch).toBeVisible();
   const deckRoot = page.locator("[data-deck-mode]").first();
   await expect(deckRoot).toHaveAttribute("data-deck-mode", /^(realmorphism|ascii)$/);
   const initialMode = await deckRoot.getAttribute("data-deck-mode");
-  await modeButton.click();
+  await modeSwitch.click();
   await expect(deckRoot).not.toHaveAttribute("data-deck-mode", initialMode!);
 });

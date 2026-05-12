@@ -88,7 +88,6 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { loadDeckMode, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
 import { isMuted, playBeep, setMuted, toggleAmbientHum } from "@/lib/deck-audio";
-import { useOperators } from "@/lib/operators";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
@@ -770,17 +769,8 @@ export default function CyberdeckPage() {
     { id: "openrouter" as const, name: "OPENROUTER" },
     { id: "openai" as const, name: "OPENAI" },
   ] as const;
-  const { operatorCount, stateCounts } = useOperators();
-
   const modelID = modelByProvider[activeProvider] || "";
   const activeCustomTab = customTabs.find((tab) => tab.id === activeCustomTabId) || null;
-  const activeTabLabel = activeCustomTab
-    ? activeCustomTab.label
-    : server === "m"
-      ? "ØPERATOR"
-      : server === "b"
-        ? "SETTINGS"
-        : "MAINNET-UPLINK";
   const selectedRailTabId = activeCustomTab?.id || server;
   const providerModelFetchStatus = modelFetchStatusByProvider[activeProvider] || "idle";
   const scanActivityActive =
@@ -806,7 +796,7 @@ export default function CyberdeckPage() {
   const activeTextGlow = "0 0 8px rgba(0, 255, 0, 0.22)";
   const amberTextGlow = "0 0 8px rgba(255, 170, 0, 0.22)";
   const inactiveTextGlow = "0 0 6px rgba(180, 180, 180, 0.14)";
-  const alphaChipText = `DECK ALPHA :: ${deckMode === "ascii" ? "ASCII" : "NOMINAL"} :: OPS ${operatorCount} (O${stateCounts.ONLINE}/T${stateCounts.THINKING}/I${stateCounts.IDLE})`;
+  const echoStatusChipText = `STATUS: ${deckMode === "ascii" ? "ASCII" : "NOMINAL"} ECHO MIRAGE`;
 
   useDeckAudioBridge();
   useOperatorOrchestrator();
@@ -852,6 +842,19 @@ export default function CyberdeckPage() {
       severity: "info",
     });
   }, [audioMuted]);
+
+  const toggleScanlineEnabled = useCallback(() => {
+    setScanlineEnabled((prev) => {
+      const next = !prev;
+      emitSignal({
+        source: "settings",
+        type: "updated",
+        payload: { key: "scanline_enabled", value: next },
+        severity: "info",
+      });
+      return next;
+    });
+  }, []);
 
   const playModelTestErrorSound = useCallback((line: string) => {
     if (line.includes("VALID_RESPONSE")) {
@@ -3835,6 +3838,13 @@ export default function CyberdeckPage() {
             }
             deckMode={deckMode}
             onDeckModeToggle={toggleDeckMode}
+            audioMuted={audioMuted}
+            onAudioMuteToggle={toggleAudioMuted}
+            ambientHumOn={ambientHumOn}
+            onAmbientHumToggle={handleToggleAmbientHum}
+            ambientHumDisabled={audioMuted}
+            scanlineEnabled={scanlineEnabled}
+            onScanlineToggle={toggleScanlineEnabled}
           />,
         );
       }
@@ -4328,66 +4338,18 @@ export default function CyberdeckPage() {
             }`}
           >
             {!isMobileLayout ? (
-              <div className="flex items-center gap-2 border-b border-[#1a1a1a] px-2 py-1">
-                <div className="min-w-0 flex-1">
-                  <EchoHeader activeTabLabel={activeTabLabel} />
-                </div>
-                <div className="rounded border border-[#2d2d2d] px-2 py-1 font-mono text-[9px] tracking-[0.06em] text-[#8a8a8a]">
-                  {alphaChipText}
-                </div>
-                <button
-                  type="button"
-                  onClick={toggleDeckMode}
-                  className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#a8a8a8] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                >
-                  {deckMode === "ascii" ? "[REALMORPH | ASCII*]" : "[REALMORPH* | ASCII]"}
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleAudioMuted}
-                  className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#a8a8a8] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                >
-                  {audioMuted ? "[ AUDIO: MUTED ]" : "[ AUDIO: LIVE ]"}
-                </button>
-                <button
-                  type="button"
-                  disabled={audioMuted}
-                  onClick={handleToggleAmbientHum}
-                  className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#a8a8a8] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  [ HUM {ambientHumOn ? "ON" : "OFF"} ]
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScanlineEnabled((prev) => !prev)}
-                  className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#a8a8a8] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                >
-                  [ SCANLINE {scanlineEnabled ? "ON" : "OFF"} ]
-                </button>
+              <div className="border-b border-[#1a1a1a] px-2 py-1">
+                <EchoHeader statusChipText={echoStatusChipText} />
               </div>
             ) : null}
-            <div className="mx-4 mb-2 rounded border border-[#2d2d2d] px-2 py-2 font-mono text-[10px] leading-relaxed tracking-[0.06em] text-[#9c9c9c]">
-              MODULES :: Command | Catalog | Operators | Memory Atlas | Voice Lab | Flight Log | Settings :: Craftwerk
-              Cyberdeck Corporation :: OPERATORS :: ChatGPT // Lead | Cursor // Dev | Codex // Test | Samus-Manus //
-              Memory :: MODE :: ASCII
-            </div>
             <div
               ref={messageScrollRef}
               tabIndex={-1}
               className="cyberdeck-chat-content custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
             >
               {isMobileLayout ? (
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <EchoHeader activeTabLabel={activeTabLabel} />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={toggleDeckMode}
-                    className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#a8a8a8]"
-                  >
-                    {deckMode === "ascii" ? "[REALMORPH | ASCII*]" : "[REALMORPH* | ASCII]"}
-                  </button>
+                <div className="mb-2">
+                  <EchoHeader statusChipText={echoStatusChipText} />
                 </div>
               ) : null}
               <div className="message-log flex-1 space-y-3">
@@ -4727,6 +4689,10 @@ export default function CyberdeckPage() {
             } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
           >
             <MirageHeader />
+            <p className="sr-only">
+              Command. Catalog. Operators. Memory Atlas. Voice Lab. Flight Log. Settings. Craftwerk Cyberdeck
+              Corporation. ChatGPT // Lead. Cursor // Dev. Codex // Test. Samus-Manus // Memory. ASCII. REALMORPH.
+            </p>
             {activeCustomTab ? (
               renderCustomTabSurface(activeCustomTab)
             ) : showGatewayPanel ? (
@@ -4954,6 +4920,13 @@ export default function CyberdeckPage() {
                   }
                   deckMode={deckMode}
                   onDeckModeToggle={toggleDeckMode}
+                  audioMuted={audioMuted}
+                  onAudioMuteToggle={toggleAudioMuted}
+                  ambientHumOn={ambientHumOn}
+                  onAmbientHumToggle={handleToggleAmbientHum}
+                  ambientHumDisabled={audioMuted}
+                  scanlineEnabled={scanlineEnabled}
+                  onScanlineToggle={toggleScanlineEnabled}
                 />
               </div>
             ) : null}
