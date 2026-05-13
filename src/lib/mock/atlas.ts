@@ -58,7 +58,6 @@ export const ATLAS_ENTITIES: AtlasEntity[] = [
     aliases: ["Cold Start Reactor", "Main Spine"],
     relations: [
       { targetId: "rail-bus", type: "powers" },
-      { targetId: "ambient-scanline", type: "feeds" },
     ],
     confidence: 0.88,
     source: "deck-telemetry",
@@ -114,12 +113,4 @@ export const ATLAS_ENTITIES: AtlasEntity[] = [
     confidence: 0.79,
     source: "module-registry",
   },
-  {
-    id: "ambient-scanline",
-    label: "Ambient Scanline",
-    aliases: ["Presence Drift", "Visual Carrier"],
-    relations: [{ targetId: "deck-core", type: "overlays" }],
-    confidence: 0.76,
-    source: "visual-telemetry",
-  },
-];
+  ];

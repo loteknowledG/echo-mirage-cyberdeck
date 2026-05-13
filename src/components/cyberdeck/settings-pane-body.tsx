@@ -19,11 +19,6 @@ type CyberdeckSettingsPaneBodyProps = {
   onDeckModeToggle: () => void;
   audioMuted: boolean;
   onAudioMuteToggle: () => void;
-  ambientHumOn: boolean;
-  onAmbientHumToggle: () => void;
-  ambientHumDisabled: boolean;
-  scanlineEnabled: boolean;
-  onScanlineToggle: () => void;
 };
 
 /** SETTINGS rail / `settings` command surface. */
@@ -36,11 +31,6 @@ export function CyberdeckSettingsPaneBody({
   onDeckModeToggle,
   audioMuted,
   onAudioMuteToggle,
-  ambientHumOn,
-  onAmbientHumToggle,
-  ambientHumDisabled,
-  scanlineEnabled,
-  onScanlineToggle,
 }: CyberdeckSettingsPaneBodyProps) {
   return (
     <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
@@ -140,11 +130,11 @@ export function CyberdeckSettingsPaneBody({
           <section className="flex flex-col gap-2">
             <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">DECK AUDIO</div>
             <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">
-              <div className="flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3 first:border-t-0 first:pt-0">
+<div className="flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3 first:border-t-0 first:pt-0">
                 <div className="min-w-0">
                   <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">AUDIO OUTPUT</div>
                   <div className="mt-0.5 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
-                    Live: SFX and hum allowed. Muted: full silence; hum cannot run until live again.
+                    Live: SFX allowed. Muted: full silence.
                   </div>
                 </div>
                 <Switch
@@ -153,44 +143,6 @@ export function CyberdeckSettingsPaneBody({
                     onAudioMuteToggle();
                   }}
                   aria-label={audioMuted ? "Unmute deck audio" : "Mute deck audio"}
-                  className="shrink-0 data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
-                />
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3">
-                <div className="min-w-0">
-                  <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">AMBIENT HUM</div>
-                  <div className="mt-0.5 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
-                    Low idle layer on the deck audio bus (disabled while muted).
-                  </div>
-                </div>
-                <Switch
-                  checked={ambientHumOn}
-                  disabled={ambientHumDisabled}
-                  onCheckedChange={() => {
-                    onAmbientHumToggle();
-                  }}
-                  aria-label={ambientHumOn ? "Ambient hum on" : "Ambient hum off"}
-                  className="shrink-0 data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c] disabled:opacity-45"
-                />
-              </div>
-            </div>
-          </section>
-          <section className="flex flex-col gap-2">
-            <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">DISPLAY</div>
-            <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">SCANLINE OVERLAY</div>
-                  <div className="mt-0.5 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
-                    Drift overlay on the deck shell (hidden automatically in ASCII deck mode).
-                  </div>
-                </div>
-                <Switch
-                  checked={scanlineEnabled}
-                  onCheckedChange={() => {
-                    onScanlineToggle();
-                  }}
-                  aria-label={scanlineEnabled ? "Scanline on" : "Scanline off"}
                   className="shrink-0 data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
                 />
               </div>

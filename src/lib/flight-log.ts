@@ -33,7 +33,6 @@ const SYNTHETIC_MIN_MS = 6000;
 const SYNTHETIC_MAX_MS = 14000;
 const SYNTHETIC_EVENTS = [
   { actor: "DECK", action: "ambient telemetry nominal", result: "OK" },
-  { actor: "DECK", action: "scanline drift recalibrated", result: "OK" },
   { actor: "RAIL", action: "bus pulse synchronized", result: "NOMINAL" },
   { actor: "SHELL", action: "surface heartbeat steady", result: "OK" },
 ];
@@ -217,10 +216,6 @@ export function signalToFlightLog(
       const action = readString(payload, "action") ?? "progress";
       const result = readString(payload, "result") ?? "OK";
       return { actor, action, result, severity };
-    }
-    case "audio:hum_toggled": {
-      const state = readString(payload, "state") ?? "OFF";
-      return { actor: "AUDIO", action: "hum toggled", result: state, severity };
     }
     case "audio:setting_changed": {
       const key = readString(payload, "key") ?? "audio";

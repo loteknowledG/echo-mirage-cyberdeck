@@ -7,7 +7,7 @@ let masterCompressorNode = null;
 let sonarIntervalId = null;
 let sonarLoopIntervalMs = 3200;
 let sonarLoopVolumeScale = 1;
-const KEYBOARD_EFFECTS_GAIN = 0.35;
+const KEYBOARD_EFFECTS_GAIN = 0.15;
 const KEYBOARD_NAV_GAIN = 0.5;
 
 function getCtx() {
@@ -184,17 +184,17 @@ function playFallbackClip(kind, volume = 0.4) {
   if (typeof Audio === "undefined") return;
   const v = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 0.4));
   try {
-    const base = kind === "chirp" || kind === "lock" ? "/chime.wav" : "/chime_quiet.wav";
+    const base = "/chime_quiet.wav";
     const ref = kind === "chirp" || kind === "lock" ? "chirp" : "click";
     if (ref === "chirp") {
       if (!fallbackChirpAudio) fallbackChirpAudio = new Audio(base);
       fallbackChirpAudio.currentTime = 0;
-      fallbackChirpAudio.volume = Math.max(0.75, v);
+      fallbackChirpAudio.volume = v * 0.5;
       fallbackChirpAudio.play().catch(() => {});
     } else {
       if (!fallbackClickAudio) fallbackClickAudio = new Audio(base);
       fallbackClickAudio.currentTime = 0;
-      fallbackClickAudio.volume = Math.max(0.65, Math.min(1, v));
+      fallbackClickAudio.volume = v * 0.5;
       fallbackClickAudio.play().catch(() => {});
     }
   } catch {
@@ -218,111 +218,83 @@ export function playKeySound(key, options = {}) {
   }
 
   switch (kind) {
-    case "letter":
+    case "letter": {
+      const keyCode = key.toLowerCase().charCodeAt(0);
+      const baseFreq = 280 + (keyCode - 97) * 18;
       playTone({
-        freqStart: rand(520, 760),
-        freqEnd: rand(500, 840),
-        duration: rand(0.035, 0.075),
-        type: Math.random() > 0.5 ? "square" : "triangle",
-        volume: v(rand(0.032, 0.055)),
-        crunch: Math.random() > 0.65,
-      });
-      playNoiseClick({
-        duration: rand(0.01, 0.018),
-        volume: v(0.014),
-        filterFreq: rand(1800, 3600),
+        freqStart: baseFreq + rand(-30, 30),
+        freqEnd: baseFreq + rand(-50, 50),
+        duration: rand(0.03, 0.06),
+        type: "sine",
+        volume: v(rand(0.02, 0.035)),
       });
       break;
+    }
 
-    case "number":
+    case "number": {
+      const keyCode = key.charCodeAt(0);
+      const baseFreq = 600 + (keyCode - 48) * 80;
       playTone({
-        freqStart: rand(740, 980),
-        freqEnd: rand(860, 1180),
-        duration: rand(0.04, 0.075),
-        type: "square",
-        volume: v(0.05),
-        crunch: true,
+        freqStart: baseFreq + rand(-40, 40),
+        freqEnd: baseFreq + rand(-60, 60),
+        duration: rand(0.03, 0.055),
+        type: "sine",
+        volume: v(rand(0.025, 0.04)),
       });
       break;
+    }
 
-    case "symbol":
+    case "symbol": {
+      const symbolChars = "!@#$%^&*()_+-=[]{}|;':\",./<>?";
+      const idx = symbolChars.indexOf(key);
+      const baseFreq = idx >= 0 ? 700 + idx * 35 : rand(800, 1200);
       playTone({
-        freqStart: rand(900, 1300),
-        freqEnd: rand(500, 900),
-        duration: rand(0.025, 0.055),
-        type: "triangle",
-        volume: v(0.045),
-        crunch: true,
-      });
-      playNoiseClick({
-        duration: 0.014,
-        volume: v(0.018),
-        filterFreq: 3600,
+        freqStart: baseFreq + rand(-30, 30),
+        freqEnd: baseFreq * 0.7 + rand(-30, 30),
+        duration: rand(0.025, 0.045),
+        type: "sine",
+        volume: v(rand(0.025, 0.04)),
       });
       break;
+    }
 
     case "space":
       playTone({
-        freqStart: rand(210, 320),
-        freqEnd: rand(180, 260),
-        duration: rand(0.045, 0.08),
-        type: "triangle",
-        volume: v(0.042),
+        freqStart: rand(180, 260),
+        freqEnd: rand(150, 220),
+        duration: rand(0.04, 0.07),
+        type: "sine",
+        volume: v(0.025),
       });
       break;
 
     case "enter":
-      // base rise
       playTone({
-        freqStart: rand(480, 620),
-        freqEnd: rand(1100, 1400),
-        duration: rand(0.08, 0.12),
+        freqStart: rand(440, 560),
+        freqEnd: rand(800, 1000),
+        duration: rand(0.06, 0.1),
         type: "sine",
-        volume: v(0.08),
-      });
-
-      // harmonic sparkle layer
-      setTimeout(() => {
-        playTone({
-          freqStart: rand(900, 1200),
-          freqEnd: rand(1400, 1800),
-          duration: 0.05,
-          type: "triangle",
-          volume: v(0.04),
-        });
-      }, 30);
-
-      // tiny click for tactility
-      playNoiseClick({
-        duration: 0.015,
-        volume: v(0.02),
-        filterFreq: 3000,
+        volume: v(0.04),
       });
       break;
 
     case "escape":
       playTone({
-        freqStart: rand(420, 560),
-        freqEnd: rand(180, 280),
-        duration: rand(0.06, 0.09),
-        type: "triangle",
-        volume: v(0.05),
-      });
-      playNoiseClick({
-        duration: rand(0.014, 0.022),
-        volume: v(0.016),
-        filterFreq: rand(1400, 2400),
+        freqStart: rand(360, 480),
+        freqEnd: rand(200, 300),
+        duration: rand(0.05, 0.08),
+        type: "sine",
+        volume: v(0.03),
       });
       break;
 
     case "delete":
       playTone({
-        freqStart: rand(950, 1200),
-        freqEnd: rand(220, 360),
-        duration: rand(0.07, 0.11),
-        type: "square",
-        volume: v(0.065),
-        crunch: true,
+        freqStart: rand(600, 800),
+        freqEnd: rand(200, 350),
+        duration: rand(0.06, 0.1),
+        type: "sine",
+        volume: v(0.035),
       });
       break;
 
@@ -412,63 +384,78 @@ export function setupAudio() {
 export function playSystemSound(type = "click", vol = 0.08) {
   const gain = Math.max(0, Number.isFinite(vol) ? vol : 0.08) * 2.2;
   if (type === "chirp") {
-    playKeySound("Enter", { volume: Math.max(0.9, gain * 1.7) });
+    playKeySound("Enter", { volume: Math.max(0.05, gain * 0.1) });
     playTone({
       freqStart: rand(760, 920),
       freqEnd: rand(1200, 1500),
       duration: 0.08,
       type: "triangle",
-      volume: Math.max(0.22, gain * 0.62),
+      volume: Math.max(0.02, gain * 0.05),
     });
-    playFallbackClip("chirp", Math.max(0.9, gain * 1.35));
   } else if (type === "keypress") {
-    playKeySound("a", { volume: Math.max(0.1, gain) });
-    playFallbackClip("click", gain * 0.9);
+    playKeySound("a", { volume: Math.max(0.01, gain * 0.02) });
   } else if (type === "lock") {
-    playKeySound("Enter", { volume: Math.max(1.1, gain * 2) });
+    playKeySound("Enter", { volume: Math.max(0.05, gain * 0.1) });
     playTone({
       freqStart: rand(620, 760),
       freqEnd: rand(1260, 1600),
       duration: 0.1,
       type: "sine",
-      volume: Math.max(0.26, gain * 0.7),
+      volume: Math.max(0.02, gain * 0.05),
     });
-    playFallbackClip("lock", Math.max(0.95, gain * 1.4));
   } else {
-    playNoiseClick({ duration: 0.02, volume: Math.max(0.04, gain * 0.75) });
-    playFallbackClip("click", gain);
+    playNoiseClick({ duration: 0.02, volume: Math.max(0.005, gain * 0.02) });
   }
 }
 
 export function playNetworkScanSound(stage = "start") {
   if (!enabled) return;
   if (stage === "start") {
+    // Radar ping - clean sine wave with decay
     playTone({
-      freqStart: rand(420, 520),
-      freqEnd: rand(980, 1200),
-      duration: 0.14,
-      type: "square",
-      volume: 0.62,
-      crunch: true,
+      freqStart: 800,
+      freqEnd: 800,
+      duration: 0.15,
+      type: "sine",
+      volume: 0.08,
     });
-    playNoiseClick({ duration: 0.03, volume: 0.14, filterFreq: 3200 });
-    playFallbackClip("chirp", 1);
+    // Subtle echo
+    setTimeout(() => {
+      playTone({
+        freqStart: 600,
+        duration: 0.25,
+        type: "sine",
+        volume: 0.03,
+      });
+    }, 80);
     return;
   }
   if (stage === "success") {
-    playSystemSound("lock", 0.9);
+    // Double ping for success
+    playTone({
+      freqStart: 1200,
+      duration: 0.1,
+      type: "sine",
+      volume: 0.06,
+    });
+    setTimeout(() => {
+      playTone({
+        freqStart: 1600,
+        duration: 0.15,
+        type: "sine",
+        volume: 0.04,
+      });
+    }, 60);
     return;
   }
-  // fail
+  // fail - low thud
   playTone({
-    freqStart: rand(840, 980),
-    freqEnd: rand(180, 260),
-    duration: 0.16,
-    type: "triangle",
-    volume: 0.52,
-    crunch: true,
+    freqStart: 150,
+    freqEnd: 80,
+    duration: 0.2,
+    type: "sine",
+    volume: 0.05,
   });
-  playFallbackClip("click", 0.95);
 }
 
 export function playSatelliteUplink() {
@@ -491,14 +478,14 @@ export function playCinematicSonarPing(timeOffset = 0, volumeScale = 1) {
     freqStart: 520,
     duration: 0.18,
     type: "sine",
-    volume: 0.22 * s,
+    volume: 0.11 * s,
   });
   setTimeout(() => {
     playTone({
       freqStart: 1040,
       duration: 0.12,
       type: "sine",
-      volume: 0.08 * s,
+      volume: 0.04 * s,
     });
   }, 15 + t * 1000);
 
@@ -508,7 +495,7 @@ export function playCinematicSonarPing(timeOffset = 0, volumeScale = 1) {
       freqStart: 360,
       duration: 0.35,
       type: "triangle",
-      volume: 0.09 * s,
+      volume: 0.045 * s,
     });
   }, 900 + t * 1000);
   setTimeout(() => {
@@ -516,7 +503,7 @@ export function playCinematicSonarPing(timeOffset = 0, volumeScale = 1) {
       freqStart: 240,
       duration: 0.6,
       type: "sine",
-      volume: 0.05 * s,
+      volume: 0.025 * s,
     });
   }, 1800 + t * 1000);
 

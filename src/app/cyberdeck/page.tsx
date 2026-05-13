@@ -87,7 +87,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { loadDeckMode, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
-import { isMuted, playBeep, setMuted, toggleAmbientHum } from "@/lib/deck-audio";
+import { isMuted, playBeep, setMuted } from "@/lib/deck-audio";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
@@ -656,8 +656,6 @@ export default function CyberdeckPage() {
   const [heapHydrated, setHeapHydrated] = useState(false);
   const [deckMode, setDeckMode] = useState<DeckMode>("realmorphism");
   const [audioMuted, setAudioMutedState] = useState<boolean>(() => isMuted());
-  const [ambientHumOn, setAmbientHumOn] = useState(false);
-  const [scanlineEnabled, setScanlineEnabled] = useState(true);
   const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
 
   const [activeProvider, setActiveProvider] = useState<string>("opencode");
@@ -818,9 +816,7 @@ export default function CyberdeckPage() {
     const nextMuted = !audioMuted;
     setMuted(nextMuted);
     setAudioMutedState(nextMuted);
-    if (nextMuted) {
-      setAmbientHumOn(false);
-    } else {
+    if (!nextMuted) {
       playBeep();
     }
     emitSignal({
@@ -830,31 +826,6 @@ export default function CyberdeckPage() {
       severity: "info",
     });
   }, [audioMuted]);
-
-  const handleToggleAmbientHum = useCallback(() => {
-    if (audioMuted) return;
-    const next = toggleAmbientHum();
-    setAmbientHumOn(next);
-    emitSignal({
-      source: "audio",
-      type: "hum_toggled",
-      payload: { state: next ? "ON" : "OFF" },
-      severity: "info",
-    });
-  }, [audioMuted]);
-
-  const toggleScanlineEnabled = useCallback(() => {
-    setScanlineEnabled((prev) => {
-      const next = !prev;
-      emitSignal({
-        source: "settings",
-        type: "updated",
-        payload: { key: "scanline_enabled", value: next },
-        severity: "info",
-      });
-      return next;
-    });
-  }, []);
 
   const playModelTestErrorSound = useCallback((line: string) => {
     if (line.includes("VALID_RESPONSE")) {
@@ -1342,12 +1313,6 @@ export default function CyberdeckPage() {
 
   useEffect(() => {
     saveDeckMode(deckMode);
-  }, [deckMode]);
-
-  useEffect(() => {
-    if (deckMode === "ascii") {
-      setScanlineEnabled(false);
-    }
   }, [deckMode]);
 
   useEffect(() => {
@@ -1890,9 +1855,9 @@ export default function CyberdeckPage() {
         if (activeCustomTabId !== id) {
           setActiveCustomTabId(id);
           emitSignal({ source: "ui", type: "select", payload: { tabId: id, kind: "custom" }, severity: "info" });
-          playSystemSound("chirp");
+          playSystemSound("chirp", 0.03);
         } else {
-          playSystemSound("click", 0.05);
+          playSystemSound("click", 0.02);
         }
         return;
       }
@@ -1901,9 +1866,9 @@ export default function CyberdeckPage() {
       if (server !== id) {
         setServer(id as (typeof SERVER_IDS)[number]);
         emitSignal({ source: "ui", type: "select", payload: { tabId: id, kind: "fixed" }, severity: "info" });
-        playSystemSound("chirp");
+        playSystemSound("chirp", 0.03);
       } else {
-        playSystemSound("click", 0.05);
+        playSystemSound("click", 0.02);
       }
     },
     [activeCustomTabId, closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu, customTabs, server],
@@ -1934,7 +1899,7 @@ export default function CyberdeckPage() {
     if (!activeCustomTabId) return;
     setCustomTabs((prev) => prev.filter((tab) => tab.id !== activeCustomTabId));
     setActiveCustomTabId(null);
-    playSystemSound("click", 0.05);
+    playSystemSound("click", 0.02);
   }, [activeCustomTabId, closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
 
   const clearSavedCustomTabState = useCallback(() => {
@@ -2207,7 +2172,7 @@ export default function CyberdeckPage() {
       } catch {
         /* ignore */
       }
-      playSystemSound("click", 0.05);
+      playSystemSound("click", 0.02);
       void probeSelectedModel(activeProvider, modelId, key || "");
     },
     [activeProvider, probeSelectedModel, providerKeys],
@@ -3840,11 +3805,6 @@ export default function CyberdeckPage() {
             onDeckModeToggle={toggleDeckMode}
             audioMuted={audioMuted}
             onAudioMuteToggle={toggleAudioMuted}
-            ambientHumOn={ambientHumOn}
-            onAmbientHumToggle={handleToggleAmbientHum}
-            ambientHumDisabled={audioMuted}
-            scanlineEnabled={scanlineEnabled}
-            onScanlineToggle={toggleScanlineEnabled}
           />,
         );
       }
@@ -3991,11 +3951,9 @@ export default function CyberdeckPage() {
     <div
       ref={cyberdeckRootRef}
       data-deck-mode={deckMode}
-      data-scanline={scanlineEnabled ? "on" : "off"}
       className="terminal-window flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:flex-col max-md:overflow-y-auto md:overflow-hidden"
     >
       <CyberdeckBootSequence />
-      {scanlineEnabled && deckMode !== "ascii" ? <div className="cyberdeck-scanline-overlay" /> : null}
       {railTabContextMenu || mirageContextMenu || gatewayPaneContextMenu ? (
         <div
           className="fixed inset-0 z-[90]"
@@ -4922,11 +4880,6 @@ export default function CyberdeckPage() {
                   onDeckModeToggle={toggleDeckMode}
                   audioMuted={audioMuted}
                   onAudioMuteToggle={toggleAudioMuted}
-                  ambientHumOn={ambientHumOn}
-                  onAmbientHumToggle={handleToggleAmbientHum}
-                  ambientHumDisabled={audioMuted}
-                  scanlineEnabled={scanlineEnabled}
-                  onScanlineToggle={toggleScanlineEnabled}
                 />
               </div>
             ) : null}

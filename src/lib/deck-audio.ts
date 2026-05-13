@@ -46,9 +46,11 @@ function playTone(type: OscillatorType, hz: number, durationMs: number, gainValu
   if (!ctx) return;
   const oscillator = ctx.createOscillator();
   const gain = ctx.createGain();
+  const fadeInMs = 8;
   oscillator.type = type;
   oscillator.frequency.setValueAtTime(hz, ctx.currentTime);
-  gain.gain.setValueAtTime(gainValue, ctx.currentTime);
+  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(gainValue, ctx.currentTime + fadeInMs / 1000);
   gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durationMs / 1000);
   oscillator.connect(gain);
   gain.connect(ctx.destination);
@@ -57,15 +59,33 @@ function playTone(type: OscillatorType, hz: number, durationMs: number, gainValu
 }
 
 export function playClick() {
-  playTone("triangle", 1200, 20, 0.025);
+  if (isMuted()) return;
+  const ctx = ensureContext();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(120, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.06);
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(400, ctx.currentTime);
+  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.025, ctx.currentTime + 0.003);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.06);
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.06);
 }
 
 export function playBack() {
-  playTone("triangle", 700, 20, 0.03);
+  playTone("triangle", 700, 30, 0.008);
 }
 
 export function playBeep() {
-  playTone("square", 880, 80, 0.03);
+  playTone("square", 880, 80, 0.015);
 }
 
 export function isMuted() {
