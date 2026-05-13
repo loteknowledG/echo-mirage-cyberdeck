@@ -689,6 +689,11 @@ export default function CyberdeckPage() {
   const [modelHealthByProvider, setModelHealthByProvider] = useState<
     Record<string, Record<string, string>>
   >({ opencode: {}, openrouter: {}, openai: {} });
+  const [verifiedProviders, setVerifiedProviders] = useState<Record<string, boolean>>({
+    opencode: false,
+    openrouter: false,
+    openai: false,
+  });
   const [probeInFlightByProvider, setProbeInFlightByProvider] = useState<Record<string, string>>({
     opencode: "",
     openrouter: "",
@@ -781,7 +786,8 @@ export default function CyberdeckPage() {
     providerModelFetchStatus === "retrieving" ||
     isStreaming;
   const hasProviderAuth = Boolean(providerKeys[activeProvider]) || Boolean(defaultKeyAvailableByProvider[activeProvider]);
-  const isConnected = hasProviderAuth && Boolean(modelID) && providerModelFetchStatus === "ready";
+  const isVerified = Boolean(verifiedProviders[activeProvider]);
+  const isConnected = hasProviderAuth && Boolean(modelID) && providerModelFetchStatus === "ready" && isVerified;
   const connectionState: "offline" | "connecting" | "connected" = scanActivityActive
     ? "connecting"
       : isConnected
@@ -853,7 +859,7 @@ export default function CyberdeckPage() {
       playOutOfGas429();
       return;
     }
-    if (line.includes("EMPTY_RESPONSE")) {
+    if (line.includes("EMPTY_PROBE")) {
       playDeclined();
       return;
     }
@@ -2131,6 +2137,7 @@ export default function CyberdeckPage() {
           const line = `MODEL_TEST ${provider.toUpperCase()}/${model}: HTTP_${data.status ?? res.status}${data.rateLimited ? " RATE_LIMIT" : " FAILURE"}`;
           playModelTestErrorSound(line);
           setModelHealth(provider, model, failHealth);
+          setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
           setMessages((prev) => [
             ...prev,
             {
@@ -2142,7 +2149,11 @@ export default function CyberdeckPage() {
         }
         const valid = Boolean(data.valid);
         setModelHealth(provider, model, valid ? "green" : "amber");
-        const line = `MODEL_TEST ${provider.toUpperCase()}/${model}: ${valid ? "VALID_RESPONSE" : "EMPTY_RESPONSE"}`;
+        const isVerified = valid || provider === "opencode";
+        setVerifiedProviders((prev) => ({ ...prev, [provider]: isVerified }));
+        const line = valid
+          ? `MODEL_TEST ${provider.toUpperCase()}/${model}: VALID_RESPONSE`
+          : `MODEL_TEST ${provider.toUpperCase()}/${model}: EMPTY_PROBE // transport OK, content empty`;
         playModelTestErrorSound(line);
         setMessages((prev) => [
           ...prev,
@@ -2154,6 +2165,7 @@ export default function CyberdeckPage() {
       } catch (err) {
         playModelTestErrorSound(`MODEL_TEST ${provider.toUpperCase()}/${model}: FAILURE`);
         setModelHealth(provider, model, "grey");
+        setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
         setMessages((prev) => [
           ...prev,
           {
@@ -2168,7 +2180,7 @@ export default function CyberdeckPage() {
         });
       }
     },
-    [playModelTestErrorSound, setModelHealth],
+    [playModelTestErrorSound, setModelHealth, setVerifiedProviders],
   );
 
   const activateModelById = useCallback(
@@ -2176,6 +2188,7 @@ export default function CyberdeckPage() {
       const key = providerKeys[activeProvider];
       if (!modelId) return;
       setModelByProvider((prev) => ({ ...prev, [activeProvider]: modelId }));
+      setVerifiedProviders((prev) => ({ ...prev, [activeProvider]: false }));
       try {
         localStorage.setItem(`ascii_model_${activeProvider}`, modelId);
       } catch {
@@ -2184,7 +2197,7 @@ export default function CyberdeckPage() {
       playSystemSound("click", 0.02);
       void probeSelectedModel(activeProvider, modelId, key || "");
     },
-    [activeProvider, probeSelectedModel, providerKeys],
+    [activeProvider, probeSelectedModel, providerKeys, setVerifiedProviders],
   );
 
   // Column-scoped arrows: rail / chat scroll / gateway (providers + models). Tab rail: Escape; Enter on rail → gateway + provider hover.
@@ -2652,6 +2665,7 @@ export default function CyberdeckPage() {
 
     let cancelled = false;
     setModelFetchStatusByProvider((prev) => ({ ...prev, [activeProvider]: "retrieving" }));
+    setVerifiedProviders((prev) => ({ ...prev, [activeProvider]: false }));
 
     (async () => {
       try {
@@ -2706,7 +2720,7 @@ export default function CyberdeckPage() {
           const current = prev[activeProvider] || "";
           const hasCurrent = current && raw.some((m) => m.id === current);
           const nextModel = hasCurrent ? current : raw[0]?.id || "";
-          if (nextModel && nextModel !== current) {
+          if (nextModel) {
             localStorage.setItem(`ascii_model_${activeProvider}`, nextModel);
             void probeSelectedModel(activeProvider, nextModel, currentKey || "");
           }
@@ -2723,7 +2737,7 @@ export default function CyberdeckPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeProvider, probeSelectedModel, providerKeys]);
+  }, [activeProvider, probeSelectedModel, providerKeys, setVerifiedProviders]);
 
   useEffect(() => {
     const latest = messages[messages.length - 1];
