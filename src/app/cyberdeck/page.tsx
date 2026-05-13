@@ -92,6 +92,8 @@ import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 import { useOperatorOrchestrator } from "@/lib/cyberdeck/operator-orchestrator";
+import { loadIdentityBundle } from "@/lib/identity/load-identity";
+import type { Identity } from "@/lib/identity/identity-types";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -657,6 +659,7 @@ export default function CyberdeckPage() {
   const [deckMode, setDeckMode] = useState<DeckMode>("realmorphism");
   const [audioMuted, setAudioMutedState] = useState<boolean>(() => isMuted());
   const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
+  const [identity, setIdentity] = useState<Identity | null>(null);
 
   const [activeProvider, setActiveProvider] = useState<string>("opencode");
   /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
@@ -798,6 +801,12 @@ export default function CyberdeckPage() {
 
   useDeckAudioBridge();
   useOperatorOrchestrator();
+
+  useEffect(() => {
+    loadIdentityBundle().then((bundle) => {
+      setIdentity(bundle.identity);
+    });
+  }, []);
 
   const toggleDeckMode = useCallback(() => {
     setDeckMode((prev) => {
@@ -3805,6 +3814,7 @@ export default function CyberdeckPage() {
             onDeckModeToggle={toggleDeckMode}
             audioMuted={audioMuted}
             onAudioMuteToggle={toggleAudioMuted}
+            identity={identity}
           />,
         );
       }
@@ -4880,6 +4890,7 @@ export default function CyberdeckPage() {
                   onDeckModeToggle={toggleDeckMode}
                   audioMuted={audioMuted}
                   onAudioMuteToggle={toggleAudioMuted}
+                  identity={identity}
                 />
               </div>
             ) : null}

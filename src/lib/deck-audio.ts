@@ -4,10 +4,6 @@ const AUDIO_MUTED_KEY = "echo-mirage-audio-muted-v1";
 
 let muted = true;
 let context: AudioContext | null = null;
-let humOscillator: OscillatorNode | null = null;
-let humGain: GainNode | null = null;
-let humLfo: OscillatorNode | null = null;
-let humLfoGain: GainNode | null = null;
 let hasLoadedMuteState = false;
 
 function ensureMuteStateLoaded() {
@@ -96,58 +92,7 @@ export function isMuted() {
 export function setMuted(nextMuted: boolean) {
   muted = nextMuted;
   persistMuted();
-  if (muted) {
-    if (humOscillator) {
-      humOscillator.stop();
-      humOscillator.disconnect();
-      humOscillator = null;
-    }
-    if (humLfo) {
-      humLfo.stop();
-      humLfo.disconnect();
-      humLfo = null;
-    }
-    humGain?.disconnect();
-    humLfoGain?.disconnect();
-    humGain = null;
-    humLfoGain = null;
-  } else {
+  if (!muted) {
     ensureContext();
   }
-}
-
-export function toggleAmbientHum() {
-  if (isMuted()) return false;
-  const ctx = ensureContext();
-  if (!ctx) return false;
-  if (humOscillator) {
-    humOscillator.stop();
-    humOscillator.disconnect();
-    humOscillator = null;
-    humLfo?.stop();
-    humLfo?.disconnect();
-    humLfo = null;
-    humGain?.disconnect();
-    humLfoGain?.disconnect();
-    humGain = null;
-    humLfoGain = null;
-    return false;
-  }
-  humOscillator = ctx.createOscillator();
-  humGain = ctx.createGain();
-  humLfo = ctx.createOscillator();
-  humLfoGain = ctx.createGain();
-  humOscillator.type = "sine";
-  humOscillator.frequency.setValueAtTime(80, ctx.currentTime);
-  humGain.gain.setValueAtTime(0.02, ctx.currentTime);
-  humLfo.type = "sine";
-  humLfo.frequency.setValueAtTime(0.7, ctx.currentTime);
-  humLfoGain.gain.setValueAtTime(2.5, ctx.currentTime);
-  humLfo.connect(humLfoGain);
-  humLfoGain.connect(humOscillator.frequency);
-  humOscillator.connect(humGain);
-  humGain.connect(ctx.destination);
-  humOscillator.start();
-  humLfo.start();
-  return true;
 }

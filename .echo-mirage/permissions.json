@@ -1,0 +1,6 @@
+{
+  "allowed_providers": ["opencode", "openrouter", "openai"],
+  "network_access": true,
+  "file_system_access": false,
+  "max_session_duration_minutes": 480
+}

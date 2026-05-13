@@ -8,6 +8,7 @@ import {
 import { Knob } from "@/components/ui/knob";
 import { Switch } from "@/components/ui/switch";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
+import type { Identity } from "@/lib/identity/identity-types";
 
 type CyberdeckSettingsPaneBodyProps = {
   voiceEnabled: boolean;
@@ -19,6 +20,7 @@ type CyberdeckSettingsPaneBodyProps = {
   onDeckModeToggle: () => void;
   audioMuted: boolean;
   onAudioMuteToggle: () => void;
+  identity: Identity | null;
 };
 
 /** SETTINGS rail / `settings` command surface. */
@@ -31,6 +33,7 @@ export function CyberdeckSettingsPaneBody({
   onDeckModeToggle,
   audioMuted,
   onAudioMuteToggle,
+  identity,
 }: CyberdeckSettingsPaneBodyProps) {
   return (
     <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
@@ -175,6 +178,29 @@ export function CyberdeckSettingsPaneBody({
                   className="shrink-0 data-[state=checked]:border-amber-500/70 data-[state=checked]:bg-amber-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
                 />
               </div>
+            </div>
+          </section>
+          <section className="flex flex-col gap-2">
+            <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">OPERATOR IDENTITY</div>
+            <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">
+              {identity ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-[#5f5f5f]">ID</span>
+                    <span className="text-[9px] text-[#9a9a9a]">{identity.agent_id}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-[#5f5f5f]">NAME</span>
+                    <span className="text-[9px] text-[#9a9a9a]">{identity.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-[#5f5f5f]">ROLE</span>
+                    <span className="text-[9px] text-[#9a9a9a]">{identity.role}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[9px] text-[#5f5f5f]">No identity loaded</div>
+              )}
             </div>
           </section>
         </div>
