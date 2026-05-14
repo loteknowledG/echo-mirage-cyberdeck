@@ -1,0 +1,196 @@
+{
+  "playbooks": [
+    {
+      "id": "implement_feature",
+      "name": "Implement Feature",
+      "description": "Full cycle from requirement to deployed change",
+      "steps": [
+        {
+          "step": 1,
+          "owner": "chatgpt-lead",
+          "action": "decompose requirement into implementation tasks",
+          "output": "task list with files and instructions"
+        },
+        {
+          "step": 2,
+          "owner": "opencode-builder",
+          "action": "implement feature from instructions",
+          "output": "modified files and new code"
+        },
+        {
+          "step": 3,
+          "owner": "codex-reviewer",
+          "action": "verify implementation, run tests, check types",
+          "output": "verification report with pass/fail"
+        },
+        {
+          "step": 4,
+          "owner": "codex-reviewer",
+          "action": "if failures: handoff to opencode-builder for revision",
+          "output": "revision instructions"
+        },
+        {
+          "step": 5,
+          "owner": "human-operator",
+          "action": "final review and approval",
+          "output": "approved or rejected"
+        }
+      ],
+      "success_criteria": "code verified, tests pass, human approved"
+    },
+    {
+      "id": "review_change",
+      "name": "Review Change",
+      "description": "Code review workflow for existing changes",
+      "steps": [
+        {
+          "step": 1,
+          "owner": "codex-reviewer",
+          "action": "review code for correctness, style, best practices",
+          "output": "review findings"
+        },
+        {
+          "step": 2,
+          "owner": "codex-reviewer",
+          "action": "generate or update tests if needed",
+          "output": "test coverage report"
+        },
+        {
+          "step": 3,
+          "owner": "codex-reviewer",
+          "action": "if issues found: specify required changes",
+          "output": "change requirements"
+        },
+        {
+          "step": 4,
+          "owner": "opencode-builder",
+          "action": "apply fixes from review",
+          "output": "revised code"
+        },
+        {
+          "step": 5,
+          "owner": "codex-reviewer",
+          "action": "re-verify after fixes",
+          "output": "final verification"
+        }
+      ],
+      "success_criteria": "all review items resolved, tests pass"
+    },
+    {
+      "id": "revise_after_codex",
+      "name": "Revise After Codex",
+      "description": "Handle Codex feedback and iterate",
+      "steps": [
+        {
+          "step": 1,
+          "owner": "codex-reviewer",
+          "action": "identify specific failures or issues",
+          "output": "list of required changes"
+        },
+        {
+          "step": 2,
+          "owner": "opencode-builder",
+          "action": "implement fixes based on Codex feedback",
+          "output": "revised implementation"
+        },
+        {
+          "step": 3,
+          "owner": "codex-reviewer",
+          "action": "re-verify fixes",
+          "output": "pass or continue iteration"
+        }
+      ],
+      "success_criteria": "Codex passes verification"
+    },
+    {
+      "id": "research_current_info",
+      "name": "Research Current Info",
+      "description": "Gather current information or status",
+      "steps": [
+        {
+          "step": 1,
+          "owner": "chatgpt-lead",
+          "action": "define research questions and context needed",
+          "output": "research brief"
+        },
+        {
+          "step": 2,
+          "owner": "opencode-builder",
+          "action": "gather current code state, docs, and context",
+          "output": "current state report"
+        },
+        {
+          "step": 3,
+          "owner": "chatgpt-lead",
+          "action": "analyze findings and provide recommendations",
+          "output": "analysis and recommendations"
+        }
+      ],
+      "success_criteria": "clear understanding of current state"
+    },
+    {
+      "id": "stabilize_ui",
+      "name": "Stabilize UI",
+      "description": "Iterate on UI until human approves",
+      "steps": [
+        {
+          "step": 1,
+          "owner": "opencode-builder",
+          "action": "implement UI based on design requirements",
+          "output": "UI implementation"
+        },
+        {
+          "step": 2,
+          "owner": "cursor-dev",
+          "action": "interactive refinement of UI details",
+          "output": "refined UI"
+        },
+        {
+          "step": 3,
+          "owner": "human-operator",
+          "action": "visual verification and feedback",
+          "output": "approval or change list"
+        },
+        {
+          "step": 4,
+          "owner": "opencode-builder",
+          "action": "apply final changes from human feedback",
+          "output": "final UI"
+        }
+      ],
+      "success_criteria": "human visually approves UI"
+    },
+    {
+      "id": "debug_provider_connection",
+      "name": "Debug Provider Connection",
+      "description": "Investigate and fix provider connection issues",
+      "steps": [
+        {
+          "step": 1,
+          "owner": "opencode-builder",
+          "action": "check API key configuration and environment",
+          "output": "configuration status"
+        },
+        {
+          "step": 2,
+          "owner": "codex-reviewer",
+          "action": "test provider endpoint connectivity",
+          "output": "connectivity report"
+        },
+        {
+          "step": 3,
+          "owner": "opencode-builder",
+          "action": "apply fixes based on test results",
+          "output": "configuration changes"
+        },
+        {
+          "step": 4,
+          "owner": "codex-reviewer",
+          "action": "verify fix by probing provider",
+          "output": "verification"
+        }
+      ],
+      "success_criteria": "provider responds to probe"
+    }
+  ]
+}

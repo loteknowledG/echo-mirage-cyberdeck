@@ -7,6 +7,11 @@ import {
 } from "@/components/cyberdeck/pane-header";
 import { useOperators, type OperatorState } from "@/lib/operators";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
+import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
+
+type CyberdeckOperatorsPaneBodyProps = {
+  orchestration: OrchestrationBundle | null;
+};
 
 function statusTone(status: OperatorState) {
   if (status === "ONLINE") return "text-emerald-300 border-emerald-600/50";
@@ -15,8 +20,10 @@ function statusTone(status: OperatorState) {
   return "text-[#a0a0a0] border-[#2a2a2a]";
 }
 
-export function CyberdeckOperatorsPaneBody() {
+export function CyberdeckOperatorsPaneBody({ orchestration }: CyberdeckOperatorsPaneBodyProps) {
   const { operators, stateCounts } = useOperators();
+  const activeTask = orchestration?.activeTask;
+  const agentRoles = orchestration?.agentRoles;
 
   return (
     <div className="custom-scrollbar flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-black p-3">
@@ -72,6 +79,21 @@ export function CyberdeckOperatorsPaneBody() {
             );
           })}
         </div>
+        {agentRoles && (
+          <div className="border-t border-[#1c1c1c] p-3">
+            <div className="mb-2 font-mono text-[9px] tracking-[0.06em] text-[#6a6a6a]">ORCHESTRATION</div>
+            <div className="space-y-1 text-[9px] text-[#5a5a5a]">
+              <div>HIERARCHY: {agentRoles.hierarchy.top} → {agentRoles.hierarchy.verifier} → {agentRoles.hierarchy.final}</div>
+              {activeTask && (
+                <>
+                  <div>STATUS: {activeTask.status}</div>
+                  <div>STEP: {activeTask.current_step}</div>
+                  <div>NEXT: {activeTask.next_step}</div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

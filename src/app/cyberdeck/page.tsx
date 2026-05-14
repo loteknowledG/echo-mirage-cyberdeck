@@ -94,6 +94,8 @@ import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 import { useOperatorOrchestrator } from "@/lib/cyberdeck/operator-orchestrator";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
+import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration";
+import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -660,6 +662,7 @@ export default function CyberdeckPage() {
   const [audioMuted, setAudioMutedState] = useState<boolean>(() => isMuted());
   const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
+  const [orchestration, setOrchestration] = useState<OrchestrationBundle | null>(null);
 
   const [activeProvider, setActiveProvider] = useState<string>("opencode");
   /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
@@ -811,6 +814,9 @@ export default function CyberdeckPage() {
   useEffect(() => {
     loadIdentityBundle().then((bundle) => {
       setIdentity(bundle.identity);
+    });
+    loadOrchestrationBundle().then((bundle) => {
+      setOrchestration(bundle);
     });
   }, []);
 
@@ -3892,7 +3898,7 @@ export default function CyberdeckPage() {
       }
 
       if (tab.kind === "operators") {
-        return shell(<CyberdeckOperatorsPaneBody />);
+        return shell(<CyberdeckOperatorsPaneBody orchestration={orchestration} />);
       }
 
       if (tab.kind === "memory-atlas") {

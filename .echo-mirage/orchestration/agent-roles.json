@@ -1,0 +1,58 @@
+{
+  "agents": [
+    {
+      "id": "chatgpt-lead",
+      "name": "ChatGPT Lead",
+      "role": "planner",
+      "capabilities": ["instruction writing", "task decomposition", "architecture planning", "design reasoning"],
+      "primary_use": "break down requirements into clear implementation tasks",
+      "handoff_to": ["opencode-builder", "cursor-dev"]
+    },
+    {
+      "id": "opencode-builder",
+      "name": "OpenCode Builder",
+      "role": "implementation engine",
+      "capabilities": ["code generation", "refactoring", "file creation", "search and replace"],
+      "primary_use": "implement features, write new code, apply changes to codebase",
+      "handoff_to": ["codex-reviewer", "cursor-dev"]
+    },
+    {
+      "id": "codex-reviewer",
+      "name": "Codex Reviewer",
+      "role": "verification judge",
+      "capabilities": ["code review", "test generation", "verification", "linting", "type checking"],
+      "primary_use": "verify implementations, generate tests, validate correctness",
+      "handoff_to": ["opencode-builder", "chatgpt-lead", "human-operator"]
+    },
+    {
+      "id": "cursor-dev",
+      "name": "Cursor Dev",
+      "role": "interactive IDE editor",
+      "capabilities": ["cursor IDE integration", "inline editing", "multi-file refactoring", "chat context"],
+      "primary_use": "interactive code editing with full IDE context",
+      "handoff_to": ["codex-reviewer", "opencode-builder"]
+    },
+    {
+      "id": "zed-editor",
+      "name": "Zed Editor",
+      "role": "manual paste-assist workflow",
+      "capabilities": ["quick edits", "paste snippets", "small fixes", "manual review"],
+      "primary_use": "quick manual edits, paste large blocks, small targeted changes",
+      "handoff_to": ["codex-reviewer"]
+    },
+    {
+      "id": "human-operator",
+      "name": "Human Operator",
+      "role": "final authority",
+      "capabilities": ["final approval", "manual verification", "deployment decisions", "rollback authority"],
+      "primary_use": "final sign-off before deployment, manual verification of critical paths",
+      "handoff_to": []
+    }
+  ],
+  "hierarchy": {
+    "top": "chatgpt-lead",
+    "builders": ["opencode-builder", "cursor-dev"],
+    "verifier": "codex-reviewer",
+    "final": "human-operator"
+  }
+}

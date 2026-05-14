@@ -1,0 +1,135 @@
+{
+  "tools": [
+    {
+      "id": "chatgpt",
+      "agent": "chatgpt-lead",
+      "role": "instruction planner",
+      "use_when": [
+        "breaking down complex requirements",
+        "designing architecture decisions",
+        "planning implementation approach",
+        "writing initial instructions for other agents"
+      ],
+      "do_not_use_when": [
+        "code already exists and needs implementation",
+        "simple bug fix that other agents can handle",
+        "testing is needed - use Codex instead"
+      ],
+      "handoff_format": {
+        "instruction_set": "detailed task description",
+        "context": "background requirements",
+        "constraints": "what to avoid",
+        "success_criteria": "how to measure completion"
+      }
+    },
+    {
+      "id": "opencode",
+      "agent": "opencode-builder",
+      "role": "implementation engine",
+      "use_when": [
+        "implementing new features from instructions",
+        "creating new files or modules",
+        "refactoring existing code",
+        "applying bulk changes across codebase"
+      ],
+      "do_not_use_when": [
+        "only reviewing or testing - use Codex",
+        "planning or architecture decisions - use ChatGPT",
+        "very small one-line fixes - use Zed instead"
+      ],
+      "handoff_format": {
+        "task": "specific implementation task",
+        "files_affected": "list of files to modify",
+        "instructions": "clear implementation guide",
+        "constraints": "style and approach requirements"
+      }
+    },
+    {
+      "id": "codex",
+      "agent": "codex-reviewer",
+      "role": "verification judge",
+      "use_when": [
+        "reviewing code changes for correctness",
+        "generating test cases",
+        "running type checks and lints",
+        "validating implementations against requirements"
+      ],
+      "do_not_use_when": [
+        "planning what to build - use ChatGPT",
+        "making implementation changes - use OpenCode",
+        "simple copy-paste edits - use Zed"
+      ],
+      "handoff_format": {
+        "code_under_review": "file paths or diff",
+        "review_criteria": "what aspects to verify",
+        "test_requirements": "required test coverage",
+        "pass_threshold": "what constitutes acceptable"
+      }
+    },
+    {
+      "id": "cursor",
+      "agent": "cursor-dev",
+      "role": "interactive IDE editor",
+      "use_when": [
+        "needing full IDE context for complex refactoring",
+        "multi-file coordinated changes",
+        "interactive debugging and exploration",
+        "inline editing with real-time feedback"
+      ],
+      "do_not_use_when": [
+        "simple isolated file edits - use Zed",
+        "planning or design work - use ChatGPT",
+        "automated verification - use Codex"
+      ],
+      "handoff_format": {
+        "editing_context": "what files to work with",
+        "change_scope": "multi-file or single",
+        "interactive_mode": "chat or direct edit"
+      }
+    },
+    {
+      "id": "zed",
+      "agent": "zed-editor",
+      "role": "manual paste-assist",
+      "use_when": [
+        "quick small fixes under 10 lines",
+        "pasting code blocks from clipboard",
+        "manual code review with direct edits",
+        "simple targeted corrections"
+      ],
+      "do_not_use_when": [
+        "large refactoring across many files",
+        "planning implementation approach",
+        "generating tests or verification"
+      ],
+      "handoff_format": {
+        "target_file": "single file path",
+        "change_type": "insert | replace | delete",
+        "content": "exact code to apply",
+        "line_range": "optional line numbers for precision"
+      }
+    },
+    {
+      "id": "human",
+      "agent": "human-operator",
+      "role": "final authority",
+      "use_when": [
+        "final approval before deployment",
+        "manual verification of critical changes",
+        "rollback decisions",
+        "architectural decisions requiring human judgment"
+      ],
+      "do_not_use_when": [
+        "automated tasks that agents can handle",
+        "routine implementation work",
+        "test generation and verification"
+      ],
+      "handoff_format": {
+        "task_summary": "what was done",
+        "risk_level": "low | medium | high",
+        "approval_needed": "what decision is required",
+        "rollback_plan": "how to undo if needed"
+      }
+    }
+  ]
+}

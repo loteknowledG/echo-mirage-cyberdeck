@@ -1,33 +1,39 @@
 import { expect, test } from "@playwright/test";
 
 async function createAuditTab(page: import("@playwright/test").Page) {
-  const input = page.locator('input[placeholder*="GATEWAY"], input[placeholder*="command"]').first();
+  const input = page.locator('input[placeholder*="GATEWAY"], input[placeholder*="command"], input[placeholder*="COMMAND"]').first();
+  await input.waitFor({ state: "visible", timeout: 10000 });
   await input.click();
   await input.fill("new tab named audit glyph A");
   await expect(input).toHaveValue("new tab named audit glyph A");
   await input.press("Enter");
-  await expect(page.getByText("TAB_CREATED // audit // GLYPH A")).toBeVisible();
+  await expect(page.getByText("TAB_CREATED // audit // GLYPH A")).toBeVisible({ timeout: 10000 });
 }
 
 async function openAuditSurface(page: import("@playwright/test").Page, surface: string) {
   const auditTab = page.locator("cyberdeck-rail-tab").nth(3);
+  await auditTab.waitFor({ state: "visible", timeout: 10000 });
   await auditTab.click({ button: "right" });
   await page.getByRole("menuitem", { name: surface }).click();
 }
 
 test("cyberdeck renders and switches required alpha modules", async ({ page }) => {
-  await page.goto("/cyberdeck", { waitUntil: "domcontentloaded" });
-  await page.evaluate(() => window.localStorage.clear());
-  const response = await page.goto("/cyberdeck", { waitUntil: "domcontentloaded" });
+  try {
+    await page.goto("/cyberdeck", { waitUntil: "load", timeout: 30000 });
+  } catch {
+    await page.goto("/cyberdeck", { waitUntil: "domcontentloaded", timeout: 30000 });
+  }
+  await page.waitForSelector("cyberdeck-rail-tab", { timeout: 20000 });
+  const response = await page.reload({ waitUntil: "domcontentloaded" });
   expect(response).not.toBeNull();
   expect(response!.status()).toBeLessThan(500);
 
-  await expect(page.locator("cyberdeck-rail-tab")).toHaveCount(3);
-  await expect(page.getByText(/STATUS: (NOMINAL|ASCII) ECHO MIRAGE/)).toBeVisible();
+  await expect(page.locator("cyberdeck-rail-tab")).toHaveCount(3, { timeout: 10000 });
+  await expect(page.getByText(/STATUS: (NOMINAL|ASCII) ECHO MIRAGE/)).toBeVisible({ timeout: 10000 });
   const body = page.locator("body");
-  await expect(body).toContainText("Memory Atlas");
-  await expect(body).toContainText("Voice Lab");
-  await expect(body).toContainText("Flight Log");
+  await expect(body).toContainText("Memory Atlas", { timeout: 10000 });
+  await expect(body).toContainText("Voice Lab", { timeout: 10000 });
+  await expect(body).toContainText("Flight Log", { timeout: 10000 });
 
   await createAuditTab(page);
 

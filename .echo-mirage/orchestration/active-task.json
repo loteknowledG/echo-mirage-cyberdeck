@@ -1,0 +1,10 @@
+{
+  "title": "Operator Orchestration Memory v1",
+  "status": "initializing",
+  "owner": "human-operator",
+  "current_step": "setup",
+  "next_step": "define initial project task",
+  "blockers": [],
+  "created_at": null,
+  "updated_at": null
+}
