@@ -60,6 +60,10 @@ import {
 import { detectSelfStatusIntent } from "@/lib/computer-use/intent-detect";
 import { formatStatusText } from "@/lib/computer-use/introspection";
 import { runComputerUseAction as runComputerUseBridgeAction } from "@/lib/computer-use/electron-computer-use-bridge";
+import { resolveUiTarget, type CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
+import { addNarrationListener } from "@/lib/computer-use/narration";
+import { isTeachingDemoTrigger, runTeachingDemo } from "@/lib/computer-use/guided-teaching";
+import { emergencyStop, acknowledgeWatchdog, cancelTeachingWatchdog, resumeAfterStop } from "@/lib/computer-use/teardown";
 import { useBrowserController } from "@/lib/use-browser-controller";
 import { useCustomTabBrowserController } from "@/lib/use-custom-tab-browser-controller";
 import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
@@ -2784,6 +2788,29 @@ export default function CyberdeckPage() {
   }, [isStreaming, messages, speakMother, voiceEnabled]);
 
   useEffect(() => {
+    if (!voiceEnabled) return;
+    let failureCount = 0;
+    let pending = false;
+    const removeListener = addNarrationListener((narration) => {
+      if (!voiceEnabled) return;
+      failureCount = 0;
+      pending = true;
+      void speakMother(narration.text).catch(() => {
+        failureCount += 1;
+        if (failureCount >= 3) {
+          void abortMotherSpeech();
+        }
+      }).finally(() => {
+        pending = false;
+      });
+    });
+    return () => {
+      removeListener();
+      resumeAfterStop();
+    };
+  }, [voiceEnabled]);
+
+  useEffect(() => {
     let unlocked = false;
     const unlock = () => {
       if (unlocked) return;
@@ -2899,10 +2926,20 @@ export default function CyberdeckPage() {
       return;
     }
 
-    if (detectSelfStatusIntent(userMessage)) {
+if (detectSelfStatusIntent(userMessage)) {
       const statusText = formatStatusText();
       setMessages((prev) => [...prev, { role: "assistant", text: statusText }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, statusText));
+      setIsStreaming(false);
+      return;
+    }
+
+    if (isTeachingDemoTrigger(userMessage)) {
+      void runTeachingDemo();
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: "Starting guided teaching demo. Follow the highlighted regions with your cursor." },
+      ]);
       setIsStreaming(false);
       return;
     }
@@ -2941,19 +2978,42 @@ export default function CyberdeckPage() {
         }) ?? null;
       };
 
-      const target =
-        text.includes("command input") || text.includes("input area") || text.includes("message box")
-          ? messageInputRef.current
-          : text.includes("voice lab")
-            ? document.querySelector<HTMLElement>('[data-pointer-target="voice-lab"]') ??
+const resolved = resolveUiTarget(userMessage);
+      if (!resolved.success) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: "INDICATE_SKIPPED // TARGET_NOT_RECOGNIZED" },
+        ]);
+        setIsStreaming(false);
+        return true;
+      }
+
+      const getTargetElement = (target: CanonicalTarget): HTMLElement | null => {
+        switch (target) {
+          case "COMMAND_INPUT":
+            return messageInputRef.current;
+          case "VOICE_LAB":
+            return (
+              document.querySelector<HTMLElement>('[data-pointer-target="voice-lab"]') ??
               findVisibleTextTarget("voice lab") ??
               gatewayColumnRef.current
-            : null;
+            );
+          case "LEFT_CONSOLE":
+            return document.querySelector<HTMLElement>('[data-pointer-target="left-console"]') ?? null;
+          case "RIGHT_PANEL":
+            return document.querySelector<HTMLElement>('[data-pointer-target="right-panel"]') ?? null;
+          case "CENTER_STAGE":
+            return findVisibleTextTarget("main") ?? null;
+          default:
+            return null;
+        }
+      };
 
+      const target = getTargetElement(resolved.target);
       if (!target) {
         setMessages((prev) => [
           ...prev,
-          { role: "system", text: "INDICATE_SKIPPED // TARGET_NOT_VISIBLE" },
+          { role: "system", text: `INDICATE_SKIPPED // TARGET_NOT_VISIBLE // ${resolved.target}` },
         ]);
         setIsStreaming(false);
         return true;
@@ -2970,7 +3030,7 @@ export default function CyberdeckPage() {
           position,
           width: Math.max(48, Math.min(rect.width, 420)),
           height: Math.max(32, Math.min(rect.height, 220)),
-          label: text.includes("voice lab") ? "Voice Lab" : "Command input",
+          label: resolved.target === "VOICE_LAB" ? "Voice Lab" : "Command input",
           ttlMs: 30_000,
         },
       });
@@ -2980,7 +3040,7 @@ export default function CyberdeckPage() {
         {
           role: "system",
           text: result.success
-            ? `INDICATE_${wantsHighlight ? "HIGHLIGHT" : "POINT"} // ${text.includes("voice lab") ? "VOICE_LAB" : "COMMAND_INPUT"}`
+            ? `INDICATE_${wantsHighlight ? "HIGHLIGHT" : "POINT"} // ${resolved.target}`
             : `INDICATE_FAILED // ${result.error ?? "UNKNOWN"}`,
         },
       ]);
@@ -3254,10 +3314,14 @@ export default function CyberdeckPage() {
   );
 
   const handleStop = useCallback(() => {
-    if (!isStreaming) return;
     abortMotherSpeech();
-    chatAbortRef.current?.abort();
-  }, [abortMotherSpeech, isStreaming]);
+    emergencyStop();
+    cancelTeachingWatchdog();
+    if (chatAbortRef.current) {
+      chatAbortRef.current.abort();
+    }
+    setIsStreaming(false);
+  }, [abortMotherSpeech]);
 
   const handleModelLabelClick = useCallback((targetServer: "s" | "b" = "s") => {
     setActiveCustomTabId(null);
@@ -4568,6 +4632,7 @@ export default function CyberdeckPage() {
                   <span className="pointer-events-none absolute left-3 text-lg font-bold text-green-500">$</span>
                   <input
                     ref={messageInputRef}
+                    data-pointer-target="command-input"
                     value={input}
                     onChange={(e) => {
                       setInput(e.target.value);

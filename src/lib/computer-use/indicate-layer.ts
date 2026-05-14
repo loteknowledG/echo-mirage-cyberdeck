@@ -2,6 +2,8 @@ import type { IndicateMarker, IndicatePosition, ComputerUseResult } from "./comp
 import { emit } from "./control-lease";
 import { narrate } from "./narration";
 
+const DEBUG = process.env.NODE_ENV !== "production";
+
 let markers: IndicateMarker[] = [];
 
 function purgeExpiredMarkers(now = Date.now()): void {
@@ -81,6 +83,20 @@ export async function indicatePoint(
   purgeExpiredMarkers();
   markers.push(marker);
 
+  if (DEBUG) {
+    console.debug("[INDICATE-DEBUG] indicate_point created", {
+      id,
+      position,
+      style: marker.style,
+      color: marker.color ?? "#86efac",
+      label: marker.label ?? "(none)",
+      width: marker.width ?? 0,
+      height: marker.height ?? 0,
+      ttlMs: marker.ttlMs ?? "infinite",
+      createdAt: marker.createdAt,
+    });
+  }
+
   emit("INDICATE_STARTED", {
     to: "MUTHUR",
     reason: opts?.label ?? "Point indicated",
@@ -127,6 +143,20 @@ export async function indicateHighlight(
 
   purgeExpiredMarkers();
   markers.push(marker);
+
+  if (DEBUG) {
+    console.debug("[INDICATE-DEBUG] indicate_highlight created", {
+      id,
+      position,
+      style: marker.style,
+      color: marker.color ?? "#86efac",
+      label: marker.label ?? "(none)",
+      width,
+      height,
+      ttlMs: marker.ttlMs ?? "infinite",
+      createdAt: marker.createdAt,
+    });
+  }
 
   emit("INDICATE_UPDATED", {
     to: "MUTHUR",

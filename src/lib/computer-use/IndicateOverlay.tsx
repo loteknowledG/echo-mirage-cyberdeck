@@ -1,20 +1,87 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { IndicateMarker } from "./computer-use-types";
 import { getMarkers } from "./indicate-layer";
+import { trackCursorPosition, addPresenceListener, resetPresence, type PresenceEvent } from "./cursor-presence";
+import { narrate } from "./narration";
+import { acknowledgeCurrentStep, advanceWorkflow } from "./guided-workflow";
+import { proceedToNextStep } from "./guided-teaching";
+import { acknowledgeWatchdog, cancelTeachingWatchdog, cancelStepWatchdog } from "./teardown";
+
+const DEBUG = process.env.NODE_ENV !== "production";
 
 export default function IndicateOverlay() {
   const [markers, setMarkers] = useState<readonly IndicateMarker[]>([]);
+  const renderCountRef = useRef(0);
+  const pollCountRef = useRef(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setMarkers(getMarkers());
+      const current = getMarkers();
+      setMarkers(current);
+      if (DEBUG) {
+        pollCountRef.current += 1;
+        console.debug(`[OVERLAY-DEBUG] poll #${pollCountRef.current} - ${current.length} marker(s)`, current.map((m) => ({
+          id: m.id,
+          style: m.style,
+          position: m.position,
+          label: m.label ?? "(none)",
+          width: m.width ?? 0,
+          height: m.height ?? 0,
+          computedBounds: (m.width ?? 0) > 0 && (m.height ?? 0) > 0
+            ? { left: m.position.x - (m.width! / 2), top: m.position.y - (m.height! / 2), right: m.position.x + (m.width! / 2), bottom: m.position.y + (m.height! / 2) }
+            : null,
+        })));
+      }
     }, 200);
-    return () => clearInterval(interval);
+
+    const onMouseMove = (e: MouseEvent) => {
+      const currentMarkers = getMarkers();
+      trackCursorPosition(e.clientX, e.clientY, currentMarkers);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+
+    const unsubscribe = addPresenceListener((event: PresenceEvent, marker: IndicateMarker) => {
+      if (DEBUG) {
+        console.debug("[OVERLAY-DEBUG] presence event", { event, markerId: marker.id, style: marker.style });
+      }
+      if (event === "CURSOR_ENTER_REGION") {
+        const acknowledged = acknowledgeCurrentStep(marker.id);
+        if (DEBUG) {
+          console.debug("[OVERLAY-DEBUG] cursor enter region", { markerId: marker.id, acknowledged });
+        }
+        if (acknowledged) {
+          narrate("CURSOR_ENTER_REGION");
+          acknowledgeWatchdog();
+          const next = advanceWorkflow();
+          if (next) {
+            narrate("STEP_ACKNOWLEDGED");
+            void proceedToNextStep();
+          } else {
+            narrate("STEP_ACKNOWLEDGED");
+          }
+        }
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("mousemove", onMouseMove);
+      unsubscribe();
+      resetPresence();
+      cancelTeachingWatchdog();
+      cancelStepWatchdog();
+    };
   }, []);
 
   if (markers.length === 0) return null;
+
+  if (DEBUG) {
+    renderCountRef.current += 1;
+    console.debug(`[OVERLAY-RENDER] render #${renderCountRef.current} - ${markers.length} marker(s) visible`);
+  }
 
   return (
     <div

@@ -1,8 +1,45 @@
 import { CAPABILITY_REGISTRY } from "./capability-registry";
 import { getCurrentOwner, getCurrentLease, getMUTHURMode, getEventLog } from "./control-lease";
 import { requiresConfirmation } from "./capability-registry";
-import { getActiveMarkerCount } from "./indicate-layer";
+import { getMarkers } from "./indicate-layer";
+import { getWorkflowState, getCurrentStep, getNextStep } from "./guided-workflow";
+import { getPresenceState } from "./cursor-presence";
 import type { ActionName } from "./computer-use-types";
+
+export interface MarkerInfo {
+  id: string;
+  style: string;
+  position: { x: number; y: number };
+  label: string | null;
+  width: number;
+  height: number;
+  bounds: { left: number; top: number; right: number; bottom: number } | null;
+  hasRegion: boolean;
+}
+
+export function getActiveGuidedMarker(): MarkerInfo | null {
+  const markers = getMarkers();
+  if (markers.length === 0) return null;
+  const m = markers[markers.length - 1];
+  const hasRegion = (m.width ?? 0) > 0 && (m.height ?? 0) > 0;
+  return {
+    id: m.id,
+    style: m.style ?? "ring",
+    position: { x: m.position.x, y: m.position.y },
+    label: m.label ?? null,
+    width: m.width ?? 0,
+    height: m.height ?? 0,
+    bounds: hasRegion
+      ? {
+          left: m.position.x - (m.width! / 2),
+          top: m.position.y - (m.height! / 2),
+          right: m.position.x + (m.width! / 2),
+          bottom: m.position.y + (m.height! / 2),
+        }
+      : null,
+    hasRegion,
+  };
+}
 
 export interface ComputerUseStatus {
   owner: string;
@@ -20,6 +57,28 @@ export interface ComputerUseStatus {
   pointerLayer: {
     available: boolean;
     activeMarkers: number;
+    markers: {
+      id: string;
+      style: string;
+      position: { x: number; y: number };
+      label: string | null;
+      width: number;
+      height: number;
+    }[];
+  };
+  guidedWorkflow: {
+    active: boolean;
+    currentStep: string | null;
+    nextStep: string | null;
+    acknowledged: boolean;
+    totalSteps: number;
+    completedSteps: number;
+  };
+  guidedMarker: MarkerInfo | null;
+  cursorPresence: {
+    x: number;
+    y: number;
+    insideRegion: string | null;
   };
   electronBridge: {
     available: boolean;
@@ -71,10 +130,42 @@ export function getComputerUseStatus(): ComputerUseStatus {
       unsupported,
       requiresConfirmation: confirmationRequired,
     },
-    pointerLayer: {
-      available: true,
-      activeMarkers: getActiveMarkerCount(),
-    },
+    pointerLayer: (() => {
+      const raw = getMarkers();
+      return {
+        available: true,
+        activeMarkers: raw.length,
+        markers: raw.map((m) => ({
+          id: m.id,
+          style: m.style ?? "ring",
+          position: { x: m.position.x, y: m.position.y },
+          label: m.label ?? null,
+          width: m.width ?? 0,
+          height: m.height ?? 0,
+        })),
+      };
+    })(),
+    guidedWorkflow: (() => {
+      const wf = getWorkflowState();
+      const current = getCurrentStep();
+      const next = getNextStep();
+      return {
+        active: wf.active,
+        currentStep: current?.label ?? null,
+        nextStep: next?.label ?? null,
+        acknowledged: wf.acknowledged,
+        totalSteps: wf.steps.length,
+        completedSteps: Math.max(0, wf.currentStepIndex),
+      };
+    })(),
+    guidedMarker: (() => {
+      const marker = getActiveGuidedMarker();
+      return marker;
+    })(),
+    cursorPresence: (() => {
+      const ps = getPresenceState();
+      return { x: ps.x, y: ps.y, insideRegion: ps.insideRegion };
+    })(),
     electronBridge: {
       available: false,
     },
@@ -180,6 +271,23 @@ export function formatStatusText(): string {
     "",
     "Pointer layer: available",
     `Active markers: ${status.pointerLayer.activeMarkers}`,
+    ...status.pointerLayer.markers.map((m) =>
+      `  marker: id=${m.id} style=${m.style} pos=(${m.position.x}, ${m.position.y}) label=${m.label ?? "(none)"} bounds=${m.width}x${m.height}`,
+    ),
+    "",
+    "Guided workflow:",
+    `  active: ${status.guidedWorkflow.active}`,
+    `  current step: ${status.guidedWorkflow.currentStep ?? "none"}`,
+    `  next step: ${status.guidedWorkflow.nextStep ?? "none"}`,
+    `  acknowledged: ${status.guidedWorkflow.acknowledged}`,
+    "",
+    status.guidedMarker
+      ? (`Guided marker: id=${status.guidedMarker.id} label=${status.guidedMarker.label ?? "(none)"} bounds=${status.guidedMarker.width}x${status.guidedMarker.height} region=${status.guidedMarker.hasRegion}` as string)
+      : "Guided marker: none",
+    "",
+    "Cursor presence:",
+    `  position: (${status.cursorPresence.x}, ${status.cursorPresence.y})`,
+    `  inside region: ${status.cursorPresence.insideRegion ?? "none"}`,
     "",
     "Electron bridge: unavailable",
   ];

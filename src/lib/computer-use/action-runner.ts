@@ -7,6 +7,7 @@ import * as uiVerification from "./ui-verification";
 import * as indicateLayer from "./indicate-layer";
 import { checkActionPermission, getCurrentOwner, emitControlDenied } from "./control-lease";
 import { getActionScope } from "./capability-registry";
+import { narrate } from "./narration";
 
 const safetyGuard = createSafetyGuard();
 
@@ -176,6 +177,7 @@ async function executeAction(action: ComputerUseAction): Promise<ComputerUseResu
 
     default: {
       const start = Date.now();
+      narrate("UNSUPPORTED_ACTION");
       return {
         success: false,
         action: action.name,
@@ -223,6 +225,7 @@ export async function runComputerUseAction(
     if (!permission.allowed) {
       const denialReason = permission.reason ?? `Scope "${actionScope}" is not permitted under current lease (owner: ${owner})`;
       emitControlDenied({ reason: denialReason });
+      narrate("OWNERSHIP_DENIED");
       return {
         success: false,
         action: action.name,

@@ -75,8 +75,8 @@ async function main() {
   ];
   const source = files.map((file) => readFileSync(join(process.cwd(), file), "utf8")).join("\n");
   assert(
-    "pointer modules contain no MouseEvent/KeyboardEvent/dispatchEvent injection",
-    !/\b(?:MouseEvent|KeyboardEvent|dispatchEvent)\b/.test(source),
+    "pointer modules contain no synthetic input dispatch",
+    !/\bdispatchEvent\b|\bnew\s+(?:MouseEvent|KeyboardEvent)\b/.test(source),
   );
   assert(
     "overlay declares pointer-events none",

@@ -1,5 +1,7 @@
 export type ControlOwner = "USER" | "SHARED" | "MUTHUR";
 
+import { narrate } from "./narration";
+
 export type ControlScope =
   | "observation"
   | "input"
@@ -102,6 +104,7 @@ export function requestLease(
     to: owner,
     reason: opts?.reason,
   });
+  narrate("CONTROL_REQUESTED");
 
   if (owner === "USER") {
     grantLease(owner, scope, {
@@ -175,6 +178,7 @@ function grantLease(
     lease: { ...currentLease },
     reason: currentLease.reason,
   });
+  narrate("CONTROL_GRANTED");
   return { ...currentLease };
 }
 
@@ -205,6 +209,7 @@ export function retake(
     to: requestor,
     reason,
   });
+  narrate("CONTROL_RETURNED");
   return { success: true, previousOwner: prev };
 }
 
@@ -223,6 +228,7 @@ export function expireLease(reason: string = "Expired"): ControlLease {
     to: "USER",
     reason,
   });
+  narrate("CONTROL_RETURNED");
   return { ...currentLease };
 }
 
