@@ -1,10 +1,11 @@
-import type { ComputerUseAction, ComputerUseResult, ComputerUseStatus } from "./computer-use-types";
+import type { ComputerUseAction, ComputerUseResult, ComputerUseStatus, IndicateMarker } from "./computer-use-types";
 import { createSafetyGuard } from "./safety-guard";
 import * as windowManager from "./window-manager";
 import * as screenCapture from "./screen-capture";
 import * as inputController from "./input-controller";
 import * as uiVerification from "./ui-verification";
-import { checkActionPermission, getCurrentOwner } from "./control-lease";
+import * as indicateLayer from "./indicate-layer";
+import { checkActionPermission, getCurrentOwner, emitControlDenied } from "./control-lease";
 import { getActionScope } from "./capability-registry";
 
 const safetyGuard = createSafetyGuard();
@@ -110,6 +111,69 @@ async function executeAction(action: ComputerUseAction): Promise<ComputerUseResu
         durationMs: 0,
       };
 
+    case "indicate_point": {
+      const rawPos = action.params?.position;
+      const position = (typeof rawPos === "object" && rawPos != null)
+        ? indicateLayer.normalizePosition(rawPos as Record<string, unknown>)
+        : null;
+      if (!position) {
+        const start = Date.now();
+        return {
+          success: false,
+          action: "indicate_point",
+          status: "error",
+          error: "MISSING_PARAM: position with x/y required",
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - start,
+        };
+      }
+      return indicateLayer.indicatePoint(position, {
+        label: action.params?.label as string | undefined,
+        style: (action.params?.style as IndicateMarker["style"]) ?? "ring",
+        color: action.params?.color as string | undefined,
+        ttlMs: action.params?.ttlMs as number | undefined,
+        width: action.params?.width as number | undefined,
+        height: action.params?.height as number | undefined,
+      });
+    }
+
+    case "indicate_highlight": {
+      const rawPos = action.params?.position;
+      const position = (typeof rawPos === "object" && rawPos != null)
+        ? indicateLayer.normalizePosition(rawPos as Record<string, unknown>)
+        : null;
+      if (!position) {
+        const start = Date.now();
+        return {
+          success: false,
+          action: "indicate_highlight",
+          status: "error",
+          error: "MISSING_PARAM: position with x/y required",
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - start,
+        };
+      }
+      return indicateLayer.indicateHighlight(position, {
+        label: action.params?.label as string | undefined,
+        style: (action.params?.style as IndicateMarker["style"]) ?? "glow",
+        color: action.params?.color as string | undefined,
+        ttlMs: action.params?.ttlMs as number | undefined,
+        width: action.params?.width as number | undefined,
+        height: action.params?.height as number | undefined,
+      });
+    }
+
+    case "clear_indicators":
+      indicateLayer.clearMarkers();
+      return {
+        success: true,
+        action: "clear_indicators",
+        status: "completed",
+        data: { cleared: true },
+        timestamp: new Date().toISOString(),
+        durationMs: 0,
+      };
+
     default: {
       const start = Date.now();
       return {
@@ -157,11 +221,13 @@ export async function runComputerUseAction(
     const actionScope = getActionScope(action.name);
     const permission = checkActionPermission(actionScope);
     if (!permission.allowed) {
+      const denialReason = permission.reason ?? `Scope "${actionScope}" is not permitted under current lease (owner: ${owner})`;
+      emitControlDenied({ reason: denialReason });
       return {
         success: false,
         action: action.name,
         status: "error",
-        error: `OWNERSHIP_DENIED: ${permission.reason ?? `Scope "${actionScope}" is not permitted under current lease (owner: ${owner})`}`,
+        error: `OWNERSHIP_DENIED: ${denialReason}`,
         timestamp: new Date().toISOString(),
         durationMs: Date.now() - start,
       };

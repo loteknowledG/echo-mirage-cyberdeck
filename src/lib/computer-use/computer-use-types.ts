@@ -8,11 +8,14 @@ export type ActionName =
   | "verify_text_visible"
   | "verify_window_active"
   | "stop_execution"
+  | "indicate_point"
+  | "indicate_highlight"
+  | "clear_indicators"
   | "unknown";
 
 export interface ComputerUseAction {
   name: ActionName;
-  params?: Record<string, string | number | boolean>;
+  params?: Record<string, unknown>;
   verify?: {
     type: "text_visible" | "window_active";
     target: string;
@@ -42,6 +45,24 @@ export interface VerificationResult {
   success: boolean;
   matches: boolean;
   reason?: string;
+}
+
+export interface IndicatePosition {
+  x: number;
+  y: number;
+  anchor?: "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
+}
+
+export interface IndicateMarker {
+  id: string;
+  position: IndicatePosition;
+  label?: string;
+  style?: "ring" | "dot" | "glow";
+  color?: string;
+  ttlMs?: number;
+  createdAt: number;
+  width?: number;
+  height?: number;
 }
 
 export interface ComputerUseResult {

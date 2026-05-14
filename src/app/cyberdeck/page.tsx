@@ -27,6 +27,7 @@ import {
 } from "@/lib/AudioEngine";
 import { applyMuthurEffectChain } from "@/voice/effectsChain";
 import { MUTHUR_PRESET } from "@/voice/muthurPreset";
+import IndicateOverlay from "@/lib/computer-use/IndicateOverlay";
 import {
   buildMuthurVoiceMasterCopy,
   getInitialMuthurVoiceDials,
@@ -56,6 +57,9 @@ import {
   parseBrowserCommand,
   parseBrowserUseModeCommand,
 } from "@/lib/browser-intents";
+import { detectSelfStatusIntent } from "@/lib/computer-use/intent-detect";
+import { formatStatusText } from "@/lib/computer-use/introspection";
+import { runComputerUseAction as runComputerUseBridgeAction } from "@/lib/computer-use/electron-computer-use-bridge";
 import { useBrowserController } from "@/lib/use-browser-controller";
 import { useCustomTabBrowserController } from "@/lib/use-custom-tab-browser-controller";
 import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
@@ -2895,6 +2899,99 @@ export default function CyberdeckPage() {
       return;
     }
 
+    if (detectSelfStatusIntent(userMessage)) {
+      const statusText = formatStatusText();
+      setMessages((prev) => [...prev, { role: "assistant", text: statusText }]);
+      setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, statusText));
+      setIsStreaming(false);
+      return;
+    }
+
+    const runPointerCommand = async (): Promise<boolean> => {
+      const text = userMessage.toLowerCase();
+      const wantsClear = /\bclear\s+(?:the\s+)?(?:indicator|indicators|pointer|pointers|marker|markers)\b/.test(text);
+      const wantsIndicate = /\bindicate\b/.test(text);
+      const wantsHighlight = /\bhighlight\b/.test(text);
+
+      if (!wantsClear && !wantsIndicate && !wantsHighlight) return false;
+
+      if (wantsClear) {
+        const result = await runComputerUseBridgeAction({ name: "clear_indicators" });
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: result.success
+              ? "INDICATE_CLEAR // ACTIVE_MARKERS 0"
+              : `INDICATE_CLEAR_FAILED // ${result.error ?? "UNKNOWN"}`,
+          },
+        ]);
+        setIsStreaming(false);
+        return true;
+      }
+
+      const findVisibleTextTarget = (label: string): HTMLElement | null => {
+        const candidates = Array.from(
+          document.querySelectorAll<HTMLElement>('[data-pointer-target], button, [role="button"], h1, h2, h3, span'),
+        );
+        return candidates.find((candidate) => {
+          if (!candidate.textContent?.toLowerCase().includes(label)) return false;
+          const rect = candidate.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0 && rect.bottom >= 0 && rect.right >= 0;
+        }) ?? null;
+      };
+
+      const target =
+        text.includes("command input") || text.includes("input area") || text.includes("message box")
+          ? messageInputRef.current
+          : text.includes("voice lab")
+            ? document.querySelector<HTMLElement>('[data-pointer-target="voice-lab"]') ??
+              findVisibleTextTarget("voice lab") ??
+              gatewayColumnRef.current
+            : null;
+
+      if (!target) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: "INDICATE_SKIPPED // TARGET_NOT_VISIBLE" },
+        ]);
+        setIsStreaming(false);
+        return true;
+      }
+
+      const rect = target.getBoundingClientRect();
+      const position = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+      const result = await runComputerUseBridgeAction({
+        name: wantsHighlight ? "indicate_highlight" : "indicate_point",
+        params: {
+          position,
+          width: Math.max(48, Math.min(rect.width, 420)),
+          height: Math.max(32, Math.min(rect.height, 220)),
+          label: text.includes("voice lab") ? "Voice Lab" : "Command input",
+          ttlMs: 30_000,
+        },
+      });
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          text: result.success
+            ? `INDICATE_${wantsHighlight ? "HIGHLIGHT" : "POINT"} // ${text.includes("voice lab") ? "VOICE_LAB" : "COMMAND_INPUT"}`
+            : `INDICATE_FAILED // ${result.error ?? "UNKNOWN"}`,
+        },
+      ]);
+      setIsStreaming(false);
+      return true;
+    };
+
+    if (await runPointerCommand()) {
+      return;
+    }
+
     const browserCommand =
       parseBrowserCommand(userMessage) ||
       (operatorSurfaceMode === "browser" ? parseBrowserUseModeCommand(userMessage) : null);
@@ -3670,7 +3767,10 @@ export default function CyberdeckPage() {
   const renderCustomTabSurface = useCallback(
     (tab: CustomTab) => {
       const shell = (content: JSX.Element, right?: JSX.Element) => (
-        <div className="custom-scrollbar flex h-full flex-1 flex-col overflow-y-auto bg-black p-4">
+        <div
+          className="custom-scrollbar flex h-full flex-1 flex-col overflow-y-auto bg-black p-4"
+          data-pointer-target={tab.kind}
+        >
           <div className="flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors">
             <CyberdeckPaneHeader
               left={
@@ -3984,6 +4084,7 @@ export default function CyberdeckPage() {
       className="terminal-window flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:flex-col max-md:overflow-y-auto md:overflow-hidden"
     >
       <CyberdeckBootSequence />
+      <IndicateOverlay />
       {railTabContextMenu || mirageContextMenu || gatewayPaneContextMenu ? (
         <div
           className="fixed inset-0 z-[90]"

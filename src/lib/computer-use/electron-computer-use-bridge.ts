@@ -27,10 +27,18 @@ function getElectronAPI(): ElectronComputerUseAPI | null {
   return null;
 }
 
+function isRendererOnlyAction(action: ComputerUseAction): boolean {
+  return (
+    action.name === "indicate_point" ||
+    action.name === "indicate_highlight" ||
+    action.name === "clear_indicators"
+  );
+}
+
 export async function runComputerUseAction(action: ComputerUseAction): Promise<ComputerUseResult> {
   const electronAPI = getElectronAPI();
 
-  if (!electronAPI?.runAction) {
+  if (!electronAPI?.runAction || isRendererOnlyAction(action)) {
     return runAction(action);
   }
 

@@ -7,12 +7,17 @@ export type ControlScope =
   | "control"
   | "full";
 
+export type MUTHURMode = "OBSERVE" | "INDICATE" | "ASSIST" | "USE";
+
 export type ControlEvent =
   | "CONTROL_REQUESTED"
   | "CONTROL_GRANTED"
   | "CONTROL_RETAKEN"
   | "CONTROL_EXPIRED"
-  | "CONTROL_DENIED";
+  | "CONTROL_DENIED"
+  | "INDICATE_STARTED"
+  | "INDICATE_UPDATED"
+  | "INDICATE_CLEARED";
 
 export interface ControlLease {
   owner: ControlOwner;
@@ -50,9 +55,10 @@ const MUTHUR_OBSERVATION_SCOPES = new Set<ControlScope>([
 ]);
 
 let currentLease: ControlLease = { ...DEFAULT_LEASE };
+let muthurMode: MUTHURMode = "OBSERVE";
 const eventLog: ControlEventRecord[] = [];
 
-function emit(event: ControlEvent, extra?: Partial<ControlEventRecord>): void {
+export function emit(event: ControlEvent, extra?: Partial<ControlEventRecord>): void {
   const record: ControlEventRecord = {
     event,
     timestamp: new Date().toISOString(),
@@ -139,7 +145,13 @@ export function requestLease(
   };
 }
 
-export function grantLease(
+/**
+ * Internal: updates the lease state directly. Used exclusively by requestLease() within this
+ * module. External callers should use requestLease() which enforces policy (duration validation,
+ * owner checks, event emission). Calling grantLease() directly bypasses policy and is therefore
+ * not exported.
+ */
+function grantLease(
   owner: ControlOwner,
   scope: ControlScope,
   opts?: {
@@ -254,6 +266,27 @@ export function checkActionPermission(
 
 export function canRevoke(): boolean {
   return currentLease.revocable;
+}
+
+export function getMUTHURMode(): MUTHURMode {
+  return muthurMode;
+}
+
+export function setMUTHURMode(mode: MUTHURMode): MUTHURMode {
+  muthurMode = mode;
+  return muthurMode;
+}
+
+export function emitControlDenied(opts: {
+  deniedTo?: ControlOwner;
+  reason: string;
+}): void {
+  emit("CONTROL_DENIED", {
+    from: currentLease.owner,
+    to: opts.deniedTo,
+    reason: opts.reason,
+    lease: { ...currentLease },
+  });
 }
 
 export function revokeLease(

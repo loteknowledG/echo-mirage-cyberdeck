@@ -17,6 +17,14 @@ async function openAuditSurface(page: import("@playwright/test").Page, surface: 
   await page.getByRole("menuitem", { name: surface }).click();
 }
 
+async function sendDeckCommand(page: import("@playwright/test").Page, text: string) {
+  const input = page.locator('input[placeholder*="GATEWAY"], input[placeholder*="command"], input[placeholder*="COMMAND"]').first();
+  await input.waitFor({ state: "visible", timeout: 10000 });
+  await input.click();
+  await input.fill(text);
+  await input.press("Enter");
+}
+
 test("cyberdeck renders and switches required alpha modules", async ({ page }) => {
   try {
     await page.goto("/cyberdeck", { waitUntil: "load", timeout: 30000 });
@@ -34,6 +42,16 @@ test("cyberdeck renders and switches required alpha modules", async ({ page }) =
   await expect(body).toContainText("Memory Atlas", { timeout: 10000 });
   await expect(body).toContainText("Voice Lab", { timeout: 10000 });
   await expect(body).toContainText("Flight Log", { timeout: 10000 });
+
+  await sendDeckCommand(page, "MUTHUR, indicate the command input area.");
+  await expect(page.locator('[data-computer-use-indicate-marker="ring"]')).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator('[data-computer-use-indicate-overlay="true"]')).toHaveCSS("pointer-events", "none");
+
+  await sendDeckCommand(page, "MUTHUR, highlight the Voice Lab panel.");
+  await expect(page.locator("[data-computer-use-indicate-marker]")).toHaveCount(2, { timeout: 5000 });
+
+  await sendDeckCommand(page, "MUTHUR, clear indicators.");
+  await expect(page.locator("[data-computer-use-indicate-marker]")).toHaveCount(0, { timeout: 5000 });
 
   await createAuditTab(page);
 
