@@ -1,5 +1,5 @@
 const path = require('path');
-const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, clipboard } = require('electron');
 
 let playrightBrowserState = null;
 
@@ -324,6 +324,200 @@ ipcMain.handle('echo-mirage-browser:forward', async () => {
     return await goForwardPlaywrightBrowser();
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Browser forward failed.' };
+  }
+});
+
+// Computer Use Layer IPC handlers
+const MAX_PASTE_LENGTH = 50000;
+const ALLOWED_HOTKEYS = new Set(['Ctrl+V', 'Control+V', 'Ctrl+C', 'Control+C', 'Ctrl+A', 'Control+A', 'Enter', 'Escape', 'Esc']);
+
+ipcMain.handle('computer-use:run-action', async (_event, action) => {
+  const start = Date.now();
+  const actionObj = action && typeof action === 'object' && 'name' in action ? action : null;
+  const actionName = actionObj?.name || 'unknown';
+
+  if (!actionObj) {
+    return {
+      success: false,
+      action: actionName,
+      status: 'error',
+      error: 'INVALID_ACTION: action must be an object with a name property',
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - start,
+    };
+  }
+
+  switch (actionName) {
+    case 'get_active_window': {
+      const win = BrowserWindow.getFocusedWindow();
+      if (!win) {
+        return {
+          success: false,
+          action: actionName,
+          status: 'error',
+          data: null,
+          error: 'NO_FOCUSED_WINDOW: No focused Electron window',
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - start,
+        };
+      }
+      const title = win.getTitle();
+      const url = win.webContents.getURL();
+      return {
+        success: true,
+        action: actionName,
+        status: 'completed',
+        data: { title, url, isFocused: true },
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - start,
+      };
+    }
+
+    case 'list_open_windows': {
+      const windows = BrowserWindow.getAllWindows();
+      const windowInfos = windows.map((win) => ({
+        title: win.getTitle(),
+        url: win.webContents.getURL(),
+        isFocused: win.isFocused(),
+      }));
+      return {
+        success: true,
+        action: actionName,
+        status: 'completed',
+        data: windowInfos,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - start,
+      };
+    }
+
+    case 'capture_screen': {
+      return {
+        success: false,
+        action: actionName,
+        status: 'error',
+        data: null,
+        error: 'CAPTURE_NOT_IMPLEMENTED: Screen capture requires desktopCapturer which is not enabled in this build',
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - start,
+      };
+    }
+
+    case 'paste_text': {
+      const text = actionObj.params?.text;
+      if (!text || typeof text !== 'string' || text.trim().length === 0) {
+        return {
+          success: false,
+          action: actionName,
+          status: 'error',
+          error: 'PASTE_REJECTED: Empty text payload',
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - start,
+        };
+      }
+      if (text.length > MAX_PASTE_LENGTH) {
+        return {
+          success: false,
+          action: actionName,
+          status: 'error',
+          error: `PASTE_REJECTED: Payload exceeds max length of ${MAX_PASTE_LENGTH}`,
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - start,
+        };
+      }
+      if (!actionObj.confirm) {
+        return {
+          success: false,
+          action: actionName,
+          status: 'error',
+          error: 'PASTE_REJECTED: Action requires explicit confirmation flag',
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - start,
+        };
+      }
+      try {
+        clipboard.writeText(text);
+        return {
+          success: true,
+          action: actionName,
+          status: 'completed',
+          data: { written: text.length },
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - start,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          action: actionName,
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Clipboard write failed',
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - start,
+        };
+      }
+    }
+
+    case 'hotkey': {
+      const keys = actionObj.params?.keys;
+      if (!keys || typeof keys !== 'string') {
+        return {
+          success: false,
+          action: actionName,
+          status: 'error',
+          error: 'HOTKEY_REJECTED: keys parameter required',
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - start,
+        };
+      }
+      if (!ALLOWED_HOTKEYS.has(keys)) {
+        return {
+          success: false,
+          action: actionName,
+          status: 'error',
+          error: `HOTKEY_REJECTED: "${keys}" is not in the allowlist. Allowed: ${[...ALLOWED_HOTKEYS].join(', ')}`,
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - start,
+        };
+      }
+      if (!actionObj.confirm) {
+        return {
+          success: false,
+          action: actionName,
+          status: 'error',
+          error: 'HOTKEY_REJECTED: Action requires explicit confirmation flag',
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - start,
+        };
+      }
+      return {
+        success: false,
+        action: actionName,
+        status: 'error',
+        data: null,
+        error: 'HOTKEY_NOT_IMPLEMENTED: Direct hotkey injection requires webContents.send with accelerator which is not implemented',
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - start,
+      };
+    }
+
+    case 'stop_execution':
+      return {
+        success: true,
+        action: actionName,
+        status: 'stopped',
+        data: { stopped: true },
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - start,
+      };
+
+    default:
+      return {
+        success: false,
+        action: actionName,
+        status: 'error',
+        error: `UNKNOWN_ACTION: "${actionName}" is not a recognized computer use action`,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - start,
+      };
   }
 });
 

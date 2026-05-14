@@ -16,3 +16,8 @@ contextBridge.exposeInMainWorld('echoMirageBrowser', {
   back: () => ipcRenderer.invoke('echo-mirage-browser:back'),
   forward: () => ipcRenderer.invoke('echo-mirage-browser:forward'),
 });
+
+contextBridge.exposeInMainWorld('echoMirageComputerUse', {
+  runAction: (action) => ipcRenderer.invoke('computer-use:run-action', action),
+  isAvailable: () => true,
+});
