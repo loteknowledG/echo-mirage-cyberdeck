@@ -125,9 +125,21 @@ async function executeAction(action: ComputerUseAction): Promise<ComputerUseResu
 export async function runComputerUseAction(
   action: ComputerUseAction
 ): Promise<ComputerUseResult> {
+  const start = Date.now();
+
+  if (!action || typeof action !== "object" || !("name" in action)) {
+    return {
+      success: false,
+      action: "unknown",
+      status: "error",
+      error: "INVALID_ACTION: action must be an object with a name property",
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - start,
+    };
+  }
+
   const validation = safetyGuard.validateAction(action);
   if (!validation.valid) {
-    const start = Date.now();
     return {
       success: false,
       action: action.name,

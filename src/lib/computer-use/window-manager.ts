@@ -16,10 +16,11 @@ export async function getActiveWindow(): Promise<ComputerUseResult> {
 export async function listOpenWindows(): Promise<ComputerUseResult> {
   const start = Date.now();
   return {
-    success: true,
+    success: false,
     action: "list_open_windows",
-    status: "completed",
-    data: [] as WindowInfo[],
+    status: "error",
+    data: null,
+    error: "WINDOW_MANAGER_NOT_IMPLEMENTED: Window enumeration is not available in this environment",
     timestamp: new Date().toISOString(),
     durationMs: Date.now() - start,
   };

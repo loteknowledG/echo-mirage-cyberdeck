@@ -38,7 +38,7 @@ export function createSafetyGuard(config: SafetyConfig = DEFAULT_SAFETY_CONFIG) 
 
   return {
     validateAction(action: ComputerUseAction): { valid: boolean; error?: string } {
-      if (!action || !action.name) {
+      if (!action || typeof action !== "object" || !("name" in action)) {
         return { valid: false, error: "SAFETY_REJECT: Empty or invalid action" };
       }
 
@@ -63,7 +63,7 @@ export function createSafetyGuard(config: SafetyConfig = DEFAULT_SAFETY_CONFIG) 
         };
       }
 
-      if (config.requireConfirmation && action.name !== "stop_execution" && action.name !== "get_active_window" && action.name !== "list_open_windows") {
+      if (config.requireConfirmation && action.name !== "stop_execution" && action.name !== "get_active_window" && action.name !== "list_open_windows" && action.name !== "capture_screen") {
         if (!action.confirm) {
           return {
             valid: false,

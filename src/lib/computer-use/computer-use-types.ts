@@ -7,7 +7,8 @@ export type ActionName =
   | "hotkey"
   | "verify_text_visible"
   | "verify_window_active"
-  | "stop_execution";
+  | "stop_execution"
+  | "unknown";
 
 export interface ComputerUseAction {
   name: ActionName;
