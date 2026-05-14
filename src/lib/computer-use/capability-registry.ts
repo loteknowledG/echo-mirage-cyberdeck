@@ -127,3 +127,14 @@ export function getConfirmationPolicy(
 ): ConfirmationPolicy {
   return CAPABILITY_REGISTRY[actionName]?.confirmationPolicy ?? "none";
 }
+
+export function getActionScope(
+  actionName: ActionName
+): "observation" | "input" | "output" | "control" | "full" {
+  const cap = CAPABILITY_REGISTRY[actionName];
+  if (!cap) return "control";
+  if (cap.category === "observation") return "observation";
+  if (cap.category === "input") return "input";
+  if (cap.category === "output") return "output";
+  return "control";
+}

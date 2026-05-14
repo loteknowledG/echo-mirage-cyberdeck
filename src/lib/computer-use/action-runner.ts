@@ -4,6 +4,8 @@ import * as windowManager from "./window-manager";
 import * as screenCapture from "./screen-capture";
 import * as inputController from "./input-controller";
 import * as uiVerification from "./ui-verification";
+import { checkActionPermission, getCurrentOwner } from "./control-lease";
+import { getActionScope } from "./capability-registry";
 
 const safetyGuard = createSafetyGuard();
 
@@ -148,6 +150,22 @@ export async function runComputerUseAction(
       timestamp: new Date().toISOString(),
       durationMs: Date.now() - start,
     };
+  }
+
+  const owner = getCurrentOwner();
+  if (owner !== "USER") {
+    const actionScope = getActionScope(action.name);
+    const permission = checkActionPermission(actionScope);
+    if (!permission.allowed) {
+      return {
+        success: false,
+        action: action.name,
+        status: "error",
+        error: `OWNERSHIP_DENIED: ${permission.reason ?? `Scope "${actionScope}" is not permitted under current lease (owner: ${owner})`}`,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - start,
+      };
+    }
   }
 
   const result = await executeAction(action);
