@@ -1,4 +1,5 @@
 import type { ComputerUseAction, SafetyConfig } from "./computer-use-types";
+import { requiresConfirmation } from "./capability-registry";
 
 export const DEFAULT_SAFETY_CONFIG: SafetyConfig = {
   maxPasteLength: 50000,
@@ -63,7 +64,7 @@ export function createSafetyGuard(config: SafetyConfig = DEFAULT_SAFETY_CONFIG) 
         };
       }
 
-      if (config.requireConfirmation && action.name !== "stop_execution" && action.name !== "get_active_window" && action.name !== "list_open_windows" && action.name !== "capture_screen") {
+      if (config.requireConfirmation && requiresConfirmation(action.name)) {
         if (!action.confirm) {
           return {
             valid: false,
