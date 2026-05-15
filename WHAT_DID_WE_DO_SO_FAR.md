@@ -71,6 +71,10 @@ Build and refine Echo Mirage Cyberdeck features including computer use layer, MU
 
 **UI Semantic Alias Registry v0 (enhanced)**: added "volume slider" to VOICE_LAB; "event log" to LEFT_CONSOLE; "doctrine panel" to RIGHT_PANEL; normalize() strips punctuation before matching; probe-ui-alias-registry.ts with 78 assertions
 
+**Workflow Observation v0**: workflow-observation.ts with state machine (inactive/observing/paused/complete), startObservation/stopObservation/pauseObservation/resumeObservation; ALLOWED_EVENT_TYPES whitelist (10 types); BLOCKED_KEYWORDS sanitization for context; recordEvent() queues question + sanitizes; confirmEvent() marks confirmed; formatDraftProcedure() outputs structured draft; question-queue.ts with queueQuestion/answerQuestion/getNextPendingQuestion/getAnswerSummary; 6 answer types; detectObserveIntent/stop/pause/resume in intent-detect.ts; instrumentation in page.tsx and IndicateOverlay.tsx; getNextPendingQuestion + getPendingQuestionCount exported from workflow-observation.ts
+
+**Build Fixes v1**: exported getNextPendingQuestion + getPendingQuestionCount from workflow-observation.ts; updated assert() in probe-workflow-observation.ts to accept `boolean | (() => boolean)` and added null guard for pending question
+
 ### In Progress
 - (none)
 
@@ -129,9 +133,14 @@ Build and refine Echo Mirage Cyberdeck features including computer use layer, MU
 2. settings command
 3. `detectSelfStatusIntent` → formatStatusText()
 4. `detectInspectIntent` → formatSurfaceResponse() or fallback
-5. `isTeachingDemoTrigger` → runTeachingDemo()
-6. `runPointerCommand` (indicate/highlight/clear via resolveUiTarget)
-7. `parseBrowserCommand` / `parseBrowserUseModeCommand`
+5. `detectStopObserveIntent` → stopObservation()
+6. `detectPauseObserveIntent` → pauseObservation()
+7. `detectResumeObserveIntent` → resumeObservation()
+8. `detectObserveIntent` → startObservation()
+9. answer question (yes/no/skip/record_this/ignore_this/optional/recovery)
+10. `isTeachingDemoTrigger` → runTeachingDemo()
+11. `runPointerCommand` (indicate/highlight/clear via resolveUiTarget)
+12. `parseBrowserCommand` / `parseBrowserUseModeCommand`
 8. chat stream (model inference)
 
 **Unresolved indicate** (`TARGET_NOT_RECOGNIZED`) returns early from runPointerCommand — does NOT fall through to browser/search/chat

@@ -57,7 +57,8 @@ import {
   parseBrowserCommand,
   parseBrowserUseModeCommand,
 } from "@/lib/browser-intents";
-import { detectSelfStatusIntent, detectInspectIntent } from "@/lib/computer-use/intent-detect";
+import { detectSelfStatusIntent, detectInspectIntent, detectObserveIntent, detectStopObserveIntent, detectPauseObserveIntent, detectResumeObserveIntent } from "@/lib/computer-use/intent-detect";
+import { startObservation, stopObservation, pauseObservation, resumeObservation, recordEvent, getNextPendingQuestion, answerQuestion, getEventCount } from "@/lib/computer-use/workflow-observation";
 import { formatStatusText } from "@/lib/computer-use/introspection";
 import { runComputerUseAction as runComputerUseBridgeAction } from "@/lib/computer-use/electron-computer-use-bridge";
 import { resolveUiTarget, type CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
@@ -2984,6 +2985,82 @@ if (detectSelfStatusIntent(userMessage)) {
       return;
     }
 
+    if (detectStopObserveIntent(userMessage)) {
+      const session = stopObservation();
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: `Workflow observation stopped. ${getEventCount()} events recorded.`,
+        },
+      ]);
+      setIsStreaming(false);
+      return;
+    }
+
+    if (detectPauseObserveIntent(userMessage)) {
+      pauseObservation();
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: "Workflow observation paused." },
+      ]);
+      setIsStreaming(false);
+      return;
+    }
+
+    if (detectResumeObserveIntent(userMessage)) {
+      resumeObservation();
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: "Workflow observation resumed." },
+      ]);
+      setIsStreaming(false);
+      return;
+    }
+
+    if (detectObserveIntent(userMessage)) {
+      const session = startObservation();
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: "Workflow observation started. Say 'MUTHUR, pause workflow observation' to pause, or 'MUTHUR, stop workflow observation' to end.",
+        },
+      ]);
+      setIsStreaming(false);
+      return;
+    }
+
+    const answerMap: Record<string, string> = {
+      yes: "yes",
+      no: "no",
+      skip: "skip",
+      "record this": "record_this",
+      "ignore this": "ignore_this",
+      optional: "optional",
+      recovery: "recovery",
+      "mark as recovery": "recovery",
+      "yes record": "record_this",
+      "no skip": "skip",
+    };
+    const lower = userMessage.toLowerCase().trim();
+    for (const [trigger, answer] of Object.entries(answerMap)) {
+      if (lower === trigger || lower === `muthur, ${trigger}`) {
+        const pending = getNextPendingQuestion();
+        if (pending) {
+          answerQuestion(pending.id, answer as "yes" | "no" | "skip" | "record_this" | "ignore_this" | "optional" | "recovery");
+          const questionsLeft = getNextPendingQuestion();
+          let response = `Recorded.`;
+          if (questionsLeft) {
+            response += ` Next: ${questionsLeft.question}`;
+          }
+          setMessages((prev) => [...prev, { role: "assistant", text: response }]);
+          setIsStreaming(false);
+          return;
+        }
+      }
+    }
+
     if (isTeachingDemoTrigger(userMessage)) {
       void runTeachingDemo();
       setMessages((prev) => [
@@ -3004,6 +3081,9 @@ if (detectSelfStatusIntent(userMessage)) {
 
       if (wantsClear) {
         const result = await runComputerUseBridgeAction({ name: "clear_indicators" });
+        if (result.success) {
+          recordEvent("clear_indicators", "Indicators cleared", userMessage);
+        }
         setMessages((prev) => [
           ...prev,
           {
@@ -3084,7 +3164,10 @@ const resolved = resolveUiTarget(userMessage);
           ttlMs: 30_000,
         },
       });
-
+      if (result.success) {
+        const actionType = wantsHighlight ? "indicate_highlight" : "indicate_point";
+        recordEvent(actionType, resolved.target, userMessage);
+      }
       setMessages((prev) => [
         ...prev,
         {

@@ -5,6 +5,7 @@ import { getMarkers } from "./indicate-layer";
 import { getWorkflowState, getCurrentStep, getNextStep } from "./guided-workflow";
 import { getPresenceState } from "./cursor-presence";
 import { getInspectionSummary } from "./inspect-layer";
+import { getSession, getEventCount, getNextPendingQuestion, getPendingQuestionCount, getConfirmedEvents } from "./workflow-observation";
 import type { ActionName } from "./computer-use-types";
 
 export interface MarkerInfo {
@@ -90,6 +91,14 @@ export interface ComputerUseStatus {
     confidence: string | null;
     timestamp: string | null;
     source: string | null;
+  };
+  workflowObservation: {
+    state: string;
+    observing: boolean;
+    eventCount: number;
+    pendingQuestionCount: number;
+    confirmedStepCount: number;
+    workflowName: string | null;
   };
   recentEvents: {
     event: string;
@@ -185,6 +194,17 @@ export function getComputerUseStatus(): ComputerUseStatus {
         confidence: insp.confidence,
         timestamp: insp.timestamp,
         source: insp.source,
+      };
+    })(),
+    workflowObservation: (() => {
+      const session = getSession();
+      return {
+        state: session.state,
+        observing: session.state === "observing",
+        eventCount: session.events.length,
+        pendingQuestionCount: getPendingQuestionCount(),
+        confirmedStepCount: getConfirmedEvents().length,
+        workflowName: session.workflowName,
       };
     })(),
     recentEvents,
@@ -319,4 +339,26 @@ export function formatSurfaceStatus(): string {
     return "Surface awareness: no recent inspection";
   }
   return `Surface awareness: ${insp.surface} [${insp.confidence}] — ${insp.source} at ${insp.timestamp}`;
+}
+
+export function formatObservationStatus(): string {
+  const session = getSession();
+  if (session.state === "inactive") {
+    return "Workflow observation: inactive";
+  }
+  const pending = getPendingQuestionCount();
+  const confirmed = getConfirmedEvents().length;
+  const nextQ = getNextPendingQuestion();
+  let status = `Workflow observation: ${session.state.toUpperCase()}`;
+  if (session.workflowName) {
+    status += ` — ${session.workflowName}`;
+  }
+  status += ` | Events: ${session.events.length} | Confirmed: ${confirmed}`;
+  if (pending > 0) {
+    status += ` | Pending questions: ${pending}`;
+  }
+  if (nextQ) {
+    status += `\n  Next: ${nextQ.question}`;
+  }
+  return status;
 }

@@ -46,6 +46,37 @@ const INSPECT_PATTERNS = [
   "muthur inspect",
 ];
 
+const OBSERVE_PATTERNS = [
+  "observe this workflow",
+  "start workflow observation",
+  "start observing",
+  "observe workflow",
+  "start workflow recording",
+  "record this workflow",
+];
+
+const STOP_OBSERVE_PATTERNS = [
+  "stop workflow observation",
+  "stop observing",
+  "end workflow observation",
+  "stop workflow recording",
+  "finish observation",
+  "stop recording this workflow",
+  "done observing",
+];
+
+const PAUSE_OBSERVE_PATTERNS = [
+  "pause workflow observation",
+  "pause observing",
+  "pause workflow recording",
+];
+
+const RESUME_OBSERVE_PATTERNS = [
+  "resume workflow observation",
+  "resume observing",
+  "resume workflow recording",
+];
+
 function normalize(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9 ]/g, " ");
 }
@@ -60,6 +91,26 @@ function isInspectRequest(text: string): boolean {
   return INSPECT_PATTERNS.some((pattern) => norm.includes(normalize(pattern)));
 }
 
+function isObserveRequest(text: string): boolean {
+  const norm = normalize(text);
+  return OBSERVE_PATTERNS.some((pattern) => norm.includes(normalize(pattern)));
+}
+
+function isStopObserveRequest(text: string): boolean {
+  const norm = normalize(text);
+  return STOP_OBSERVE_PATTERNS.some((pattern) => norm.includes(normalize(pattern)));
+}
+
+function isPauseObserveRequest(text: string): boolean {
+  const norm = normalize(text);
+  return PAUSE_OBSERVE_PATTERNS.some((pattern) => norm.includes(normalize(pattern)));
+}
+
+function isResumeObserveRequest(text: string): boolean {
+  const norm = normalize(text);
+  return RESUME_OBSERVE_PATTERNS.some((pattern) => norm.includes(normalize(pattern)));
+}
+
 export function detectSelfStatusIntent(input: string): boolean {
   if (!input || typeof input !== "string") return false;
   return isSelfStatusQuestion(input.trim());
@@ -70,10 +121,36 @@ export function detectInspectIntent(input: string): boolean {
   return isInspectRequest(input.trim());
 }
 
-export function classifyIntent(input: string): "self_status" | "inspect" | "unknown" {
+export function detectObserveIntent(input: string): boolean {
+  if (!input || typeof input !== "string") return false;
+  return isObserveRequest(input.trim());
+}
+
+export function detectStopObserveIntent(input: string): boolean {
+  if (!input || typeof input !== "string") return false;
+  return isStopObserveRequest(input.trim());
+}
+
+export function detectPauseObserveIntent(input: string): boolean {
+  if (!input || typeof input !== "string") return false;
+  return isPauseObserveRequest(input.trim());
+}
+
+export function detectResumeObserveIntent(input: string): boolean {
+  if (!input || typeof input !== "string") return false;
+  return isResumeObserveRequest(input.trim());
+}
+
+export type IntentType = "self_status" | "inspect" | "observe" | "stop_observe" | "pause_observe" | "resume_observe" | "unknown";
+
+export function classifyIntent(input: string): IntentType {
   if (!input || typeof input !== "string") return "unknown";
   const trimmed = input.trim();
   if (detectSelfStatusIntent(trimmed)) return "self_status";
   if (detectInspectIntent(trimmed)) return "inspect";
+  if (detectStopObserveIntent(trimmed)) return "stop_observe";
+  if (detectPauseObserveIntent(trimmed)) return "pause_observe";
+  if (detectResumeObserveIntent(trimmed)) return "resume_observe";
+  if (detectObserveIntent(trimmed)) return "observe";
   return "unknown";
 }

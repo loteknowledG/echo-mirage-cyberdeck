@@ -1,0 +1,29 @@
+{
+  "name": "hello_local_demo",
+  "description": "Minimal local Conductor demo workflow with no external workers",
+  "version": 1,
+  "schemaVersion": 2,
+  "inputParameters": [
+    "name"
+  ],
+  "tasks": [
+    {
+      "name": "start_marker",
+      "taskReferenceName": "start_marker",
+      "type": "NOOP"
+    },
+    {
+      "name": "build_message",
+      "taskReferenceName": "build_message",
+      "type": "INLINE",
+      "inputParameters": {
+        "evaluatorType": "graaljs",
+        "expression": "function e() { return 'Hello, ' + $.name + '! Conductor is running locally.'; } e();",
+        "name": "${workflow.input.name}"
+      }
+    }
+  ],
+  "outputParameters": {
+    "message": "${build_message.output.result}"
+  }
+}

@@ -8,6 +8,7 @@ import { narrate } from "./narration";
 import { acknowledgeCurrentStep, advanceWorkflow } from "./guided-workflow";
 import { proceedToNextStep } from "./guided-teaching";
 import { acknowledgeWatchdog, cancelTeachingWatchdog, cancelStepWatchdog, startStepWatchdog } from "./teardown";
+import { isObserving, recordEvent } from "./workflow-observation";
 
 const DEBUG = process.env.NODE_ENV !== "production";
 
@@ -54,14 +55,23 @@ export default function IndicateOverlay() {
         }
         if (acknowledged) {
           narrate("CURSOR_ENTER_REGION");
+          if (isObserving()) {
+            recordEvent("cursor_enter_region", marker.id, `Cursor entered region: ${marker.label ?? marker.id}`);
+          }
           acknowledgeWatchdog();
           cancelStepWatchdog();
           const next = advanceWorkflow();
           if (next) {
             narrate("STEP_ACKNOWLEDGED");
+            if (isObserving()) {
+              recordEvent("step_acknowledged", `Step: ${marker.label ?? marker.id}`, "Step acknowledged by cursor entry, advancing workflow");
+            }
             void proceedToNextStep();
           } else {
             narrate("STEP_ACKNOWLEDGED");
+            if (isObserving()) {
+              recordEvent("teaching_end", "Teaching workflow completed", "All steps acknowledged, workflow ended");
+            }
           }
         }
       }
