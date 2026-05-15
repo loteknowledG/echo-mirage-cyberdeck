@@ -57,10 +57,11 @@ import {
   parseBrowserCommand,
   parseBrowserUseModeCommand,
 } from "@/lib/browser-intents";
-import { detectSelfStatusIntent, detectInspectIntent, detectObserveIntent, detectStopObserveIntent, detectPauseObserveIntent, detectResumeObserveIntent, detectExecDeckShowIntent, detectExecDeckPrepareIntent, detectExecDeckClearIntent, detectExecDeckPushIntent, detectExecDeckExecuteIntent } from "@/lib/computer-use/intent-detect";
+import { detectSelfStatusIntent, detectInspectIntent, detectObserveIntent, detectStopObserveIntent, detectPauseObserveIntent, detectResumeObserveIntent, detectExecDeckShowIntent, detectExecDeckPrepareIntent, detectExecDeckClearIntent, detectExecDeckPushIntent, detectExecDeckExecuteIntent, detectExecDeckDescribeStagedIntent } from "@/lib/computer-use/intent-detect";
+import { ExecutionDeckPane } from "@/components/cyberdeck/execution-deck-pane";
 import { startObservation, stopObservation, pauseObservation, resumeObservation, recordEvent, getNextPendingQuestion, answerQuestion, getEventCount, isObserving } from "@/lib/computer-use/workflow-observation";
 import { formatStatusText } from "@/lib/computer-use/introspection";
-import { openDeck, prepareHand, clearDeck, describeDeck, buildReviewerHand, isDeckOpen, pushHandToStack, attemptExecute, isExecutionEnabled } from "@/lib/computer-use/execution-deck";
+import { openDeck, prepareHand, clearDeck, describeDeck, buildReviewerHand, isDeckOpen, pushHandToStack, attemptExecute, isExecutionEnabled, getExecutionDeckState } from "@/lib/computer-use/execution-deck";
 import { runComputerUseAction as runComputerUseBridgeAction } from "@/lib/computer-use/electron-computer-use-bridge";
 import { resolveUiTarget, type CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
 import { addNarrationListener } from "@/lib/computer-use/narration";
@@ -646,6 +647,8 @@ export default function CyberdeckPage() {
     | { variant: "fixed"; serverId: (typeof SERVER_IDS)[number]; x: number; y: number }
     | null
   >(null);
+
+  const [showExecutionDeckPane, setShowExecutionDeckPane] = useState(false);
   /** Right-click menu for the main chat / Echo Mirage pane (viewport-clamped like rail tabs). */
   const [mirageContextMenu, setMirageContextMenu] = useState<{ x: number; y: number } | null>(null);
   /** Right-click menu for gateway column surfaces (settings, operator, connection, custom tabs). */
@@ -3066,10 +3069,11 @@ export default function CyberdeckPage() {
     if (detectExecDeckShowIntent(userMessage)) {
       openDeck();
       if (isObserving()) recordEvent("execution_deck_opened", "Deck Opened", userMessage);
+      setShowExecutionDeckPane(true);
       if (isDeckOpen()) {
         const desc = describeDeck();
-        setMessages((prev) => [...prev, { role: "assistant", text: desc }]);
-        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, desc));
+        setMessages((prev) => [...prev, { role: "assistant", text: `Execution Deck displayed. ${desc}` }]);
+        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, `Execution Deck displayed. ${desc}`));
       }
       setIsStreaming(false);
       return;
@@ -3079,6 +3083,7 @@ if (detectExecDeckPrepareIntent(userMessage)) {
       openDeck();
       const cards = buildReviewerHand();
       const hand = prepareHand("Reviewer Hand", cards);
+      setShowExecutionDeckPane(true);
       const desc = describeDeck();
       if (isObserving()) recordEvent("hand_prepared", "Reviewer Hand", `${cards.length} cards staged: ${cards.map((c) => c.title).join(", ")}`);
       narrate("HAND_PREPARED");
@@ -3088,10 +3093,34 @@ if (detectExecDeckPrepareIntent(userMessage)) {
       return;
     }
 
+    if (detectExecDeckDescribeStagedIntent(userMessage)) {
+      const state = getExecutionDeckState();
+      if (!state.stagedHand || state.stagedHand.cards.length === 0) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", text: "No staged hand. Ask MUTHUR to prepare a reviewer hand." },
+        ]);
+      } else {
+        const lines: string[] = [];
+        lines.push(`## Staged Hand: ${state.stagedHand.name}`);
+        for (const card of state.stagedHand.cards) {
+          lines.push(`  [ ] ${card.title} — ${card.purpose} (${card.riskLevel} risk)${card.requiredConfirmation ? " [CONF REQUIRED]" : ""}`);
+        }
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", text: lines.join("\n") },
+        ]);
+      }
+      setShowExecutionDeckPane(true);
+      setIsStreaming(false);
+      return;
+    }
+
     if (detectExecDeckClearIntent(userMessage)) {
       clearDeck();
       if (isObserving()) recordEvent("stack_cleared", "Execution Deck", userMessage);
       narrate("EXECUTION_DECK_CLEARED");
+      setShowExecutionDeckPane(false);
       setMessages((prev) => [
         ...prev,
         { role: "assistant", text: "Execution deck cleared. All cards discarded." },
@@ -3103,6 +3132,7 @@ if (detectExecDeckPrepareIntent(userMessage)) {
     if (detectExecDeckPushIntent(userMessage)) {
       openDeck();
       const result = pushHandToStack();
+      setShowExecutionDeckPane(true);
       if (result.pushed > 0) {
         if (isObserving()) recordEvent("hand_pushed_to_stack", "Hand Pushed", `${result.pushed} cards pushed to stack, depth now ${result.stackDepth}`);
         narrate("HAND_PUSHED_TO_STACK");
@@ -3117,6 +3147,7 @@ if (detectExecDeckPrepareIntent(userMessage)) {
     if (detectExecDeckExecuteIntent(userMessage)) {
       openDeck();
       const result = attemptExecute();
+      setShowExecutionDeckPane(true);
       if (!result.success && isObserving()) {
         recordEvent("execution_attempt_blocked", "Execute Blocked", result.reason);
       }
@@ -3398,6 +3429,12 @@ const resolved = resolveUiTarget(userMessage);
       setMessages((prev) => [...prev, { role: "assistant", text: fullText }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
       setStreamText("");
+
+      if (activeProvider && modelID) {
+        setVerifiedProviders((prev) => ({ ...prev, [activeProvider]: true }));
+        setModelHealth(activeProvider, modelID, "green");
+        setModelFetchStatusByProvider((prev) => ({ ...prev, [activeProvider]: "ready" }));
+      }
 
       try {
         const jsonMatch = fullText.match(/^\{[\s\S]*\}$/);
@@ -4598,8 +4635,9 @@ const resolved = resolveUiTarget(userMessage);
                 Open Diagnostics tab
               </button>
             </div>
-          ) : null}
-        </div>
+) : null
+            }
+          </div>
       ) : null}
       <aside
         ref={serverRailRef}
@@ -5048,10 +5086,41 @@ const resolved = resolveUiTarget(userMessage);
               Command. Catalog. Operators. Memory Atlas. Voice Lab. Flight Log. Settings. Craftwerk Cyberdeck
               Corporation. ChatGPT // Lead. Cursor // Dev. Codex // Test. Samus-Manus // Memory. ASCII. REALMORPH.
             </p>
-            {activeCustomTab ? (
-              renderCustomTabSurface(activeCustomTab)
-            ) : showGatewayPanel ? (
-              <div className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
+            {showExecutionDeckPane ? (
+              <div className="flex flex-1 flex-col overflow-hidden">
+                <ExecutionDeckPane
+                  activeHand={getExecutionDeckState().activeHand}
+                  stagedCardCount={getExecutionDeckState().stagedHand?.cards.length ?? 0}
+                  stackDepth={getExecutionDeckState().executionStack.length}
+                  executionEnabled={getExecutionDeckState().executionEnabled}
+                  topStackCard={getExecutionDeckState().currentCard ? { title: getExecutionDeckState().currentCard!.title, status: getExecutionDeckState().currentCard!.status, riskLevel: getExecutionDeckState().currentCard!.riskLevel } : null}
+                  stackCards={getExecutionDeckState().executionStack.map((c) => ({ title: c.title, status: c.status, riskLevel: c.riskLevel }))}
+                  stagedCards={(getExecutionDeckState().stagedHand?.cards ?? []).map((c) => ({ title: c.title, purpose: c.purpose, riskLevel: c.riskLevel, status: c.status, requiredConfirmation: c.requiredConfirmation }))}
+                  onPushHandToStack={() => {
+                    const result = pushHandToStack();
+                    if (result.pushed > 0 && isObserving()) recordEvent("hand_pushed_to_stack", "Hand Pushed", `${result.pushed} cards pushed to stack`);
+                    narrate("HAND_PUSHED_TO_STACK");
+                  }}
+                  onClearDeck={() => {
+                    clearDeck();
+                    if (isObserving()) recordEvent("stack_cleared", "Execution Deck", "Deck cleared via pane control");
+                    narrate("EXECUTION_DECK_CLEARED");
+                    setShowExecutionDeckPane(false);
+                  }}
+                  onExecute={() => {
+                    const result = attemptExecute();
+                    if (!result.success && isObserving()) recordEvent("execution_attempt_blocked", "Execute Blocked", result.reason);
+                    narrate("EXECUTION_DISABLED");
+                  }}
+                  onClose={() => setShowExecutionDeckPane(false)}
+                />
+              </div>
+            ) : (
+              <>
+                {activeCustomTab ? (
+                renderCustomTabSurface(activeCustomTab)
+              ) : showGatewayPanel ? (
+                <div className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
                   {droppedMarkdown ? (
                     <div className="mb-4 rounded-sm border border-amber-700/70 bg-black p-3">
                       <div className="mb-2 flex items-center justify-between">
@@ -5234,53 +5303,55 @@ const resolved = resolveUiTarget(userMessage);
                       </pre>
                     </div>
                   ) : null}
-              </div>
-            ) : server === "m" ? (
-            <CyberdeckOperatorPaneBody
-              isOperatorDragOver={isOperatorDragOver}
-              operatorDroppedAsset={operatorDroppedAsset}
-              operatorSurfaceMode="workspace"
-              operatorBrowserEngine={operatorBrowserEngine}
-              operatorSurfaceIsDocument={operatorSurfaceIsDocument}
-              operatorBrowserUrl={operatorBrowserUrl}
-              operatorDocMode={operatorDocMode}
-              operatorDocNameDraft={operatorDocNameDraft}
-              operatorEditorRef={operatorEditorRef}
-              operatorNameInputRef={operatorNameInputRef}
-              operatorBrowserRef={operatorBrowserRef}
-              onOperatorDragOver={handleOperatorDragOver}
-              onOperatorDragLeave={handleOperatorDragLeave}
-              onOperatorDrop={handleOperatorDrop}
-              onOperatorDocNameDraftChange={setOperatorDocNameDraft}
-              onCommitOperatorDocName={commitOperatorDocName}
-              onSetOperatorDocMode={setOperatorDocMode}
-              onOperatorBrowserNavigate={openOperatorBrowser}
-              onOperatorBrowserUrlChange={setOperatorBrowserUrl}
-              onPasteClipboardToOperator={pasteClipboardToOperator}
-              onSaveOperatorDocAsFile={saveOperatorDocAsFile}
-              onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
-              onSetOperatorDroppedAsset={setOperatorDroppedAsset}
-            />
-            ) : server === "b" ? (
-              <div ref={gatewayBlankSettingsRef} className="flex min-h-0 flex-1 flex-col">
-                <CyberdeckSettingsPaneBody
-                  voiceEnabled={voiceEnabled}
-                  onVoiceToggle={toggleVoiceEnabled}
-                  muthurMasterVolume={voiceDial.volume}
-                  onMuthurMasterVolumeChange={(volume) =>
-                    setVoiceDial((prev) => ({
-                      ...prev,
-                      volume: Math.min(1.25, Math.max(0.05, volume)),
-                    }))
-                  }
-                  deckMode={deckMode}
-                  onDeckModeToggle={toggleDeckMode}
-                  audioMuted={audioMuted}
-                  onAudioMuteToggle={toggleAudioMuted}
-                  identity={identity}
+                </div>
+              ) : server === "m" ? (
+                <CyberdeckOperatorPaneBody
+                  isOperatorDragOver={isOperatorDragOver}
+                  operatorDroppedAsset={operatorDroppedAsset}
+                  operatorSurfaceMode="workspace"
+                  operatorBrowserEngine={operatorBrowserEngine}
+                  operatorSurfaceIsDocument={operatorSurfaceIsDocument}
+                  operatorBrowserUrl={operatorBrowserUrl}
+                  operatorDocMode={operatorDocMode}
+                  operatorDocNameDraft={operatorDocNameDraft}
+                  operatorEditorRef={operatorEditorRef}
+                  operatorNameInputRef={operatorNameInputRef}
+                  operatorBrowserRef={operatorBrowserRef}
+                  onOperatorDragOver={handleOperatorDragOver}
+                  onOperatorDragLeave={handleOperatorDragLeave}
+                  onOperatorDrop={handleOperatorDrop}
+                  onOperatorDocNameDraftChange={setOperatorDocNameDraft}
+                  onCommitOperatorDocName={commitOperatorDocName}
+                  onSetOperatorDocMode={setOperatorDocMode}
+                  onOperatorBrowserNavigate={openOperatorBrowser}
+                  onOperatorBrowserUrlChange={setOperatorBrowserUrl}
+                  onPasteClipboardToOperator={pasteClipboardToOperator}
+                  onSaveOperatorDocAsFile={saveOperatorDocAsFile}
+                  onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
+                  onSetOperatorDroppedAsset={setOperatorDroppedAsset}
                 />
-              </div>
-            ) : null}
+              ) : server === "b" ? (
+                <div ref={gatewayBlankSettingsRef} className="flex min-h-0 flex-1 flex-col">
+                  <CyberdeckSettingsPaneBody
+                    voiceEnabled={voiceEnabled}
+                    onVoiceToggle={toggleVoiceEnabled}
+                    muthurMasterVolume={voiceDial.volume}
+                    onMuthurMasterVolumeChange={(volume) =>
+                      setVoiceDial((prev) => ({
+                        ...prev,
+                        volume: Math.min(1.25, Math.max(0.05, volume)),
+                      }))
+                    }
+                    deckMode={deckMode}
+                    onDeckModeToggle={toggleDeckMode}
+                    audioMuted={audioMuted}
+                    onAudioMuteToggle={toggleAudioMuted}
+                    identity={identity}
+                  />
+                </div>
+              ) : null}
+              </>
+            )}
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>

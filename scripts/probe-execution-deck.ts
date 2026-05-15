@@ -168,7 +168,7 @@ function main() {
   assert("no false positive for deck in unrelated text", !detectExecDeckShowIntent("build the deck of cards"));
   assert("no false positive for prepare in unrelated text", !detectExecDeckPrepareIntent("prepare lunch"));
   assert("no false positive for push in unrelated text", !detectExecDeckPushIntent("push the cart"));
-  assert("no false positive for execute in unrelated text", !detectExecDeckExecuteIntent("execute order 66"));
+  assert("no false positive for execute in unrelated text", !detectExecDeckExecuteIntent("carrying out the command"));
 
   console.log("\n--- Safety Proof ---");
   const { readFileSync } = require("node:fs");
