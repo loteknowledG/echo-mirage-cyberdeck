@@ -139,3 +139,7 @@ export function resumeNarration(): void {
 export function isNarrationPaused(): boolean {
   return narrationPaused;
 }
+
+export function resetNarrationDebounce(): void {
+  recentEvents.length = 0;
+}

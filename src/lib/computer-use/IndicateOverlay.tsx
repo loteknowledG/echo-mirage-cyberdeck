@@ -7,7 +7,7 @@ import { trackCursorPosition, addPresenceListener, resetPresence, type PresenceE
 import { narrate } from "./narration";
 import { acknowledgeCurrentStep, advanceWorkflow } from "./guided-workflow";
 import { proceedToNextStep } from "./guided-teaching";
-import { acknowledgeWatchdog, cancelTeachingWatchdog, cancelStepWatchdog } from "./teardown";
+import { acknowledgeWatchdog, cancelTeachingWatchdog, cancelStepWatchdog, startStepWatchdog } from "./teardown";
 
 const DEBUG = process.env.NODE_ENV !== "production";
 
@@ -55,6 +55,7 @@ export default function IndicateOverlay() {
         if (acknowledged) {
           narrate("CURSOR_ENTER_REGION");
           acknowledgeWatchdog();
+          cancelStepWatchdog();
           const next = advanceWorkflow();
           if (next) {
             narrate("STEP_ACKNOWLEDGED");

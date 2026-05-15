@@ -4,6 +4,7 @@ import { requiresConfirmation } from "./capability-registry";
 import { getMarkers } from "./indicate-layer";
 import { getWorkflowState, getCurrentStep, getNextStep } from "./guided-workflow";
 import { getPresenceState } from "./cursor-presence";
+import { getInspectionSummary } from "./inspect-layer";
 import type { ActionName } from "./computer-use-types";
 
 export interface MarkerInfo {
@@ -82,6 +83,13 @@ export interface ComputerUseStatus {
   };
   electronBridge: {
     available: boolean;
+  };
+  surfaceAwareness: {
+    classified: boolean;
+    surface: string | null;
+    confidence: string | null;
+    timestamp: string | null;
+    source: string | null;
   };
   recentEvents: {
     event: string;
@@ -169,6 +177,16 @@ export function getComputerUseStatus(): ComputerUseStatus {
     electronBridge: {
       available: false,
     },
+    surfaceAwareness: (() => {
+      const insp = getInspectionSummary();
+      return {
+        classified: insp.classified,
+        surface: insp.surface,
+        confidence: insp.confidence,
+        timestamp: insp.timestamp,
+        source: insp.source,
+      };
+    })(),
     recentEvents,
   };
 }
@@ -293,4 +311,12 @@ export function formatStatusText(): string {
   ];
 
   return lines.join("\n");
+}
+
+export function formatSurfaceStatus(): string {
+  const insp = getInspectionSummary();
+  if (!insp.classified) {
+    return "Surface awareness: no recent inspection";
+  }
+  return `Surface awareness: ${insp.surface} [${insp.confidence}] — ${insp.source} at ${insp.timestamp}`;
 }

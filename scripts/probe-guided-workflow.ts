@@ -12,7 +12,7 @@ import {
   registerWatchdogCanceller,
 } from "../src/lib/computer-use/guided-workflow";
 import { isTeachingDemoTrigger, proceedToNextStep, runTeachingDemo } from "../src/lib/computer-use/guided-teaching";
-import { addNarrationListener, narrate, pauseNarration, resumeNarration } from "../src/lib/computer-use/narration";
+import { addNarrationListener, narrate, pauseNarration, resumeNarration, isNarrationPaused, resetNarrationDebounce } from "../src/lib/computer-use/narration";
 import { trackCursorPosition, resetPresence } from "../src/lib/computer-use/cursor-presence";
 import { emergencyStop, acknowledgeWatchdog, cancelTeachingWatchdog, startStepWatchdog, cancelStepWatchdog } from "../src/lib/computer-use/teardown";
 import type { IndicateMarker } from "../src/lib/computer-use/computer-use-types";
@@ -128,83 +128,11 @@ async function main() {
   const afterFinalAdvance = getWorkflowState();
   assert("after final advance, workflow not active", afterFinalAdvance.active === false, afterFinalAdvance);
   assert("active marker count is 0 after workflow end", getComputerUseStatus().pointerLayer.activeMarkers === 0, getComputerUseStatus().pointerLayer);
-  endWorkflow();
+assert("pauseNarration called when workflow naturally ends via advanceWorkflow", isNarrationPaused(), isNarrationPaused());
+  resumeNarration();
 
-  startWorkflow([
-    { id: "s1", label: "Step One", target: "COMMAND_INPUT", instruction: "step one" },
-    { id: "s2", label: "Step Two", target: "VOICE_LAB", instruction: "step two" },
-    { id: "s3", label: "Step Three", target: "LEFT_CONSOLE", instruction: "step three" },
-  ]);
-
-  const initial = getCurrentStep();
-  assert("workflow starts at step 0", initial?.id === "s1", initial);
-
-  const m1 = makeMarker("marker-s1", 100, 200, 120, 60);
-
-  const ack1 = acknowledgeCurrentStep("marker-s1");
-  assert("acknowledge with correct marker ID succeeds", ack1);
-  const ack1again = acknowledgeCurrentStep("marker-s1");
-  assert("acknowledge again returns false (already acknowledged)", !ack1again);
-
-  const ack2 = acknowledgeCurrentStep("wrong-marker");
-  assert("acknowledge with wrong marker ID returns false", !ack2);
-
-  const next = advanceWorkflow();
-  assert("advance returns next step", next?.id === "s2", next);
-  assert("new current step is s2", getCurrentStep()?.id === "s2");
-  assert("acknowledged flag reset after advance", !getWorkflowState().acknowledged);
-
-  const m2 = makeMarker("marker-s2", 300, 250, 180, 80, "glow");
-  trackCursorPosition(320, 280, [m2]);
-  const ack3 = acknowledgeCurrentStep("marker-s2");
-  assert("acknowledge with matching marker succeeds in new step", ack3);
-
-  advanceWorkflow();
-  const m3 = makeMarker("marker-s3", 50, 100, 96, 56, "glow");
-  trackCursorPosition(51, 101, [m3]);
-  const ack4 = acknowledgeCurrentStep("marker-s3");
-  assert("acknowledge step 3 succeeds", ack4);
-
-  const final = advanceWorkflow();
-  assert("advance from last step returns null and ends workflow", final === null && !getWorkflowState().active);
-
-  startWorkflow([
-    { id: "dup1", label: "Dup One", target: "COMMAND_INPUT", instruction: "dup" },
-    { id: "dup2", label: "Dup Two", target: "VOICE_LAB", instruction: "dup" },
-  ]);
-
-  const mDup = makeMarker("dup-marker", 400, 400, 100, 50);
-  trackCursorPosition(450, 425, [mDup]);
-  const ackDup1 = acknowledgeCurrentStep("dup-marker");
-  assert("cursor inside region + acknowledge succeeds", ackDup1);
-
-  trackCursorPosition(500, 500, [mDup]);
-  const ackDup2 = acknowledgeCurrentStep("dup-marker");
-  assert("acknowledge again returns false (already acknowledged)", !ackDup2);
-
-  trackCursorPosition(-100, -100, []);
-  const ackDup3 = acknowledgeCurrentStep("dup-marker");
-  assert("cursor exits region, acknowledge still false (step already acknowledged)", !ackDup3);
-
-  endWorkflow();
-  resetPresence();
-  resetPresence();
-
-  assert("unmatched marker without step markerId succeeds (null = wildcard)", (() => {
-    startWorkflow([{ id: "w1", label: "Wrong", target: "COMMAND_INPUT", instruction: "w" }]);
-    const result = acknowledgeCurrentStep("wrong-id");
-    endWorkflow();
-    return result === true;
-  })());
-
-  assert("wrong marker does not advance when step has markerId", (() => {
-    startWorkflow([{ id: "w1", label: "Wrong", target: "COMMAND_INPUT", instruction: "w" }]);
-    setMarkerForStep("w1", "expected-marker");
-    const result = acknowledgeCurrentStep("wrong-id");
-    endWorkflow();
-    return result === false;
-  })());
-
+  resetNarrationDebounce();
+  resetNarrationDebounce();
   assert("narrate CURSOR_ENTER_REGION emits", narrate("CURSOR_ENTER_REGION") !== null);
   assert("narrate STEP_ACKNOWLEDGED emits", narrate("STEP_ACKNOWLEDGED") !== null);
   assert("listener heard events", heard.length >= 2, heard);

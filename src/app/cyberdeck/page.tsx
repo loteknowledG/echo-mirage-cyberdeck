@@ -57,13 +57,15 @@ import {
   parseBrowserCommand,
   parseBrowserUseModeCommand,
 } from "@/lib/browser-intents";
-import { detectSelfStatusIntent } from "@/lib/computer-use/intent-detect";
+import { detectSelfStatusIntent, detectInspectIntent } from "@/lib/computer-use/intent-detect";
 import { formatStatusText } from "@/lib/computer-use/introspection";
 import { runComputerUseAction as runComputerUseBridgeAction } from "@/lib/computer-use/electron-computer-use-bridge";
 import { resolveUiTarget, type CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
 import { addNarrationListener } from "@/lib/computer-use/narration";
 import { isTeachingDemoTrigger, runTeachingDemo } from "@/lib/computer-use/guided-teaching";
 import { emergencyStop, acknowledgeWatchdog, cancelTeachingWatchdog, resumeAfterStop } from "@/lib/computer-use/teardown";
+import { classifyWindowTitle, formatSurfaceResponse, type SurfaceClassification } from "@/lib/computer-use/surface-classifier";
+import { setLastSurfaceClassification, getLastSurfaceClassification, clearSurfaceInspection } from "@/lib/computer-use/inspect-layer";
 import { useBrowserController } from "@/lib/use-browser-controller";
 import { useCustomTabBrowserController } from "@/lib/use-custom-tab-browser-controller";
 import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
@@ -2789,19 +2791,17 @@ export default function CyberdeckPage() {
 
   useEffect(() => {
     if (!voiceEnabled) return;
-    let failureCount = 0;
-    let pending = false;
+    const failureCountRef = { current: 0 };
     const removeListener = addNarrationListener((narration) => {
       if (!voiceEnabled) return;
-      failureCount = 0;
-      pending = true;
-      void speakMother(narration.text).catch(() => {
-        failureCount += 1;
-        if (failureCount >= 3) {
+      void speakMother(narration.text).then(() => {
+        failureCountRef.current = 0;
+      }).catch(() => {
+        failureCountRef.current += 1;
+        if (failureCountRef.current >= 3) {
           void abortMotherSpeech();
+          failureCountRef.current = 0;
         }
-      }).finally(() => {
-        pending = false;
       });
     });
     return () => {
@@ -2835,6 +2835,37 @@ export default function CyberdeckPage() {
       window.removeEventListener("touchstart", unlock);
       unbind();
     };
+  }, []);
+
+  const screenshotRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const inputEl = messageInputRef.current;
+    if (!inputEl) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items ?? []);
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (!file) continue;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = reader.result as string;
+            screenshotRef.current = dataUrl;
+            setLastSurfaceClassification({
+              surface: "unknown",
+              confidence: "low",
+              reason: "Screenshot available for inspection",
+              rawTitle: "Screenshot",
+            });
+          };
+          reader.readAsDataURL(file);
+          break;
+        }
+      }
+    };
+    inputEl.addEventListener("paste", onPaste);
+    return () => inputEl.removeEventListener("paste", onPaste);
   }, []);
 
   const handleSend = async () => {
@@ -2930,6 +2961,25 @@ if (detectSelfStatusIntent(userMessage)) {
       const statusText = formatStatusText();
       setMessages((prev) => [...prev, { role: "assistant", text: statusText }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, statusText));
+      setIsStreaming(false);
+      return;
+    }
+
+    if (detectInspectIntent(userMessage)) {
+      const lastSurface = getLastSurfaceClassification();
+      if (lastSurface) {
+        let response = formatSurfaceResponse(lastSurface);
+        if (screenshotRef.current && lastSurface.surface === "unknown") {
+          response += " Screenshot captured — surface type unclassified. Consider reviewing the image content manually.";
+          screenshotRef.current = null;
+        }
+        setMessages((prev) => [...prev, { role: "assistant", text: response }]);
+        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, response));
+      } else {
+        const response = "Screenshot capture is not available in this environment. Please paste a screenshot image using the attachment button, then ask me to inspect it.";
+        setMessages((prev) => [...prev, { role: "assistant", text: response }]);
+        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, response));
+      }
       setIsStreaming(false);
       return;
     }

@@ -1,4 +1,5 @@
 import { clearMarkers } from "./indicate-layer";
+import { pauseNarration } from "./narration";
 
 let _cancelWatchdog: (() => void) | null = null;
 
@@ -87,6 +88,7 @@ export function advanceWorkflow(): WorkflowStep | null {
     state.acknowledged = false;
     state.markerId = null;
     clearMarkers();
+    pauseNarration();
     if (_cancelWatchdog) {
       _cancelWatchdog();
       _cancelWatchdog = null;

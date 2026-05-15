@@ -41,6 +41,7 @@ const ALIAS_MAP: Record<CanonicalTarget, readonly string[]> = {
     "tts panel",
     "speech controls",
     "master gain",
+    "volume slider",
   ],
   LEFT_CONSOLE: [
     "left console",
@@ -48,6 +49,7 @@ const ALIAS_MAP: Record<CanonicalTarget, readonly string[]> = {
     "log panel",
     "system log",
     "sys log",
+    "event log",
   ],
   RIGHT_PANEL: [
     "right panel",
@@ -55,6 +57,7 @@ const ALIAS_MAP: Record<CanonicalTarget, readonly string[]> = {
     "docs panel",
     "viewer panel",
     "markdown panel",
+    "doctrine panel",
   ],
   CENTER_STAGE: [
     "center stage",
@@ -65,7 +68,7 @@ const ALIAS_MAP: Record<CanonicalTarget, readonly string[]> = {
 };
 
 function normalize(input: string): string {
-  return input.toLowerCase().replace(/\s+/g, " ").trim();
+  return input.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function buildExactMap(): Map<string, CanonicalTarget> {
