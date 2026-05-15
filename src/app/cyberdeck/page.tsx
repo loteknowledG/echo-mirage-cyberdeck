@@ -57,12 +57,14 @@ import {
   parseBrowserCommand,
   parseBrowserUseModeCommand,
 } from "@/lib/browser-intents";
-import { detectSelfStatusIntent, detectInspectIntent, detectObserveIntent, detectStopObserveIntent, detectPauseObserveIntent, detectResumeObserveIntent } from "@/lib/computer-use/intent-detect";
-import { startObservation, stopObservation, pauseObservation, resumeObservation, recordEvent, getNextPendingQuestion, answerQuestion, getEventCount } from "@/lib/computer-use/workflow-observation";
+import { detectSelfStatusIntent, detectInspectIntent, detectObserveIntent, detectStopObserveIntent, detectPauseObserveIntent, detectResumeObserveIntent, detectExecDeckShowIntent, detectExecDeckPrepareIntent, detectExecDeckClearIntent, detectExecDeckPushIntent, detectExecDeckExecuteIntent } from "@/lib/computer-use/intent-detect";
+import { startObservation, stopObservation, pauseObservation, resumeObservation, recordEvent, getNextPendingQuestion, answerQuestion, getEventCount, isObserving } from "@/lib/computer-use/workflow-observation";
 import { formatStatusText } from "@/lib/computer-use/introspection";
+import { openDeck, prepareHand, clearDeck, describeDeck, buildReviewerHand, isDeckOpen, pushHandToStack, attemptExecute, isExecutionEnabled } from "@/lib/computer-use/execution-deck";
 import { runComputerUseAction as runComputerUseBridgeAction } from "@/lib/computer-use/electron-computer-use-bridge";
 import { resolveUiTarget, type CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
 import { addNarrationListener } from "@/lib/computer-use/narration";
+import { narrate } from "@/lib/computer-use/narration";
 import { isTeachingDemoTrigger, runTeachingDemo } from "@/lib/computer-use/guided-teaching";
 import { emergencyStop, acknowledgeWatchdog, cancelTeachingWatchdog, resumeAfterStop } from "@/lib/computer-use/teardown";
 import { classifyWindowTitle, formatSurfaceResponse, type SurfaceClassification } from "@/lib/computer-use/surface-classifier";
@@ -2958,7 +2960,7 @@ export default function CyberdeckPage() {
       return;
     }
 
-if (detectSelfStatusIntent(userMessage)) {
+    if (detectSelfStatusIntent(userMessage)) {
       const statusText = formatStatusText();
       setMessages((prev) => [...prev, { role: "assistant", text: statusText }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, statusText));
@@ -3059,6 +3061,72 @@ if (detectSelfStatusIntent(userMessage)) {
           return;
         }
       }
+    }
+
+    if (detectExecDeckShowIntent(userMessage)) {
+      openDeck();
+      if (isObserving()) recordEvent("execution_deck_opened", "Deck Opened", userMessage);
+      if (isDeckOpen()) {
+        const desc = describeDeck();
+        setMessages((prev) => [...prev, { role: "assistant", text: desc }]);
+        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, desc));
+      }
+      setIsStreaming(false);
+      return;
+    }
+
+if (detectExecDeckPrepareIntent(userMessage)) {
+      openDeck();
+      const cards = buildReviewerHand();
+      const hand = prepareHand("Reviewer Hand", cards);
+      const desc = describeDeck();
+      if (isObserving()) recordEvent("hand_prepared", "Reviewer Hand", `${cards.length} cards staged: ${cards.map((c) => c.title).join(", ")}`);
+      narrate("HAND_PREPARED");
+      setMessages((prev) => [...prev, { role: "assistant", text: desc }]);
+      setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, desc));
+      setIsStreaming(false);
+      return;
+    }
+
+    if (detectExecDeckClearIntent(userMessage)) {
+      clearDeck();
+      if (isObserving()) recordEvent("stack_cleared", "Execution Deck", userMessage);
+      narrate("EXECUTION_DECK_CLEARED");
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: "Execution deck cleared. All cards discarded." },
+      ]);
+      setIsStreaming(false);
+      return;
+    }
+
+    if (detectExecDeckPushIntent(userMessage)) {
+      openDeck();
+      const result = pushHandToStack();
+      if (result.pushed > 0) {
+        if (isObserving()) recordEvent("hand_pushed_to_stack", "Hand Pushed", `${result.pushed} cards pushed to stack, depth now ${result.stackDepth}`);
+        narrate("HAND_PUSHED_TO_STACK");
+      }
+      const desc = describeDeck();
+      setMessages((prev) => [...prev, { role: "assistant", text: desc }]);
+      setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, desc));
+      setIsStreaming(false);
+      return;
+    }
+
+    if (detectExecDeckExecuteIntent(userMessage)) {
+      openDeck();
+      const result = attemptExecute();
+      if (!result.success && isObserving()) {
+        recordEvent("execution_attempt_blocked", "Execute Blocked", result.reason);
+      }
+      narrate("EXECUTION_DISABLED");
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: result.reason },
+      ]);
+      setIsStreaming(false);
+      return;
     }
 
     if (isTeachingDemoTrigger(userMessage)) {

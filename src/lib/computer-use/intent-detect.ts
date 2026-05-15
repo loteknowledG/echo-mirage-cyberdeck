@@ -77,6 +77,55 @@ const RESUME_OBSERVE_PATTERNS = [
   "resume workflow recording",
 ];
 
+const EXEC_DECK_SHOW_PATTERNS = [
+  "show execution deck",
+  "open execution deck",
+  "execution deck",
+  "what is on the execution deck",
+  "whats on the execution deck",
+  "execution deck status",
+  "show me the execution deck",
+  "muthur show execution deck",
+];
+
+const EXEC_DECK_PREPARE_PATTERNS = [
+  "prepare reviewer hand",
+  "prepare hand",
+  "stage reviewer hand",
+  "load reviewer hand",
+  "muthur prepare reviewer hand",
+  "prepare the reviewer hand",
+];
+
+const EXEC_DECK_CLEAR_PATTERNS = [
+  "clear execution deck",
+  "discard execution deck",
+  "clear the deck",
+  "empty execution deck",
+  "muthur clear execution deck",
+  "reset execution deck",
+];
+
+const EXEC_DECK_PUSH_PATTERNS = [
+  "push hand to stack",
+  "push to stack",
+  "commit hand",
+  "stage stack",
+  "muthur push hand to stack",
+  "muthur push to stack",
+];
+
+const EXEC_DECK_EXECUTE_PATTERNS = [
+  "execute deck",
+  "run deck",
+  "execute stack",
+  "run stack",
+  "execute next card",
+  "muthur execute deck",
+  "muthur execute",
+  "run execution deck",
+];
+
 function normalize(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9 ]/g, " ");
 }
@@ -141,7 +190,37 @@ export function detectResumeObserveIntent(input: string): boolean {
   return isResumeObserveRequest(input.trim());
 }
 
-export type IntentType = "self_status" | "inspect" | "observe" | "stop_observe" | "pause_observe" | "resume_observe" | "unknown";
+export function detectExecDeckShowIntent(input: string): boolean {
+  if (!input || typeof input !== "string") return false;
+  const norm = normalize(input.trim());
+  return EXEC_DECK_SHOW_PATTERNS.some((p) => norm.includes(normalize(p)));
+}
+
+export function detectExecDeckPrepareIntent(input: string): boolean {
+  if (!input || typeof input !== "string") return false;
+  const norm = normalize(input.trim());
+  return EXEC_DECK_PREPARE_PATTERNS.some((p) => norm.includes(normalize(p)));
+}
+
+export function detectExecDeckClearIntent(input: string): boolean {
+  if (!input || typeof input !== "string") return false;
+  const norm = normalize(input.trim());
+  return EXEC_DECK_CLEAR_PATTERNS.some((p) => norm.includes(normalize(p)));
+}
+
+export function detectExecDeckPushIntent(input: string): boolean {
+  if (!input || typeof input !== "string") return false;
+  const norm = normalize(input.trim());
+  return EXEC_DECK_PUSH_PATTERNS.some((p) => norm.includes(normalize(p)));
+}
+
+export function detectExecDeckExecuteIntent(input: string): boolean {
+  if (!input || typeof input !== "string") return false;
+  const norm = normalize(input.trim());
+  return EXEC_DECK_EXECUTE_PATTERNS.some((p) => norm.includes(normalize(p)));
+}
+
+export type IntentType = "self_status" | "inspect" | "observe" | "stop_observe" | "pause_observe" | "resume_observe" | "exec_deck_show" | "exec_deck_prepare" | "exec_deck_clear" | "exec_deck_push" | "exec_deck_execute" | "unknown";
 
 export function classifyIntent(input: string): IntentType {
   if (!input || typeof input !== "string") return "unknown";
@@ -151,6 +230,11 @@ export function classifyIntent(input: string): IntentType {
   if (detectStopObserveIntent(trimmed)) return "stop_observe";
   if (detectPauseObserveIntent(trimmed)) return "pause_observe";
   if (detectResumeObserveIntent(trimmed)) return "resume_observe";
+  if (detectExecDeckShowIntent(trimmed)) return "exec_deck_show";
+  if (detectExecDeckPrepareIntent(trimmed)) return "exec_deck_prepare";
+  if (detectExecDeckPushIntent(trimmed)) return "exec_deck_push";
+  if (detectExecDeckExecuteIntent(trimmed)) return "exec_deck_execute";
+  if (detectExecDeckClearIntent(trimmed)) return "exec_deck_clear";
   if (detectObserveIntent(trimmed)) return "observe";
   return "unknown";
 }

@@ -40,6 +40,12 @@ const ALLOWED_EVENT_TYPES = new Set([
   "self_status_request",
   "inspect_request",
   "alias_resolved",
+  "execution_deck_opened",
+  "hand_prepared",
+  "card_staged",
+  "stack_cleared",
+  "hand_pushed_to_stack",
+  "execution_attempt_blocked",
 ]);
 
 const BLOCKED_KEYWORDS = new Set([

@@ -235,7 +235,7 @@ stopObservation();
   assert("no dispatchEvent in workflow-observation", !/dispatchEvent/.test(src));
   assert("no clipboard read in workflow-observation", !/clipboardData/.test(src));
   assert("no clipboard write in workflow-observation", !/setData/.test(src));
-  assert("no exec/spawn in workflow-observation", !/exec|spawn/.test(src));
+  assert("no exec/spawn in workflow-observation", !/\b(exec|spawn)\b/.test(src));
   assert("no click() in workflow-observation", !/\.click\(/.test(src));
   assert("no focus() in workflow-observation", !/\.focus\(/.test(src));
   assert("no screenshot capture in workflow-observation", !/captureScreen|screenshot/.test(src));

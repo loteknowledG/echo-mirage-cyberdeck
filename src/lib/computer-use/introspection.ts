@@ -6,6 +6,7 @@ import { getWorkflowState, getCurrentStep, getNextStep } from "./guided-workflow
 import { getPresenceState } from "./cursor-presence";
 import { getInspectionSummary } from "./inspect-layer";
 import { getSession, getEventCount, getNextPendingQuestion, getPendingQuestionCount, getConfirmedEvents } from "./workflow-observation";
+import { getExecutionDeckState, getStagedCardCount, getStackDepth, isExecutionEnabled, getTopStackCard, getStackCards, getCurrentStatuses } from "./execution-deck";
 import type { ActionName } from "./computer-use-types";
 
 export interface MarkerInfo {
@@ -99,6 +100,16 @@ export interface ComputerUseStatus {
     pendingQuestionCount: number;
     confirmedStepCount: number;
     workflowName: string | null;
+  };
+  executionDeck: {
+    stagedCardCount: number;
+    stackDepth: number;
+    isOpen: boolean;
+    lastResult: string | null;
+    executionEnabled: boolean;
+    activeHand: string | null;
+    topStackCard: string | null;
+    currentStatuses: Record<string, string>;
   };
   recentEvents: {
     event: string;
@@ -205,6 +216,20 @@ export function getComputerUseStatus(): ComputerUseStatus {
         pendingQuestionCount: getPendingQuestionCount(),
         confirmedStepCount: getConfirmedEvents().length,
         workflowName: session.workflowName,
+      };
+    })(),
+    executionDeck: (() => {
+      const deck = getExecutionDeckState();
+      const top = getTopStackCard();
+      return {
+        stagedCardCount: getStagedCardCount(),
+        stackDepth: getStackDepth(),
+        isOpen: deck.openedAt !== null,
+        lastResult: deck.lastResult,
+        executionEnabled: isExecutionEnabled(),
+        activeHand: deck.activeHand,
+        topStackCard: top?.title ?? null,
+        currentStatuses: getCurrentStatuses(),
       };
     })(),
     recentEvents,
@@ -326,6 +351,14 @@ export function formatStatusText(): string {
     "Cursor presence:",
     `  position: (${status.cursorPresence.x}, ${status.cursorPresence.y})`,
     `  inside region: ${status.cursorPresence.insideRegion ?? "none"}`,
+    "",
+    "Execution deck:",
+    `  active hand: ${status.executionDeck.activeHand ?? "(none)"}`,
+    `  staged cards: ${status.executionDeck.stagedCardCount}`,
+    `  stack depth: ${status.executionDeck.stackDepth}`,
+    `  execution: ${status.executionDeck.executionEnabled ? "ENABLED" : "DISABLED"}`,
+    ...(status.executionDeck.topStackCard ? [`  top of stack: ${status.executionDeck.topStackCard}`] : []),
+    ...(status.executionDeck.lastResult ? [`  last result: ${status.executionDeck.lastResult}`] : []),
     "",
     "Electron bridge: unavailable",
   ];

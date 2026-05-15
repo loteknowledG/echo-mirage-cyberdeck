@@ -11,7 +11,11 @@ export type NarrationEvent =
   | "BUILD_FAILURE"
   | "CURSOR_ENTER_REGION"
   | "STEP_ACKNOWLEDGED"
-  | "TARGET_NOT_FOUND";
+  | "TARGET_NOT_FOUND"
+  | "HAND_PREPARED"
+  | "HAND_PUSHED_TO_STACK"
+  | "EXECUTION_DISABLED"
+  | "EXECUTION_DECK_CLEARED";
 
 export interface Narration {
   event: NarrationEvent;
@@ -35,6 +39,10 @@ const NARRATION_MAP: Record<NarrationEvent, string> = {
   CURSOR_ENTER_REGION: "Step acknowledged.",
   STEP_ACKNOWLEDGED: "Proceeding to next instruction.",
   TARGET_NOT_FOUND: "Unable to locate teaching target.",
+  HAND_PREPARED: "Reviewer Hand prepared.",
+  HAND_PUSHED_TO_STACK: "Hand pushed to stack.",
+  EXECUTION_DISABLED: "Execution disabled in v0.1.",
+  EXECUTION_DECK_CLEARED: "Execution Deck cleared.",
 };
 
 const listeners: Set<NarrationListener> = new Set();
