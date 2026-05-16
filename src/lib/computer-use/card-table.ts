@@ -22,7 +22,7 @@ export interface ExecutionHand {
   createdAt: string;
 }
 
-export interface ExecutionDeckState {
+export interface CardTableState {
   stagedHand: ExecutionHand | null;
   executionStack: ExecutionCard[];
   currentCard: ExecutionCard | null;
@@ -36,7 +36,7 @@ function makeId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-const state: ExecutionDeckState = {
+const state: CardTableState = {
   stagedHand: null,
   executionStack: [],
   currentCard: null,
@@ -50,7 +50,7 @@ function touch(card: ExecutionCard): void {
   card.updatedAt = new Date().toISOString();
 }
 
-export function getExecutionDeckState(): ExecutionDeckState {
+export function getCardTableState(): CardTableState {
   return {
     stagedHand: state.stagedHand ? { ...state.stagedHand, cards: [...state.stagedHand.cards] } : null,
     executionStack: [...state.executionStack],
@@ -66,14 +66,14 @@ export function isDeckOpen(): boolean {
   return state.openedAt !== null;
 }
 
-export function openDeck(): ExecutionDeckState {
+export function openDeck(): CardTableState {
   state.openedAt = state.openedAt ?? new Date().toISOString();
-  return getExecutionDeckState();
+  return getCardTableState();
 }
 
-export function closeDeck(): ExecutionDeckState {
+export function closeDeck(): CardTableState {
   state.openedAt = null;
-  return getExecutionDeckState();
+  return getCardTableState();
 }
 
 export function prepareHand(name: string, cards: ExecutionCard[]): ExecutionHand {
@@ -172,7 +172,7 @@ export function removeCard(cardId: string): boolean {
   return removed;
 }
 
-export function clearDeck(): ExecutionDeckState {
+export function clearDeck(): CardTableState {
   if (state.stagedHand) {
     for (const card of state.stagedHand.cards) {
       card.status = "skipped";
@@ -188,7 +188,7 @@ export function clearDeck(): ExecutionDeckState {
   state.currentCard = null;
   state.lastResult = null;
   state.activeHand = null;
-  return getExecutionDeckState();
+  return getCardTableState();
 }
 
 export function updateCardStatus(cardId: string, status: CardStatus, result?: string): boolean {
@@ -213,8 +213,64 @@ export function getStagedCardCount(): number {
   return state.stagedHand?.cards.length ?? 0;
 }
 
+export function prepareHandFromRegistry(handName: string, registryCards: Array<{ id: string; name: string; description: string; risk: string; requiresConfirmation: boolean }>): ExecutionHand {
+  const now = new Date().toISOString();
+  const cards: ExecutionCard[] = registryCards.map((rc) => ({
+    id: makeId("card"),
+    title: rc.name,
+    purpose: rc.description,
+    riskLevel: rc.risk === "safe" ? "low" : rc.risk === "caution" ? "medium" : "high",
+    requiredConfirmation: rc.requiresConfirmation,
+    status: "staged",
+    inputsSummary: "",
+    outputsSummary: "",
+    createdAt: now,
+    updatedAt: now,
+  }));
+  const hand: ExecutionHand = {
+    name: handName,
+    cards,
+    createdAt: now,
+  };
+  state.stagedHand = hand;
+  state.executionStack = [];
+  state.currentCard = null;
+  state.lastResult = null;
+  state.activeHand = handName;
+  if (!state.openedAt) state.openedAt = new Date().toISOString();
+  return hand;
+}
+
+export function syncStagedHandFromSelectedIds(selectedCardIds: string[], registryCards: Record<string, { name: string; description: string; risk: string; requiresConfirmation: boolean }>): ExecutionHand {
+  const now = new Date().toISOString();
+  const cards: ExecutionCard[] = selectedCardIds.map((id) => {
+    const rc = registryCards[id];
+    return {
+      id: makeId("card"),
+      title: rc?.name ?? id,
+      purpose: rc?.description ?? "",
+      riskLevel: (rc?.risk === "safe" ? "low" : rc?.risk === "caution" ? "medium" : "high") as RiskLevel,
+      requiredConfirmation: rc?.requiresConfirmation ?? false,
+      status: "staged" as CardStatus,
+      inputsSummary: "",
+      outputsSummary: "",
+      createdAt: now,
+      updatedAt: now,
+    };
+  });
+  const hand: ExecutionHand = {
+    name: "Selected Cards",
+    cards,
+    createdAt: now,
+  };
+  state.stagedHand = hand;
+  state.activeHand = "Selected Cards";
+  if (!state.openedAt) state.openedAt = new Date().toISOString();
+  return hand;
+}
+
 export function describeDeck(): string {
-  const deck = getExecutionDeckState();
+  const deck = getCardTableState();
   const lines: string[] = [];
   lines.push(`=== EXECUTION DECK ===`);
   lines.push(`Active hand: ${deck.activeHand ?? "(none)"}`);

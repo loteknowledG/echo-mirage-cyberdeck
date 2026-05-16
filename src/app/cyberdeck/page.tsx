@@ -58,10 +58,10 @@ import {
   parseBrowserUseModeCommand,
 } from "@/lib/browser-intents";
 import { detectSelfStatusIntent, detectInspectIntent, detectObserveIntent, detectStopObserveIntent, detectPauseObserveIntent, detectResumeObserveIntent, detectExecDeckShowIntent, detectExecDeckPrepareIntent, detectExecDeckClearIntent, detectExecDeckPushIntent, detectExecDeckExecuteIntent, detectExecDeckDescribeStagedIntent } from "@/lib/computer-use/intent-detect";
-import { ExecutionDeckPane } from "@/components/cyberdeck/execution-deck-pane";
+import { CardTablePane } from "@/components/cyberdeck/card-table-pane";
 import { startObservation, stopObservation, pauseObservation, resumeObservation, recordEvent, getNextPendingQuestion, answerQuestion, getEventCount, isObserving } from "@/lib/computer-use/workflow-observation";
 import { formatStatusText } from "@/lib/computer-use/introspection";
-import { openDeck, prepareHand, clearDeck, describeDeck, buildReviewerHand, isDeckOpen, pushHandToStack, attemptExecute, isExecutionEnabled, getExecutionDeckState } from "@/lib/computer-use/execution-deck";
+import { openDeck, prepareHand, clearDeck, describeDeck, buildReviewerHand, isDeckOpen, pushHandToStack, attemptExecute, isExecutionEnabled, getCardTableState, prepareHandFromRegistry, syncStagedHandFromSelectedIds } from "@/lib/computer-use/card-table";
 import { runComputerUseAction as runComputerUseBridgeAction } from "@/lib/computer-use/electron-computer-use-bridge";
 import { resolveUiTarget, type CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
 import { addNarrationListener } from "@/lib/computer-use/narration";
@@ -126,11 +126,12 @@ const servers = [
   { id: "w", glyph: "W", label: "WEB" },
   { id: "c", glyph: "C", label: "CONNECTION" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
+  { id: "ct", glyph: "◈", label: "CARD TABLE" },
   { id: "h", glyph: "π", label: "DIAGNOSTIC" },
   { id: "b", glyph: "§", label: "SETTINGS" },
 ] as const;
 
-const SERVER_IDS = ["m", "s", "b"] as const;
+const SERVER_IDS = ["m", "s", "ct", "b"] as const;
 
 function isFixedServerTabId(id: string): id is (typeof SERVER_IDS)[number] {
   return (SERVER_IDS as readonly string[]).includes(id);
@@ -145,6 +146,7 @@ function contextMenuTargetIsTextField(target: EventTarget | null): boolean {
 const fixedServers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
+  { id: "ct", glyph: "◈", label: "CARD TABLE" },
   { id: "b", glyph: "§", label: "SETTINGS" },
 ] as const;
 const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
@@ -648,7 +650,8 @@ export default function CyberdeckPage() {
     | null
   >(null);
 
-  const [showExecutionDeckPane, setShowExecutionDeckPane] = useState(false);
+  const [showCardTablePane, setShowCardTablePane] = useState(false);
+  const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
   /** Right-click menu for the main chat / Echo Mirage pane (viewport-clamped like rail tabs). */
   const [mirageContextMenu, setMirageContextMenu] = useState<{ x: number; y: number } | null>(null);
   /** Right-click menu for gateway column surfaces (settings, operator, connection, custom tabs). */
@@ -3069,11 +3072,12 @@ export default function CyberdeckPage() {
     if (detectExecDeckShowIntent(userMessage)) {
       openDeck();
       if (isObserving()) recordEvent("execution_deck_opened", "Deck Opened", userMessage);
-      setShowExecutionDeckPane(true);
+      setServer("ct");
+      setActiveCustomTabId(null);
       if (isDeckOpen()) {
         const desc = describeDeck();
-        setMessages((prev) => [...prev, { role: "assistant", text: `Execution Deck displayed. ${desc}` }]);
-        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, `Execution Deck displayed. ${desc}`));
+        setMessages((prev) => [...prev, { role: "assistant", text: `Card Table displayed. ${desc}` }]);
+        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, `Card Table displayed. ${desc}`));
       }
       setIsStreaming(false);
       return;
@@ -3083,7 +3087,8 @@ if (detectExecDeckPrepareIntent(userMessage)) {
       openDeck();
       const cards = buildReviewerHand();
       const hand = prepareHand("Reviewer Hand", cards);
-      setShowExecutionDeckPane(true);
+      setServer("ct");
+      setActiveCustomTabId(null);
       const desc = describeDeck();
       if (isObserving()) recordEvent("hand_prepared", "Reviewer Hand", `${cards.length} cards staged: ${cards.map((c) => c.title).join(", ")}`);
       narrate("HAND_PREPARED");
@@ -3094,7 +3099,7 @@ if (detectExecDeckPrepareIntent(userMessage)) {
     }
 
     if (detectExecDeckDescribeStagedIntent(userMessage)) {
-      const state = getExecutionDeckState();
+      const state = getCardTableState();
       if (!state.stagedHand || state.stagedHand.cards.length === 0) {
         setMessages((prev) => [
           ...prev,
@@ -3111,19 +3116,20 @@ if (detectExecDeckPrepareIntent(userMessage)) {
           { role: "assistant", text: lines.join("\n") },
         ]);
       }
-      setShowExecutionDeckPane(true);
+      setServer("ct");
+      setActiveCustomTabId(null);
       setIsStreaming(false);
       return;
     }
 
     if (detectExecDeckClearIntent(userMessage)) {
       clearDeck();
-      if (isObserving()) recordEvent("stack_cleared", "Execution Deck", userMessage);
-      narrate("EXECUTION_DECK_CLEARED");
-      setShowExecutionDeckPane(false);
+      if (isObserving()) recordEvent("stack_cleared", "Card Table", userMessage);
+      narrate("CARD_TABLE_CLEARED");
+      setServer("s");
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", text: "Execution deck cleared. All cards discarded." },
+        { role: "assistant", text: "Card table cleared. All cards discarded." },
       ]);
       setIsStreaming(false);
       return;
@@ -3132,7 +3138,8 @@ if (detectExecDeckPrepareIntent(userMessage)) {
     if (detectExecDeckPushIntent(userMessage)) {
       openDeck();
       const result = pushHandToStack();
-      setShowExecutionDeckPane(true);
+      setServer("ct");
+      setActiveCustomTabId(null);
       if (result.pushed > 0) {
         if (isObserving()) recordEvent("hand_pushed_to_stack", "Hand Pushed", `${result.pushed} cards pushed to stack, depth now ${result.stackDepth}`);
         narrate("HAND_PUSHED_TO_STACK");
@@ -3147,7 +3154,8 @@ if (detectExecDeckPrepareIntent(userMessage)) {
     if (detectExecDeckExecuteIntent(userMessage)) {
       openDeck();
       const result = attemptExecute();
-      setShowExecutionDeckPane(true);
+      setServer("ct");
+      setActiveCustomTabId(null);
       if (!result.success && isObserving()) {
         recordEvent("execution_attempt_blocked", "Execute Blocked", result.reason);
       }
@@ -3561,7 +3569,7 @@ const resolved = resolveUiTarget(userMessage);
     setIsStreaming(false);
   }, [abortMotherSpeech]);
 
-  const handleModelLabelClick = useCallback((targetServer: "s" | "b" = "s") => {
+  const handleModelLabelClick = useCallback((targetServer: "s" | "ct" | "b" = "s") => {
     setActiveCustomTabId(null);
     setServer(targetServer);
     setNavRailContext("gateway");
@@ -3580,6 +3588,10 @@ const resolved = resolveUiTarget(userMessage);
     (serverId: (typeof SERVER_IDS)[number]) => {
       if (serverId === "s") {
         handleModelLabelClick("s");
+        return;
+      }
+      if (serverId === "ct") {
+        handleModelLabelClick("ct");
         return;
       }
       if (serverId === "b") {
@@ -4433,7 +4445,9 @@ const resolved = resolveUiTarget(userMessage);
                     ? "Focus operator panel"
                     : railTabContextMenu.serverId === "s"
                       ? "Focus connection panel"
-                      : "Focus settings panel"}
+                      : railTabContextMenu.serverId === "ct"
+                        ? "Focus card table"
+                        : "Focus settings panel"}
                 </button>
                 <button
                   type="button"
@@ -5086,41 +5100,62 @@ const resolved = resolveUiTarget(userMessage);
               Command. Catalog. Operators. Memory Atlas. Voice Lab. Flight Log. Settings. Craftwerk Cyberdeck
               Corporation. ChatGPT // Lead. Cursor // Dev. Codex // Test. Samus-Manus // Memory. ASCII. REALMORPH.
             </p>
-            {showExecutionDeckPane ? (
+            {server === "ct" ? (
               <div className="flex flex-1 flex-col overflow-hidden">
-                <ExecutionDeckPane
-                  activeHand={getExecutionDeckState().activeHand}
-                  stagedCardCount={getExecutionDeckState().stagedHand?.cards.length ?? 0}
-                  stackDepth={getExecutionDeckState().executionStack.length}
-                  executionEnabled={getExecutionDeckState().executionEnabled}
-                  topStackCard={getExecutionDeckState().currentCard ? { title: getExecutionDeckState().currentCard!.title, status: getExecutionDeckState().currentCard!.status, riskLevel: getExecutionDeckState().currentCard!.riskLevel } : null}
-                  stackCards={getExecutionDeckState().executionStack.map((c) => ({ title: c.title, status: c.status, riskLevel: c.riskLevel }))}
-                  stagedCards={(getExecutionDeckState().stagedHand?.cards ?? []).map((c) => ({ title: c.title, purpose: c.purpose, riskLevel: c.riskLevel, status: c.status, requiredConfirmation: c.requiredConfirmation }))}
+                <CardTablePane
+                  activeHand={getCardTableState().activeHand}
+                  stagedCardCount={selectedCardIds.length}
+                  stackDepth={getCardTableState().executionStack.length}
+                  executionEnabled={getCardTableState().executionEnabled}
+                  topStackCard={getCardTableState().currentCard ? { title: getCardTableState().currentCard!.title, status: getCardTableState().currentCard!.status, riskLevel: getCardTableState().currentCard!.riskLevel } : null}
+                  stackCards={getCardTableState().executionStack.map((c) => ({ title: c.title, status: c.status, riskLevel: c.riskLevel }))}
+                  stagedCards={selectedCardIds.map(id => {
+                    const card = getCardTableState().stagedHand?.cards.find(c => c.id === id);
+                    return card ? { title: card.title, purpose: card.purpose, riskLevel: card.riskLevel, status: card.status, requiredConfirmation: card.requiredConfirmation } : { title: id, purpose: "", riskLevel: "low", status: "staged", requiredConfirmation: false };
+                  })}
                   onPushHandToStack={() => {
                     const result = pushHandToStack();
                     if (result.pushed > 0 && isObserving()) recordEvent("hand_pushed_to_stack", "Hand Pushed", `${result.pushed} cards pushed to stack`);
                     narrate("HAND_PUSHED_TO_STACK");
+                    setSelectedCardIds([]);
                   }}
                   onClearDeck={() => {
                     clearDeck();
-                    if (isObserving()) recordEvent("stack_cleared", "Execution Deck", "Deck cleared via pane control");
-                    narrate("EXECUTION_DECK_CLEARED");
-                    setShowExecutionDeckPane(false);
+                    if (isObserving()) recordEvent("stack_cleared", "Card Table", "Deck cleared via pane control");
+                    narrate("CARD_TABLE_CLEARED");
+                    setSelectedCardIds([]);
+                    setServer("s");
                   }}
                   onExecute={() => {
                     const result = attemptExecute();
                     if (!result.success && isObserving()) recordEvent("execution_attempt_blocked", "Execute Blocked", result.reason);
                     narrate("EXECUTION_DISABLED");
                   }}
-                  onClose={() => setShowExecutionDeckPane(false)}
+                  onClose={() => setServer("s")}
+                  onSelectHand={(handId) => {
+                    const { EXECUTION_HANDS, getHandCards } = require("@/lib/computer-use/execution-card-registry");
+                    const hand = EXECUTION_HANDS.find((h: { id: string }) => h.id === handId);
+                    if (hand) {
+                      const cards = getHandCards(handId);
+                      prepareHandFromRegistry(hand.name, cards);
+                      setSelectedCardIds(cards.map((c: { id: string }) => c.id));
+                    }
+                  }}
+                  onStageCard={(cardId) => {
+                    const { EXECUTION_CARD_REGISTRY } = require("@/lib/computer-use/execution-card-registry");
+                    const newSelected = selectedCardIds.includes(cardId)
+                      ? selectedCardIds.filter(id => id !== cardId)
+                      : [...selectedCardIds, cardId];
+                    setSelectedCardIds(newSelected);
+                    syncStagedHandFromSelectedIds(newSelected, EXECUTION_CARD_REGISTRY);
+                  }}
+                  selectedCardIds={selectedCardIds}
                 />
-              </div>
-            ) : (
-              <>
-                {activeCustomTab ? (
-                renderCustomTabSurface(activeCustomTab)
-              ) : showGatewayPanel ? (
-                <div className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
+</div>
+            ) : activeCustomTab ? (
+              renderCustomTabSurface(activeCustomTab)
+            ) : showGatewayPanel ? (
+              <div className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
                   {droppedMarkdown ? (
                     <div className="mb-4 rounded-sm border border-amber-700/70 bg-black p-3">
                       <div className="mb-2 flex items-center justify-between">
@@ -5350,9 +5385,7 @@ const resolved = resolveUiTarget(userMessage);
                   />
                 </div>
               ) : null}
-              </>
-            )}
-          </div>
+            </div>
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

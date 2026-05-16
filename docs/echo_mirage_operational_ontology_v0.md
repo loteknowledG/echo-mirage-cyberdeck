@@ -1,3 +1,24 @@
+---
+card_id: echo-mirage.doctrine.operational-ontology.v0
+card_type: doctrine
+title: Operational Ontology v0
+project: echo-mirage
+deck: doctrine
+risk: safe
+clicks: 0
+tags:
+  - ontology
+  - domains
+  - games
+  - decks
+  - hands
+  - doctrine
+aliases:
+  - operational ontology
+  - language doctrine
+version: v0
+---
+
 # Echo Mirage Operational Ontology v0
 ## Domains, Games, Decks, Hands, Plays, Stacks, and Execute
 

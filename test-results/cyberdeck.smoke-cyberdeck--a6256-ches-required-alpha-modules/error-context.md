@@ -12,10 +12,16 @@
 # Error details
 
 ```
-TimeoutError: page.goto: Timeout 30000ms exceeded.
+TimeoutError: page.waitForSelector: Timeout 20000ms exceeded.
 Call log:
-  - navigating to "http://127.0.0.1:3050/cyberdeck", waiting until "domcontentloaded"
+  - waiting for locator('cyberdeck-rail-tab') to be visible
 
+```
+
+# Page snapshot
+
+```yaml
+- generic [ref=e2]: Internal Server Error
 ```
 
 # Test source
@@ -52,10 +58,10 @@ Call log:
   29 |   try {
   30 |     await page.goto("/cyberdeck", { waitUntil: "load", timeout: 30000 });
   31 |   } catch {
-> 32 |     await page.goto("/cyberdeck", { waitUntil: "domcontentloaded", timeout: 30000 });
-     |                ^ TimeoutError: page.goto: Timeout 30000ms exceeded.
+  32 |     await page.goto("/cyberdeck", { waitUntil: "domcontentloaded", timeout: 30000 });
   33 |   }
-  34 |   await page.waitForSelector("cyberdeck-rail-tab", { timeout: 20000 });
+> 34 |   await page.waitForSelector("cyberdeck-rail-tab", { timeout: 20000 });
+     |              ^ TimeoutError: page.waitForSelector: Timeout 20000ms exceeded.
   35 |   const response = await page.reload({ waitUntil: "domcontentloaded" });
   36 |   expect(response).not.toBeNull();
   37 |   expect(response!.status()).toBeLessThan(500);

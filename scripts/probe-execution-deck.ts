@@ -5,7 +5,7 @@ import {
   stageCard,
   removeCard,
   updateCardStatus,
-  getExecutionDeckState,
+  getCardTableState,
   getStagedCardCount,
   getStackDepth,
   describeDeck,
@@ -18,7 +18,7 @@ import {
   getStackCards,
   getCurrentStatuses,
   type ExecutionCard,
-} from "../src/lib/computer-use/execution-deck";
+} from "../src/lib/computer-use/card-table";
 import { detectExecDeckShowIntent, detectExecDeckPrepareIntent, detectExecDeckClearIntent, detectExecDeckPushIntent, detectExecDeckExecuteIntent } from "../src/lib/computer-use/intent-detect";
 
 function assert(name: string, condition: boolean | (() => boolean), detail?: unknown) {
@@ -66,7 +66,7 @@ function main() {
   const hand = prepareHand("Reviewer Hand", reviewerCards);
   assert("prepareHand returns hand", hand.name === "Reviewer Hand");
   assert("hand has 4 cards", hand.cards.length === 4);
-  const state = getExecutionDeckState();
+  const state = getCardTableState();
   assert("staged hand set", state.stagedHand !== null);
   assert("staged hand name correct", state.stagedHand!.name === "Reviewer Hand");
   assert("activeHand set to hand name", state.activeHand === "Reviewer Hand");
@@ -79,7 +79,7 @@ function main() {
   const pushResult = pushHandToStack();
   assert("pushHandToStack returns pushed count", pushResult.pushed === 4);
   assert("pushHandToStack updates stackDepth", pushResult.stackDepth === 4);
-  const postPush = getExecutionDeckState();
+  const postPush = getCardTableState();
   assert("staged hand null after push", postPush.stagedHand === null);
   assert("execution stack has 4 cards after push", postPush.executionStack.length === 4);
   assert("currentCard set to first card after push", postPush.currentCard !== null);
@@ -101,12 +101,12 @@ function main() {
   const first = postPush.executionStack[0];
   const updated = updateCardStatus(first.id, "complete", "Build artifact captured successfully.");
   assert("updateCardStatus returns true", updated);
-  const postUpdate = getExecutionDeckState();
+  const postUpdate = getCardTableState();
   assert("card status updated", postUpdate.executionStack.some((c) => c.status === "complete"));
   assert("card lastResult set", postUpdate.executionStack.some((c) => c.lastResult !== undefined));
 
   updateCardStatus(first.id, "running");
-  const runningState = getExecutionDeckState();
+  const runningState = getCardTableState();
   assert("currentCard updates on running", runningState.currentCard?.status === "running");
 
   console.log("\n--- Remove Card ---");
@@ -114,12 +114,12 @@ function main() {
   const removed = removeCard(first.id);
   assert("removeCard returns true", removed);
   assert("stack depth decrements after removeCard", getStackDepth() === stackLen - 1);
-  const afterRemove = getExecutionDeckState();
+  const afterRemove = getCardTableState();
   assert("currentCard advances after removeCard", afterRemove.currentCard?.title === "Request Codex Review");
 
   console.log("\n--- Clear Deck ---");
   clearDeck();
-  const cleared = getExecutionDeckState();
+  const cleared = getCardTableState();
   assert("staged hand null after clear", cleared.stagedHand === null);
   assert("execution stack empty after clear", cleared.executionStack.length === 0);
   assert("current card null after clear", cleared.currentCard === null);
@@ -173,7 +173,7 @@ function main() {
   console.log("\n--- Safety Proof ---");
   const { readFileSync } = require("node:fs");
   const { join } = require("node:path");
-  const src = readFileSync(join(process.cwd(), "src/lib/computer-use/execution-deck.ts"), "utf8");
+  const src = readFileSync(join(process.cwd(), "src/lib/computer-use/card-table.ts"), "utf8");
   assert("no dispatchEvent in execution-deck", !/dispatchEvent/.test(src));
   assert("no clipboard read in execution-deck", !/clipboardData/.test(src));
   assert("no clipboard write in execution-deck", !/setData/.test(src));

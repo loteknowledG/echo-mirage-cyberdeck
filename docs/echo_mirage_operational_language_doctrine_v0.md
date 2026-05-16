@@ -1,3 +1,23 @@
+---
+card_id: echo-mirage.doctrine.operational-language.v0
+card_type: doctrine
+title: Operational Language Doctrine v0
+project: echo-mirage
+deck: doctrine
+risk: safe
+clicks: 0
+tags:
+  - language
+  - doctrine
+  - cards
+  - hands
+  - stacks
+aliases:
+  - operational language
+  - card doctrine
+version: v0
+---
+
 # Echo Mirage Operational Language Doctrine v0
 ## Cards, Hands, Stacks, Decks, and Dealer Architecture
 

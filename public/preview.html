@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PowerFist Matrix Carousel Test</title>
+
+    <style>
+      :root {
+        --bg: #050807;
+        --panel: #08110d;
+        --line: rgba(134, 239, 172, 0.35);
+        --text: #d8ffe5;
+        --muted: #76a586;
+        --green: #86efac;
+        --amber: #facc15;
+        --red: #fb7185;
+        --cyan: #67e8f9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(
+            circle at top,
+            rgba(34, 197, 94, 0.14),
+            transparent 35%
+          ),
+          linear-gradient(180deg, #020403, var(--bg));
+        color: var(--text);
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+
+      .shell {
+        width: min(960px, 94vw);
+        display: grid;
+        gap: 14px;
+      }
+
+      .status {
+        border: 1px solid var(--line);
+        background: rgba(8, 17, 13, 0.88);
+        border-radius: 14px;
+        padding: 12px 14px;
+        box-shadow: 0 0 40px rgba(34, 197, 94, 0.08);
+      }
+
+      .status strong {
+        color: var(--green);
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 6px;
+      }
+
+      .matrix {
+        height: 520px;
+        border: 1px solid var(--line);
+        background: rgba(8, 17, 13, 0.72);
+        border-radius: 22px;
+        overflow: hidden;
+        position: relative;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+          0 20px 80px rgba(0, 0, 0, 0.45);
+      }
+
+      .deckViewport {
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .deckContainer {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .deckSlide {
+        flex: 0 0 100%;
+        min-height: 0;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        padding: 20px;
+        gap: 18px;
+      }
+
+      .deckHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .deckTitle {
+        font-size: 22px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--green);
+      }
+
+      .deckBadge {
+        color: var(--muted);
+        border: 1px solid rgba(134, 239, 172, 0.25);
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+      }
+
+      .handViewport {
+        overflow: hidden;
+        height: 100%;
+        display: grid;
+        align-items: center;
+      }
+
+      .handContainer {
+        display: flex;
+        align-items: center;
+        height: 100%;
+      }
+
+      .cardSlide {
+        flex: 0 0 42%;
+        min-width: 0;
+        padding: 12px;
+        transition:
+          transform 180ms ease,
+          opacity 180ms ease,
+          filter 180ms ease;
+        will-change: transform;
+      }
+
+      .card {
+        height: 310px;
+        border: 1px solid rgba(134, 239, 172, 0.32);
+        border-radius: 22px;
+        padding: 18px;
+        background:
+          linear-gradient(145deg, rgba(13, 31, 23, 0.95), rgba(5, 10, 8, 0.98)),
+          radial-gradient(
+            circle at top left,
+            rgba(103, 232, 249, 0.12),
+            transparent 40%
+          );
+        display: grid;
+        align-content: space-between;
+        flex: '0 0 100%';
+        justify-content: center;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+          0 16px 46px rgba(0, 0, 0, 0.45);
+      }
+
+      .cardSlide:not(.is-selected) {
+        transform: scale(0.82);
+        opacity: 0.48;
+        filter: grayscale(0.45) blur(0.4px);
+      }
+
+      .cardSlide.is-selected {
+        transform: scale(1.03);
+        opacity: 1;
+        filter: none;
+      }
+
+      .cardTop {
+        display: grid;
+        gap: 10px;
+      }
+
+      .cardType {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--cyan);
+      }
+
+      .cardTitle {
+        font-size: 24px;
+        line-height: 1.1;
+        color: var(--text);
+      }
+
+      .cardPurpose {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .cardBottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 10px;
+      }
+
+      .risk {
+        font-size: 12px;
+        border-radius: 999px;
+        padding: 6px 9px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+      }
+
+      .risk.safe {
+        color: var(--green);
+      }
+
+      .risk.caution {
+        color: var(--amber);
+      }
+
+      .risk.restricted {
+        color: var(--red);
+      }
+
+      .play {
+        border: 1px solid rgba(134, 239, 172, 0.55);
+        background: rgba(134, 239, 172, 0.12);
+        color: var(--green);
+        border-radius: 12px;
+        padding: 10px 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .play:hover {
+        background: rgba(134, 239, 172, 0.22);
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 1px solid rgba(134, 239, 172, 0.3);
+        background: rgba(8, 17, 13, 0.9);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: rgba(134, 239, 172, 0.7);
+      }
+
+      .stackLog {
+        min-height: 42px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .stackLog strong {
+        color: var(--amber);
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="shell">
+      <section class="status">
+        <div>
+          POWERFIST MATRIX // <strong id="activeDeck">Execution Deck</strong> //
+          <strong id="activeCard">Capture Builder Result</strong>
+        </div>
+        <div class="hint">
+          Use Arrow Up/Down to switch decks. Arrow Left/Right to choose cards.
+          Enter plays the focused card.
+        </div>
+      </section>
+
+      <section class="matrix">
+        <div class="deckViewport">
+          <div class="deckContainer" id="deckContainer"></div>
+        </div>
+      </section>
+
+      <section class="controls">
+        <button id="prevDeck">Deck ↑</button>
+        <button id="nextDeck">Deck ↓</button>
+        <button id="prevCard">Card ←</button>
+        <button id="nextCard">Card →</button>
+        <button id="playCard">Play Focused Card</button>
+      </section>
+
+      <section class="stackLog" id="stackLog">Stack idle.</section>
+    </main>
+
+    <script src="https://unpkg.com/embla-carousel/embla-carousel.umd.js"></script>
+
+    <script>
+      const decks = [
+        {
+          name: "Execution Deck",
+          badge: "runtime cards",
+          cards: [
+            {
+              type: "capture",
+              title: "Capture Builder Result",
+              purpose: "Capture OpenCode output as the next runtime artifact.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+            {
+              type: "review",
+              title: "Request Codex Review",
+              purpose: "Send builder result to the reviewer surface.",
+              risk: "caution",
+              flex: '0 0 100%'
+            },
+            {
+              type: "system",
+              title: "Archive Outcome",
+              purpose: "Turn completed card result into a receipt.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+            {
+              type: "runtime",
+              title: "Emergency Halt",
+              purpose: "Push halt card to the top of the stack.",
+              risk: "restricted",
+              flex: '0 0 100%'
+            },
+          ],
+        },
+        {
+          name: "Diagnostics Deck",
+          badge: "bridge health",
+          cards: [
+            {
+              type: "diagnostic",
+              title: "Run Probe Suite",
+              purpose: "Check runtime health and known probes.",
+              risk: "caution",
+              flex: '0 0 100%'
+            },
+            {
+              type: "diagnostic",
+              title: "Inspect Surface",
+              purpose: "Classify current operational surface.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+            {
+              type: "diagnostic",
+              title: "Check Provider",
+              purpose: "Verify active model gateway status.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+            {
+              type: "diagnostic",
+              title: "Memory Recall",
+              purpose: "Verify active model gateway status.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+          ],
+        },
+        {
+          name: "Voice Deck",
+          badge: "vox net",
+          cards: [
+            {
+              type: "voice",
+              title: "MUTHUR Voice",
+              purpose: "Load calm ship AI narration posture.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+            {
+              type: "voice",
+              title: "Reviewer Voice",
+              purpose: "Load dry verification narration mode.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+            {
+              type: "voice",
+              title: "Emergency Voice",
+              purpose: "Use short critical alert narration.",
+              risk: "caution",
+              flex: '0 0 100%'
+            },
+            {
+              type: "voice",
+              title: "Jeena Jacket Voice",
+              purpose: "Load calm ship AI narration posture.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+            {
+              type: "voice",
+              title: "Cory Chase Voice",
+              purpose: "Load calm ship AI narration posture.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+          ],
+        },
+        {
+          name: "Quorum Deck",
+          badge: "counsel cards",
+          cards: [
+            {
+              type: "quorum",
+              title: "Convene Quorum",
+              purpose: "Ask counsel when route is uncertain.",
+              risk: "caution",
+              flex: '0 0 100%'
+            },
+            {
+              type: "quorum",
+              title: "Request Arbitration",
+              purpose: "Escalate disagreement to operator.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+            {
+              type: "quorum",
+              title: "Prepare Recovery Hand",
+              purpose: "Deal recovery options after failure.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+            {
+              type: "quorum",
+              title: "War room",
+              purpose: "Deal recovery options after failure.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+            {
+              type: "quorum",
+              title: "Gangbang",
+              purpose: "Deal recovery options after failure.",
+              risk: "safe",
+              flex: '0 0 100%'
+            },
+          ],
+        },
+      ];
+
+      const deckContainer = document.getElementById("deckContainer");
+
+      deckContainer.innerHTML = decks
+        .map(
+          (deck, deckIndex) => `
+      <section class="deckSlide" data-deck-index="${deckIndex}">
+        <header class="deckHeader">
+          <div class="deckTitle">${deck.name}</div>
+          <div class="deckBadge">${deck.badge}</div>
+        </header>
+
+        <div class="handViewport" data-hand-index="${deckIndex}">
+          <div class="handContainer">
+            ${deck.cards
+              .map(
+                (card, cardIndex) => `
+              <article class="cardSlide" data-card-index="${cardIndex}">
+                <div class="card">
+                  <div class="cardTop">
+                    <div class="cardType">${card.type}</div>
+                    <div class="cardTitle">${card.title}</div>
+                    <div class="cardPurpose">${card.purpose}</div>
+                  </div>
+                  <div class="cardBottom">
+                    <span class="risk ${card.risk}">${card.risk}</span>
+                    <button class="play" data-play-deck="${deckIndex}" data-play-card="${cardIndex}">Play</button>
+                  </div>
+                </div>
+              </article>
+            `,
+              )
+              .join("")}
+          </div>
+        </div>
+      </section>
+    `,
+        )
+        .join("");
+
+      const deckViewport = document.querySelector(".deckViewport");
+      const deckEmbla = EmblaCarousel(deckViewport, {
+        axis: "y",
+        loop: true,
+        align: "center",
+        dragFree: false,
+        containScroll: false,
+          overflow: "hidden",
+          display: "flex",
+      });
+
+      const handEmblas = Array.from(
+        document.querySelectorAll(".handViewport"),
+      ).map((node) => {
+        return EmblaCarousel(node, {
+          axis: "x",
+          loop: true,
+          align: "center",
+          dragFree: true,
+          skipSnaps: false,
+          skipSnaps: false,
+          overflow: "hidden",
+          display: "flex",
+        });
+      });
+
+      let activeDeckIndex = 0;
+      let activeCardIndex = 0;
+
+      const activeDeckEl = document.getElementById("activeDeck");
+      const activeCardEl = document.getElementById("activeCard");
+      const stackLog = document.getElementById("stackLog");
+
+      function updateSelectedClasses() {
+        document.querySelectorAll(".cardSlide").forEach((slide) => {
+          slide.classList.remove("is-selected");
+        });
+
+        const activeDeckSlide = document.querySelector(
+          `[data-deck-index="${activeDeckIndex}"]`,
+        );
+        if (!activeDeckSlide) return;
+
+        const activeCardSlide = activeDeckSlide.querySelector(
+          `[data-card-index="${activeCardIndex}"]`,
+        );
+        if (activeCardSlide) activeCardSlide.classList.add("is-selected");
+      }
+
+      function updateStatus() {
+        const deck = decks[activeDeckIndex];
+        const card = deck.cards[activeCardIndex];
+
+        activeDeckEl.textContent = deck.name;
+        activeCardEl.textContent = card.title;
+
+        updateSelectedClasses();
+      }
+
+      deckEmbla.on("select", () => {
+        activeDeckIndex = deckEmbla.selectedScrollSnap();
+        activeCardIndex = handEmblas[activeDeckIndex].selectedScrollSnap();
+        updateStatus();
+      });
+
+      handEmblas.forEach((embla, deckIndex) => {
+        embla.on("select", () => {
+          if (deckIndex !== activeDeckIndex) return;
+          activeCardIndex = embla.selectedScrollSnap();
+          updateStatus();
+        });
+      });
+
+      function playFocusedCard() {
+        const deck = decks[activeDeckIndex];
+        const card = deck.cards[activeCardIndex];
+
+        stackLog.innerHTML = `Played <strong>${card.title}</strong> from <strong>${deck.name}</strong>. Card would be pushed to Stack. Execution still blocked in prototype.`;
+      }
+
+      document
+        .getElementById("prevDeck")
+        .addEventListener("click", () => deckEmbla.scrollPrev());
+      document
+        .getElementById("nextDeck")
+        .addEventListener("click", () => deckEmbla.scrollNext());
+      document
+        .getElementById("prevCard")
+        .addEventListener("click", () =>
+          handEmblas[activeDeckIndex].scrollPrev(),
+        );
+      document
+        .getElementById("nextCard")
+        .addEventListener("click", () =>
+          handEmblas[activeDeckIndex].scrollNext(),
+        );
+      document
+        .getElementById("playCard")
+        .addEventListener("click", playFocusedCard);
+
+      document.addEventListener("click", (event) => {
+        const playButton = event.target.closest("[data-play-deck]");
+        if (!playButton) return;
+
+        activeDeckIndex = Number(playButton.dataset.playDeck);
+        activeCardIndex = Number(playButton.dataset.playCard);
+
+        deckEmbla.scrollTo(activeDeckIndex);
+        handEmblas[activeDeckIndex].scrollTo(activeCardIndex);
+
+        updateStatus();
+        playFocusedCard();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowUp") deckEmbla.scrollPrev();
+        if (event.key === "ArrowDown") deckEmbla.scrollNext();
+        if (event.key === "ArrowLeft") handEmblas[activeDeckIndex].scrollPrev();
+        if (event.key === "ArrowRight")
+          handEmblas[activeDeckIndex].scrollNext();
+        if (event.key === "Enter") playFocusedCard();
+      });
+
+      updateStatus();
+    </script>
+  </body>
+</html>

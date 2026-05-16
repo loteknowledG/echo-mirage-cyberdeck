@@ -1,3 +1,22 @@
+---
+card_id: echo-mirage.doctrine.cognition.v0
+card_type: doctrine
+title: Cognition Doctrine v0
+project: echo-mirage
+deck: doctrine
+risk: safe
+clicks: 0
+tags:
+  - cognition
+  - context
+  - memory
+  - doctrine
+aliases:
+  - cognitive doctrine
+  - context memory doctrine
+version: v0
+---
+
 # Echo Mirage Cognition Doctrine v0
 
 ## Core Cognitive Hierarchy

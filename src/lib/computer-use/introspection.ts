@@ -6,7 +6,7 @@ import { getWorkflowState, getCurrentStep, getNextStep } from "./guided-workflow
 import { getPresenceState } from "./cursor-presence";
 import { getInspectionSummary } from "./inspect-layer";
 import { getSession, getEventCount, getNextPendingQuestion, getPendingQuestionCount, getConfirmedEvents } from "./workflow-observation";
-import { getExecutionDeckState, getStagedCardCount, getStackDepth, isExecutionEnabled, getTopStackCard, getStackCards, getCurrentStatuses } from "./execution-deck";
+import { getCardTableState, getStagedCardCount, getStackDepth, isExecutionEnabled, getTopStackCard, getStackCards, getCurrentStatuses } from "./card-table";
 import type { ActionName } from "./computer-use-types";
 
 export interface MarkerInfo {
@@ -219,7 +219,7 @@ export function getComputerUseStatus(): ComputerUseStatus {
       };
     })(),
     executionDeck: (() => {
-      const deck = getExecutionDeckState();
+      const deck = getCardTableState();
       const top = getTopStackCard();
       return {
         stagedCardCount: getStagedCardCount(),

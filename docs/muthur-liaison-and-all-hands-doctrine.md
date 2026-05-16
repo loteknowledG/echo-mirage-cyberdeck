@@ -1,3 +1,22 @@
+---
+card_id: echo-mirage.doctrine.muthur-liaison.v0
+card_type: doctrine
+title: MUTHUR Liaison And All-Hands Doctrine
+project: echo-mirage
+deck: doctrine
+risk: safe
+clicks: 0
+tags:
+  - muthur
+  - liaison
+  - coordination
+  - doctrine
+aliases:
+  - muthur liaison
+  - team coordination
+version: v0
+---
+
 # MUTHUR Liaison And All-Hands Doctrine
 
 ## Core Claim
