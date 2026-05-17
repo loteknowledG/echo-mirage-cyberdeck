@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Dispatch, DragEvent, RefObject, SetStateAction } from "react";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { Streamdown } from "streamdown";
@@ -43,6 +43,8 @@ type OperatorPaneBodyProps = {
   onSetOperatorDroppedAsset: Dispatch<SetStateAction<DroppedOperatorAsset | null>>;
 };
 
+const ZOOM_LEVELS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const;
+
 export function CyberdeckOperatorPaneBody({
   isOperatorDragOver,
   operatorDroppedAsset,
@@ -69,10 +71,17 @@ export function CyberdeckOperatorPaneBody({
   onSetOperatorDroppedAsset,
 }: OperatorPaneBodyProps) {
   const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
+  const [imageZoom, setImageZoom] = useState<number>(1);
+  const imageZoomIndexRef = useRef(3);
 
   useEffect(() => {
     setBrowserDraft(operatorBrowserUrl);
   }, [operatorBrowserUrl]);
+
+  useEffect(() => {
+    imageZoomIndexRef.current = 3;
+    setImageZoom(1);
+  }, [operatorDroppedAsset?.imageSrc]);
 
   useEffect(() => {
     if (operatorSurfaceMode !== "browser") return;
@@ -317,16 +326,74 @@ export function CyberdeckOperatorPaneBody({
             ) : null}
             {operatorDroppedAsset.kind === "image" ? (
               <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
-                <div className="mb-2 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
-                  IMAGE PREVIEW
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
+                    IMAGE PREVIEW
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const idx = imageZoomIndexRef.current;
+                        if (idx > 0) {
+                          imageZoomIndexRef.current = idx - 1;
+                          setImageZoom(ZOOM_LEVELS[idx - 1]);
+                        }
+                      }}
+                      disabled={imageZoomIndexRef.current === 0}
+                      className="flex h-5 w-5 items-center justify-center rounded border border-[#2d2d2d] bg-black font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-30"
+                      title="Zoom out"
+                    >
+                      −
+                    </button>
+                    <span className="w-10 text-center font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
+                      {Math.round(imageZoom * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const idx = imageZoomIndexRef.current;
+                        if (idx < ZOOM_LEVELS.length - 1) {
+                          imageZoomIndexRef.current = idx + 1;
+                          setImageZoom(ZOOM_LEVELS[idx + 1]);
+                        }
+                      }}
+                      disabled={imageZoomIndexRef.current === ZOOM_LEVELS.length - 1}
+                      className="flex h-5 w-5 items-center justify-center rounded border border-[#2d2d2d] bg-black font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-30"
+                      title="Zoom in"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        imageZoomIndexRef.current = 3;
+                        setImageZoom(1);
+                      }}
+                      className="ml-1 flex h-5 items-center justify-center rounded border border-[#2d2d2d] bg-black px-1.5 font-mono text-[8px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                      title="Reset zoom"
+                    >
+                      FIT
+                    </button>
+                  </div>
                 </div>
                 {operatorDroppedAsset.imageSrc ? (
-                  <img
-                    src={operatorDroppedAsset.imageSrc}
-                    alt={operatorDroppedAsset.name}
-                    className="max-h-[72vh] w-full rounded-sm border border-[#1c1c1c] object-contain"
-                    draggable={false}
-                  />
+                  <div
+                    className="overflow-auto rounded-sm border border-[#1c1c1c] bg-black"
+                    style={{ maxHeight: "65vh" }}
+                  >
+                    <img
+                      src={operatorDroppedAsset.imageSrc}
+                      alt={operatorDroppedAsset.name}
+                      style={{
+                        transform: `scale(${imageZoom})`,
+                        transformOrigin: "top left",
+                        maxWidth: "none",
+                      }}
+                      className="block w-full rounded-sm object-contain"
+                      draggable={false}
+                    />
+                  </div>
                 ) : (
                   <div className="rounded-sm border border-dashed border-[#1c1c1c] bg-black p-4 font-mono text-[10px] leading-snug text-[#8a8a8a]">
                     Could not load image preview.

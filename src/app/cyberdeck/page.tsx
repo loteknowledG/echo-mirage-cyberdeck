@@ -121,17 +121,31 @@ const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
   openai: (process.env.NEXT_PUBLIC_OPENAI_API_KEY || "").trim(),
 };
 
+const ENABLE_CARD_TABLE =
+  process.env.NEXT_PUBLIC_ENABLE_CARD_TABLE === "true";
+
+const DEFAULT_SERVER_ID = "s";
+
+function safeServerId(id: string): string {
+  if (id === "ct" && !ENABLE_CARD_TABLE) {
+    return DEFAULT_SERVER_ID;
+  }
+  return id;
+}
+
 const servers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
   { id: "w", glyph: "W", label: "WEB" },
   { id: "c", glyph: "C", label: "CONNECTION" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
-  { id: "ct", glyph: "◈", label: "CARD TABLE" },
+  ...(ENABLE_CARD_TABLE ? [{ id: "ct", glyph: "◈", label: "CARD TABLE" }] : []),
   { id: "h", glyph: "π", label: "DIAGNOSTIC" },
   { id: "b", glyph: "§", label: "SETTINGS" },
 ] as const;
 
-const SERVER_IDS = ["m", "s", "ct", "b"] as const;
+const SERVER_IDS = ENABLE_CARD_TABLE
+  ? (["m", "s", "ct", "b"] as const)
+  : (["m", "s", "b"] as const);
 
 function isFixedServerTabId(id: string): id is (typeof SERVER_IDS)[number] {
   return (SERVER_IDS as readonly string[]).includes(id);
@@ -146,9 +160,10 @@ function contextMenuTargetIsTextField(target: EventTarget | null): boolean {
 const fixedServers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
-  { id: "ct", glyph: "◈", label: "CARD TABLE" },
+  ...(ENABLE_CARD_TABLE ? [{ id: "ct", glyph: "◈", label: "CARD TABLE" }] : []),
   { id: "b", glyph: "§", label: "SETTINGS" },
-] as const;
+];
+
 const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
 const CHAT_STORAGE_KEY = "echo-mirage-chat-messages-v1";
 const CHAT_STREAM_STORAGE_KEY = "echo-mirage-chat-stream-text-v1";
@@ -1448,8 +1463,10 @@ export default function CyberdeckPage() {
       const stored = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Partial<CyberdeckUiState> | null;
-        if (parsed && SERVER_IDS.includes(parsed.server as (typeof SERVER_IDS)[number])) {
-          setServer(parsed.server as (typeof SERVER_IDS)[number]);
+        const allFixedIds = ["m", "s", "ct", "b"] as const;
+        const savedServer = parsed?.server;
+        if (savedServer && allFixedIds.includes(savedServer as (typeof allFixedIds)[number])) {
+          setServer(safeServerId(savedServer) as (typeof SERVER_IDS)[number]);
           restored = true;
         }
         if (parsed?.navRailContext === "gateway" || parsed?.navRailContext === "tabs") {
@@ -1457,8 +1474,8 @@ export default function CyberdeckPage() {
           restored = true;
         }
         const highlightId = parsed?.serverKeyboardHighlightId;
-        if (SERVER_IDS.includes(highlightId as (typeof SERVER_IDS)[number])) {
-          setServerKeyboardHighlightId(highlightId as (typeof SERVER_IDS)[number]);
+        if (highlightId && allFixedIds.includes(highlightId as (typeof allFixedIds)[number])) {
+          setServerKeyboardHighlightId(safeServerId(highlightId) as (typeof SERVER_IDS)[number] | null);
           restored = true;
         }
         if (parsed?.operatorSurfaceMode === "workspace" || parsed?.operatorSurfaceMode === "browser") {
@@ -3072,7 +3089,7 @@ export default function CyberdeckPage() {
     if (detectExecDeckShowIntent(userMessage)) {
       openDeck();
       if (isObserving()) recordEvent("execution_deck_opened", "Deck Opened", userMessage);
-      setServer("ct");
+      setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
       setActiveCustomTabId(null);
       if (isDeckOpen()) {
         const desc = describeDeck();
@@ -3087,7 +3104,7 @@ if (detectExecDeckPrepareIntent(userMessage)) {
       openDeck();
       const cards = buildReviewerHand();
       const hand = prepareHand("Reviewer Hand", cards);
-      setServer("ct");
+      setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
       setActiveCustomTabId(null);
       const desc = describeDeck();
       if (isObserving()) recordEvent("hand_prepared", "Reviewer Hand", `${cards.length} cards staged: ${cards.map((c) => c.title).join(", ")}`);
@@ -3116,7 +3133,7 @@ if (detectExecDeckPrepareIntent(userMessage)) {
           { role: "assistant", text: lines.join("\n") },
         ]);
       }
-      setServer("ct");
+      setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
       setActiveCustomTabId(null);
       setIsStreaming(false);
       return;
@@ -3126,7 +3143,7 @@ if (detectExecDeckPrepareIntent(userMessage)) {
       clearDeck();
       if (isObserving()) recordEvent("stack_cleared", "Card Table", userMessage);
       narrate("CARD_TABLE_CLEARED");
-      setServer("s");
+      setServer(safeServerId("s") as (typeof SERVER_IDS)[number]);
       setMessages((prev) => [
         ...prev,
         { role: "assistant", text: "Card table cleared. All cards discarded." },
@@ -3138,7 +3155,7 @@ if (detectExecDeckPrepareIntent(userMessage)) {
     if (detectExecDeckPushIntent(userMessage)) {
       openDeck();
       const result = pushHandToStack();
-      setServer("ct");
+      setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
       setActiveCustomTabId(null);
       if (result.pushed > 0) {
         if (isObserving()) recordEvent("hand_pushed_to_stack", "Hand Pushed", `${result.pushed} cards pushed to stack, depth now ${result.stackDepth}`);
@@ -3154,7 +3171,7 @@ if (detectExecDeckPrepareIntent(userMessage)) {
     if (detectExecDeckExecuteIntent(userMessage)) {
       openDeck();
       const result = attemptExecute();
-      setServer("ct");
+      setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
       setActiveCustomTabId(null);
       if (!result.success && isObserving()) {
         recordEvent("execution_attempt_blocked", "Execute Blocked", result.reason);
@@ -3570,14 +3587,15 @@ const resolved = resolveUiTarget(userMessage);
   }, [abortMotherSpeech]);
 
   const handleModelLabelClick = useCallback((targetServer: "s" | "ct" | "b" = "s") => {
+    const safe = safeServerId(targetServer);
     setActiveCustomTabId(null);
-    setServer(targetServer);
+    setServer(safe as (typeof SERVER_IDS)[number]);
     setNavRailContext("gateway");
     setServerKeyboardHighlightId(null);
     setProviderKeyboardHighlightId(activeProvider);
     setModelKeyboardHighlightId(modelID || null);
     gatewayColumnRef.current?.focus({ preventScroll: true });
-    if (targetServer === "s") {
+    if (safe === "s") {
       gatewayConnectionPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     } else {
       gatewayBlankSettingsRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -3700,9 +3718,53 @@ const resolved = resolveUiTarget(userMessage);
     setIsOperatorDragOver(false);
 
     const file = e.dataTransfer.files?.[0];
-    if (!file) return;
+    if (file) {
+      await loadOperatorAssetFromFile(file);
+      return;
+    }
 
-    await loadOperatorAssetFromFile(file);
+    const uriList = e.dataTransfer.getData("text/uri-list");
+    if (uriList) {
+      const uris = uriList.split("\n").filter((u) => u.trim() && !u.startsWith("#"));
+      if (uris.length > 0) {
+        const uri = uris[0];
+        if (uri.startsWith("file://")) {
+          const filePath = uri.startsWith("file:///")
+            ? uri.slice(8)
+            : uri.startsWith("file://localhost/")
+              ? uri.slice("file://localhost".length)
+              : uri.slice(7);
+          try {
+            const response = await fetch(uri);
+            if (response.ok) {
+              const blob = await response.blob();
+              const fileName = filePath.split("/").pop() || "dropped-image";
+              const droppedFile = new File([blob], fileName, { type: blob.type || "image/png" });
+              await loadOperatorAssetFromFile(droppedFile);
+              return;
+            }
+          } catch {
+            // fallback: try reading as text path
+          }
+        }
+      }
+    }
+
+    const textPath = e.dataTransfer.getData("text/plain");
+    if (textPath && textPath.startsWith("/")) {
+      try {
+        const response = await fetch(`file://${textPath}`);
+        if (response.ok) {
+          const blob = await response.blob();
+          const fileName = textPath.split("/").pop() || "dropped-image";
+          const droppedFile = new File([blob], fileName, { type: blob.type || "image/png" });
+          await loadOperatorAssetFromFile(droppedFile);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+    }
   }, [loadOperatorAssetFromFile]);
 
   const updateCustomTab = useCallback((tabId: string, updater: (tab: CustomTab) => CustomTab) => {
