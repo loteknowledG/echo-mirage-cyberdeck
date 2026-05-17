@@ -1,0 +1,15 @@
+# MUTHUR Receipts
+
+Operational evidence, logs, and artifacts directory.
+
+Receipts provide:
+- Action evidence trails
+- Decision documentation
+- Operational audit logs
+- Performance receipts
+
+Format:
+- `YYYY-MM-DD_operation_type.md` for operation receipts
+- `receipt_*.json` for structured receipts
+
+This directory ensures traceability and accountability for MUTHUR operations.

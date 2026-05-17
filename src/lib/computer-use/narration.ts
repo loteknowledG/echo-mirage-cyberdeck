@@ -15,7 +15,8 @@ export type NarrationEvent =
   | "HAND_PREPARED"
   | "HAND_PUSHED_TO_STACK"
   | "EXECUTION_DISABLED"
-  | "EXECUTION_DECK_CLEARED";
+  | "EXECUTION_DECK_CLEARED"
+  | "CARD_TABLE_CLEARED";
 
 export interface Narration {
   event: NarrationEvent;
@@ -43,6 +44,7 @@ const NARRATION_MAP: Record<NarrationEvent, string> = {
   HAND_PUSHED_TO_STACK: "Hand pushed to stack.",
   EXECUTION_DISABLED: "Execution disabled in v0.1.",
   EXECUTION_DECK_CLEARED: "Execution Deck cleared.",
+  CARD_TABLE_CLEARED: "Card table cleared.",
 };
 
 const listeners: Set<NarrationListener> = new Set();

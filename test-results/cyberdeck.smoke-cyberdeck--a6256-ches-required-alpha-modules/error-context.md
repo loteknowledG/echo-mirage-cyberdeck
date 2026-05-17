@@ -12,16 +12,74 @@
 # Error details
 
 ```
-TimeoutError: page.waitForSelector: Timeout 20000ms exceeded.
+Error: expect(locator).toHaveCount(expected) failed
+
+Locator:  locator('cyberdeck-rail-tab')
+Expected: 3
+Received: 4
+Timeout:  10000ms
+
 Call log:
-  - waiting for locator('cyberdeck-rail-tab') to be visible
+  - Expect "toHaveCount" with timeout 10000ms
+  - waiting for locator('cyberdeck-rail-tab')
+    13 × locator resolved to 4 elements
+       - unexpected value "4"
 
 ```
 
 # Page snapshot
 
 ```yaml
-- generic [ref=e2]: Internal Server Error
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - complementary "Server rail" [ref=e4]:
+      - generic [ref=e7] [cursor=pointer]: ┌───┐ │ Ø │ └───┘
+      - generic [ref=e10] [cursor=pointer]: ┌───┐ │ μ │▓ └───┘▓ ▓▓▓▓▓
+      - generic [ref=e13] [cursor=pointer]: ┌───┐ │ ◈ │▓ └───┘▓ ▓▓▓▓▓
+      - generic [ref=e16] [cursor=pointer]: ┌───┐ │ § │▓ └───┘▓ ▓▓▓▓▓
+      - button "+" [ref=e18] [cursor=pointer]
+    - generic [ref=e19]:
+      - generic [ref=e21]:
+        - banner [ref=e23]:
+          - generic [ref=e24]: "STATUS: NOMINAL ECHO MIRAGE"
+          - generic [ref=e25]: _ _ _ _ _ ╱╲ ╲ ╱╲ ╲ ╱ ╱╲ ╱ ╱╲ ╱╲ ╲ ╱ ╲ ╲ ╱ ╲ ╲ ╱ ╱ ╱ ╱ ╱ ╱╱ ╲ ╲ ╱ ╱╲ ╲ ╲ ╱ ╱╲ ╲ ╲ ╱ ╱_╱ ╱ ╱ ╱╱ ╱╲ ╲ ╲ ╱ ╱ ╱╲ ╲_╲ ╱ ╱ ╱╲ ╲ ╲ ╱ ╱╲ ╲__╱ ╱ ╱╱ ╱ ╱╲ ╲ ╲ ╱ ╱_╱_ ╲╱_╱ ╱ ╱ ╱ ╲ ╲_╲ ╱ ╱╲ ╲___╲╱ ╱╱ ╱ ╱ ╲ ╲_╲ ╱ ╱____╱╲ ╱ ╱ ╱ ╲╱_╱ ╱ ╱ ╱╲╱___╱ ╱╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱╲____╲╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱______ ╱ ╱ ╱________ ╱ ╱ ╱ ╱ ╱ ╱╱ ╱ ╱___╱ ╱ ╱ ╱ ╱ ╱_______╲╱ ╱ ╱_________╲╱ ╱ ╱ ╱ ╱ ╱╱ ╱ ╱____╲╱ ╱ ╲╱__________╱╲╱____________╱╲╱_╱ ╲╱_╱ ╲╱_________╱
+        - generic [ref=e27]:
+          - generic [ref=e28]:
+            - generic [ref=e29]: "[SYS]"
+            - generic [ref=e31]:
+              - text: ENTER OPENCODE KEY BELOW. create one by visiting
+              - link "OpenCode console" [ref=e32] [cursor=pointer]:
+                - /url: https://opencode.ai
+              - text: .
+          - generic [ref=e33]:
+            - generic [ref=e34]: "[SYS]"
+            - generic [ref=e35]: "MODEL_TEST OPENCODE/deepseek-v4-flash-free: HTTP_429 RATE_LIMIT"
+          - generic [ref=e36]:
+            - generic [ref=e37]: "[SYS]"
+            - generic [ref=e38]: "MODEL_TEST OPENCODE/deepseek-v4-flash-free: HTTP_429 RATE_LIMIT"
+        - contentinfo [ref=e39]:
+          - generic [ref=e40]:
+            - generic [ref=e41]:
+              - generic: $
+              - textbox "Enter command or message..." [ref=e42]
+            - generic [ref=e43]:
+              - button "DISCONNECTED" [ref=e44] [cursor=pointer]
+              - generic [ref=e45]:
+                - button "Voice on" [ref=e46] [cursor=pointer]:
+                  - img [ref=e47]
+                - button "Send" [disabled] [ref=e51]:
+                  - img [ref=e52]
+      - separator "Drag to resize. Double-click to reset." [ref=e55]
+      - generic "Gateway" [active] [ref=e58]:
+        - banner [ref=e59]:
+          - generic [ref=e60]: _ _ _ _ _ _ _ ╱╲_╲╱╲_╲ _ ╱╲ ╲ ╱╲ ╲ ╱ ╱╲ ╱╲ ╲ ╱╲ ╲ ╱ ╱ ╱ ╱ ╱╱╲_╲ ╲ ╲ ╲ ╱ ╲ ╲ ╱ ╱ ╲ ╱ ╲ ╲ ╱ ╲ ╲ ╱╲ ╲╱ ╲ ╲╱ ╱ ╱ ╱╲ ╲_╲ ╱ ╱╲ ╲ ╲ ╱ ╱ ╱╲ ╲ ╱ ╱╲ ╲_╲ ╱ ╱╲ ╲ ╲ ╱ ╲____╲__╱ ╱ ╱ ╱╲╱_╱ ╱ ╱ ╱╲ ╲_╲ ╱ ╱ ╱╲ ╲ ╲ ╱ ╱ ╱╲╱_╱ ╱ ╱ ╱╲ ╲_╲ ╱ ╱╲╱________╱ ╱ ╱ ╱ ╱ ╱ ╱_╱ ╱ ╱ ╱ ╱ ╱ ╲ ╲ ╲ ╱ ╱ ╱ ______ ╱ ╱_╱_ ╲╱_╱ ╱ ╱ ╱╲╱_╱╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱__╲╱ ╱ ╱ ╱ ╱___╱ ╱╲ ╲ ╱ ╱ ╱ ╱╲_____╲ ╱ ╱____╱╲ ╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱ ╱_____╱ ╱ ╱ ╱_____╱ ╱╲ ╲ ╱ ╱ ╱ ╲╱____ ╱╱ ╱╲____╲╱ ╱ ╱ ╱ ╱ ╱ ╱___╱ ╱ ╱__ ╱ ╱ ╱╲ ╲ ╲ ╱ ╱_________╱╲ ╲ ╲ ╱ ╱ ╱_____╱ ╱ ╱╱ ╱ ╱______ ╲╱_╱ ╱ ╱ ╱╱╲__╲╱_╱___╲╱ ╱ ╱ ╲ ╲ ╲╱ ╱ ╱_ __╲ ╲_╲╱ ╱ ╱______╲╱ ╱╱ ╱ ╱_______╲ ╲╱_╱ ╲╱_________╱╲╱_╱ ╲_╲╱╲_╲___╲ ╱____╱_╱╲╱___________╱ ╲╱__________╱
+        - paragraph [ref=e61]: Command. Catalog. Operators. Memory Atlas. Voice Lab. Flight Log. Settings. Craftwerk Cyberdeck Corporation. ChatGPT // Lead. Cursor // Dev. Codex // Test. Samus-Manus // Memory. ASCII. REALMORPH.
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e66]: OPERATOR_DOC_SURFACE
+            - button "PASTE" [ref=e69] [cursor=pointer]
+          - generic [ref=e70]: DROP OR PASTE CODE, TEXT, MARKDOWN, OR IMAGE FILES HERE TO VIEW AND EDIT THEM.
+  - alert [ref=e71]
 ```
 
 # Test source
@@ -60,13 +118,13 @@ Call log:
   31 |   } catch {
   32 |     await page.goto("/cyberdeck", { waitUntil: "domcontentloaded", timeout: 30000 });
   33 |   }
-> 34 |   await page.waitForSelector("cyberdeck-rail-tab", { timeout: 20000 });
-     |              ^ TimeoutError: page.waitForSelector: Timeout 20000ms exceeded.
+  34 |   await page.waitForSelector("cyberdeck-rail-tab", { timeout: 20000 });
   35 |   const response = await page.reload({ waitUntil: "domcontentloaded" });
   36 |   expect(response).not.toBeNull();
   37 |   expect(response!.status()).toBeLessThan(500);
   38 | 
-  39 |   await expect(page.locator("cyberdeck-rail-tab")).toHaveCount(3, { timeout: 10000 });
+> 39 |   await expect(page.locator("cyberdeck-rail-tab")).toHaveCount(3, { timeout: 10000 });
+     |                                                    ^ Error: expect(locator).toHaveCount(expected) failed
   40 |   await expect(page.getByText(/STATUS: (NOMINAL|ASCII) ECHO MIRAGE/)).toBeVisible({ timeout: 10000 });
   41 |   const body = page.locator("body");
   42 |   await expect(body).toContainText("Memory Atlas", { timeout: 10000 });

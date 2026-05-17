@@ -1,0 +1,18 @@
+# Daily Memory Log
+
+This directory stores episodic operational memories organized by date.
+
+Format: YYYY-MM-DD.md
+
+Each daily file contains:
+- Date header
+- Session notes
+- Operational receipts
+- Key decisions or learnings
+- Task completions
+
+This enables:
+- Session continuity
+- Temporal reasoning
+- Operational audit trails
+- Pattern detection over time

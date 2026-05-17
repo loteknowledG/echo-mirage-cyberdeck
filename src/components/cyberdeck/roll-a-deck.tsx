@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import EmblaCarousel from "embla-carousel";
+import EmblaCarousel, { EmblaCarouselType } from "embla-carousel";
 import { type ExecutionCard, EXECUTION_CARD_REGISTRY, EXECUTION_HANDS } from "@/lib/computer-use/execution-card-registry";
 
 type RollADeckProps = {
@@ -132,8 +132,8 @@ export function RollADeck({ onPlayCard, onDeckChange, onCardChange }: RollADeckP
   const deckViewportRef = useRef<HTMLDivElement>(null);
   const handViewportRefs = useRef<HTMLDivElement[]>([]);
 
-  const deckEmblaRef = useRef<EmblaCarousel | null>(null);
-  const handEmblaRefs = useRef<(EmblaCarousel | null)[]>([]);
+  const deckEmblaRef = useRef<EmblaCarouselType | null>(null);
+  const handEmblaRefs = useRef<(EmblaCarouselType | null)[]>([]);
 
   useEffect(() => {
     if (!deckViewportRef.current) return;

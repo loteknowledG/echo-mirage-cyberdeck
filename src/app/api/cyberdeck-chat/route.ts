@@ -3,6 +3,63 @@ import { createMuthurToolRegistry } from "@/lib/muthur-core/tool-registry";
 import { muthurChatWithModelTools } from "@/lib/muthur-core/muthur-provider-chat";
 import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
 
+interface MemoryCacheEntry {
+  context: string;
+  queryHash: string;
+  timestamp: number;
+}
+
+const _memoryContextCache = new Map<string, MemoryCacheEntry>();
+const MEMORY_CONTEXT_TTL_MS = 30_000;
+
+function hashQuery(query: string): string {
+  let hash = 0;
+  const text = query.toLowerCase().trim();
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(16);
+}
+
+async function getMuthurMemoryContext(message: string): Promise<string> {
+  const queryHash = hashQuery(message);
+  const now = Date.now();
+
+  const cached = _memoryContextCache.get(queryHash);
+  if (cached && now - cached.timestamp < MEMORY_CONTEXT_TTL_MS) {
+    return cached.context;
+  }
+
+  try {
+    const { bootMuthur, buildMemoryContext } = await import("@/muthur/boot/boot_muthur");
+
+    await bootMuthur({ workspaceRoot: process.cwd() });
+
+    const ctx = await buildMemoryContext(message);
+    const context = ctx || "";
+
+    if (context.trim().length > 0) {
+      _memoryContextCache.set(queryHash, {
+        context,
+        queryHash,
+        timestamp: now,
+      });
+    }
+
+    for (const [key, entry] of _memoryContextCache.entries()) {
+      if (now - entry.timestamp >= MEMORY_CONTEXT_TTL_MS) {
+        _memoryContextCache.delete(key);
+      }
+    }
+
+    return context;
+  } catch {
+    return "";
+  }
+}
+
 const CHAT_URL: Record<string, string> = {
   opencode: "https://opencode.ai/zen/v1/chat/completions",
   openai: "https://api.openai.com/v1/chat/completions",
@@ -198,10 +255,20 @@ export async function POST(request: Request) {
         const model =
           (typeof modelFromBody === "string" && modelFromBody.trim()) || defaultModelForProvider(provider);
 
+        const serverMemoryCtx = await getMuthurMemoryContext(message);
+        const serverMemoryPrompt = serverMemoryCtx.trim()
+          ? `\n\nMUTHUR Memory Context:\n${serverMemoryCtx.trim()}`
+          : "";
+        const clientMemoryPrompt =
+          typeof memoryContext === "string" && memoryContext.trim()
+            ? `\n\nClient memory context:\n${memoryContext.trim()}`
+            : "";
+
         const systemContent =
           "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
           "\n\nYou may call tools: justbash (workspace shell), localfs (read paths on the machine; mkdir and write_text only inside this project workspace), clock (server time). Use tools when the user asks about the repo, files, time, or when inspection is more reliable than guessing." +
-          memoryPrompt +
+          serverMemoryPrompt +
+          clientMemoryPrompt +
           browserPrompt;
 
         const baseMessages: Record<string, unknown>[] = [
@@ -267,10 +334,20 @@ export async function POST(request: Request) {
     const envModel = process.env.OPENCODE_MODEL || "trinity-large-preview-free";
     const endpoint = "https://opencode.ai/zen/v1/chat/completions";
 
+    const fallbackMemoryCtx = await getMuthurMemoryContext(typeof message === "string" ? message : "");
+    const fallbackMemoryPrompt = fallbackMemoryCtx.trim()
+      ? `\n\nMUTHUR Memory Context:\n${fallbackMemoryCtx.trim()}`
+      : "";
+    const fallbackClientMemoryPrompt =
+      typeof memoryContext === "string" && memoryContext.trim()
+        ? `\n\nClient memory context:\n${memoryContext.trim()}`
+        : "";
+
     const systemContent =
       "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
       "\n\nYou may call tools: justbash (workspace shell), localfs (read paths on the machine; mkdir and write_text only inside this project workspace), clock (server time). Use tools when the user asks about the repo, files, time, or when inspection is more reliable than guessing." +
-      memoryPrompt +
+      fallbackMemoryPrompt +
+      fallbackClientMemoryPrompt +
       browserPrompt;
 
     const baseMessages: Record<string, unknown>[] = [
@@ -299,10 +376,7 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "system",
-            content:
-              "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
-              memoryPrompt +
-              browserPrompt,
+            content: systemContent,
           },
           ...chatHistory,
           { role: "user", content: message },
