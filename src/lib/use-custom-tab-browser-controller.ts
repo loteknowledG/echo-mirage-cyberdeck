@@ -10,6 +10,7 @@ type CustomTabBrowserKind =
   | "web"
   | "settings"
   | "connection"
+  | "project"
   | "pi"
   | "diagnostics"
   | "catalog"

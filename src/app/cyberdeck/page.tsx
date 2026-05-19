@@ -93,6 +93,7 @@ import { CyberdeckMemoryAtlasPaneBody } from "@/components/cyberdeck/memory-atla
 import { CyberdeckVoiceLabPaneBody } from "@/components/cyberdeck/voice-lab-pane-body";
 import { CyberdeckFlightLogPaneBody } from "@/components/cyberdeck/flight-log-pane-body";
 import { CyberdeckSettingsPaneBody } from "@/components/cyberdeck/settings-pane-body";
+import { ProjectPaneBody } from "@/components/cyberdeck/project-pane-body";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
 import { EchoHeader } from "@/components/cyberdeck/echo-header";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
@@ -140,12 +141,13 @@ const servers = [
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
   ...(ENABLE_CARD_TABLE ? [{ id: "ct", glyph: "◈", label: "CARD TABLE" }] : []),
   { id: "h", glyph: "π", label: "DIAGNOSTIC" },
+  { id: "p", glyph: "⬡", label: "PROJECT" },
   { id: "b", glyph: "§", label: "SETTINGS" },
 ] as const;
 
 const SERVER_IDS = ENABLE_CARD_TABLE
-  ? (["m", "s", "ct", "b"] as const)
-  : (["m", "s", "b"] as const);
+  ? (["m", "s", "ct", "p", "b"] as const)
+  : (["m", "s", "p", "b"] as const);
 
 function isFixedServerTabId(id: string): id is (typeof SERVER_IDS)[number] {
   return (SERVER_IDS as readonly string[]).includes(id);
@@ -190,6 +192,7 @@ const CUSTOM_TAB_KINDS = [
   "web",
   "settings",
   "connection",
+  "project",
   "pi",
   "diagnostics",
   "command",
@@ -554,6 +557,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "document") return "D";
   if (kind === "settings") return "S";
   if (kind === "connection") return "C";
+  if (kind === "project") return "⬡";
   if (kind === "command") return ">";
   if (kind === "catalog") return "K";
   if (kind === "operators") return "O";
@@ -610,7 +614,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog|command|operators|memory-atlas|voice-lab|flight-log)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|project|pi|diagnostics|diagnostic|catelog|catalog|command|operators|memory-atlas|voice-lab|flight-log)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -695,6 +699,7 @@ export default function CyberdeckPage() {
   const [deckMode, setDeckMode] = useState<DeckMode>("realmorphism");
   const [audioMuted, setAudioMutedState] = useState<boolean>(() => isMuted());
   const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
+  const [workspaceRoots, setWorkspaceRoots] = useState<{ name: string; handle: FileSystemDirectoryHandle }[]>([]);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [orchestration, setOrchestration] = useState<OrchestrationBundle | null>(null);
 
@@ -723,6 +728,7 @@ export default function CyberdeckPage() {
     openrouter: "idle",
     openai: "idle",
   }));
+  const [rateLimitedProviders, setRateLimitedProviders] = useState<Set<string>>(new Set());
   const [modelHealthByProvider, setModelHealthByProvider] = useState<
     Record<string, Record<string, string>>
   >({ opencode: {}, openrouter: {}, openai: {} });
@@ -1887,6 +1893,18 @@ export default function CyberdeckPage() {
     playSystemSound("chirp", 0.05);
   }, []);
 
+  const handleAddWorkspaceRoot = useCallback((root: { name: string; handle: FileSystemDirectoryHandle }) => {
+    setWorkspaceRoots((prev) => {
+      if (prev.some((r) => r.name === root.name)) return prev;
+      if (prev.some((r) => r.name === root.name)) return prev;
+      return [...prev, root];
+    });
+  }, []);
+
+  const handleRemoveWorkspaceRoot = useCallback((name: string) => {
+    setWorkspaceRoots((prev) => prev.filter((r) => r.name !== name));
+  }, []);
+
   const closeRailTabContextMenu = useCallback(() => {
     setRailTabContextMenu(null);
     emitSignal({ source: "ui", type: "cancel", payload: { target: "rail_tab_menu" }, severity: "info" });
@@ -2175,6 +2193,9 @@ export default function CyberdeckPage() {
           status?: number;
         };
         const failHealth = data.rateLimited ? "amber" : "grey";
+        if (data.rateLimited) {
+          setRateLimitedProviders((prev) => new Set(prev).add(provider));
+        }
         if (!res.ok || data.ok === false) {
           const line = `MODEL_TEST ${provider.toUpperCase()}/${model}: HTTP_${data.status ?? res.status}${data.rateLimited ? " RATE_LIMIT" : " FAILURE"}`;
           playModelTestErrorSound(line);
@@ -2702,7 +2723,10 @@ export default function CyberdeckPage() {
 
   // Fetch models for selected provider; API route can use user key or server default key.
   useEffect(() => {
+    if (!didHydrateProviderState) return;
+    if (rateLimitedProviders.has(activeProvider)) return;
     const currentKey = providerKeys[activeProvider];
+    if (!currentKey) return;
     setModelList([]);
 
     let cancelled = false;
@@ -2764,7 +2788,6 @@ export default function CyberdeckPage() {
           const nextModel = hasCurrent ? current : raw[0]?.id || "";
           if (nextModel) {
             localStorage.setItem(`ascii_model_${activeProvider}`, nextModel);
-            void probeSelectedModel(activeProvider, nextModel, currentKey || "");
           }
           return { ...prev, [activeProvider]: nextModel };
         });
@@ -2779,7 +2802,7 @@ export default function CyberdeckPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeProvider, probeSelectedModel, providerKeys, setVerifiedProviders]);
+  }, [activeProvider, probeSelectedModel, providerKeys, setVerifiedProviders, didHydrateProviderState, rateLimitedProviders]);
 
   useEffect(() => {
     const latest = messages[messages.length - 1];
@@ -2980,6 +3003,205 @@ export default function CyberdeckPage() {
         { role: "system", text: "SETTINGS_SURFACE // CONFIG_PLANE" },
       ]);
       setIsStreaming(false);
+      return;
+    }
+
+    const muthurReviewMatch = userMessage.match(/^\/muthur\s+review\s*$/i);
+    if (muthurReviewMatch) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: "MUTHUR_REVIEW // FETCHING_CHANGES..." },
+      ]);
+      setIsStreaming(false);
+      try {
+        const res = await fetch("/api/git-diff");
+        if (!res.ok) throw new Error("Failed to get diff");
+        const { diff } = await res.json() as { diff: string };
+        
+        if (!diff) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: `REVIEW OUTCOME: BLOCKED
+
+SUMMARY: No changes detected in the repository.
+
+SCOPE REVIEWED: None - no git diff available.
+
+FINDINGS: None.
+
+VALIDATION: Not applicable.
+
+RISK LEVEL: N/A
+
+DOCTRINE CHECK: Cannot verify - no changes present.
+
+RECOMMENDED ACTION: Make code changes first before requesting review.
+
+CONFIDENCE: 1.00` },
+          ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            { role: "system", text: "MUTHUR_REVIEW // DIFF_RETRIEVED // SENDING_FOR_EVALUATION" },
+          ]);
+          
+          const reviewPrompt = `You are MUTHUR, the Echo Mirage operational AI. You must produce a STRUCTURED REVIEW of code changes.
+
+IMPORTANT: You MUST follow the output format below. NEVER respond with just "Review complete." - you must provide a full structured report.
+
+OUTPUT FORMAT:
+\`\`\`
+REVIEW OUTCOME: [PASS|REVISE|FAIL|BLOCKED]
+
+SUMMARY:
+[Brief explanation of what changed]
+
+SCOPE REVIEWED:
+[Files and artifacts reviewed]
+
+FINDINGS:
+1. [Finding description]
+   Severity: [LOW|MEDIUM|HIGH|CRITICAL]
+   Evidence: [file path, diff reference, or observed behavior]
+   Recommendation: [fix or "none"]
+
+VALIDATION:
+- pnpm exec tsc --noEmit: [PASS|FAIL|NOT RUN]
+- pnpm build: [PASS|FAIL|NOT RUN]
+- Manual validation: [PASS|FAIL|NOT RUN]
+
+RISK LEVEL: [LOW|MEDIUM|HIGH|CRITICAL]
+
+DOCTRINE CHECK:
+- explicit operational ownership: [PASS|FAIL|N/A]
+- interruptibility: [PASS|FAIL|N/A]
+- visible handoff: [PASS|FAIL|N/A]
+- no hidden active systems: [PASS|FAIL|N/A]
+- memory may recall, documents decide: [PASS|FAIL|N/A]
+- human-supervised control transfer: [PASS|FAIL|N/A]
+
+RECOMMENDED ACTION: [merge|revise before merge|block until fixed|run missing validation|request human decision]
+
+CONFIDENCE: [0.00 to 1.00]
+\`\`\`
+
+RULES:
+1. If no diff is available, output REVIEW OUTCOME: BLOCKED
+2. If diff exists but no tests run, outcome should be REVISE (unless documentation-only)
+3. If validation fails, outcome must be FAIL
+4. If validation passes and no risks found, outcome may be PASS
+5. NEVER say "Review complete." without the full structured report
+6. If your response doesn't contain "REVIEW OUTCOME:", it will be rejected
+
+Here are the code changes to review:
+${diff}`;
+
+          const reviewRes = await fetch("/api/cyberdeck-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: reviewPrompt,
+              provider: activeProvider,
+              apiKey: providerKeys[activeProvider] || "",
+              model: modelID,
+              memoryContext: "",
+              browserContext: "",
+              history: [],
+            }),
+          });
+          
+          if (reviewRes.ok) {
+            const reader = reviewRes.body?.getReader();
+            if (reader) {
+              const decoder = new TextDecoder();
+              let reviewText = "";
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                reviewText += decoder.decode(value, { stream: true });
+              }
+              
+              if (!reviewText.includes("REVIEW OUTCOME:")) {
+                setMessages((prev) => [
+                  ...prev,
+                  { role: "system", text: "MUTHUR_REVIEW // INVALID_FORMAT // REGENERATING" },
+                ]);
+              } else {
+                setMessages((prev) => [
+                  ...prev,
+                  { role: "assistant", text: reviewText },
+                ]);
+              }
+            }
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              { role: "system", text: "MUTHUR_REVIEW // FAILED // API_ERROR" },
+            ]);
+          }
+        }
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: "MUTHUR_REVIEW // FAILED // ERROR" },
+        ]);
+      }
+      return;
+    }
+
+    const muthurReadMatch = userMessage.match(/^\/muthur\s+read\s+(.+)$/i);
+    if (muthurReadMatch) {
+      const filePath = muthurReadMatch[1].trim();
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: `MUTHUR_READ // ${filePath}` },
+      ]);
+      setIsStreaming(false);
+      try {
+        const res = await fetch(`/api/read-file?path=${encodeURIComponent(filePath)}`);
+        if (!res.ok) throw new Error("Failed to read file");
+        const { content } = await res.json() as { content: string };
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", text: `Here's the content of ${filePath}:\n\n\`\`\`\n${content.slice(0, 4000)}\n\`\`\`\n${content.length > 4000 ? "\n...(truncated)" : ""}` },
+        ]);
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: `MUTHUR_READ // FAILED // FILE_NOT_FOUND_OR_ERROR` },
+        ]);
+      }
+      return;
+    }
+
+    const muthurHistoryMatch = userMessage.match(/^\/muthur\s+history\s*$/i);
+    if (muthurHistoryMatch) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: "MUTHUR_HISTORY // FETCHING..." },
+      ]);
+      setIsStreaming(false);
+      try {
+        const res = await fetch("/api/git-log");
+        if (!res.ok) throw new Error("Failed to get history");
+        const { log } = await res.json() as { log: string };
+        if (!log) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: "No commit history found." },
+          ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: `Recent commits:\n\n${log.slice(0, 3000)}` },
+          ]);
+        }
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: "MUTHUR_HISTORY // FAILED // ERROR" },
+        ]);
+      }
       return;
     }
 
@@ -3998,7 +4220,7 @@ const resolved = resolveUiTarget(userMessage);
   }, [customTabs]);
 
   const openOrFocusModuleTab = useCallback(
-    (target: "memory-atlas" | "catalog" | "operators" | "flight-log" | "voice-lab" | "settings" | "command") => {
+    (target: "memory-atlas" | "catalog" | "operators" | "flight-log" | "voice-lab" | "settings" | "command" | "project") => {
       const existing = customTabs.find((tab) => tab.kind === target);
       if (existing) {
         setActiveCustomTabId(existing.id);
@@ -4046,7 +4268,8 @@ const resolved = resolveUiTarget(userMessage);
         target !== "flight-log" &&
         target !== "voice-lab" &&
         target !== "settings" &&
-        target !== "command"
+        target !== "command" &&
+        target !== "project"
       ) {
         return;
       }
@@ -4361,6 +4584,16 @@ const resolved = resolveUiTarget(userMessage);
         );
       }
 
+      if (tab.kind === "project") {
+        return shell(
+          <ProjectPaneBody
+            workspaceRoots={workspaceRoots}
+            onAddRoot={handleAddWorkspaceRoot}
+            onRemoveRoot={handleRemoveWorkspaceRoot}
+          />,
+        );
+      }
+
       if (tab.kind === "pi") {
         return shell(<CyberdeckPiChatPaneBody server={server} />);
       }
@@ -4438,6 +4671,7 @@ const resolved = resolveUiTarget(userMessage);
     | { label: string; kind: CustomTabKind; action: "convert" }
     | { label: string; action: "settings-pane" | "connection-pane" }
   > = [
+    { label: "Project", kind: "project", action: "convert" },
     { label: "Command", kind: "command", action: "convert" },
     { label: "Document", kind: "document", action: "convert" },
     { label: "Web", kind: "web", action: "convert" },
@@ -4892,7 +5126,15 @@ const resolved = resolveUiTarget(userMessage);
                                 .filter(Boolean)
                                 .join(" · ")}
                             </span>
-                          ) : null}
+) : server === "p" ? (
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <ProjectPaneBody
+                    workspaceRoots={workspaceRoots}
+                    onAddRoot={handleAddWorkspaceRoot}
+                    onRemoveRoot={handleRemoveWorkspaceRoot}
+                  />
+                </div>
+              ) : null}
                           <span className="whitespace-pre-wrap">{m.text}</span>
                         </>
                       )}
