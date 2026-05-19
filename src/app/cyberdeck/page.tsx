@@ -170,6 +170,7 @@ const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
 const CHAT_STORAGE_KEY = "echo-mirage-chat-messages-v1";
 const CHAT_STREAM_STORAGE_KEY = "echo-mirage-chat-stream-text-v1";
 const INPUT_STORAGE_KEY = "echo-mirage-chat-input-v1";
+const INPUT_HISTORY_KEY = "echo-mirage-chat-history-v1";
 const UI_STATE_STORAGE_KEY = "echo-mirage-ui-state-v1";
 
 /** Cinematic sonar gain while the deck talks to providers (see AudioEngine `startSonarLoop` scale). */
@@ -1407,6 +1408,15 @@ export default function CyberdeckPage() {
       if (typeof storedStreamText === "string") {
         setStreamText(storedStreamText);
       }
+      const storedHistory = window.localStorage.getItem(INPUT_HISTORY_KEY);
+      if (storedHistory) {
+        try {
+          const parsed = JSON.parse(storedHistory);
+          if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
+            setInputHistory(parsed);
+          }
+        } catch { /* ignore */ }
+      }
     } catch {
       /* ignore chat restore errors */
     } finally {
@@ -1440,6 +1450,21 @@ export default function CyberdeckPage() {
       /* ignore */
     }
   }, [streamText, chatHydrated]);
+
+  useEffect(() => {
+    if (!chatHydrated) return;
+    if (inputHistory.length === 0) {
+      try {
+        window.localStorage.removeItem(INPUT_HISTORY_KEY);
+      } catch { /* ignore */ }
+      return;
+    }
+    try {
+      window.localStorage.setItem(INPUT_HISTORY_KEY, JSON.stringify(inputHistory.slice(-50)));
+    } catch {
+      /* ignore */
+    }
+  }, [inputHistory, chatHydrated]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1896,7 +1921,6 @@ export default function CyberdeckPage() {
   const handleAddWorkspaceRoot = useCallback((root: { name: string; handle: FileSystemDirectoryHandle }) => {
     setWorkspaceRoots((prev) => {
       if (prev.some((r) => r.name === root.name)) return prev;
-      if (prev.some((r) => r.name === root.name)) return prev;
       return [...prev, root];
     });
   }, []);
@@ -2195,6 +2219,12 @@ export default function CyberdeckPage() {
         const failHealth = data.rateLimited ? "amber" : "grey";
         if (data.rateLimited) {
           setRateLimitedProviders((prev) => new Set(prev).add(provider));
+        } else {
+          setRateLimitedProviders((prev) => {
+            const next = new Set(prev);
+            next.delete(provider);
+            return next;
+          });
         }
         if (!res.ok || data.ok === false) {
           const line = `MODEL_TEST ${provider.toUpperCase()}/${model}: HTTP_${data.status ?? res.status}${data.rateLimited ? " RATE_LIMIT" : " FAILURE"}`;
@@ -3010,9 +3040,10 @@ export default function CyberdeckPage() {
     if (muthurReviewMatch) {
       setMessages((prev) => [
         ...prev,
-        { role: "system", text: "MUTHUR_REVIEW // FETCHING_CHANGES..." },
+        { role: "system", text: "⚡ MUTHUR_REVIEW // FETCHING_CHANGES..." },
       ]);
-      setIsStreaming(false);
+      setIsStreaming(true);
+      setStreamText("⚡ MUTHUR is analyzing changes...");
       try {
         const res = await fetch("/api/git-diff");
         if (!res.ok) throw new Error("Failed to get diff");
@@ -3042,8 +3073,9 @@ CONFIDENCE: 1.00` },
         } else {
           setMessages((prev) => [
             ...prev,
-            { role: "system", text: "MUTHUR_REVIEW // DIFF_RETRIEVED // SENDING_FOR_EVALUATION" },
+            { role: "system", text: "⚡ MUTHUR_REVIEW // DIFF_RETRIEVED // ANALYZING..." },
           ]);
+          setStreamText("⚡ MUTHUR analyzing changes...\n\n" + diff.slice(0, 500) + (diff.length > 500 ? "\n... (diff truncated)" : ""));
           
           const reviewPrompt = `You are MUTHUR, the Echo Mirage operational AI. You must produce a STRUCTURED REVIEW of code changes.
 
@@ -3124,13 +3156,17 @@ ${diff}`;
               if (!reviewText.includes("REVIEW OUTCOME:")) {
                 setMessages((prev) => [
                   ...prev,
-                  { role: "system", text: "MUTHUR_REVIEW // INVALID_FORMAT // REGENERATING" },
+                  { role: "system", text: "⚠️ MUTHUR_REVIEW // INVALID_FORMAT" },
                 ]);
+                setStreamText("");
+                setIsStreaming(false);
               } else {
                 setMessages((prev) => [
                   ...prev,
-                  { role: "assistant", text: reviewText },
+                  { role: "assistant", text: "✅ " + reviewText },
                 ]);
+                setStreamText("");
+                setIsStreaming(false);
               }
             }
           } else {
@@ -3202,6 +3238,29 @@ ${diff}`;
           { role: "system", text: "MUTHUR_HISTORY // FAILED // ERROR" },
         ]);
       }
+      return;
+    }
+
+    const muthurStatusMatch = userMessage.match(/^\/muthur\s+status\s*$/i);
+    if (muthurStatusMatch) {
+      setIsStreaming(false);
+      const statusText = `
+⚡ MUTHUR STATUS REPORT
+========================
+Provider: ${activeProvider.toUpperCase()}
+Model: ${modelID || "NOT SELECTED"}
+API Key: ${providerKeys[activeProvider] ? "✓ CONFIGURED" : "✗ MISSING"}
+Model Status: ${modelFetchStatusByProvider[activeProvider] || "idle"}
+Verified: ${verifiedProviders[activeProvider] ? "✓ YES" : "✗ NO"}
+Rate Limited: ${rateLimitedProviders.has(activeProvider) ? "⚠️ YES" : "✓ NO"}
+Connection: ${connectionState.toUpperCase()}
+
+Last Messages: ${messages.slice(-3).map(m => `[${m.role.substring(0,3)}] ${m.text.substring(0,30)}...`).join("\n")}
+`;
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: statusText },
+      ]);
       return;
     }
 
@@ -3645,7 +3704,9 @@ const resolved = resolveUiTarget(userMessage);
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           fullText += chunk;
-          setStreamText(fullText);
+          // Clean up streamText for display but keep fullText intact
+          const displayText = chunk.replace(/^=+\s*$/gm, "").replace(/^=+$\n?/g, "");
+          setStreamText(fullText.replace(/^=+\s*$/gm, "").replace(/^=+$\n?/g, ""));
         }
       }
 
@@ -3673,14 +3734,187 @@ const resolved = resolveUiTarget(userMessage);
         return;
       }
 
-      setMessages((prev) => [...prev, { role: "assistant", text: fullText }]);
+      // Clean up fullText - remove excessive === lines and trim
+      const cleanedText = fullText
+        .replace(/^=+\s*$/gm, "")
+        .replace(/^=+$\n?/g, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+      // Check if response is a tool invocation JSON - don't show raw JSON to user
+      // Quick check first - only if text starts with { or [
+      let toolInvocationMatch = null;
+      let altToolMatch = null;
+      if (cleanedText.trim().startsWith("{") || cleanedText.trim().startsWith("[")) {
+        toolInvocationMatch = cleanedText.match(/^\s*\{[\s\S]*"tool"\s*:\s*"(\w+)"[\s\S]*"command"\s*:\s*"([^"]+)"[\s\S]*\}\s*$/);
+        if (!toolInvocationMatch) {
+          altToolMatch = cleanedText.match(/^\s*\[[\s\S]*"type"\s*:\s*"tool"[\s\S]*"name"\s*:\s*"(\w+)"[\s\S]*"arguments"\s*:\s*\{[\s\S]*"command"\s*:\s*"([^"]+)"[\s\S]*\}[^\]]*\]\s*$/);
+        }
+      }
+      
+      if (altToolMatch && !cleanedText.includes("[EXEC:")) {
+        const toolName = altToolMatch[1];
+        const toolCommand = altToolMatch[2];
+      } else if (toolInvocationMatch && !cleanedText.includes("[EXEC:")) {
+        const toolName = toolInvocationMatch[1];
+        const toolCommand = toolInvocationMatch[2];
+        
+        // Whitelist of allowed commands
+        const allowedCommands = [
+          "pnpm exec tsc --noEmit",
+          "pnpm build", 
+          "pnpm e2e",
+          "git diff",
+          "git status --short",
+          "git log --oneline -10"
+        ];
+        
+        if (!allowedCommands.includes(toolCommand)) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: `TOOL EXECUTION BLOCKED: command not allowlisted\n\nRequested: ${toolCommand}` },
+          ]);
+          setStreamText("");
+          setIsStreaming(false);
+          return;
+        }
+
+        // Execute the tool
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: `⚡ TOOL // ${toolName.toUpperCase()} // EXECUTING // ${toolCommand}` },
+        ]);
+        setIsStreaming(true);
+        setStreamText(`⚡ Executing ${toolName}...`);
+
+        try {
+          const startTime = Date.now();
+          
+          const execRes = await fetch("/api/execute-command", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ command: toolCommand }),
+          });
+          
+          const execResult = await execRes.json();
+          
+          if (!execRes.ok) {
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", text: `TOOL EXECUTION BLOCKED: ${execResult.error}\n\nRequested: ${toolCommand}` },
+            ]);
+            setStreamText("");
+            setIsStreaming(false);
+            return;
+          }
+          
+          const { exitCode, stdout, stderr, durationMs } = execResult;
+          const resultStatus = exitCode === 0 ? "PASS" : "FAIL";
+          
+          // Send result back to Muthur for final summary
+          const toolResultMessage = `TOOL RESULT:
+tool: ${toolName}
+command: ${toolCommand}
+exit_code: ${exitCode}
+status: ${resultStatus}
+stdout: ${stdout.slice(0, 2000)}
+stderr: ${stderr.slice(0, 1000)}
+duration_ms: ${durationMs}`;
+          
+          // Now call Muthur again to get final summary
+          const reviewRes = await fetch("/api/cyberdeck-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: `A tool was executed. Give a brief summary of the result.\n\n${toolResultMessage}`,
+              provider: activeProvider,
+              apiKey: providerKeys[activeProvider] || "",
+              model: modelID,
+              memoryContext: "",
+              browserContext: "",
+              history: [],
+            }),
+          });
+          
+          if (reviewRes.ok) {
+            const reader = reviewRes.body?.getReader();
+            if (reader) {
+              const decoder = new TextDecoder();
+              let finalSummary = "";
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                finalSummary += decoder.decode(value, { stream: true });
+              }
+              // Clean up the summary too
+              const cleanSummary = finalSummary.replace(/^=+\s*$/gm, "").replace(/^=+$\n?/g, "").trim();
+              setMessages((prev) => [
+                ...prev,
+                { role: "assistant", text: cleanSummary },
+              ]);
+            }
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", text: `TOOL ${resultStatus}\nCommand: ${toolCommand}\nDuration: ${durationMs}ms` },
+            ]);
+          }
+        } catch (e) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: `TOOL EXECUTION FAILED: ${(e as Error).message}` },
+          ]);
+        }
+        
+        setStreamText("");
+        setIsStreaming(false);
+        return;
+      }
+      
+      setMessages((prev) => [...prev, { role: "assistant", text: cleanedText }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
+      
+      // Check for MUTHUR exec commands like [EXEC: typecheck] or [EXEC: read path=src/app/page.tsx]
+      const execMatch = fullText.match(/\[EXEC:(\w+)(?:\s+(.*))?\]/i);
+      if (execMatch) {
+        const command = execMatch[1].toLowerCase();
+        const args: Record<string, string> = {};
+        if (execMatch[2]) {
+          execMatch[2].split(" ").forEach(part => {
+            const [key, val] = part.split("=");
+            if (key && val) args[key] = val;
+          });
+        }
+        try {
+          const execRes = await fetch("/api/muthur-command", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ command, args }),
+          });
+          const execResult = await execRes.json();
+          setMessages((prev) => [
+            ...prev,
+            { role: "system", text: `⚡ EXEC[${command.toUpperCase()}] // ${JSON.stringify(execResult).slice(0, 200)}` },
+          ]);
+        } catch (e) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "system", text: `⚡ EXEC[${command.toUpperCase()}] // ERROR: ${(e as Error).message}` },
+          ]);
+        }
+      }
+      
       setStreamText("");
 
       if (activeProvider && modelID) {
         setVerifiedProviders((prev) => ({ ...prev, [activeProvider]: true }));
         setModelHealth(activeProvider, modelID, "green");
         setModelFetchStatusByProvider((prev) => ({ ...prev, [activeProvider]: "ready" }));
+        setRateLimitedProviders((prev) => {
+          const next = new Set(prev);
+          next.delete(activeProvider);
+          return next;
+        });
       }
 
       try {
@@ -5175,7 +5409,7 @@ const resolved = resolveUiTarget(userMessage);
                     >
                       <span className="cyberdeck-cogitating">
                         <span className="animate-pulse">█</span>
-                        <span className="cyberdeck-cogitating-text">COGITATING...</span>
+                        <span className="cyberdeck-cogitating-text">⚡ MUTHUR COGITATING...</span>
                       </span>
                     </div>
                   )}
@@ -5237,11 +5471,9 @@ const resolved = resolveUiTarget(userMessage);
                     } cursor-pointer hover:underline`}
                     title="Open provider connection panel"
                   >
-                    {connectionState === "offline"
-                      ? "DISCONNECTED"
-                      : modelID
-                        ? modelID.split("/").pop()
-                        : "UNSET"}{" "}
+                    {modelID
+                      ? modelID.split("/").pop()
+                      : "NO_MODEL"}{" "}
                     {isStreaming ? "STREAMING" : ""}
                   </button>
                   <div className="flex items-center gap-2">
