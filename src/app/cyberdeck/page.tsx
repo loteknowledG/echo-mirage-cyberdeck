@@ -923,7 +923,6 @@ export default function CyberdeckPage() {
   const activeTextGlow = "0 0 8px rgba(0, 255, 0, 0.22)";
   const amberTextGlow = "0 0 8px rgba(255, 170, 0, 0.22)";
   const inactiveTextGlow = "0 0 6px rgba(180, 180, 180, 0.14)";
-  const echoStatusChipText = `STATUS: ${deckMode === "ascii" ? "ASCII" : "NOMINAL"} ECHO MIRAGE`;
 
   useDeckAudioBridge();
   useOperatorOrchestrator();
@@ -1779,16 +1778,20 @@ export default function CyberdeckPage() {
           error?: string;
         };
 
-        if (!res.ok || !payload.ok || !payload.markdown) {
+        if (!res.ok || !payload.ok) {
           throw new Error(payload.error || `Conversion failed (${res.status})`);
         }
+
+        if (!payload.markdown) {
+          throw new Error("Conversion completed but returned no markdown.");
+        }
+
+        const markdown = payload.markdown;
 
         const outputName =
           payload.outputPath?.split(/[/\\]/).pop() ||
           filePath.replace(/\.(pdf|docx)$/i, ".md").split(/[/\\]/).pop() ||
           "converted.md";
-
-        const markdown = payload.markdown;
         const convertHistoryPath = `convert://${filePath}`;
         await openOperatorFile(convertHistoryPath, async () => {
           operatorKindManualRef.current = false;
@@ -5901,7 +5904,7 @@ duration_ms: ${durationMs}`;
           >
             {!isMobileLayout ? (
               <div className="border-b border-[#1a1a1a] px-2 py-1">
-                <EchoHeader statusChipText={echoStatusChipText} />
+                <EchoHeader />
               </div>
             ) : null}
             <div
@@ -5911,7 +5914,7 @@ duration_ms: ${durationMs}`;
             >
               {isMobileLayout ? (
                 <div className="mb-2">
-                  <EchoHeader statusChipText={echoStatusChipText} />
+                  <EchoHeader />
                 </div>
               ) : null}
               <div className="message-log flex-1 space-y-3">
