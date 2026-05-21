@@ -11,7 +11,8 @@ export type SignalSource =
   | "audio"
   | "settings"
   | "system"
-  | "ui";
+  | "ui"
+  | "muthur";
 
 export type SignalSeverity = "info" | "success" | "warning" | "error";
 

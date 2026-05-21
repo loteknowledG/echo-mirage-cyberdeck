@@ -3878,6 +3878,27 @@ duration_ms: ${durationMs}`;
       const execMatch = fullText.match(/\[EXEC:(\w+)(?:\s+(.*))?\]/i);
       if (execMatch) {
         const command = execMatch[1].toLowerCase();
+        
+        // Handle [FOLDER: name] command to open folders in project pane
+        if (command === "folder") {
+          const folderName = execMatch[2]?.trim();
+          if (folderName) {
+            emitSignal({
+              source: "muthur",
+              type: "project-folder-toggle",
+              payload: { folderName },
+              severity: "info",
+            });
+            setMessages((prev) => [
+              ...prev,
+              { role: "system", text: `📂 FOLDER // ${folderName.toUpperCase()} // TOGGLED` },
+            ]);
+            setStreamText("");
+            setIsStreaming(false);
+            return;
+          }
+        }
+        
         const args: Record<string, string> = {};
         if (execMatch[2]) {
           execMatch[2].split(" ").forEach(part => {

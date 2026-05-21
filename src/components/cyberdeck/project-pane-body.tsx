@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useDeckSignal } from "@/lib/cyberdeck/signal-router";
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderSubtitle, CyberdeckPaneHeaderTitle } from "@/components/cyberdeck/pane-header";
 import { LuChevronRight, LuChevronDown, LuFolder, LuFile, LuX, LuFolderPlus } from "react-icons/lu";
 
@@ -21,9 +22,25 @@ export function ProjectPaneBody({ workspaceRoots, onAddRoot, onRemoveRoot }: Pro
   const [tree, setTree] = useState<Record<string, TreeNode[]>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [isPicking, setIsPicking] = useState(false);
+  const isPickingRef = useRef(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [loadingFile, setLoadingFile] = useState(false);
+
+  // Listen for signals from Muthur to toggle folders
+  useDeckSignal((signal) => {
+    if (signal.source === "muthur" && signal.type === "project-folder-toggle") {
+      const folderName = signal.payload?.folderName as string;
+      if (folderName && workspaceRoots.some(r => r.name === folderName)) {
+        // Toggle the root folder
+        if (expanded.has(folderName)) {
+          setExpanded((prev) => { const n = new Set(prev); n.delete(folderName); return n; });
+        } else {
+          setExpanded((prev) => { const n = new Set(prev); n.add(folderName); return n; });
+        }
+      }
+    }
+  });
 
   const loadRootFolder = useCallback(async (name: string, handle: FileSystemDirectoryHandle) => {
     try {
@@ -64,7 +81,8 @@ export function ProjectPaneBody({ workspaceRoots, onAddRoot, onRemoveRoot }: Pro
   }, [workspaceRoots, loadRootFolder]);
 
   const handleAddFolder = useCallback(async () => {
-    if (isPicking) return;
+    if (isPickingRef.current) return;
+    isPickingRef.current = true;
     setIsPicking(true);
     try {
       const dirHandle = await (window as any).showDirectoryPicker();
@@ -72,9 +90,10 @@ export function ProjectPaneBody({ workspaceRoots, onAddRoot, onRemoveRoot }: Pro
     } catch (e) {
       console.error("Error picking folder:", e);
     } finally {
+      isPickingRef.current = false;
       setIsPicking(false);
     }
-  }, [onAddRoot, isPicking]);
+  }, [onAddRoot]);
 
   const handleRemove = useCallback((name: string) => {
     onRemoveRoot(name);
