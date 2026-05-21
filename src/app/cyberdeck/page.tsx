@@ -1711,6 +1711,54 @@ export default function CyberdeckPage() {
     return operatorMarkdownWasHousekept(asset.text || "", next.text || "");
   }, []);
 
+  const openOperatorFile = useCallback(
+    async (filePath: string, load: () => Promise<void>, fromHistory = false) => {
+      operatorFileHistoryLoadersRef.current.set(filePath, () => openOperatorFile(filePath, load, true));
+
+      if (!fromHistory && filePath !== operatorActiveFilePath) {
+        const pushed = pushOperatorFileHistory(
+          operatorFileHistoryRef.current,
+          operatorFileHistoryIndexRef.current,
+          filePath,
+          operatorActiveFilePath,
+        );
+        if (pushed) {
+          operatorFileHistoryRef.current = pushed.history;
+          operatorFileHistoryIndexRef.current = pushed.historyIndex;
+          setOperatorFileHistory(pushed.history);
+          setOperatorFileHistoryIndex(pushed.historyIndex);
+        }
+      }
+
+      setOperatorActiveFilePath(filePath);
+      await load();
+    },
+    [operatorActiveFilePath],
+  );
+
+  const navigateOperatorFileHistory = useCallback(
+    (direction: "back" | "forward") => {
+      const history = operatorFileHistoryRef.current;
+      const idx = operatorFileHistoryIndexRef.current;
+      const nextIdx =
+        direction === "back"
+          ? operatorFileHistoryBackIndex(idx)
+          : operatorFileHistoryForwardIndex(history, idx);
+      if (nextIdx === null) return;
+
+      const path = history[nextIdx];
+      if (!path) return;
+
+      operatorFileHistoryIndexRef.current = nextIdx;
+      setOperatorFileHistoryIndex(nextIdx);
+      setOperatorActiveFilePath(path);
+
+      const loader = operatorFileHistoryLoadersRef.current.get(path);
+      if (loader) void loader();
+    },
+    [],
+  );
+
   const openConvertedMarkdownInOperator = useCallback(
     async (filePath: string) => {
       setMessages((prev) => [
@@ -1740,6 +1788,7 @@ export default function CyberdeckPage() {
           filePath.replace(/\.(pdf|docx)$/i, ".md").split(/[/\\]/).pop() ||
           "converted.md";
 
+        const markdown = payload.markdown;
         const convertHistoryPath = `convert://${filePath}`;
         await openOperatorFile(convertHistoryPath, async () => {
           operatorKindManualRef.current = false;
@@ -1747,8 +1796,8 @@ export default function CyberdeckPage() {
             kind: "markdown",
             name: outputName,
             mimeType: "text/markdown",
-            size: new Blob([payload.markdown]).size,
-            text: payload.markdown,
+            size: new Blob([markdown]).size,
+            text: markdown,
           });
           setServer("m");
           setNavRailContext("gateway");
@@ -2096,54 +2145,6 @@ export default function CyberdeckPage() {
       toast.error(err instanceof Error ? err.message : "Could not paste clipboard text.");
     }
   }, [openOperatorFile, operatorDroppedAsset?.name, setOperatorTextAsset]);
-
-  const openOperatorFile = useCallback(
-    async (filePath: string, load: () => Promise<void>, fromHistory = false) => {
-      operatorFileHistoryLoadersRef.current.set(filePath, () => openOperatorFile(filePath, load, true));
-
-      if (!fromHistory && filePath !== operatorActiveFilePath) {
-        const pushed = pushOperatorFileHistory(
-          operatorFileHistoryRef.current,
-          operatorFileHistoryIndexRef.current,
-          filePath,
-          operatorActiveFilePath,
-        );
-        if (pushed) {
-          operatorFileHistoryRef.current = pushed.history;
-          operatorFileHistoryIndexRef.current = pushed.historyIndex;
-          setOperatorFileHistory(pushed.history);
-          setOperatorFileHistoryIndex(pushed.historyIndex);
-        }
-      }
-
-      setOperatorActiveFilePath(filePath);
-      await load();
-    },
-    [operatorActiveFilePath],
-  );
-
-  const navigateOperatorFileHistory = useCallback(
-    (direction: "back" | "forward") => {
-      const history = operatorFileHistoryRef.current;
-      const idx = operatorFileHistoryIndexRef.current;
-      const nextIdx =
-        direction === "back"
-          ? operatorFileHistoryBackIndex(idx)
-          : operatorFileHistoryForwardIndex(history, idx);
-      if (nextIdx === null) return;
-
-      const path = history[nextIdx];
-      if (!path) return;
-
-      operatorFileHistoryIndexRef.current = nextIdx;
-      setOperatorFileHistoryIndex(nextIdx);
-      setOperatorActiveFilePath(path);
-
-      const loader = operatorFileHistoryLoadersRef.current.get(path);
-      if (loader) void loader();
-    },
-    [],
-  );
 
   const loadOperatorAssetFromFile = useCallback(async (file: File) => {
     operatorKindManualRef.current = false;

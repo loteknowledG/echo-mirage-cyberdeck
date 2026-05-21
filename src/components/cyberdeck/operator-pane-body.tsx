@@ -5,9 +5,10 @@ import type { Dispatch, DragEvent, RefObject, SetStateAction } from "react";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { FaRegPaste } from "react-icons/fa6";
 import { GrFormEdit, GrFormView } from "react-icons/gr";
-import { LuPanelRightClose, LuPanelRightOpen } from "react-icons/lu";
+import { LuArrowLeft, LuArrowRight, LuPanelRightClose, LuPanelRightOpen } from "react-icons/lu";
 import { Streamdown } from "streamdown";
 import { OperatorDocFolderPane } from "@/components/cyberdeck/operator-doc-folder-pane";
+import type { OperatorDocFolderRoot } from "@/lib/operator-folder-nav";
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderTitle } from "@/components/cyberdeck/pane-header";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,7 +53,12 @@ type OperatorPaneBodyProps = {
   onOperatorDocumentTextChange: (nextText: string) => void;
   operatorDocumentKind: OperatorDocumentPickerKind;
   onOperatorDocumentKindChange: (kind: OperatorDocumentPickerKind) => void;
-  onOpenOperatorFolderFile: (file: File) => void | Promise<void>;
+  onOpenOperatorFolderFile: (path: string, file: File) => void | Promise<void>;
+  onOperatorFolderRootsChange?: (roots: OperatorDocFolderRoot[]) => void;
+  operatorCanNavigateFileBack: boolean;
+  operatorCanNavigateFileForward: boolean;
+  onOperatorFileHistoryBack: () => void;
+  onOperatorFileHistoryForward: () => void;
 };
 
 const ZOOM_LEVELS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const;
@@ -66,6 +72,43 @@ const OPERATOR_MARKDOWN_VIEW_CLASS =
 
 const OPERATOR_HEADER_ICON_BTN =
   "inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200";
+
+function OperatorFileHistoryNav({
+  canBack,
+  canForward,
+  onBack,
+  onForward,
+}: {
+  canBack: boolean;
+  canForward: boolean;
+  onBack: () => void;
+  onForward: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-0.5">
+      <button
+        type="button"
+        onClick={onBack}
+        disabled={!canBack}
+        aria-label="Go to previous file"
+        title="Go to previous file"
+        className={`${OPERATOR_HEADER_ICON_BTN} disabled:cursor-not-allowed disabled:opacity-30`}
+      >
+        <LuArrowLeft className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={onForward}
+        disabled={!canForward}
+        aria-label="Go to next file"
+        title="Go to next file"
+        className={`${OPERATOR_HEADER_ICON_BTN} disabled:cursor-not-allowed disabled:opacity-30`}
+      >
+        <LuArrowRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
 
 export function CyberdeckOperatorPaneBody({
   isOperatorDragOver,
@@ -94,6 +137,11 @@ export function CyberdeckOperatorPaneBody({
   operatorDocumentKind,
   onOperatorDocumentKindChange,
   onOpenOperatorFolderFile,
+  onOperatorFolderRootsChange,
+  operatorCanNavigateFileBack,
+  operatorCanNavigateFileForward,
+  onOperatorFileHistoryBack,
+  onOperatorFileHistoryForward,
 }: OperatorPaneBodyProps) {
   const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
   const [folderPaneOpen, setFolderPaneOpen] = useState(false);
@@ -192,6 +240,12 @@ export function CyberdeckOperatorPaneBody({
               </CyberdeckPaneHeaderTitle>
             ) : operatorSurfaceIsDocument && operatorDocMode === "edit" ? (
               <div className="flex min-w-0 items-center gap-2">
+                <OperatorFileHistoryNav
+                  canBack={operatorCanNavigateFileBack}
+                  canForward={operatorCanNavigateFileForward}
+                  onBack={onOperatorFileHistoryBack}
+                  onForward={onOperatorFileHistoryForward}
+                />
                 <input
                   ref={operatorNameInputRef}
                   value={operatorDocNameDraft}
@@ -219,6 +273,14 @@ export function CyberdeckOperatorPaneBody({
               </div>
             ) : (
               <div className="flex min-w-0 items-center gap-2">
+                {operatorSurfaceIsDocument ? (
+                  <OperatorFileHistoryNav
+                    canBack={operatorCanNavigateFileBack}
+                    canForward={operatorCanNavigateFileForward}
+                    onBack={onOperatorFileHistoryBack}
+                    onForward={onOperatorFileHistoryForward}
+                  />
+                ) : null}
                 <CyberdeckPaneHeaderTitle
                   className="min-w-0 flex-1"
                   style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
@@ -532,7 +594,10 @@ export function CyberdeckOperatorPaneBody({
             )}
             </div>
             {operatorSurfaceIsDocument && folderPaneOpen ? (
-              <OperatorDocFolderPane onOpenFile={onOpenOperatorFolderFile} />
+              <OperatorDocFolderPane
+                onOpenFile={onOpenOperatorFolderFile}
+                onRootsChange={onOperatorFolderRootsChange}
+              />
             ) : null}
           </div>
         ) : (
