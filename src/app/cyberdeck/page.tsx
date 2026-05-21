@@ -76,6 +76,8 @@ import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
 import { speakDryFallback } from "@/voice/speakMuthur";
 import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
+import { resolveCadreSaveTarget } from "@/lib/cadre-constitutional-routing";
+import { deriveMarkdownSaveFilename, deriveOperatorSaveFilename } from "@/lib/operator-markdown-title";
 import { get, set } from "idb-keyval";
 import {
   CyberdeckPaneHeader,
@@ -310,6 +312,13 @@ type SaveFilePickerOptions = {
 type EchoMirageClipboardApi = {
   readText(): string;
   writeText(text: string): void;
+};
+
+type EchoMirageSaveApi = {
+  showDialog(options: {
+    defaultRelativePath: string;
+    content: string;
+  }): Promise<{ canceled: boolean; filePath?: string }>;
 };
 
 const EDITABLE_TEXT_EXTENSIONS = [
@@ -1615,8 +1624,17 @@ export default function CyberdeckPage() {
   }, []);
 
   useEffect(() => {
+    if (operatorDroppedAsset?.kind === "markdown") {
+      const fromH1 = deriveMarkdownSaveFilename(operatorDroppedAsset.text || "");
+      const displayName = fromH1 ?? operatorDroppedAsset.name ?? "";
+      setOperatorDocNameDraft(displayName);
+      if (fromH1 && fromH1 !== operatorDroppedAsset.name) {
+        setOperatorDroppedAsset((prev) => (prev ? { ...prev, name: fromH1 } : prev));
+      }
+      return;
+    }
     setOperatorDocNameDraft(operatorDroppedAsset?.name || "");
-  }, [operatorDroppedAsset?.name]);
+  }, [operatorDroppedAsset?.kind, operatorDroppedAsset?.name, operatorDroppedAsset?.text]);
 
   useLayoutEffect(() => {
     if (!operatorSurfaceIsDocument || operatorDocMode !== "edit") return;
@@ -1733,9 +1751,16 @@ export default function CyberdeckPage() {
       return;
     }
 
-    const nextName =
-      operatorDroppedAsset?.name?.trim() ||
-      (operatorDroppedAsset?.kind === "markdown" ? "operator-doc.md" : "operator-doc.txt");
+    const cadreTarget =
+      operatorDroppedAsset?.kind === "markdown"
+        ? resolveCadreSaveTarget(text, { kind: "markdown" })
+        : null;
+    const nextName = deriveOperatorSaveFilename({
+      kind: operatorDroppedAsset?.kind,
+      text,
+      fallbackName: operatorDroppedAsset?.name,
+    });
+    const suggestedSavePath = cadreTarget?.suggestedRelativePath ?? nextName;
     const fileTypes: SaveFilePickerOptions["types"] = [
       {
         description: "Text document",
@@ -1752,21 +1777,41 @@ export default function CyberdeckPage() {
       },
     ];
 
+    const electronSave = (window as Window & { echoMirageSave?: EchoMirageSaveApi }).echoMirageSave;
     const picker = (window as Window & {
       showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<SaveFilePickerHandle>;
     }).showSaveFilePicker;
 
     try {
+      if (electronSave) {
+        const result = await electronSave.showDialog({
+          defaultRelativePath: suggestedSavePath,
+          content: text,
+        });
+        if (result.canceled) return;
+        const savedLabel = result.filePath ?? suggestedSavePath;
+        toast.success(
+          cadreTarget?.constitutionalPrefix
+            ? `Saved to Cadre route // ${cadreTarget.relativeDirectory} // ${savedLabel}`
+            : `Saved "${savedLabel}".`,
+        );
+        return;
+      }
+
       if (picker) {
         const handle = await picker({
-          suggestedName: nextName,
+          suggestedName: suggestedSavePath,
           types: fileTypes,
           excludeAcceptAllOption: false,
         });
         const writable = await handle.createWritable();
         await writable.write(text);
         await writable.close();
-        toast.success(`Saved "${nextName}".`);
+        toast.success(
+          cadreTarget?.constitutionalPrefix
+            ? `Saved // ${cadreTarget.relativeDirectory}${cadreTarget.filename}`
+            : `Saved "${nextName}".`,
+        );
         return;
       }
 
@@ -1774,10 +1819,14 @@ export default function CyberdeckPage() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = nextName;
+      anchor.download = cadreTarget?.filename ?? nextName;
       anchor.click();
       URL.revokeObjectURL(url);
-      toast.success(`Downloaded "${nextName}".`);
+      toast.success(
+        cadreTarget?.constitutionalPrefix
+          ? `Downloaded // ${suggestedSavePath} (browser may omit folder path)`
+          : `Downloaded "${nextName}".`,
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save operator document.");
     }
@@ -1798,9 +1847,11 @@ export default function CyberdeckPage() {
           ? currentKind
           : "text";
 
+      const markdownName =
+        nextKind === "markdown" ? deriveMarkdownSaveFilename(clipboardText) : null;
       setOperatorDroppedAsset({
         kind: nextKind,
-        name: "",
+        name: markdownName ?? "",
         mimeType: nextKind === "markdown" ? "text/markdown" : "text/plain",
         size: new Blob([clipboardText]).size,
         text: clipboardText,
@@ -1846,7 +1897,11 @@ export default function CyberdeckPage() {
     if (kind === "markdown" || kind === "code" || kind === "text") {
       try {
         const text = await file.text();
-        setOperatorDroppedAsset({ ...baseAsset, text });
+        const name =
+          kind === "markdown"
+            ? deriveMarkdownSaveFilename(text) ?? file.name
+            : file.name;
+        setOperatorDroppedAsset({ ...baseAsset, name, text });
       } catch {
         setOperatorDroppedAsset(baseAsset);
       }
@@ -1875,13 +1930,15 @@ export default function CyberdeckPage() {
       entry.name.toLowerCase().endsWith(".md") || text.includes("\n")
         ? "text/markdown"
         : "text/plain";
+    const fromH1 =
+      mimeType === "text/markdown" ? deriveMarkdownSaveFilename(text) : null;
     setOperatorDroppedAsset({
       kind: mimeType === "text/markdown" ? "markdown" : "text",
-      name: entry.name,
-        mimeType,
-        size: new Blob([text]).size,
-        text,
-      });
+      name: fromH1 ?? entry.name,
+      mimeType,
+      size: new Blob([text]).size,
+      text,
+    });
       setOperatorSurfaceMode("workspace");
       setOperatorDocMode("view");
       setServer("m");

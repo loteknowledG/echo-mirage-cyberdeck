@@ -308,7 +308,11 @@ export function CyberdeckOperatorPaneBody({
                   type="button"
                   onClick={() => void onSaveOperatorDocAsFile()}
                   aria-label="Save operator document"
-                  title="Save operator document"
+                  title={
+                    operatorDroppedAsset.kind === "markdown"
+                      ? "Save — Cadre folder + filename from H1 prefix (L-/E-/ER-/JR-/JP-/JF-)"
+                      : "Save operator document"
+                  }
                   className="inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
                 >
                   <DownloadIcon className="h-3.5 w-3.5" />

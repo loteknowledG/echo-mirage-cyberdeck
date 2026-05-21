@@ -1,5 +1,16 @@
+const fs = require('fs/promises');
 const path = require('path');
-const { app, BrowserWindow, Menu, shell, ipcMain, clipboard } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, clipboard, dialog } = require('electron');
+
+function getEchoMirageProjectRoot() {
+  if (process.env.ECHO_MIRAGE_PROJECT_ROOT) {
+    return path.resolve(process.env.ECHO_MIRAGE_PROJECT_ROOT);
+  }
+  if (!app.isPackaged) {
+    return path.resolve(__dirname, '..');
+  }
+  return app.getPath('documents');
+}
 
 let playrightBrowserState = null;
 
@@ -325,6 +336,26 @@ ipcMain.handle('echo-mirage-browser:forward', async () => {
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Browser forward failed.' };
   }
+});
+
+ipcMain.handle('echo-mirage-save:show-dialog', async (_event, options) => {
+  const relative = String(options?.defaultRelativePath || 'docs/cadre/operator-doc.md').replace(/\\/g, '/');
+  const content = String(options?.content || '');
+  const projectRoot = getEchoMirageProjectRoot();
+  const defaultPath = path.join(projectRoot, ...relative.split('/').filter(Boolean));
+  const win = BrowserWindow.getFocusedWindow();
+  const result = await dialog.showSaveDialog(win || undefined, {
+    defaultPath,
+    filters: [
+      { name: 'Markdown', extensions: ['md', 'markdown'] },
+      { name: 'Text', extensions: ['txt'] },
+    ],
+  });
+  if (result.canceled || !result.filePath) {
+    return { canceled: true };
+  }
+  await fs.writeFile(result.filePath, content, 'utf8');
+  return { canceled: false, filePath: result.filePath };
 });
 
 // Computer Use Layer IPC handlers

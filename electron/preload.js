@@ -21,3 +21,7 @@ contextBridge.exposeInMainWorld('echoMirageComputerUse', {
   runAction: (action) => ipcRenderer.invoke('computer-use:run-action', action),
   isAvailable: () => true,
 });
+
+contextBridge.exposeInMainWorld('echoMirageSave', {
+  showDialog: (options) => ipcRenderer.invoke('echo-mirage-save:show-dialog', options),
+});

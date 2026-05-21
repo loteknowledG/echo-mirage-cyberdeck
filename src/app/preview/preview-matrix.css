@@ -1,0 +1,259 @@
+/* Ported from public/preview.html — scoped to PowerFist preview route */
+.powerfist-preview-layout {
+  min-height: 100vh;
+  width: 100%;
+}
+
+.powerfist-preview-root {
+  --pf-bg: #050807;
+  --pf-panel: #08110d;
+  --pf-line: rgba(134, 239, 172, 0.35);
+  --pf-text: #d8ffe5;
+  --pf-muted: #76a586;
+  --pf-green: #86efac;
+  --pf-amber: #facc15;
+  --pf-red: #fb7185;
+  --pf-cyan: #67e8f9;
+
+  box-sizing: border-box;
+  margin: 0;
+  min-height: 100vh;
+  width: 100%;
+  background:
+    radial-gradient(circle at top, rgba(34, 197, 94, 0.14), transparent 35%),
+    linear-gradient(180deg, #020403, var(--pf-bg));
+  color: var(--pf-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.powerfist-preview-root *,
+.powerfist-preview-root *::before,
+.powerfist-preview-root *::after {
+  box-sizing: border-box;
+}
+
+.powerfist-preview-root .shell {
+  width: min(960px, 94vw);
+  display: grid;
+  gap: 14px;
+}
+
+.powerfist-preview-root .status {
+  border: 1px solid var(--pf-line);
+  background: rgba(8, 17, 13, 0.88);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 0 40px rgba(34, 197, 94, 0.08);
+}
+
+.powerfist-preview-root .status strong {
+  color: var(--pf-green);
+}
+
+.powerfist-preview-root .hint {
+  color: var(--pf-muted);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.powerfist-preview-root .matrix {
+  height: 520px;
+  border: 1px solid var(--pf-line);
+  background: rgba(8, 17, 13, 0.72);
+  border-radius: 22px;
+  overflow: hidden;
+  position: relative;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 20px 80px rgba(0, 0, 0, 0.45);
+}
+
+.powerfist-preview-root .deckViewport {
+  height: 100%;
+  overflow: hidden;
+}
+
+.powerfist-preview-root .deckContainer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.powerfist-preview-root .deckSlide {
+  flex: 0 0 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 20px;
+  gap: 18px;
+}
+
+.powerfist-preview-root .deckHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.powerfist-preview-root .deckTitle {
+  font-size: 22px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pf-green);
+}
+
+.powerfist-preview-root .deckBadge {
+  color: var(--pf-muted);
+  border: 1px solid rgba(134, 239, 172, 0.25);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.powerfist-preview-root .handViewport {
+  overflow: hidden;
+  height: 100%;
+  display: grid;
+  align-items: center;
+}
+
+.powerfist-preview-root .handContainer {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.powerfist-preview-root .cardSlide {
+  flex: 0 0 42%;
+  min-width: 0;
+  padding: 12px;
+  transition:
+    transform 180ms ease,
+    opacity 180ms ease,
+    filter 180ms ease;
+  will-change: transform;
+}
+
+.powerfist-preview-root .card {
+  height: 310px;
+  border: 1px solid rgba(134, 239, 172, 0.32);
+  border-radius: 22px;
+  padding: 18px;
+  background:
+    linear-gradient(145deg, rgba(13, 31, 23, 0.95), rgba(5, 10, 8, 0.98)),
+    radial-gradient(circle at top left, rgba(103, 232, 249, 0.12), transparent 40%);
+  display: grid;
+  align-content: space-between;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 16px 46px rgba(0, 0, 0, 0.45);
+}
+
+.powerfist-preview-root .cardSlide:not(.is-selected) {
+  transform: scale(0.82);
+  opacity: 0.48;
+  filter: grayscale(0.45) blur(0.4px);
+}
+
+.powerfist-preview-root .cardSlide.is-selected {
+  transform: scale(1.03);
+  opacity: 1;
+  filter: none;
+}
+
+.powerfist-preview-root .cardTop {
+  display: grid;
+  gap: 10px;
+}
+
+.powerfist-preview-root .cardType {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--pf-cyan);
+}
+
+.powerfist-preview-root .cardTitle {
+  font-size: 24px;
+  line-height: 1.1;
+  color: var(--pf-text);
+}
+
+.powerfist-preview-root .cardPurpose {
+  color: var(--pf-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.powerfist-preview-root .cardBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 10px;
+}
+
+.powerfist-preview-root .risk {
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.powerfist-preview-root .risk.safe {
+  color: var(--pf-green);
+}
+
+.powerfist-preview-root .risk.caution {
+  color: var(--pf-amber);
+}
+
+.powerfist-preview-root .risk.restricted {
+  color: var(--pf-red);
+}
+
+.powerfist-preview-root .play {
+  border: 1px solid rgba(134, 239, 172, 0.55);
+  background: rgba(134, 239, 172, 0.12);
+  color: var(--pf-green);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.powerfist-preview-root .play:hover {
+  background: rgba(134, 239, 172, 0.22);
+}
+
+.powerfist-preview-root .controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.powerfist-preview-root .controls button {
+  border: 1px solid rgba(134, 239, 172, 0.3);
+  background: rgba(8, 17, 13, 0.9);
+  color: var(--pf-text);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.powerfist-preview-root .controls button:hover {
+  border-color: rgba(134, 239, 172, 0.7);
+}
+
+.powerfist-preview-root .stackLog {
+  min-height: 42px;
+  color: var(--pf-muted);
+  font-size: 13px;
+}
+
+.powerfist-preview-root .stackLog strong {
+  color: var(--pf-amber);
+}

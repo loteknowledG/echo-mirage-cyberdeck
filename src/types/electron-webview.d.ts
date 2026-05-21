@@ -43,8 +43,16 @@ declare global {
     forward(): Promise<EchoMirageBrowserSnapshot>;
   }
 
+  interface EchoMirageSaveBridge {
+    showDialog(options: {
+      defaultRelativePath: string;
+      content: string;
+    }): Promise<{ canceled: boolean; filePath?: string }>;
+  }
+
   interface Window {
     echoMirageBrowser?: EchoMirageBrowserBridge;
+    echoMirageSave?: EchoMirageSaveBridge;
   }
 }
 
