@@ -129,24 +129,30 @@ async def _speak(
         await asyncio.wait_for(communicate.save(out_path), timeout=VOICE_PROFILE_TIMEOUT_SEC)
 
         pygame.mixer.init()
+        estimated_sec = 30.0
+        try:
+            estimated_sec = max(1.0, float(pygame.mixer.Sound(out_path).get_length()) + 0.5)
+        except Exception:
+            pass
+
         pygame.mixer.music.load(out_path)
         pygame.mixer.music.play()
         started = time.monotonic()
         saw_busy = False
-        while pygame.mixer.music.get_busy():
-            saw_busy = True
-            if time.monotonic() - started > VOICE_PROFILE_TIMEOUT_SEC:
-                pygame.mixer.music.stop()
-                raise TimeoutError("Playback timed out")
+        deadline = started + max(VOICE_PROFILE_TIMEOUT_SEC, estimated_sec + 5.0)
+        while time.monotonic() < deadline:
+            busy = pygame.mixer.music.get_busy()
+            if busy:
+                saw_busy = True
+            elif saw_busy:
+                time.sleep(0.15)
+                return True
+            elif time.monotonic() - started >= estimated_sec:
+                time.sleep(0.2)
+                return True
             pygame.time.Clock().tick(10)
-        if not saw_busy and os.name == "nt":
-            # Fallback for systems where pygame mixer does not bind to a real output device.
-            try:
-                subprocess.Popen(["cmd", "/c", "start", "", out_path], shell=False)
-                time.sleep(1.5)
-            except Exception:
-                return False
-        return True
+        pygame.mixer.music.stop()
+        raise TimeoutError("Playback timed out")
     finally:
         try:
             pygame.mixer.quit()  # type: ignore[name-defined]

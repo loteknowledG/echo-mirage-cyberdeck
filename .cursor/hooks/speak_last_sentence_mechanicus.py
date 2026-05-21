@@ -43,7 +43,11 @@ _TTS_STDERR_PATH = _HOOK_DIR / "mechanicus-tts-stderr.log"
 _CYBERDECK_MUTE_PATH = _HOOK_DIR / "mechanicus-cursor.muted"
 _CURSOR_VOICE_PATH = _HOOK_DIR / "cursor-tts-voice.txt"
 _CURSOR_VOLUME_PATH = _HOOK_DIR / "cursor-tts-volume.txt"
+_TTS_PID_LOCK_PATH = _HOOK_DIR / "mechanicus-tts.pid"
+_TTS_LAST_SIG_PATH = _HOOK_DIR / "mechanicus-tts-last.json"
 _CURSOR_VOICE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
+_TTS_QUEUE_MAX_WAIT_SEC = float(os.environ.get("CURSOR_HOOK_MECHANICUS_QUEUE_WAIT_SEC", "600"))
+_TTS_DEBOUNCE_SEC = float(os.environ.get("CURSOR_HOOK_MECHANICUS_DEBOUNCE_SEC", "8"))
 
 
 # Cursor dial → Samus trim. Keep in sync with `src/lib/cursorTtsVolume.ts`.
@@ -99,6 +103,110 @@ def _read_cursor_hook_voice_profile() -> str:
     if _CURSOR_VOICE_ID_RE.fullmatch(raw):
         return raw
     return default
+
+
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        import ctypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return int(code.value) == STILL_ACTIVE
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _clear_tts_pid_lock() -> None:
+    try:
+        _TTS_PID_LOCK_PATH.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _wait_for_prior_tts() -> None:
+    """Serialize hook playback so a new response does not cut off the prior clip."""
+    deadline = time.monotonic() + _TTS_QUEUE_MAX_WAIT_SEC
+    while time.monotonic() < deadline:
+        try:
+            raw = _TTS_PID_LOCK_PATH.read_text(encoding="utf-8").strip()
+            prior = int(raw)
+        except (OSError, ValueError):
+            return
+        if not _pid_alive(prior):
+            _clear_tts_pid_lock()
+            return
+        time.sleep(0.25)
+    _log(f"wait_for_prior_tts: queue wait exceeded {_TTS_QUEUE_MAX_WAIT_SEC}s; starting anyway")
+
+
+def _write_tts_pid_lock(pid: int) -> None:
+    try:
+        _TTS_PID_LOCK_PATH.write_text(str(pid), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _should_skip_duplicate_snippet(snippet: str) -> bool:
+    """Ignore identical back-to-back hook payloads (Cursor may fire twice per reply)."""
+    sig = str(hash(snippet))
+    now = time.time()
+    try:
+        prior = json.loads(_TTS_LAST_SIG_PATH.read_text(encoding="utf-8"))
+        if (
+            isinstance(prior, dict)
+            and prior.get("sig") == sig
+            and now - float(prior.get("t", 0)) < _TTS_DEBOUNCE_SEC
+        ):
+            return True
+    except (OSError, ValueError, TypeError):
+        pass
+    try:
+        _TTS_LAST_SIG_PATH.write_text(
+            json.dumps({"sig": sig, "t": now}),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+    return False
+
+
+def _sanitize_tts_snippet(snippet: str) -> str:
+    """Strip C1 control bytes that break Windows cp1252 logging before TTS."""
+    cleaned: list[str] = []
+    for ch in snippet:
+        code = ord(ch)
+        if ch in "\n\t":
+            cleaned.append(ch)
+            continue
+        if code < 32 or 0x7F <= code <= 0x9F:
+            continue
+        cleaned.append(ch)
+    return "".join(cleaned).strip()
+
+
+def _tts_timeout_env(snippet: str) -> dict[str, str]:
+    """Scale Samus voice_profile / ai_bootup timeouts with spoken text length."""
+    chars = max(1, len(snippet))
+    voice_sec = min(900.0, max(120.0, 45.0 + chars / 6.0))
+    play_sec = min(600.0, max(90.0, 15.0 + chars / 14.0))
+    return {
+        "VOICE_PROFILE_TIMEOUT_SEC": str(int(voice_sec)),
+        "BOOTUP_PLAYBACK_TIMEOUT_SEC": str(int(play_sec)),
+    }
 
 
 def _cyberdeck_mutes_cursor_hook() -> bool:
@@ -356,10 +464,16 @@ def main() -> int:
 
     full = _extract_full_text(data)
     mode = os.environ.get("CURSOR_HOOK_MECHANICUS_EXTRACT", "full").strip().lower()
-    snippet = tts_excerpt(full, mode)
+    snippet = _sanitize_tts_snippet(tts_excerpt(full, mode))
     if not snippet:
         _log(f"main: no snippet (text len={len(full)}) keys={list(data.keys())[:12]}")
         return 0
+
+    if _should_skip_duplicate_snippet(snippet):
+        _log(f"main: debounced duplicate snippet (len={len(snippet)})")
+        return 0
+
+    _wait_for_prior_tts()
 
     voice_profile = _read_cursor_hook_voice_profile()
     _log(f"main: mode={mode!r} full_len={len(full)} snippet_len={len(snippet)} voice={voice_profile}")
@@ -402,6 +516,9 @@ def main() -> int:
         popen_kw["stderr"] = tts_log
         env = popen_kw["env"]
         env.pop("CURSOR_HOOK_BOOTUP_TTS_VOLUME", None)
+        env.setdefault("PYTHONIOENCODING", "utf-8")
+        env.setdefault("PYTHONUTF8", "1")
+        env.update(_tts_timeout_env(snippet))
         vol = _read_cursor_tts_volume_override()
         cmd = [sys.executable, vp, "speak", voice_profile]
         # Volume trim via env (read in voice_profile.speak_profile) avoids argparse edge cases
@@ -432,7 +549,22 @@ def main() -> int:
     finally:
         tts_log.close()
 
-    _log(f"spawned child pid={proc.pid}")
+    _write_tts_pid_lock(proc.pid)
+    _log(f"spawned child pid={proc.pid} voice_timeout={env.get('VOICE_PROFILE_TIMEOUT_SEC')} play_timeout={env.get('BOOTUP_PLAYBACK_TIMEOUT_SEC')}")
+
+    wait_for_child = os.environ.get("CURSOR_HOOK_MECHANICUS_WAIT", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if wait_for_child:
+        try:
+            proc.wait(timeout=float(env.get("VOICE_PROFILE_TIMEOUT_SEC", "120")) + 30.0)
+        except subprocess.TimeoutExpired:
+            _log(f"child pid={proc.pid} wait timed out")
+        finally:
+            _clear_tts_pid_lock()
     return 0
 
 
