@@ -11,13 +11,14 @@ import { OperatorDocFolderPane } from "@/components/cyberdeck/operator-doc-folde
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderTitle } from "@/components/cyberdeck/pane-header";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { OperatorDocTypePicker } from "@/components/cyberdeck/operator-doc-type-picker";
 import {
-  OPERATOR_DOCUMENT_KIND_PICKER_OPTIONS,
+  normalizeOperatorDocumentKind,
   type OperatorDocumentPickerKind,
-} from "@/lib/operator-markdown-title";
+} from "@/lib/operator-document-types";
 
 type DroppedOperatorAsset = {
-  kind: "text" | "code" | "markdown" | "image" | "video" | "file";
+  kind: string;
   name: string;
   mimeType: string;
   size: number;
@@ -100,8 +101,11 @@ export function CyberdeckOperatorPaneBody({
   const imageZoomIndexRef = useRef(3);
 
   const operatorDocText = operatorDroppedAsset?.text || "";
-  const operatorShowsMarkdown = operatorDocumentKind === "markdown";
+  const operatorShowsMarkdown = normalizeOperatorDocumentKind(operatorDocumentKind) === "markdown";
   const operatorCanPickDocKind = Boolean(operatorDroppedAsset?.text);
+  const operatorFileSizeLabel = operatorDroppedAsset
+    ? `// ${Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB`
+    : null;
 
   useEffect(() => {
     setBrowserDraft(operatorBrowserUrl);
@@ -187,29 +191,46 @@ export function CyberdeckOperatorPaneBody({
                 MUTHUR_BROWSER
               </CyberdeckPaneHeaderTitle>
             ) : operatorSurfaceIsDocument && operatorDocMode === "edit" ? (
-              <input
-                ref={operatorNameInputRef}
-                value={operatorDocNameDraft}
-                onChange={(event) => onOperatorDocNameDraftChange(event.target.value)}
-                onBlur={onCommitOperatorDocName}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
-                  event.preventDefault();
-                  onCommitOperatorDocName();
-                  operatorNameInputRef.current?.blur();
-                }}
-                spellCheck={false}
-                autoCapitalize="off"
-                autoComplete="off"
-                autoCorrect="off"
-                aria-label="Rename operator document"
-                className="w-full border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]"
-                style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-              />
+              <div className="flex min-w-0 items-center gap-2">
+                <input
+                  ref={operatorNameInputRef}
+                  value={operatorDocNameDraft}
+                  onChange={(event) => onOperatorDocNameDraftChange(event.target.value)}
+                  onBlur={onCommitOperatorDocName}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    event.preventDefault();
+                    onCommitOperatorDocName();
+                    operatorNameInputRef.current?.blur();
+                  }}
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  aria-label="Rename operator document"
+                  className="min-w-0 flex-1 border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]"
+                  style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+                />
+                {operatorFileSizeLabel ? (
+                  <span className="shrink-0 font-mono text-[9px] tracking-[0.04em] text-[#5a5a5a]">
+                    {operatorFileSizeLabel}
+                  </span>
+                ) : null}
+              </div>
             ) : (
-              <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
-                {operatorDroppedAsset ? operatorDroppedAsset.name : "OPERATOR_DOC_SURFACE"}
-              </CyberdeckPaneHeaderTitle>
+              <div className="flex min-w-0 items-center gap-2">
+                <CyberdeckPaneHeaderTitle
+                  className="min-w-0 flex-1"
+                  style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+                >
+                  {operatorDroppedAsset ? operatorDroppedAsset.name : "OPERATOR_DOC_SURFACE"}
+                </CyberdeckPaneHeaderTitle>
+                {operatorDroppedAsset && operatorFileSizeLabel ? (
+                  <span className="shrink-0 font-mono text-[9px] tracking-[0.04em] text-[#5a5a5a]">
+                    {operatorFileSizeLabel}
+                  </span>
+                ) : null}
+              </div>
             )
           }
           right={
@@ -353,27 +374,14 @@ export function CyberdeckOperatorPaneBody({
         ) : operatorDroppedAsset ? (
           <div className="flex min-h-0 flex-1 overflow-hidden">
             <div className="custom-scrollbar min-w-0 flex-1 overflow-auto p-3">
-            <div className="mb-4 flex items-center gap-2 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
-              {operatorCanPickDocKind ? (
-                <select
-                  value={operatorDocumentKind}
-                  onChange={(event) =>
-                    onOperatorDocumentKindChange(event.target.value as OperatorDocumentPickerKind)
-                  }
-                  aria-label="Operator document type"
-                  className="rounded border border-[#2d2d2d] bg-black px-1.5 py-0.5 font-mono text-[9px] tracking-[0.06em] text-[#cfcfcf] outline-none transition hover:border-emerald-500/60 focus:border-emerald-500/60"
-                >
-                  {OPERATOR_DOCUMENT_KIND_PICKER_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
-              <span className="ml-auto">
-                // {Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB
-              </span>
-            </div>
+            {operatorCanPickDocKind ? (
+              <div className="mb-4 flex justify-end">
+                <OperatorDocTypePicker
+                  value={normalizeOperatorDocumentKind(operatorDocumentKind)}
+                  onChange={onOperatorDocumentKindChange}
+                />
+              </div>
+            ) : null}
             {operatorSurfaceIsDocument ? (
               <div className="mb-3 flex justify-end gap-2">
                 <button

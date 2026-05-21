@@ -78,10 +78,12 @@ import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import {
   applyOperatorTextAutodetect,
+  isOperatorDocumentSurfaceKind,
+  normalizeOperatorDocumentKind,
   operatorMimeTypeForKind,
   resolveOperatorDocumentNameForKind,
   type OperatorDocumentPickerKind,
-} from "@/lib/operator-markdown-title";
+} from "@/lib/operator-document-types";
 import {
   buildOperatorSaveIntent,
   downloadOperatorDoc,
@@ -255,7 +257,19 @@ const GATEWAY_LINK_HREF: Record<string, string> = {
 };
 
 type DroppedOperatorAsset = {
-  kind: "text" | "code" | "markdown" | "image" | "video" | "file";
+  kind:
+    | "css"
+    | "html"
+    | "javascript"
+    | "markdown"
+    | "pdf"
+    | "python"
+    | "text"
+    | "typescript"
+    | "code"
+    | "image"
+    | "video"
+    | "file";
   name: string;
   mimeType: string;
   size: number;
@@ -1629,10 +1643,7 @@ export default function CyberdeckPage() {
     return () => window.cancelAnimationFrame(id);
   }, [deckUiHydrated, navRailContext]);
 
-  const operatorSurfaceIsDocument =
-    operatorDroppedAsset?.kind === "text" ||
-    operatorDroppedAsset?.kind === "code" ||
-    operatorDroppedAsset?.kind === "markdown";
+  const operatorSurfaceIsDocument = isOperatorDocumentSurfaceKind(operatorDroppedAsset?.kind);
 
   const { captureOperatorBrowserSnapshot, openOperatorBrowser, performBrowserCommand } = useBrowserController({
     operatorBrowserRef,
@@ -6317,13 +6328,7 @@ duration_ms: ${durationMs}`;
                   onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
                   onOperatorDocumentTextChange={handleOperatorDocumentTextChange}
                   onOperatorDocumentKindChange={handleOperatorDocumentKindChange}
-                  operatorDocumentKind={
-                    operatorDroppedAsset?.kind === "markdown" ||
-                    operatorDroppedAsset?.kind === "text" ||
-                    operatorDroppedAsset?.kind === "code"
-                      ? operatorDroppedAsset.kind
-                      : "text"
-                  }
+                  operatorDocumentKind={normalizeOperatorDocumentKind(operatorDroppedAsset?.kind)}
                   onOpenOperatorFolderFile={loadOperatorAssetFromFile}
                 />
               ) : server === "b" ? (
