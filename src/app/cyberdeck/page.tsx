@@ -76,7 +76,7 @@ import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
 import { speakDryFallback } from "@/voice/speakMuthur";
 import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
-import { deriveMarkdownSaveFilename } from "@/lib/operator-markdown-title";
+import { inferOperatorDocumentFromText } from "@/lib/operator-markdown-title";
 import {
   buildOperatorSaveIntent,
   downloadOperatorDoc,
@@ -1643,8 +1643,31 @@ export default function CyberdeckPage() {
   }, []);
 
   useEffect(() => {
-    if (operatorDroppedAsset?.kind === "markdown") {
-      const fromH1 = deriveMarkdownSaveFilename(operatorDroppedAsset.text || "");
+    if (!operatorDroppedAsset?.text) {
+      setOperatorDocNameDraft(operatorDroppedAsset?.name || "");
+      return;
+    }
+    const inferred = inferOperatorDocumentFromText(operatorDroppedAsset.text, {
+      fileName: operatorDroppedAsset.name,
+      fileKind: operatorDroppedAsset.kind,
+      mimeType: operatorDroppedAsset.mimeType,
+    });
+    const needsReclassify =
+      inferred.kind !== operatorDroppedAsset.kind ||
+      inferred.mimeType !== operatorDroppedAsset.mimeType;
+    if (needsReclassify) {
+      setOperatorDroppedAsset((prev) =>
+        prev
+          ? {
+              ...prev,
+              kind: inferred.kind,
+              mimeType: inferred.mimeType,
+            }
+          : prev,
+      );
+    }
+    if (inferred.kind === "markdown") {
+      const fromH1 = inferred.suggestedFilename;
       const displayName = fromH1 ?? operatorDroppedAsset.name ?? "";
       setOperatorDocNameDraft(displayName);
       if (fromH1 && fromH1 !== operatorDroppedAsset.name) {
@@ -1653,7 +1676,35 @@ export default function CyberdeckPage() {
       return;
     }
     setOperatorDocNameDraft(operatorDroppedAsset?.name || "");
-  }, [operatorDroppedAsset?.kind, operatorDroppedAsset?.name, operatorDroppedAsset?.text]);
+  }, [
+    operatorDroppedAsset?.kind,
+    operatorDroppedAsset?.mimeType,
+    operatorDroppedAsset?.name,
+    operatorDroppedAsset?.text,
+  ]);
+
+  const handleOperatorDocumentTextChange = useCallback((nextText: string) => {
+    setOperatorDroppedAsset((prev) => {
+      if (!prev) return prev;
+      const inferred = inferOperatorDocumentFromText(nextText, {
+        fileName: prev.name,
+        fileKind: prev.kind,
+        mimeType: prev.mimeType,
+      });
+      const nextName =
+        inferred.kind === "markdown" && inferred.suggestedFilename
+          ? inferred.suggestedFilename
+          : prev.name;
+      return {
+        ...prev,
+        text: nextText,
+        kind: inferred.kind,
+        mimeType: inferred.mimeType,
+        name: nextName,
+        size: new Blob([nextText]).size,
+      };
+    });
+  }, []);
 
   useLayoutEffect(() => {
     if (!operatorSurfaceIsDocument || operatorDocMode !== "edit") return;
@@ -1914,18 +1965,15 @@ export default function CyberdeckPage() {
         return;
       }
 
-      const currentKind = operatorDroppedAsset?.kind;
-      const nextKind: DroppedOperatorAsset["kind"] =
-        currentKind === "markdown" || currentKind === "code" || currentKind === "text"
-          ? currentKind
-          : "text";
-
-      const markdownName =
-        nextKind === "markdown" ? deriveMarkdownSaveFilename(clipboardText) : null;
+      const inferred = inferOperatorDocumentFromText(clipboardText, {
+        fileName: operatorDroppedAsset?.name,
+        fileKind: operatorDroppedAsset?.kind,
+        mimeType: operatorDroppedAsset?.mimeType,
+      });
       setOperatorDroppedAsset({
-        kind: nextKind,
-        name: markdownName ?? "",
-        mimeType: nextKind === "markdown" ? "text/markdown" : "text/plain",
+        kind: inferred.kind,
+        name: inferred.suggestedFilename ?? operatorDroppedAsset?.name ?? "",
+        mimeType: inferred.mimeType,
         size: new Blob([clipboardText]).size,
         text: clipboardText,
       });
@@ -1970,11 +2018,18 @@ export default function CyberdeckPage() {
     if (kind === "markdown" || kind === "code" || kind === "text") {
       try {
         const text = await file.text();
-        const name =
-          kind === "markdown"
-            ? deriveMarkdownSaveFilename(text) ?? file.name
-            : file.name;
-        setOperatorDroppedAsset({ ...baseAsset, name, text });
+        const inferred = inferOperatorDocumentFromText(text, {
+          fileName: file.name,
+          fileKind: kind,
+          mimeType,
+        });
+        setOperatorDroppedAsset({
+          kind: inferred.kind,
+          name: inferred.suggestedFilename ?? file.name,
+          mimeType: inferred.mimeType,
+          size: file.size,
+          text,
+        });
       } catch {
         setOperatorDroppedAsset(baseAsset);
       }
@@ -1999,16 +2054,11 @@ export default function CyberdeckPage() {
 
   const openHeapEntryInOperator = useCallback((entry: HeapEntry) => {
     const text = entry.text || "";
-    const mimeType =
-      entry.name.toLowerCase().endsWith(".md") || text.includes("\n")
-        ? "text/markdown"
-        : "text/plain";
-    const fromH1 =
-      mimeType === "text/markdown" ? deriveMarkdownSaveFilename(text) : null;
+    const inferred = inferOperatorDocumentFromText(text, { fileName: entry.name });
     setOperatorDroppedAsset({
-      kind: mimeType === "text/markdown" ? "markdown" : "text",
-      name: fromH1 ?? entry.name,
-      mimeType,
+      kind: inferred.kind,
+      name: inferred.suggestedFilename ?? entry.name,
+      mimeType: inferred.mimeType,
       size: new Blob([text]).size,
       text,
     });
@@ -6295,7 +6345,7 @@ duration_ms: ${durationMs}`;
                   onPasteClipboardToOperator={pasteClipboardToOperator}
                   onSaveOperatorDocAsFile={saveOperatorDocAsFile}
                   onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
-                  onSetOperatorDroppedAsset={setOperatorDroppedAsset}
+                  onOperatorDocumentTextChange={handleOperatorDocumentTextChange}
                 />
               ) : server === "b" ? (
                 <div ref={gatewayBlankSettingsRef} className="flex min-h-0 flex-1 flex-col">

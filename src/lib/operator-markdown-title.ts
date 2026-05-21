@@ -1,7 +1,6 @@
 import {
   buildCadreFilename,
   parseCadreTitleParts,
-  resolveCadreSaveTarget,
   slugifyCadreDescription,
 } from "@/lib/cadre-constitutional-routing";
 
@@ -18,13 +17,60 @@ export function parseMarkdownH1Title(markdown: string): string | null {
   return null;
 }
 
-/** L-3 cadre filename from H1, or null if no H1 / unknown prefix. */
+/** True when the document's first non-empty line is a markdown H1. */
+export function isMarkdownH1Document(text: string): boolean {
+  return parseMarkdownH1Title(text) !== null;
+}
+
+export type OperatorDocumentKind = "markdown" | "text" | "code";
+
+export function inferOperatorDocumentFromText(
+  text: string,
+  hints?: {
+    fileName?: string;
+    fileKind?: OperatorDocumentKind | "file" | "image" | "video";
+    mimeType?: string;
+  },
+): {
+  kind: OperatorDocumentKind;
+  mimeType: string;
+  suggestedFilename: string | null;
+} {
+  const extMarkdown = Boolean(hints?.fileName && /\.(md|markdown)$/i.test(hints.fileName));
+  const mimeMarkdown = hints?.mimeType === "text/markdown";
+  const h1Markdown = isMarkdownH1Document(text);
+
+  if (extMarkdown || mimeMarkdown || h1Markdown) {
+    return {
+      kind: "markdown",
+      mimeType: "text/markdown",
+      suggestedFilename: deriveMarkdownSaveFilename(text),
+    };
+  }
+
+  if (hints?.fileKind === "code") {
+    return {
+      kind: "code",
+      mimeType: hints.mimeType || "text/plain",
+      suggestedFilename: null,
+    };
+  }
+
+  return {
+    kind: "text",
+    mimeType: "text/plain",
+    suggestedFilename: null,
+  };
+}
+
+/** Filename from first H1 (cadre prefix or slugified title); null when no H1. */
 export function deriveMarkdownSaveFilename(markdown: string): string | null {
   const h1 = parseMarkdownH1Title(markdown);
   if (!h1) return null;
   const parts = parseCadreTitleParts(h1);
-  if (!parts) return null;
-  return buildCadreFilename(parts.prefix, parts.description);
+  if (parts) return buildCadreFilename(parts.prefix, parts.description);
+  const slug = slugifyCadreDescription(h1);
+  return slug ? `${slug}.md` : null;
 }
 
 export function deriveOperatorSaveFilename(options: {
@@ -36,11 +82,9 @@ export function deriveOperatorSaveFilename(options: {
   const trimmedFallback = fallbackName?.trim();
 
   if (kind === "markdown") {
-    const routing = resolveCadreSaveTarget(text, { kind: "markdown" });
-    if (routing.constitutionalPrefix) {
-      return routing.filename;
-    }
-    return trimmedFallback || routing.filename;
+    const fromH1 = deriveMarkdownSaveFilename(text);
+    if (fromH1) return fromH1;
+    return trimmedFallback || "operator-doc.md";
   }
 
   if (trimmedFallback) return trimmedFallback;

@@ -40,10 +40,17 @@ type OperatorPaneBodyProps = {
   onPasteClipboardToOperator: () => void | Promise<void>;
   onSaveOperatorDocAsFile: () => void | Promise<void>;
   onCopyOperatorDocToClipboard: () => void | Promise<void>;
-  onSetOperatorDroppedAsset: Dispatch<SetStateAction<DroppedOperatorAsset | null>>;
+  onOperatorDocumentTextChange: (nextText: string) => void;
 };
 
 const ZOOM_LEVELS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const;
+
+/** Shared document surface scale for operator view + edit modes. */
+const OPERATOR_DOC_SURFACE_CLASS =
+  "min-h-[50vh] w-full rounded-sm border border-[#1c1c1c] bg-black px-3 py-3 font-mono text-[12px] leading-snug text-green-200";
+
+const OPERATOR_MARKDOWN_VIEW_CLASS =
+  "max-w-none font-mono text-[12px] leading-snug text-green-200 [&_h1]:my-2 [&_h1]:font-mono [&_h1]:text-[12px] [&_h1]:font-normal [&_h2]:my-2 [&_h2]:font-mono [&_h2]:text-[12px] [&_h3]:font-mono [&_h3]:text-[12px] [&_p]:my-1 [&_li]:my-0 [&_pre]:my-2 [&_pre]:bg-black [&_pre]:text-green-300";
 
 export function CyberdeckOperatorPaneBody({
   isOperatorDragOver,
@@ -68,7 +75,7 @@ export function CyberdeckOperatorPaneBody({
   onPasteClipboardToOperator,
   onSaveOperatorDocAsFile,
   onCopyOperatorDocToClipboard,
-  onSetOperatorDroppedAsset,
+  onOperatorDocumentTextChange,
 }: OperatorPaneBodyProps) {
   const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
   const [imageZoom, setImageZoom] = useState<number>(1);
@@ -409,18 +416,13 @@ export function CyberdeckOperatorPaneBody({
                 <Textarea
                   ref={operatorEditorRef}
                   value={operatorDroppedAsset.text || ""}
-                  onChange={(event) => {
-                    const nextText = event.target.value;
-                    onSetOperatorDroppedAsset((prev) =>
-                      prev ? { ...prev, text: nextText } : prev,
-                    );
-                  }}
+                  onChange={(event) => onOperatorDocumentTextChange(event.target.value)}
                   spellCheck={false}
                   autoCapitalize="off"
                   autoComplete="off"
                   autoCorrect="off"
                   wrap="off"
-                  className="min-h-0 resize-none overflow-hidden rounded-sm border border-[#1c1c1c] bg-black px-3 py-3 font-mono text-[12px] leading-snug text-green-200 shadow-none focus-visible:ring-1 focus-visible:ring-amber-500/40"
+                  className={`min-h-0 resize-none overflow-hidden shadow-none focus-visible:ring-1 focus-visible:ring-amber-500/40 ${OPERATOR_DOC_SURFACE_CLASS}`}
                   style={
                     operatorDocMode === "edit"
                       ? {
@@ -430,13 +432,15 @@ export function CyberdeckOperatorPaneBody({
                   }
                 />
               ) : operatorDroppedAsset.kind === "markdown" ? (
-                <div className="rounded-sm border border-green-900/70 bg-black/70 p-3">
-                  <Streamdown className="prose prose-invert prose-pre:bg-black prose-pre:text-green-300 max-w-none text-[12px] leading-snug text-green-200">
+                <div className={OPERATOR_DOC_SURFACE_CLASS}>
+                  <Streamdown className={OPERATOR_MARKDOWN_VIEW_CLASS}>
                     {operatorDroppedAsset.text || ""}
                   </Streamdown>
                 </div>
               ) : (
-                <pre className="min-h-[50vh] whitespace-pre-wrap break-words rounded-sm border border-[#1c1c1c] bg-black p-3 font-mono text-[12px] leading-snug text-green-200">
+                <pre
+                  className={`whitespace-pre-wrap break-words ${OPERATOR_DOC_SURFACE_CLASS}`}
+                >
                   {operatorDroppedAsset.text || ""}
                 </pre>
               )
