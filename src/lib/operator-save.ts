@@ -18,14 +18,23 @@ export function buildOperatorSaveIntent(options: {
   text: string;
   kind: string | undefined;
   mimeType: string;
+  currentName?: string;
+  headerName?: string;
+  /** @deprecated Use currentName */
   fallbackName?: string;
 }): OperatorSaveIntent {
-  const { text, kind, mimeType, fallbackName } = options;
+  const { text, kind, mimeType, currentName, headerName, fallbackName } = options;
   const cadreTarget =
     kind === "markdown" ? resolveCadreSaveTarget(text, { kind: "markdown" }) : null;
-  const nextName = deriveOperatorSaveFilename({ kind, text, fallbackName });
-  const suggestedFilename = cadreTarget?.filename ?? nextName;
-  const suggestedSavePath = cadreTarget?.suggestedRelativePath ?? nextName;
+  const suggestedFilename = deriveOperatorSaveFilename({
+    kind,
+    text,
+    currentName: currentName ?? fallbackName,
+    headerName,
+  });
+  const suggestedSavePath = cadreTarget?.constitutionalPrefix
+    ? `${cadreTarget.relativeDirectory}${suggestedFilename}`.replace(/\/{2,}/g, "/")
+    : suggestedFilename;
 
   return {
     text,

@@ -94,6 +94,29 @@ function deriveJustBashCommand(intent: string): string | null {
   return null;
 }
 
+function deriveConvertDocumentCall(intent: string) {
+  const text = intent.trim();
+  if (!text) return null;
+
+  const patterns = [
+    /^\/muthur\s+md\s+(.+)$/i,
+    /^muthur\s+md\s+(.+)$/i,
+    /^\/muthur\s+convert\s+(.+?)\s+to\s+markdown\s*$/i,
+    /^muthur\s+convert\s+(.+?)\s+to\s+markdown\s*$/i,
+    /^convert_document_to_markdown\s+(.+)$/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      const filePath = match[1].trim().replace(/^["']|["']$/g, "");
+      if (filePath) return { filePath };
+    }
+  }
+
+  return null;
+}
+
 function deriveClockCall(intent: string) {
   const text = intent.trim();
   const lower = text.toLowerCase();
@@ -117,6 +140,31 @@ function deriveClockCall(intent: string) {
 export function runMuthurCoreLoop(intent: string, _registry: ToolRegistry): MuthurLoopState {
   const normalizedIntent = (intent || "").trim();
   const steps: ToolLoopStep[] = [];
+
+  const convertCall = deriveConvertDocumentCall(normalizedIntent);
+  if (convertCall) {
+    const step: ToolLoopStep = {
+      index: 0,
+      intent: normalizedIntent,
+      action: "tool",
+      toolCall: {
+        toolName: "convert_document_to_markdown",
+        args: {
+          filePath: convertCall.filePath,
+        },
+      },
+      toolResult: null,
+      note: "Phase 1: document conversion to markdown (MarkItDown).",
+    };
+    steps.push(step);
+
+    return {
+      intent: normalizedIntent,
+      steps,
+      finalized: false,
+      finalResponse: "",
+    };
+  }
 
   const clockCall = deriveClockCall(normalizedIntent);
   if (clockCall) {

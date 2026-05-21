@@ -87,6 +87,33 @@ export function formatClockResult(result: unknown): string {
   return parts.join("\n\n");
 }
 
+export function formatConvertDocumentResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] convert_document_to_markdown returned no output.";
+  }
+
+  const payload = result as {
+    sourcePath?: string;
+    outputPath?: string;
+    format?: string;
+    markdownLength?: number;
+    preview?: string;
+  };
+
+  const parts = [
+    "[TOOL] CONVERT_DOCUMENT_TO_MARKDOWN // MARKITDOWN",
+    payload.sourcePath ? `SOURCE // ${payload.sourcePath}` : null,
+    payload.outputPath ? `OUTPUT // ${payload.outputPath}` : null,
+    payload.format ? `FORMAT // ${payload.format}` : null,
+    typeof payload.markdownLength === "number"
+      ? `MARKDOWN_BYTES // ${payload.markdownLength}`
+      : null,
+    payload.preview ? `PREVIEW\n${payload.preview.trimEnd()}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
 /** Narrated summary for legacy heuristic responses (not used in OpenAI tool messages). */
 export function summarizeToolResult(toolName: string, intent: string, output: unknown): string {
   if (toolName === "localfs" && output && typeof output === "object") {

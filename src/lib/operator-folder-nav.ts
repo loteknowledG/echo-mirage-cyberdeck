@@ -1,3 +1,8 @@
+export type OperatorDocFolderRoot = {
+  name: string;
+  handle: FileSystemDirectoryHandle;
+};
+
 export type OperatorFolderTreeNode = {
   name: string;
   path: string;

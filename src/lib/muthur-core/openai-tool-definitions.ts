@@ -75,6 +75,24 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   {
     type: "function",
     function: {
+      name: "convert_document_to_markdown",
+      description:
+        "Convert a local PDF or DOCX file to canonical markdown via MarkItDown. Use for operational intake into Echo Mirage.",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: {
+            type: "string",
+            description: "Absolute or relative path to a .pdf or .docx file on the dev machine.",
+          },
+        },
+        required: ["filePath"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "clock",
       description: "Current date/time on the server machine.",
       parameters: {

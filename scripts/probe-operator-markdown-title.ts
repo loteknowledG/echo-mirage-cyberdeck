@@ -43,6 +43,44 @@ assert(
 );
 
 assert(
+  "header overrides H1",
+  deriveOperatorSaveFilename({
+    kind: "markdown",
+    text: sample,
+    headerName: "E-7-muthur-conversion-housekeeping-directive.md",
+  }) === "E-7-muthur-conversion-housekeeping-directive.md",
+);
+
+assert(
+  "current name overrides H1",
+  deriveOperatorSaveFilename({
+    kind: "markdown",
+    text: sample,
+    currentName: "E-7-muthur-conversion-housekeeping-directive.md",
+  }) === "E-7-muthur-conversion-housekeeping-directive.md",
+);
+
+assert(
+  "current beats header",
+  deriveOperatorSaveFilename({
+    kind: "markdown",
+    text: sample,
+    currentName: "loaded-name.md",
+    headerName: "draft-name.md",
+  }) === "loaded-name.md",
+);
+
+assert(
+  "header beats generic operator-doc",
+  deriveOperatorSaveFilename({
+    kind: "markdown",
+    text: sample,
+    currentName: "operator-doc.md",
+    headerName: "E-7-muthur-conversion-housekeeping-directive.md",
+  }) === "E-7-muthur-conversion-housekeeping-directive.md",
+);
+
+assert(
   "derive H1",
   deriveMarkdownSaveFilename(sample) ===
     "L-2-operator-markdown-viewer-automatic-save-title-directive.md",

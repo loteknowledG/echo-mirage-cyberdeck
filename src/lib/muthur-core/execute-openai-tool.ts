@@ -1,4 +1,9 @@
-import { formatClockResult, formatJustBashResult, formatLocalFsResult } from "@/lib/muthur-core/format-tool-result";
+import {
+  formatClockResult,
+  formatConvertDocumentResult,
+  formatJustBashResult,
+  formatLocalFsResult,
+} from "@/lib/muthur-core/format-tool-result";
 import type { ToolCall, ToolRegistry } from "@/lib/muthur-core/types";
 
 export async function executeRegistryToolForOpenAi(
@@ -30,6 +35,9 @@ export async function executeRegistryToolForOpenAi(
   }
   if (functionName === "clock") {
     return formatClockResult(result.output);
+  }
+  if (functionName === "convert_document_to_markdown") {
+    return formatConvertDocumentResult(result.output);
   }
   return formatJustBashResult(result.output);
 }

@@ -13,19 +13,16 @@ import {
   listDirectoryChildren,
   mergeFolderTreeNodes,
   readFileFromFolderPath,
+  type OperatorDocFolderRoot,
   type OperatorFolderTreeNode,
 } from "@/lib/operator-folder-nav";
 
-type OperatorDocFolderRoot = {
-  name: string;
-  handle: FileSystemDirectoryHandle;
-};
-
 type OperatorDocFolderPaneProps = {
-  onOpenFile: (file: File) => void | Promise<void>;
+  onOpenFile: (path: string, file: File) => void | Promise<void>;
+  onRootsChange?: (roots: OperatorDocFolderRoot[]) => void;
 };
 
-export function OperatorDocFolderPane({ onOpenFile }: OperatorDocFolderPaneProps) {
+export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDocFolderPaneProps) {
   const [roots, setRoots] = useState<OperatorDocFolderRoot[]>([]);
   const [tree, setTree] = useState<Record<string, OperatorFolderTreeNode[]>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -55,6 +52,10 @@ export function OperatorDocFolderPane({ onOpenFile }: OperatorDocFolderPaneProps
       }
     });
   }, [roots, tree, loadRootFolder]);
+
+  useEffect(() => {
+    onRootsChange?.(roots);
+  }, [onRootsChange, roots]);
 
   const handleAddFolder = useCallback(async () => {
     if (isPickingRef.current) return;
@@ -141,7 +142,7 @@ export function OperatorDocFolderPane({ onOpenFile }: OperatorDocFolderPaneProps
       setOpeningPath(path);
       try {
         const file = await readFileFromFolderPath(root.handle, path);
-        if (file) await onOpenFile(file);
+        if (file) await onOpenFile(path, file);
       } finally {
         setOpeningPath(null);
       }

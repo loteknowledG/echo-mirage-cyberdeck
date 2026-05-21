@@ -1,6 +1,7 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import { Bash, OverlayFs } from "just-bash";
+import { convertDocumentToMarkdown } from "@/lib/muthur-document-conversion.server";
 import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
@@ -181,6 +182,36 @@ async function runLocalFs(call: ToolCall): Promise<ToolResult> {
   }
 }
 
+async function runConvertDocumentToMarkdown(call: ToolCall): Promise<ToolResult> {
+  const filePath = getStringArg(call, "filePath") || getStringArg(call, "path");
+  if (!filePath) {
+    return { ok: false, error: "convert_document_to_markdown requires filePath." };
+  }
+
+  try {
+    const result = convertDocumentToMarkdown(filePath);
+    const preview = result.markdown.trim().slice(0, 1200);
+    return {
+      ok: true,
+      output: {
+        sourcePath: result.sourcePath,
+        outputPath: result.outputPath,
+        format: result.format,
+        mimeType: "text/markdown",
+        kind: "markdown",
+        markdownLength: Buffer.byteLength(result.markdown, "utf8"),
+        preview,
+        markdown: result.markdown,
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Document conversion failed.",
+    };
+  }
+}
+
 async function runClock(call: ToolCall): Promise<ToolResult> {
   const mode = getStringArg(call, "mode").toLowerCase() || "datetime";
   const now = new Date();
@@ -216,6 +247,12 @@ export function createMuthurToolRegistry(): ToolRegistry {
         name: "clock",
         description: "Reports the current local date and/or time from the server machine.",
         run: runClock,
+      },
+      convert_document_to_markdown: {
+        name: "convert_document_to_markdown",
+        description:
+          "Converts a local .pdf or .docx file to markdown using Microsoft MarkItDown (pip install 'markitdown[pdf,docx]'). Returns markdown for OperatorMarkdownViewer.",
+        run: runConvertDocumentToMarkdown,
       },
     },
   };

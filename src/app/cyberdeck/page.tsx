@@ -84,10 +84,23 @@ import {
   resolveOperatorDocumentNameForKind,
   type OperatorDocumentPickerKind,
 } from "@/lib/operator-document-types";
+import { cleanOperatorPasteText } from "@/lib/operator-paste-cleaner";
 import {
-  cleanOperatorPasteText,
-  operatorPasteWasCleaned,
-} from "@/lib/operator-paste-cleaner";
+  normalizeMarkdownMechanical,
+  operatorMarkdownWasHousekept,
+} from "@/lib/operator-markdown-housekeeping";
+import { parseConvertDocumentIntent } from "@/lib/muthur-document-conversion-intent";
+import {
+  canNavigateOperatorFileBack,
+  canNavigateOperatorFileForward,
+  operatorFileHistoryBackIndex,
+  operatorFileHistoryForwardIndex,
+  pushOperatorFileHistory,
+} from "@/lib/operator-file-history";
+import {
+  readFileFromFolderPath,
+  type OperatorDocFolderRoot,
+} from "@/lib/operator-folder-nav";
 import {
   buildOperatorSaveIntent,
   downloadOperatorDoc,
@@ -709,6 +722,13 @@ export default function CyberdeckPage() {
   const [operatorBrowserEngine, setOperatorBrowserEngine] = useState("UNKNOWN");
   const [operatorDocMode, setOperatorDocMode] = useState<"view" | "edit">("view");
   const [operatorDocNameDraft, setOperatorDocNameDraft] = useState("");
+  const [operatorFileHistory, setOperatorFileHistory] = useState<string[]>([]);
+  const [operatorFileHistoryIndex, setOperatorFileHistoryIndex] = useState(-1);
+  const [operatorActiveFilePath, setOperatorActiveFilePath] = useState<string | null>(null);
+  const operatorFileHistoryRef = useRef<string[]>([]);
+  const operatorFileHistoryIndexRef = useRef(-1);
+  const operatorFolderRootsRef = useRef<OperatorDocFolderRoot[]>([]);
+  const operatorFileHistoryLoadersRef = useRef<Map<string, () => Promise<void>>>(new Map());
   const [operatorBrowserUrl, setOperatorBrowserUrl] = useState(OPERATOR_BROWSER_HOME_URL);
   const [operatorBrowserSnapshot, setOperatorBrowserSnapshot] = useState("");
   const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
@@ -1675,11 +1695,85 @@ export default function CyberdeckPage() {
         };
       }
     }
-    const next = operatorKindManualRef.current ? prepared : applyOperatorTextAutodetect(prepared);
+    let next = operatorKindManualRef.current ? prepared : applyOperatorTextAutodetect(prepared);
+    if (next.text && normalizeOperatorDocumentKind(next.kind) === "markdown") {
+      const housekept = normalizeMarkdownMechanical(next.text);
+      if (housekept !== next.text) {
+        next = {
+          ...next,
+          text: housekept,
+          size: new Blob([housekept]).size,
+        };
+      }
+    }
     setOperatorDroppedAsset(next);
     setOperatorDocNameDraft(next.name || "");
-    return operatorPasteWasCleaned(asset.text || "", next.text || "");
+    return operatorMarkdownWasHousekept(asset.text || "", next.text || "");
   }, []);
+
+  const openConvertedMarkdownInOperator = useCallback(
+    async (filePath: string) => {
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: `MUTHUR_CONVERT // ${filePath}` },
+      ]);
+      try {
+        const res = await fetch("/api/convert-document-to-markdown", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filePath }),
+        });
+        const payload = (await res.json()) as {
+          ok?: boolean;
+          markdown?: string;
+          outputPath?: string;
+          sourcePath?: string;
+          error?: string;
+        };
+
+        if (!res.ok || !payload.ok || !payload.markdown) {
+          throw new Error(payload.error || `Conversion failed (${res.status})`);
+        }
+
+        const outputName =
+          payload.outputPath?.split(/[/\\]/).pop() ||
+          filePath.replace(/\.(pdf|docx)$/i, ".md").split(/[/\\]/).pop() ||
+          "converted.md";
+
+        const convertHistoryPath = `convert://${filePath}`;
+        await openOperatorFile(convertHistoryPath, async () => {
+          operatorKindManualRef.current = false;
+          setOperatorTextAsset({
+            kind: "markdown",
+            name: outputName,
+            mimeType: "text/markdown",
+            size: new Blob([payload.markdown]).size,
+            text: payload.markdown,
+          });
+          setServer("m");
+          setNavRailContext("gateway");
+          setOperatorSurfaceMode("workspace");
+          setOperatorDocMode("view");
+        });
+        toast.success(`Converted ${filePath} → markdown in operator.`);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            text: `Converted **${filePath}** to markdown.\n\nOutput: \`${payload.outputPath || outputName}\`\n\nOpened in OperatorMarkdownViewer as \`text/markdown\`.`,
+          },
+        ]);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Document conversion failed.";
+        toast.error(message);
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: `MUTHUR_CONVERT // FAILED // ${message}` },
+        ]);
+      }
+    },
+    [openOperatorFile, setOperatorTextAsset],
+  );
 
   const handleOperatorDocumentKindChange = useCallback((nextKind: OperatorDocumentPickerKind) => {
     operatorKindManualRef.current = true;
@@ -1932,7 +2026,8 @@ export default function CyberdeckPage() {
       text,
       kind: operatorDroppedAsset?.kind,
       mimeType: operatorDroppedAsset?.mimeType || "text/plain",
-      fallbackName: operatorDroppedAsset?.name,
+      currentName: operatorDroppedAsset?.name,
+      headerName: operatorDocNameDraft,
     });
 
     const electronSave = (window as Window & { echoMirageSave?: EchoMirageSaveApi }).echoMirageSave;
@@ -1961,6 +2056,7 @@ export default function CyberdeckPage() {
     });
   }, [
     completeOperatorSave,
+    operatorDocNameDraft,
     operatorDroppedAsset?.kind,
     operatorDroppedAsset?.mimeType,
     operatorDroppedAsset?.name,
@@ -1978,12 +2074,16 @@ export default function CyberdeckPage() {
         return;
       }
 
-      const strippedWrapper = setOperatorTextAsset({
-        kind: "text",
-        name: operatorDroppedAsset?.name ?? "",
-        mimeType: "text/plain",
-        size: new Blob([clipboardText]).size,
-        text: clipboardText,
+      const pasteHistoryPath = `paste://${Date.now()}`;
+      let strippedWrapper = false;
+      await openOperatorFile(pasteHistoryPath, async () => {
+        strippedWrapper = setOperatorTextAsset({
+          kind: "text",
+          name: operatorDroppedAsset?.name ?? "",
+          mimeType: "text/plain",
+          size: new Blob([clipboardText]).size,
+          text: clipboardText,
+        });
       });
       setOperatorSurfaceMode("workspace");
       setOperatorDocMode("edit");
@@ -1995,7 +2095,55 @@ export default function CyberdeckPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not paste clipboard text.");
     }
-  }, [operatorDroppedAsset?.name, setOperatorTextAsset]);
+  }, [openOperatorFile, operatorDroppedAsset?.name, setOperatorTextAsset]);
+
+  const openOperatorFile = useCallback(
+    async (filePath: string, load: () => Promise<void>, fromHistory = false) => {
+      operatorFileHistoryLoadersRef.current.set(filePath, () => openOperatorFile(filePath, load, true));
+
+      if (!fromHistory && filePath !== operatorActiveFilePath) {
+        const pushed = pushOperatorFileHistory(
+          operatorFileHistoryRef.current,
+          operatorFileHistoryIndexRef.current,
+          filePath,
+          operatorActiveFilePath,
+        );
+        if (pushed) {
+          operatorFileHistoryRef.current = pushed.history;
+          operatorFileHistoryIndexRef.current = pushed.historyIndex;
+          setOperatorFileHistory(pushed.history);
+          setOperatorFileHistoryIndex(pushed.historyIndex);
+        }
+      }
+
+      setOperatorActiveFilePath(filePath);
+      await load();
+    },
+    [operatorActiveFilePath],
+  );
+
+  const navigateOperatorFileHistory = useCallback(
+    (direction: "back" | "forward") => {
+      const history = operatorFileHistoryRef.current;
+      const idx = operatorFileHistoryIndexRef.current;
+      const nextIdx =
+        direction === "back"
+          ? operatorFileHistoryBackIndex(idx)
+          : operatorFileHistoryForwardIndex(history, idx);
+      if (nextIdx === null) return;
+
+      const path = history[nextIdx];
+      if (!path) return;
+
+      operatorFileHistoryIndexRef.current = nextIdx;
+      setOperatorFileHistoryIndex(nextIdx);
+      setOperatorActiveFilePath(path);
+
+      const loader = operatorFileHistoryLoadersRef.current.get(path);
+      if (loader) void loader();
+    },
+    [],
+  );
 
   const loadOperatorAssetFromFile = useCallback(async (file: File) => {
     operatorKindManualRef.current = false;
@@ -2044,6 +2192,38 @@ export default function CyberdeckPage() {
     setOperatorDocMode("view");
   }, [setOperatorTextAsset]);
 
+  const reloadOperatorFolderFile = useCallback(
+    async (filePath: string) => {
+      const rootName = filePath.split("/")[0];
+      const root = operatorFolderRootsRef.current.find((entry) => entry.name === rootName);
+      if (!root) return;
+      const file = await readFileFromFolderPath(root.handle, filePath);
+      if (!file) return;
+      await loadOperatorAssetFromFile(file);
+    },
+    [loadOperatorAssetFromFile],
+  );
+
+  const openOperatorFolderFile = useCallback(
+    async (filePath: string, file: File) => {
+      await openOperatorFile(filePath, async () => {
+        const rootName = filePath.split("/")[0];
+        const root = operatorFolderRootsRef.current.find((entry) => entry.name === rootName);
+        if (root) {
+          const fresh = await readFileFromFolderPath(root.handle, filePath);
+          await loadOperatorAssetFromFile(fresh || file);
+          return;
+        }
+        await loadOperatorAssetFromFile(file);
+      });
+    },
+    [loadOperatorAssetFromFile, openOperatorFile],
+  );
+
+  const handleOperatorFolderRootsChange = useCallback((roots: OperatorDocFolderRoot[]) => {
+    operatorFolderRootsRef.current = roots;
+  }, []);
+
   const copyHeapEntry = useCallback(async (entry: HeapEntry) => {
     try {
       await copyTextToClipboard(entry.text);
@@ -2053,21 +2233,27 @@ export default function CyberdeckPage() {
     }
   }, []);
 
-  const openHeapEntryInOperator = useCallback((entry: HeapEntry) => {
-    operatorKindManualRef.current = false;
-    const text = entry.text || "";
-    setOperatorTextAsset({
-      kind: "text",
-      name: entry.name,
-      mimeType: "text/plain",
-      size: new Blob([text]).size,
-      text,
-    });
-    setOperatorSurfaceMode("workspace");
-    setOperatorDocMode("view");
-    setServer("m");
-    setNavRailContext("gateway");
-  }, [setOperatorTextAsset]);
+  const openHeapEntryInOperator = useCallback(
+    (entry: HeapEntry) => {
+      const filePath = `heap://${entry.id}`;
+      void openOperatorFile(filePath, async () => {
+        operatorKindManualRef.current = false;
+        const text = entry.text || "";
+        setOperatorTextAsset({
+          kind: "text",
+          name: entry.name,
+          mimeType: "text/plain",
+          size: new Blob([text]).size,
+          text,
+        });
+        setOperatorSurfaceMode("workspace");
+        setOperatorDocMode("view");
+        setServer("m");
+        setNavRailContext("gateway");
+      });
+    },
+    [openOperatorFile, setOperatorTextAsset],
+  );
 
   const deleteHeapEntry = useCallback((id: string) => {
     setHeapEntries((prev) => prev.filter((entry) => entry.id !== id));
@@ -3563,6 +3749,13 @@ ${diff}`;
       return;
     }
 
+    const convertIntent = parseConvertDocumentIntent(userMessage);
+    if (convertIntent) {
+      setIsStreaming(false);
+      await openConvertedMarkdownInOperator(convertIntent.filePath);
+      return;
+    }
+
     const muthurReadMatch = userMessage.match(/^\/muthur\s+read\s+(.+)$/i);
     if (muthurReadMatch) {
       const filePath = muthurReadMatch[1].trim();
@@ -4569,9 +4762,10 @@ duration_ms: ${durationMs}`;
     }
 
     if (activeServer === "m") {
-      await loadOperatorAssetFromFile(file);
+      const dropPath = `drop://${file.name}#${file.lastModified}`;
+      await openOperatorFile(dropPath, () => loadOperatorAssetFromFile(file));
     }
-  }, [loadOperatorAssetFromFile]);
+  }, [loadOperatorAssetFromFile, openOperatorFile]);
 
   const handleOperatorDragOver = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
     if (serverRef.current !== "m") return;
@@ -4593,7 +4787,8 @@ duration_ms: ${durationMs}`;
 
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      await loadOperatorAssetFromFile(file);
+      const dropPath = `drop://${file.name}#${file.lastModified}`;
+      await openOperatorFile(dropPath, () => loadOperatorAssetFromFile(file));
       return;
     }
 
@@ -4639,7 +4834,7 @@ duration_ms: ${durationMs}`;
         // ignore
       }
     }
-  }, [loadOperatorAssetFromFile]);
+  }, [loadOperatorAssetFromFile, openOperatorFile]);
 
   const updateCustomTab = useCallback((tabId: string, updater: (tab: CustomTab) => CustomTab) => {
     setCustomTabs((prev) => prev.map((tab) => (tab.id === tabId ? updater(tab) : tab)));
@@ -4938,6 +5133,18 @@ duration_ms: ${durationMs}`;
   );
 
   useDeckSignal(handleModuleFocusSignal);
+
+  const handleOperatorConvertSignal = useCallback(
+    (signal: DeckSignal) => {
+      if (signal.type !== "operator-convert-document") return;
+      const filePath = signal.payload?.filePath;
+      if (typeof filePath !== "string" || !filePath.trim()) return;
+      void openConvertedMarkdownInOperator(filePath.trim());
+    },
+    [openConvertedMarkdownInOperator],
+  );
+
+  useDeckSignal(handleOperatorConvertSignal);
 
   const { createHandlers: createRailTabLongPressHandlers, consumeClickIfLongPress, cancelLongPressFromContextMenu } =
     useRailTabLongPress({
@@ -6349,7 +6556,17 @@ duration_ms: ${durationMs}`;
                   onOperatorDocumentTextChange={handleOperatorDocumentTextChange}
                   onOperatorDocumentKindChange={handleOperatorDocumentKindChange}
                   operatorDocumentKind={normalizeOperatorDocumentKind(operatorDroppedAsset?.kind)}
-                  onOpenOperatorFolderFile={loadOperatorAssetFromFile}
+                  onOpenOperatorFolderFile={openOperatorFolderFile}
+                  onOperatorFolderRootsChange={handleOperatorFolderRootsChange}
+                  operatorCanNavigateFileBack={canNavigateOperatorFileBack(
+                    operatorFileHistoryIndex,
+                  )}
+                  operatorCanNavigateFileForward={canNavigateOperatorFileForward(
+                    operatorFileHistory,
+                    operatorFileHistoryIndex,
+                  )}
+                  onOperatorFileHistoryBack={() => navigateOperatorFileHistory("back")}
+                  onOperatorFileHistoryForward={() => navigateOperatorFileHistory("forward")}
                 />
               ) : server === "b" ? (
                 <div ref={gatewayBlankSettingsRef} className="flex min-h-0 flex-1 flex-col">

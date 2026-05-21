@@ -7,6 +7,7 @@ import {
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
+import { parseConvertDocumentIntent } from "@/lib/muthur-document-conversion-intent";
 
 type CommandPaneBodyProps = {
   server: string;
@@ -47,6 +48,18 @@ export function CyberdeckCommandPaneBody({ server }: CommandPaneBodyProps) {
     if (!line) return;
     const stamped = `[${clockStamp()}] COMMAND > ${line}`;
     setLocalLog((prev) => [...prev.slice(-39), stamped]);
+    const convertIntent = parseConvertDocumentIntent(line);
+    if (convertIntent) {
+      emitSignal({
+        source: "command",
+        type: "operator-convert-document",
+        payload: { filePath: convertIntent.filePath },
+        severity: "info",
+      });
+      setCommandInput("");
+      return;
+    }
+
     emitSignal({
       source: "command",
       type: "submitted",

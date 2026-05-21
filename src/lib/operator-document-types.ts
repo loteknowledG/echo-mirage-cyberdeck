@@ -144,21 +144,50 @@ export function isOperatorDocumentSurfaceKind(kind: string | undefined): boolean
   return OPERATOR_DOC_TYPE_ENTRIES.some((entry) => entry.value === normalized);
 }
 
+const GENERIC_MARKDOWN_SAVE_NAMES = new Set(["operator-doc.md", "document.md", "converted.md"]);
+
+/** True when a name is safe to use as the operator markdown save default. */
+export function isValidMarkdownSaveFilename(name: string | undefined): boolean {
+  const trimmed = name?.trim();
+  if (!trimmed || !/\.md$/i.test(trimmed)) return false;
+  if (/[<>:"/\\|?*\u0000-\u001f]/.test(trimmed)) return false;
+  return true;
+}
+
+/** Loaded filename worth preferring over header/H1 (excludes autodetect placeholders). */
+export function isMeaningfulMarkdownSaveFilename(name: string | undefined): boolean {
+  if (!isValidMarkdownSaveFilename(name)) return false;
+  return !GENERIC_MARKDOWN_SAVE_NAMES.has(name!.trim().toLowerCase());
+}
+
+/**
+ * Save-dialog default filename for operator documents.
+ * Priority (markdown): current loaded name → header draft → H1-derived → operator-doc.md
+ */
 export function deriveOperatorSaveFilename(options: {
   kind: string | undefined;
   text: string;
+  /** Loaded asset filename (priority 1). */
+  currentName?: string;
+  /** Operator header filename field, including uncommitted edits (priority 2). */
+  headerName?: string;
+  /** @deprecated Use currentName */
   fallbackName?: string;
 }): string {
-  const { kind, text, fallbackName } = options;
-  const trimmedFallback = fallbackName?.trim();
+  const { kind, text, currentName, headerName, fallbackName } = options;
   const normalized = normalizeOperatorDocumentKind(kind);
+  const loadedName = currentName?.trim() || fallbackName?.trim();
 
   if (normalized === "markdown") {
+    if (isMeaningfulMarkdownSaveFilename(loadedName)) return loadedName!;
+    if (isValidMarkdownSaveFilename(headerName)) return headerName!.trim();
     const fromH1 = deriveMarkdownSaveFilename(text);
     if (fromH1) return fromH1;
-    return trimmedFallback || "operator-doc.md";
+    return "operator-doc.md";
   }
 
-  if (trimmedFallback) return trimmedFallback;
+  if (loadedName) return loadedName;
+  const header = headerName?.trim();
+  if (header) return header;
   return "operator-doc.txt";
 }
