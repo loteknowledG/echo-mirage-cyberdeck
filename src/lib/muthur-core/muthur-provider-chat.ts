@@ -1,10 +1,11 @@
+import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { executeRegistryToolForOpenAi } from "@/lib/muthur-core/execute-openai-tool";
 import { MUTHUR_OPENAI_TOOLS } from "@/lib/muthur-core/openai-tool-definitions";
 import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
 import type { ToolRegistry } from "@/lib/muthur-core/types";
 
 const textEncoder = new TextEncoder();
-const MAX_TOOL_ROUNDS = 4;
+const MAX_TOOL_ROUNDS = ENABLE_AUTOMATION ? 4 : 0;
 
 type OpenAiToolCall = {
   id: string;
@@ -79,6 +80,20 @@ export async function muthurChatWithModelTools(options: {
   const messages: JsonMessage[] = options.baseMessages.map((m) => ({ ...m }));
   const fallbackMessages = options.baseMessages.map((m) => ({ ...m }));
   const toolsUsed: string[] = [];
+
+  if (!ENABLE_AUTOMATION) {
+    const streamRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, fallbackMessages);
+    if (!streamRes.ok) {
+      const errText = await streamRes.text().catch(() => "");
+      return new Response(errText || `Upstream error ${streamRes.status}`, { status: streamRes.status });
+    }
+    return new Response(await streamOpenAiCompatibleResponse(streamRes), {
+      headers: {
+        ...PLAIN_HEADERS,
+        ...toolsUsedHeaders(toolsUsed),
+      },
+    });
+  }
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const res = await fetch(endpoint, {

@@ -111,6 +111,7 @@ import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
 import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration";
 import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
+import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -823,15 +824,18 @@ export default function CyberdeckPage() {
   const activeCustomTab = customTabs.find((tab) => tab.id === activeCustomTabId) || null;
   const selectedRailTabId = activeCustomTab?.id || server;
   const providerModelFetchStatus = modelFetchStatusByProvider[activeProvider] || "idle";
-  const scanActivityActive =
-    Boolean(probeInFlightByProvider[activeProvider]) || providerModelFetchStatus === "retrieving";
+  const scanActivityActive = ENABLE_AUTOMATION
+    ? Boolean(probeInFlightByProvider[activeProvider]) || providerModelFetchStatus === "retrieving"
+    : Boolean(probeInFlightByProvider[activeProvider]);
   const networkActivityActive =
     Boolean(probeInFlightByProvider[activeProvider]) ||
-    providerModelFetchStatus === "retrieving" ||
+    (ENABLE_AUTOMATION && providerModelFetchStatus === "retrieving") ||
     isStreaming;
   const hasProviderAuth = Boolean(providerKeys[activeProvider]) || Boolean(defaultKeyAvailableByProvider[activeProvider]);
   const isVerified = Boolean(verifiedProviders[activeProvider]);
-  const isConnected = hasProviderAuth && Boolean(modelID) && providerModelFetchStatus === "ready" && isVerified;
+  const isConnected = ENABLE_AUTOMATION
+    ? hasProviderAuth && Boolean(modelID) && providerModelFetchStatus === "ready" && isVerified
+    : hasProviderAuth && Boolean(modelID) && providerModelFetchStatus === "ready";
   const connectionState: "offline" | "connecting" | "connected" = scanActivityActive
     ? "connecting"
       : isConnected
@@ -2227,7 +2231,15 @@ export default function CyberdeckPage() {
           });
         }
         if (!res.ok || data.ok === false) {
-          const line = `MODEL_TEST ${provider.toUpperCase()}/${model}: HTTP_${data.status ?? res.status}${data.rateLimited ? " RATE_LIMIT" : " FAILURE"}`;
+          const httpStatus = data.status ?? res.status;
+          const halt =
+            data.rateLimited || httpStatus === 429 || httpStatus === 502 || httpStatus === 503;
+          if (halt) {
+            setRateLimitedProviders((prev) => new Set(prev).add(provider));
+          }
+          const line = `MODEL_TEST ${provider.toUpperCase()}/${model}: HTTP_${httpStatus}${
+            halt ? " // OPERATOR_ACTION_REQUIRED" : " FAILURE"
+          }`;
           playModelTestErrorSound(line);
           setModelHealth(provider, model, failHealth);
           setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
@@ -2273,7 +2285,7 @@ export default function CyberdeckPage() {
         });
       }
     },
-    [playModelTestErrorSound, setModelHealth, setVerifiedProviders],
+    [playModelTestErrorSound, setModelHealth, setRateLimitedProviders, setVerifiedProviders],
   );
 
   const activateModelById = useCallback(
@@ -2288,10 +2300,137 @@ export default function CyberdeckPage() {
         /* ignore */
       }
       playSystemSound("click", 0.02);
-      void probeSelectedModel(activeProvider, modelId, key || "");
+      if (ENABLE_AUTOMATION) {
+        void probeSelectedModel(activeProvider, modelId, key || "");
+      }
     },
     [activeProvider, probeSelectedModel, providerKeys, setVerifiedProviders],
   );
+
+  const fetchModelsForProvider = useCallback(
+    async (provider: string) => {
+      if (rateLimitedProviders.has(provider)) return;
+      const currentKey = providerKeys[provider];
+      if (!currentKey) return;
+
+      setModelList([]);
+      setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "retrieving" }));
+      setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
+
+      try {
+        const res = await fetch("/api/cyberdeck-models", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider, apiKey: currentKey }),
+        });
+        if (!res.ok) {
+          const errJson = (await res.json().catch(() => ({}))) as {
+            authSource?: "user" | "default" | "none";
+            code?: string;
+          };
+          if (errJson.authSource === "none" || errJson.code === "NO_PROVIDER_KEY") {
+            setDefaultKeyAvailableByProvider((prev) => ({ ...prev, [provider]: false }));
+            setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "idle" }));
+            return;
+          }
+          if (res.status === 429 || res.status === 502 || res.status === 503) {
+            setRateLimitedProviders((prev) => new Set(prev).add(provider));
+            setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "error" }));
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                text: `UPLINK_HALTED // ${provider.toUpperCase()} // HTTP_${res.status} // OPERATOR_ACTION_REQUIRED`,
+              },
+            ]);
+            return;
+          }
+          const invalid = res.status === 401 || res.status === 403;
+          setModelFetchStatusByProvider((prev) => ({
+            ...prev,
+            [provider]: invalid ? "invalid-key" : "error",
+          }));
+          if (invalid && currentKey) {
+            setProviderKeys((prev) => {
+              const next = { ...prev };
+              delete next[provider];
+              return next;
+            });
+            localStorage.removeItem(`key_${provider}`);
+            setMessages((prev) => [
+              ...prev,
+              { role: "system", text: `INVALID_KEY // ${provider.toUpperCase()} AUTH_REJECTED` },
+            ]);
+          }
+          return;
+        }
+        const json = (await res.json()) as {
+          data?: { id: string }[];
+          authSource?: "user" | "default";
+        };
+        const raw = Array.isArray(json.data) ? json.data : [];
+        setDefaultKeyAvailableByProvider((prev) => ({
+          ...prev,
+          [provider]: json.authSource === "default",
+        }));
+        setModelList(raw);
+        setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "ready" }));
+        setModelByProvider((prev) => {
+          const current = prev[provider] || "";
+          const hasCurrent = current && raw.some((m) => m.id === current);
+          const nextModel = hasCurrent ? current : raw[0]?.id || "";
+          if (nextModel) {
+            localStorage.setItem(`ascii_model_${provider}`, nextModel);
+          }
+          return { ...prev, [provider]: nextModel };
+        });
+      } catch {
+        setModelList([]);
+        setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "error" }));
+      }
+    },
+    [providerKeys, rateLimitedProviders, setVerifiedProviders],
+  );
+
+  const handleManualConnect = useCallback(() => {
+    if (!hasProviderAuth) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: "CONNECT_SKIPPED // NO_PROVIDER_KEY // PASTE_KEY_IN_CHAT_OR_ENV" },
+      ]);
+      return;
+    }
+    if (rateLimitedProviders.has(activeProvider)) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          text: `CONNECT_BLOCKED // ${activeProvider.toUpperCase()} // RATE_LIMIT // OPERATOR_ACTION_REQUIRED`,
+        },
+      ]);
+      return;
+    }
+    void fetchModelsForProvider(activeProvider);
+  }, [activeProvider, fetchModelsForProvider, hasProviderAuth, rateLimitedProviders]);
+
+  const handleManualProbe = useCallback(() => {
+    const key = providerKeys[activeProvider];
+    if (!modelID) {
+      setMessages((prev) => [...prev, { role: "system", text: "PROBE_SKIPPED // NO_MODEL_SELECTED" }]);
+      return;
+    }
+    if (rateLimitedProviders.has(activeProvider)) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          text: `PROBE_BLOCKED // ${activeProvider.toUpperCase()} // RATE_LIMIT // OPERATOR_ACTION_REQUIRED`,
+        },
+      ]);
+      return;
+    }
+    void probeSelectedModel(activeProvider, modelID, key || "");
+  }, [activeProvider, modelID, probeSelectedModel, providerKeys, rateLimitedProviders]);
 
   // Column-scoped arrows: rail / chat scroll / gateway (providers + models). Tab rail: Escape; Enter on rail → gateway + provider hover.
   useEffect(() => {
@@ -2751,88 +2890,12 @@ export default function CyberdeckPage() {
     });
   }, [activeProvider, modelList]);
 
-  // Fetch models for selected provider; API route can use user key or server default key.
+  // Fetch models for selected provider (automation only — manual mode uses CONNECT).
   useEffect(() => {
+    if (!ENABLE_AUTOMATION) return;
     if (!didHydrateProviderState) return;
-    if (rateLimitedProviders.has(activeProvider)) return;
-    const currentKey = providerKeys[activeProvider];
-    if (!currentKey) return;
-    setModelList([]);
-
-    let cancelled = false;
-    setModelFetchStatusByProvider((prev) => ({ ...prev, [activeProvider]: "retrieving" }));
-    setVerifiedProviders((prev) => ({ ...prev, [activeProvider]: false }));
-
-    (async () => {
-      try {
-        const res = await fetch("/api/cyberdeck-models", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ provider: activeProvider, apiKey: currentKey }),
-        });
-        if (cancelled) return;
-        if (!res.ok) {
-          const errJson = (await res.json().catch(() => ({}))) as {
-            authSource?: "user" | "default" | "none";
-            code?: string;
-          };
-          if (errJson.authSource === "none" || errJson.code === "NO_PROVIDER_KEY") {
-            setDefaultKeyAvailableByProvider((prev) => ({ ...prev, [activeProvider]: false }));
-            setModelFetchStatusByProvider((prev) => ({ ...prev, [activeProvider]: "idle" }));
-            return;
-          }
-          const invalid = res.status === 401 || res.status === 403;
-          setModelFetchStatusByProvider((prev) => ({
-            ...prev,
-            [activeProvider]: invalid ? "invalid-key" : "error",
-          }));
-          if (invalid && currentKey) {
-            setProviderKeys((prev) => {
-              const next = { ...prev };
-              delete next[activeProvider];
-              return next;
-            });
-            localStorage.removeItem(`key_${activeProvider}`);
-            setMessages((prev) => [
-              ...prev,
-              { role: "system", text: `INVALID_KEY // ${activeProvider.toUpperCase()} AUTH_REJECTED` },
-            ]);
-          }
-          return;
-        }
-        const json = (await res.json()) as {
-          data?: { id: string }[];
-          authSource?: "user" | "default";
-        };
-        const raw = Array.isArray(json.data) ? json.data : [];
-        if (cancelled) return;
-        setDefaultKeyAvailableByProvider((prev) => ({
-          ...prev,
-          [activeProvider]: json.authSource === "default",
-        }));
-        setModelList(raw);
-        setModelFetchStatusByProvider((prev) => ({ ...prev, [activeProvider]: "ready" }));
-        setModelByProvider((prev) => {
-          const current = prev[activeProvider] || "";
-          const hasCurrent = current && raw.some((m) => m.id === current);
-          const nextModel = hasCurrent ? current : raw[0]?.id || "";
-          if (nextModel) {
-            localStorage.setItem(`ascii_model_${activeProvider}`, nextModel);
-          }
-          return { ...prev, [activeProvider]: nextModel };
-        });
-      } catch {
-        if (!cancelled) {
-          setModelList([]);
-          setModelFetchStatusByProvider((prev) => ({ ...prev, [activeProvider]: "error" }));
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeProvider, probeSelectedModel, providerKeys, setVerifiedProviders, didHydrateProviderState, rateLimitedProviders]);
+    void fetchModelsForProvider(activeProvider);
+  }, [activeProvider, didHydrateProviderState, fetchModelsForProvider]);
 
   useEffect(() => {
     const latest = messages[messages.length - 1];
@@ -2949,6 +3012,16 @@ export default function CyberdeckPage() {
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
+    if (rateLimitedProviders.has(activeProvider)) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          text: `SEND_BLOCKED // ${activeProvider.toUpperCase()} // RATE_LIMIT // OPERATOR_ACTION_REQUIRED`,
+        },
+      ]);
+      return;
+    }
 
     const userMessage = input.trim();
     const tabCommand = parseCustomTabCommand(userMessage);
@@ -3711,7 +3784,9 @@ const resolved = resolveUiTarget(userMessage);
       }
 
       const allowBrowserDirective =
-        (looksLikeAffirmativeReply(userMessage) && looksLikeBrowserSearchOffer(latestAssistantMessage));
+        ENABLE_AUTOMATION &&
+        looksLikeAffirmativeReply(userMessage) &&
+        looksLikeBrowserSearchOffer(latestAssistantMessage);
 
       const assistantBrowserCommand = allowBrowserDirective
         ? extractAssistantBrowserCommand(fullText)
@@ -3821,43 +3896,51 @@ stdout: ${stdout.slice(0, 2000)}
 stderr: ${stderr.slice(0, 1000)}
 duration_ms: ${durationMs}`;
           
-          // Now call Muthur again to get final summary
-          const reviewRes = await fetch("/api/cyberdeck-chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              message: `A tool was executed. Give a brief summary of the result.\n\n${toolResultMessage}`,
-              provider: activeProvider,
-              apiKey: providerKeys[activeProvider] || "",
-              model: modelID,
-              memoryContext: "",
-              browserContext: "",
-              history: [],
-            }),
-          });
-          
-          if (reviewRes.ok) {
-            const reader = reviewRes.body?.getReader();
-            if (reader) {
-              const decoder = new TextDecoder();
-              let finalSummary = "";
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                finalSummary += decoder.decode(value, { stream: true });
-              }
-              // Clean up the summary too
-              const cleanSummary = finalSummary.replace(/^=+\s*$/gm, "").replace(/^=+$\n?/g, "").trim();
-              setMessages((prev) => [
-                ...prev,
-                { role: "assistant", text: cleanSummary },
-              ]);
-            }
-          } else {
+          if (!ENABLE_AUTOMATION) {
             setMessages((prev) => [
               ...prev,
-              { role: "assistant", text: `TOOL ${resultStatus}\nCommand: ${toolCommand}\nDuration: ${durationMs}ms` },
+              {
+                role: "assistant",
+                text: `TOOL ${resultStatus}\nCommand: ${toolCommand}\nDuration: ${durationMs}ms\n\nstdout:\n${stdout.slice(0, 2000)}${stderr ? `\n\nstderr:\n${stderr.slice(0, 1000)}` : ""}`,
+              },
             ]);
+          } else {
+            const reviewRes = await fetch("/api/cyberdeck-chat", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                message: `A tool was executed. Give a brief summary of the result.\n\n${toolResultMessage}`,
+                provider: activeProvider,
+                apiKey: providerKeys[activeProvider] || "",
+                model: modelID,
+                memoryContext: "",
+                browserContext: "",
+                history: [],
+              }),
+            });
+
+            if (reviewRes.ok) {
+              const reader = reviewRes.body?.getReader();
+              if (reader) {
+                const decoder = new TextDecoder();
+                let finalSummary = "";
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  finalSummary += decoder.decode(value, { stream: true });
+                }
+                const cleanSummary = finalSummary.replace(/^=+\s*$/gm, "").replace(/^=+$\n?/g, "").trim();
+                setMessages((prev) => [
+                  ...prev,
+                  { role: "assistant", text: cleanSummary },
+                ]);
+              }
+            } else {
+              setMessages((prev) => [
+                ...prev,
+                { role: "assistant", text: `TOOL ${resultStatus}\nCommand: ${toolCommand}\nDuration: ${durationMs}ms` },
+              ]);
+            }
           }
         } catch (e) {
           setMessages((prev) => [
@@ -3989,12 +4072,18 @@ duration_ms: ${durationMs}`;
         playWrongDoorShut();
         const status = msg.match(/API error\s+(\d{3})/i)?.[1] || "UNKNOWN";
         const modelLabel = modelID || "UNSET_MODEL";
+        const haltStatuses = new Set(["429", "502", "503"]);
+        if (haltStatuses.has(status)) {
+          setRateLimitedProviders((prev) => new Set(prev).add(activeProvider));
+        }
         const hint =
           status === "401" || status === "403"
             ? "CHECK_API_KEY"
             : status === "429"
-              ? "RATE_LIMIT_WAIT_AND_RETRY"
-              : "CHECK_PROVIDER_MODEL_OR_NETWORK";
+              ? "RATE_LIMIT // OPERATOR_ACTION_REQUIRED"
+              : status === "502" || status === "503"
+                ? "PROVIDER_UNAVAILABLE // OPERATOR_ACTION_REQUIRED"
+                : "CHECK_PROVIDER_MODEL_OR_NETWORK";
         setMessages((prev) => [
           ...prev,
           {
@@ -4099,6 +4188,7 @@ duration_ms: ${durationMs}`;
   );
 
   useEffect(() => {
+    if (!ENABLE_AUTOMATION) return;
     if (!didHydrateProviderState || startupRailResolvedRef.current) return;
     if (hasProviderAuth) {
       setActiveCustomTabId(null);
@@ -4114,6 +4204,7 @@ duration_ms: ${durationMs}`;
   }, [connectionState, didHydrateProviderState, handleModelLabelClick, hasProviderAuth]);
 
   useEffect(() => {
+    if (!ENABLE_AUTOMATION) return;
     const prevState = prevConnectionStateRef.current;
     prevConnectionStateRef.current = connectionState;
 
@@ -5803,13 +5894,53 @@ duration_ms: ${durationMs}`;
                       transition: "opacity 0.2s",
                     }}
                   >
+                    {!ENABLE_AUTOMATION ? (
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleManualConnect}
+                          disabled={
+                            !hasProviderAuth ||
+                            providerModelFetchStatus === "retrieving" ||
+                            rateLimitedProviders.has(activeProvider)
+                          }
+                          className="rounded border border-green-800 px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-green-400 transition hover:border-green-500 hover:text-green-200 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          CONNECT
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleManualProbe}
+                          disabled={
+                            !hasProviderAuth ||
+                            !modelID ||
+                            Boolean(probeInFlightByProvider[activeProvider]) ||
+                            rateLimitedProviders.has(activeProvider)
+                          }
+                          className="rounded border border-[#2d2d2d] px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-amber-500/60 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          TEST MODEL
+                        </button>
+                        <div className="font-mono text-[9px] tracking-[0.06em] text-[#6a6a6a]">
+                          MANUAL_BRIDGE // ONE_REQUEST_PER_ACTION
+                        </div>
+                      </div>
+                    ) : null}
                     <div
                       className="mb-2 font-mono text-[10px]"
                       style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}
                     >
                       AVAILABLE_MODELS:
                     </div>
-                    {!hasProviderAuth ? null : providerModelFetchStatus === "retrieving" ? (
+                    {!hasProviderAuth ? (
+                      <div className="font-mono text-[10px]" style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}>
+                        NO_KEY // PASTE_IN_CHAT_OR_PRESS_CONNECT_AFTER_KEY
+                      </div>
+                    ) : rateLimitedProviders.has(activeProvider) ? (
+                      <div className="font-mono text-[10px] text-amber-300" style={{ textShadow: "0 0 8px rgba(255, 170, 0, 0.28)" }}>
+                        RATE_LIMIT // OPERATOR_ACTION_REQUIRED
+                      </div>
+                    ) : providerModelFetchStatus === "retrieving" ? (
                       <div className="model-probe-wave font-mono text-[10px]" style={{ color: "#ffaa00" }}>
                         CONNECTING... RETRIEVING_MODELS
                       </div>
@@ -5819,7 +5950,7 @@ duration_ms: ${durationMs}`;
                       </div>
                     ) : providerModelFetchStatus === "error" ? (
                       <div className="font-mono text-[10px] text-red-300" style={{ textShadow: "0 0 8px rgba(255, 122, 122, 0.3)" }}>
-                        UPLINK_ERROR // RETRY
+                        UPLINK_ERROR // OPERATOR_ACTION_REQUIRED
                       </div>
                     ) : modelList.length === 0 ? (
                       <div className="font-mono text-[10px]" style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}>

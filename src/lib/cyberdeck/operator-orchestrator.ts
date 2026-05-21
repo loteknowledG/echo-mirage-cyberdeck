@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { emitSignal, subscribeSignals, type DeckSignal, type SignalSeverity } from "@/lib/cyberdeck/signal-router";
 import { pulseOperatorState } from "@/lib/operators";
 
@@ -346,6 +347,11 @@ function stopOrchestrator() {
 }
 
 export function startOperatorOrchestrator(): () => void {
+  if (!ENABLE_AUTOMATION) {
+    return () => {
+      /* manual bridge mode — orchestrator idle */
+    };
+  }
   if (typeof window === "undefined") {
     return () => {
       /* noop on server */
