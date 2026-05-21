@@ -3,10 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import type { Dispatch, DragEvent, RefObject, SetStateAction } from "react";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
+import { FaRegPaste } from "react-icons/fa6";
+import { GrFormEdit, GrFormView } from "react-icons/gr";
+import { LuPanelRightClose, LuPanelRightOpen } from "react-icons/lu";
 import { Streamdown } from "streamdown";
+import { OperatorDocFolderPane } from "@/components/cyberdeck/operator-doc-folder-pane";
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderTitle } from "@/components/cyberdeck/pane-header";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  OPERATOR_DOCUMENT_KIND_PICKER_OPTIONS,
+  type OperatorDocumentPickerKind,
+} from "@/lib/operator-markdown-title";
 
 type DroppedOperatorAsset = {
   kind: "text" | "code" | "markdown" | "image" | "video" | "file";
@@ -41,6 +49,9 @@ type OperatorPaneBodyProps = {
   onSaveOperatorDocAsFile: () => void | Promise<void>;
   onCopyOperatorDocToClipboard: () => void | Promise<void>;
   onOperatorDocumentTextChange: (nextText: string) => void;
+  operatorDocumentKind: OperatorDocumentPickerKind;
+  onOperatorDocumentKindChange: (kind: OperatorDocumentPickerKind) => void;
+  onOpenOperatorFolderFile: (file: File) => void | Promise<void>;
 };
 
 const ZOOM_LEVELS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const;
@@ -51,6 +62,9 @@ const OPERATOR_DOC_SURFACE_CLASS =
 
 const OPERATOR_MARKDOWN_VIEW_CLASS =
   "max-w-none font-mono text-[12px] leading-snug text-green-200 [&_h1]:my-2 [&_h1]:font-mono [&_h1]:text-[12px] [&_h1]:font-normal [&_h2]:my-2 [&_h2]:font-mono [&_h2]:text-[12px] [&_h3]:font-mono [&_h3]:text-[12px] [&_p]:my-1 [&_li]:my-0 [&_pre]:my-2 [&_pre]:bg-black [&_pre]:text-green-300";
+
+const OPERATOR_HEADER_ICON_BTN =
+  "inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200";
 
 export function CyberdeckOperatorPaneBody({
   isOperatorDragOver,
@@ -76,10 +90,18 @@ export function CyberdeckOperatorPaneBody({
   onSaveOperatorDocAsFile,
   onCopyOperatorDocToClipboard,
   onOperatorDocumentTextChange,
+  operatorDocumentKind,
+  onOperatorDocumentKindChange,
+  onOpenOperatorFolderFile,
 }: OperatorPaneBodyProps) {
   const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
+  const [folderPaneOpen, setFolderPaneOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState<number>(1);
   const imageZoomIndexRef = useRef(3);
+
+  const operatorDocText = operatorDroppedAsset?.text || "";
+  const operatorShowsMarkdown = operatorDocumentKind === "markdown";
+  const operatorCanPickDocKind = Boolean(operatorDroppedAsset?.text);
 
   useEffect(() => {
     setBrowserDraft(operatorBrowserUrl);
@@ -195,9 +217,11 @@ export function CyberdeckOperatorPaneBody({
               <button
                 type="button"
                 onClick={() => void onPasteClipboardToOperator()}
-                className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                aria-label="Paste into operator"
+                title="Paste into operator"
+                className={OPERATOR_HEADER_ICON_BTN}
               >
-                PASTE
+                <FaRegPaste className="h-3.5 w-3.5" />
               </button>
               {operatorSurfaceMode === "browser" ? (
                 <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em]">
@@ -208,8 +232,21 @@ export function CyberdeckOperatorPaneBody({
                 </div>
               ) : operatorSurfaceIsDocument ? (
                 <>
-                  <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                    <span className={operatorDocMode === "view" ? "text-emerald-200" : ""}>VIEW</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onCommitOperatorDocName();
+                        onSetOperatorDocMode("view");
+                      }}
+                      aria-label="View mode"
+                      title="View"
+                      className={`${OPERATOR_HEADER_ICON_BTN} ${
+                        operatorDocMode === "view" ? "border-emerald-500/60 text-emerald-200" : ""
+                      }`}
+                    >
+                      <GrFormView className="h-3.5 w-3.5" />
+                    </button>
                     <Switch
                       checked={operatorDocMode === "edit"}
                       onCheckedChange={(checked) => {
@@ -223,7 +260,17 @@ export function CyberdeckOperatorPaneBody({
                       aria-label="Toggle operator view edit mode"
                       className="data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
                     />
-                    <span className={operatorDocMode === "edit" ? "text-emerald-200" : ""}>EDIT</span>
+                    <button
+                      type="button"
+                      onClick={() => onSetOperatorDocMode("edit")}
+                      aria-label="Edit mode"
+                      title="Edit"
+                      className={`${OPERATOR_HEADER_ICON_BTN} ${
+                        operatorDocMode === "edit" ? "border-emerald-500/60 text-emerald-200" : ""
+                      }`}
+                    >
+                      <GrFormEdit className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </>
               ) : operatorDroppedAsset ? (
@@ -304,10 +351,28 @@ export function CyberdeckOperatorPaneBody({
             </div>
           </div>
         ) : operatorDroppedAsset ? (
-          <div className="flex-1 overflow-auto p-3">
-            <div className="mb-4 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
-              {operatorDroppedAsset.mimeType || "application/octet-stream"} //{" "}
-              {Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <div className="custom-scrollbar min-w-0 flex-1 overflow-auto p-3">
+            <div className="mb-4 flex items-center gap-2 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
+              {operatorCanPickDocKind ? (
+                <select
+                  value={operatorDocumentKind}
+                  onChange={(event) =>
+                    onOperatorDocumentKindChange(event.target.value as OperatorDocumentPickerKind)
+                  }
+                  aria-label="Operator document type"
+                  className="rounded border border-[#2d2d2d] bg-black px-1.5 py-0.5 font-mono text-[9px] tracking-[0.06em] text-[#cfcfcf] outline-none transition hover:border-emerald-500/60 focus:border-emerald-500/60"
+                >
+                  {OPERATOR_DOCUMENT_KIND_PICKER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              <span className="ml-auto">
+                // {Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB
+              </span>
             </div>
             {operatorSurfaceIsDocument ? (
               <div className="mb-3 flex justify-end gap-2">
@@ -316,11 +381,11 @@ export function CyberdeckOperatorPaneBody({
                   onClick={() => void onSaveOperatorDocAsFile()}
                   aria-label="Save operator document"
                   title={
-                    operatorDroppedAsset.kind === "markdown"
+                    operatorShowsMarkdown
                       ? "Save — Cadre folder + filename from H1 prefix (L-/E-/ER-/JR-/JP-/JF-)"
                       : "Save operator document"
                   }
-                  className="inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                  className={OPERATOR_HEADER_ICON_BTN}
                 >
                   <DownloadIcon className="h-3.5 w-3.5" />
                 </button>
@@ -329,9 +394,22 @@ export function CyberdeckOperatorPaneBody({
                   onClick={() => void onCopyOperatorDocToClipboard()}
                   aria-label="Copy operator document"
                   title="Copy operator document"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                  className={OPERATOR_HEADER_ICON_BTN}
                 >
                   <CopyIcon className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFolderPaneOpen((open) => !open)}
+                  aria-label={folderPaneOpen ? "Close document folders" : "Open document folders"}
+                  title={folderPaneOpen ? "Close document folders" : "Open document folders"}
+                  className={OPERATOR_HEADER_ICON_BTN}
+                >
+                  {folderPaneOpen ? (
+                    <LuPanelRightClose className="h-3.5 w-3.5" />
+                  ) : (
+                    <LuPanelRightOpen className="h-3.5 w-3.5" />
+                  )}
                 </button>
               </div>
             ) : null}
@@ -415,33 +493,26 @@ export function CyberdeckOperatorPaneBody({
               operatorDocMode === "edit" ? (
                 <Textarea
                   ref={operatorEditorRef}
-                  value={operatorDroppedAsset.text || ""}
+                  value={operatorDocText}
                   onChange={(event) => onOperatorDocumentTextChange(event.target.value)}
                   spellCheck={false}
                   autoCapitalize="off"
                   autoComplete="off"
                   autoCorrect="off"
                   wrap="off"
-                  className={`min-h-0 resize-none overflow-hidden shadow-none focus-visible:ring-1 focus-visible:ring-amber-500/40 ${OPERATOR_DOC_SURFACE_CLASS}`}
-                  style={
-                    operatorDocMode === "edit"
-                      ? {
-                          height: operatorEditorRef.current?.style.height || "auto",
-                        }
-                      : undefined
-                  }
+                  className={`min-h-[50vh] resize-y overflow-auto shadow-none focus-visible:ring-1 focus-visible:ring-amber-500/40 ${OPERATOR_DOC_SURFACE_CLASS}`}
                 />
-              ) : operatorDroppedAsset.kind === "markdown" ? (
+              ) : operatorShowsMarkdown ? (
                 <div className={OPERATOR_DOC_SURFACE_CLASS}>
                   <Streamdown className={OPERATOR_MARKDOWN_VIEW_CLASS}>
-                    {operatorDroppedAsset.text || ""}
+                    {operatorDocText}
                   </Streamdown>
                 </div>
               ) : (
                 <pre
                   className={`whitespace-pre-wrap break-words ${OPERATOR_DOC_SURFACE_CLASS}`}
                 >
-                  {operatorDroppedAsset.text || ""}
+                  {operatorDocText}
                 </pre>
               )
             ) : (
@@ -451,6 +522,10 @@ export function CyberdeckOperatorPaneBody({
                   : "Drop or paste a code, text, markdown, or image file here to view and edit it."}
               </div>
             )}
+            </div>
+            {operatorSurfaceIsDocument && folderPaneOpen ? (
+              <OperatorDocFolderPane onOpenFile={onOpenOperatorFolderFile} />
+            ) : null}
           </div>
         ) : (
           <div className="flex flex-1 items-center justify-center p-6 text-center font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">

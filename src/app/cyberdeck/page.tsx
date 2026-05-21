@@ -76,7 +76,12 @@ import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
 import { speakDryFallback } from "@/voice/speakMuthur";
 import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
-import { inferOperatorDocumentFromText } from "@/lib/operator-markdown-title";
+import {
+  applyOperatorTextAutodetect,
+  operatorMimeTypeForKind,
+  resolveOperatorDocumentNameForKind,
+  type OperatorDocumentPickerKind,
+} from "@/lib/operator-markdown-title";
 import {
   buildOperatorSaveIntent,
   downloadOperatorDoc,
@@ -795,6 +800,7 @@ export default function CyberdeckPage() {
   const motherMasterGainRef = useRef<GainNode | null>(null);
   const motherTerminalRef = useRef(new MotherTerminal({ burstThreshold: 180 }));
   const operatorEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  const operatorKindManualRef = useRef(false);
   const operatorBrowserRef = useRef<HTMLWebViewElement | null>(null);
   const operatorNameInputRef = useRef<HTMLInputElement | null>(null);
   const networkFeedbackDelayRef = useRef<number | null>(null);
@@ -1642,65 +1648,43 @@ export default function CyberdeckPage() {
     setOperatorBrowserEngine(window.echoMirageBrowser ? "PLAYWRIGHT" : "WEBVIEW_DOM_FALLBACK");
   }, []);
 
-  useEffect(() => {
-    if (!operatorDroppedAsset?.text) {
-      setOperatorDocNameDraft(operatorDroppedAsset?.name || "");
-      return;
-    }
-    const inferred = inferOperatorDocumentFromText(operatorDroppedAsset.text, {
-      fileName: operatorDroppedAsset.name,
-      fileKind: operatorDroppedAsset.kind,
-      mimeType: operatorDroppedAsset.mimeType,
+  const setOperatorTextAsset = useCallback((asset: DroppedOperatorAsset) => {
+    const next = operatorKindManualRef.current ? asset : applyOperatorTextAutodetect(asset);
+    setOperatorDroppedAsset(next);
+    setOperatorDocNameDraft(next.name || "");
+  }, []);
+
+  const handleOperatorDocumentKindChange = useCallback((nextKind: OperatorDocumentPickerKind) => {
+    operatorKindManualRef.current = true;
+    setOperatorDroppedAsset((prev) => {
+      if (!prev) return prev;
+      const text = prev.text || "";
+      const mimeType = operatorMimeTypeForKind(nextKind);
+      const name = resolveOperatorDocumentNameForKind(nextKind, text, prev.name);
+      setOperatorDocNameDraft(name);
+      return {
+        ...prev,
+        kind: nextKind,
+        mimeType,
+        name,
+      };
     });
-    const needsReclassify =
-      inferred.kind !== operatorDroppedAsset.kind ||
-      inferred.mimeType !== operatorDroppedAsset.mimeType;
-    if (needsReclassify) {
-      setOperatorDroppedAsset((prev) =>
-        prev
-          ? {
-              ...prev,
-              kind: inferred.kind,
-              mimeType: inferred.mimeType,
-            }
-          : prev,
-      );
-    }
-    if (inferred.kind === "markdown") {
-      const fromH1 = inferred.suggestedFilename;
-      const displayName = fromH1 ?? operatorDroppedAsset.name ?? "";
-      setOperatorDocNameDraft(displayName);
-      if (fromH1 && fromH1 !== operatorDroppedAsset.name) {
-        setOperatorDroppedAsset((prev) => (prev ? { ...prev, name: fromH1 } : prev));
-      }
-      return;
-    }
-    setOperatorDocNameDraft(operatorDroppedAsset?.name || "");
-  }, [
-    operatorDroppedAsset?.kind,
-    operatorDroppedAsset?.mimeType,
-    operatorDroppedAsset?.name,
-    operatorDroppedAsset?.text,
-  ]);
+  }, []);
 
   const handleOperatorDocumentTextChange = useCallback((nextText: string) => {
     setOperatorDroppedAsset((prev) => {
       if (!prev) return prev;
-      const inferred = inferOperatorDocumentFromText(nextText, {
-        fileName: prev.name,
-        fileKind: prev.kind,
-        mimeType: prev.mimeType,
-      });
-      const nextName =
-        inferred.kind === "markdown" && inferred.suggestedFilename
-          ? inferred.suggestedFilename
+      const name =
+        prev.kind === "markdown"
+          ? resolveOperatorDocumentNameForKind("markdown", nextText, prev.name)
           : prev.name;
+      if (prev.kind === "markdown") {
+        setOperatorDocNameDraft(name);
+      }
       return {
         ...prev,
         text: nextText,
-        kind: inferred.kind,
-        mimeType: inferred.mimeType,
-        name: nextName,
+        name,
         size: new Blob([nextText]).size,
       };
     });
@@ -1711,7 +1695,8 @@ export default function CyberdeckPage() {
     const el = operatorEditorRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+    const minHeight = Math.max(el.scrollHeight, el.clientHeight);
+    el.style.height = `${minHeight}px`;
   }, [operatorDocMode, operatorDroppedAsset?.text, operatorSurfaceIsDocument]);
 
   useEffect(() => {
@@ -1957,6 +1942,7 @@ export default function CyberdeckPage() {
   ]);
 
   const pasteClipboardToOperator = useCallback(async () => {
+    operatorKindManualRef.current = false;
     try {
       const clipboardText = await readEchoMirageClipboardText();
 
@@ -1965,28 +1951,23 @@ export default function CyberdeckPage() {
         return;
       }
 
-      const inferred = inferOperatorDocumentFromText(clipboardText, {
-        fileName: operatorDroppedAsset?.name,
-        fileKind: operatorDroppedAsset?.kind,
-        mimeType: operatorDroppedAsset?.mimeType,
-      });
-      setOperatorDroppedAsset({
-        kind: inferred.kind,
-        name: inferred.suggestedFilename ?? operatorDroppedAsset?.name ?? "",
-        mimeType: inferred.mimeType,
+      setOperatorTextAsset({
+        kind: "text",
+        name: operatorDroppedAsset?.name ?? "",
+        mimeType: "text/plain",
         size: new Blob([clipboardText]).size,
         text: clipboardText,
       });
       setOperatorSurfaceMode("workspace");
-      setOperatorDocNameDraft("");
       setOperatorDocMode("edit");
       toast.success("Pasted clipboard into a new operator draft.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not paste clipboard text.");
     }
-  }, [operatorDroppedAsset?.kind, operatorDroppedAsset?.name]);
+  }, [operatorDroppedAsset?.name, setOperatorTextAsset]);
 
   const loadOperatorAssetFromFile = useCallback(async (file: File) => {
+    operatorKindManualRef.current = false;
     const kind = getOperatorFileKind(file);
     const mimeType = file.type || "application/octet-stream";
     const baseAsset = {
@@ -2015,21 +1996,10 @@ export default function CyberdeckPage() {
       return;
     }
 
-    if (kind === "markdown" || kind === "code" || kind === "text") {
+    if (kind === "markdown" || kind === "code" || kind === "text" || isEditableOperatorFile(file)) {
       try {
         const text = await file.text();
-        const inferred = inferOperatorDocumentFromText(text, {
-          fileName: file.name,
-          fileKind: kind,
-          mimeType,
-        });
-        setOperatorDroppedAsset({
-          kind: inferred.kind,
-          name: inferred.suggestedFilename ?? file.name,
-          mimeType: inferred.mimeType,
-          size: file.size,
-          text,
-        });
+        setOperatorTextAsset({ ...baseAsset, text });
       } catch {
         setOperatorDroppedAsset(baseAsset);
       }
@@ -2041,7 +2011,7 @@ export default function CyberdeckPage() {
     setOperatorDroppedAsset(baseAsset);
     setOperatorSurfaceMode("workspace");
     setOperatorDocMode("view");
-  }, []);
+  }, [setOperatorTextAsset]);
 
   const copyHeapEntry = useCallback(async (entry: HeapEntry) => {
     try {
@@ -2053,20 +2023,20 @@ export default function CyberdeckPage() {
   }, []);
 
   const openHeapEntryInOperator = useCallback((entry: HeapEntry) => {
+    operatorKindManualRef.current = false;
     const text = entry.text || "";
-    const inferred = inferOperatorDocumentFromText(text, { fileName: entry.name });
-    setOperatorDroppedAsset({
-      kind: inferred.kind,
-      name: inferred.suggestedFilename ?? entry.name,
-      mimeType: inferred.mimeType,
+    setOperatorTextAsset({
+      kind: "text",
+      name: entry.name,
+      mimeType: "text/plain",
       size: new Blob([text]).size,
       text,
     });
-      setOperatorSurfaceMode("workspace");
-      setOperatorDocMode("view");
-      setServer("m");
-      setNavRailContext("gateway");
-  }, []);
+    setOperatorSurfaceMode("workspace");
+    setOperatorDocMode("view");
+    setServer("m");
+    setNavRailContext("gateway");
+  }, [setOperatorTextAsset]);
 
   const deleteHeapEntry = useCallback((id: string) => {
     setHeapEntries((prev) => prev.filter((entry) => entry.id !== id));
@@ -6346,6 +6316,15 @@ duration_ms: ${durationMs}`;
                   onSaveOperatorDocAsFile={saveOperatorDocAsFile}
                   onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
                   onOperatorDocumentTextChange={handleOperatorDocumentTextChange}
+                  onOperatorDocumentKindChange={handleOperatorDocumentKindChange}
+                  operatorDocumentKind={
+                    operatorDroppedAsset?.kind === "markdown" ||
+                    operatorDroppedAsset?.kind === "text" ||
+                    operatorDroppedAsset?.kind === "code"
+                      ? operatorDroppedAsset.kind
+                      : "text"
+                  }
+                  onOpenOperatorFolderFile={loadOperatorAssetFromFile}
                 />
               ) : server === "b" ? (
                 <div ref={gatewayBlankSettingsRef} className="flex min-h-0 flex-1 flex-col">

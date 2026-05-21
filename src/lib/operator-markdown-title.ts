@@ -24,6 +24,62 @@ export function isMarkdownH1Document(text: string): boolean {
 
 export type OperatorDocumentKind = "markdown" | "text" | "code";
 
+export type OperatorDocumentPickerKind = OperatorDocumentKind;
+
+export const OPERATOR_DOCUMENT_KIND_PICKER_OPTIONS: Array<{
+  value: OperatorDocumentPickerKind;
+  label: string;
+}> = [
+  { value: "markdown", label: "MARKDOWN" },
+  { value: "text", label: "TEXT" },
+  { value: "code", label: "CODE" },
+];
+
+export const OPERATOR_DOCUMENT_KIND_OPTIONS: Array<{
+  value: OperatorDocumentKind;
+  label: string;
+  mimeType: string;
+}> = [
+  { value: "markdown", label: "MARKDOWN", mimeType: "text/markdown" },
+  { value: "text", label: "TEXT", mimeType: "text/plain" },
+  { value: "code", label: "CODE", mimeType: "text/plain" },
+];
+
+export function applyOperatorTextAutodetect<T extends {
+  kind: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  text?: string;
+}>(asset: T): T {
+  if (!asset.text) return asset;
+  const inferred = inferOperatorDocumentFromText(asset.text, {
+    fileName: asset.name,
+    fileKind: asset.kind as OperatorDocumentKind | "file" | "image" | "video",
+    mimeType: asset.mimeType,
+  });
+  return {
+    ...asset,
+    kind: inferred.kind,
+    mimeType: inferred.mimeType,
+    name: inferred.suggestedFilename ?? asset.name,
+    size: new Blob([asset.text]).size,
+  };
+}
+
+export function operatorMimeTypeForKind(kind: OperatorDocumentKind): string {
+  return OPERATOR_DOCUMENT_KIND_OPTIONS.find((option) => option.value === kind)?.mimeType ?? "text/plain";
+}
+
+export function resolveOperatorDocumentNameForKind(
+  kind: OperatorDocumentKind,
+  text: string,
+  currentName: string,
+): string {
+  if (kind !== "markdown") return currentName;
+  return deriveMarkdownSaveFilename(text) ?? currentName;
+}
+
 export function inferOperatorDocumentFromText(
   text: string,
   hints?: {
