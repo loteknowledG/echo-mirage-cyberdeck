@@ -76,8 +76,14 @@ import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
 import { speakDryFallback } from "@/voice/speakMuthur";
 import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
-import { resolveCadreSaveTarget } from "@/lib/cadre-constitutional-routing";
-import { deriveMarkdownSaveFilename, deriveOperatorSaveFilename } from "@/lib/operator-markdown-title";
+import { deriveMarkdownSaveFilename } from "@/lib/operator-markdown-title";
+import {
+  buildOperatorSaveIntent,
+  downloadOperatorDoc,
+  isPickerAbortError,
+  saveViaCadreApi,
+  type OperatorSaveIntent,
+} from "@/lib/operator-save";
 import { get, set } from "idb-keyval";
 import {
   CyberdeckPaneHeader,
@@ -114,6 +120,16 @@ import type { Identity } from "@/lib/identity/identity-types";
 import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration";
 import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
+import {
+  PROVIDER_CLICK_ESCALATION_MS,
+  PROVIDER_LINK_REFRESH_COOLDOWN_MS,
+  loadProviderModelsCache,
+  providerModelsCacheKey,
+  providerToneColors,
+  resolveProviderVisualTone,
+  saveProviderModelsCache,
+  type ProviderModelRow,
+} from "@/lib/cyberdeck/provider-connection";
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
@@ -318,7 +334,7 @@ type EchoMirageSaveApi = {
   showDialog(options: {
     defaultRelativePath: string;
     content: string;
-  }): Promise<{ canceled: boolean; filePath?: string }>;
+  }): Promise<{ canceled: boolean; filePath?: string; error?: string }>;
 };
 
 const EDITABLE_TEXT_EXTENSIONS = [
@@ -730,6 +746,9 @@ export default function CyberdeckPage() {
     openai: false,
   });
   const [modelList, setModelList] = useState<{ id: string }[]>([]);
+  const [modelCacheByProvider, setModelCacheByProvider] = useState<Record<string, ProviderModelRow[]>>({});
+  const [credentialReplaceProvider, setCredentialReplaceProvider] = useState<string | null>(null);
+  const [gatewayKeyDraft, setGatewayKeyDraft] = useState("");
   const [deckUiHydrated, setDeckUiHydrated] = useState(false);
   const [modelByProvider, setModelByProvider] = useState<Record<string, string>>({});
   const [modelFetchStatusByProvider, setModelFetchStatusByProvider] = useState<
@@ -790,6 +809,9 @@ export default function CyberdeckPage() {
   const deckTabNextRef = useRef<"gateway" | "rail" | "chatlog">("gateway");
   const prevNavRailRef = useRef<"gateway" | "tabs">("gateway");
   const uiFocusRestoredRef = useRef(false);
+  const providerClickTrackerRef = useRef({ providerId: "", count: 0, lastClickAt: 0 });
+  const providerRefreshAtRef = useRef<Record<string, number>>({});
+  const providerBootstrapRef = useRef(false);
 
   const syncInputCaret = useCallback(() => {
     const el = messageInputRef.current;
@@ -833,18 +855,15 @@ export default function CyberdeckPage() {
   const activeCustomTab = customTabs.find((tab) => tab.id === activeCustomTabId) || null;
   const selectedRailTabId = activeCustomTab?.id || server;
   const providerModelFetchStatus = modelFetchStatusByProvider[activeProvider] || "idle";
-  const scanActivityActive = ENABLE_AUTOMATION
-    ? Boolean(probeInFlightByProvider[activeProvider]) || providerModelFetchStatus === "retrieving"
-    : Boolean(probeInFlightByProvider[activeProvider]);
+  const scanActivityActive =
+    Boolean(probeInFlightByProvider[activeProvider]) || providerModelFetchStatus === "retrieving";
   const networkActivityActive =
     Boolean(probeInFlightByProvider[activeProvider]) ||
-    (ENABLE_AUTOMATION && providerModelFetchStatus === "retrieving") ||
+    providerModelFetchStatus === "retrieving" ||
     isStreaming;
   const hasProviderAuth = Boolean(providerKeys[activeProvider]) || Boolean(defaultKeyAvailableByProvider[activeProvider]);
-  const isVerified = Boolean(verifiedProviders[activeProvider]);
-  const isConnected = ENABLE_AUTOMATION
-    ? hasProviderAuth && Boolean(modelID) && providerModelFetchStatus === "ready" && isVerified
-    : hasProviderAuth && Boolean(modelID) && providerModelFetchStatus === "ready";
+  const providerLinkReady = providerModelFetchStatus === "ready";
+  const isConnected = hasProviderAuth && providerLinkReady && Boolean(modelID);
   const connectionState: "offline" | "connecting" | "connected" = scanActivityActive
     ? "connecting"
       : isConnected
@@ -1744,93 +1763,147 @@ export default function CyberdeckPage() {
     }
   }, [operatorDroppedAsset?.name, operatorDroppedAsset?.text, operatorSurfaceIsDocument]);
 
-  const saveOperatorDocAsFile = useCallback(async () => {
+  const completeOperatorSave = useCallback(
+    async (
+      intent: OperatorSaveIntent,
+      options: {
+        pickerPromise?: Promise<SaveFilePickerHandle> | null;
+      },
+    ) => {
+      const electronSave = (window as Window & { echoMirageSave?: EchoMirageSaveApi }).echoMirageSave;
+      const pickerFn = (window as Window & {
+        showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<SaveFilePickerHandle>;
+      }).showSaveFilePicker;
+
+      const writePickerResult = async (pickerPromise: Promise<SaveFilePickerHandle>) => {
+        const handle = await pickerPromise;
+        const writable = await handle.createWritable();
+        await writable.write(intent.text);
+        await writable.close();
+        toast.success(
+          intent.cadreTarget?.constitutionalPrefix
+            ? `Saved ${intent.suggestedFilename} (Cadre folder: ${intent.cadreTarget.relativeDirectory})`
+            : `Saved "${intent.suggestedFilename}".`,
+        );
+      };
+
+      try {
+        if (electronSave) {
+          const result = await electronSave.showDialog({
+            defaultRelativePath: intent.suggestedSavePath,
+            content: intent.text,
+          });
+          if (!result.canceled && result.filePath) {
+            toast.success(
+              intent.cadreTarget?.constitutionalPrefix
+                ? `Saved to Cadre route // ${intent.cadreTarget.relativeDirectory} // ${result.filePath}`
+                : `Saved "${result.filePath}".`,
+            );
+            return;
+          }
+          if (result.canceled && !result.error) {
+            toast.info("Save canceled.");
+            return;
+          }
+          if (result.error) {
+            toast.error(`Native save failed: ${result.error}`);
+          }
+        }
+
+        if (await saveViaCadreApi(intent, false)) {
+          toast.success(`Saved to ${intent.suggestedSavePath}`);
+          return;
+        }
+
+        if (options.pickerPromise) {
+          await writePickerResult(options.pickerPromise);
+          return;
+        }
+
+        if (typeof pickerFn === "function") {
+          await writePickerResult(
+            pickerFn({
+              suggestedName: intent.suggestedFilename,
+              types: intent.fileTypes,
+              excludeAcceptAllOption: false,
+            }),
+          );
+          return;
+        }
+
+        downloadOperatorDoc(intent);
+        toast.success(
+          intent.cadreTarget?.constitutionalPrefix
+            ? `Downloaded ${intent.suggestedFilename} (browser download — target ${intent.suggestedSavePath})`
+            : `Downloaded "${intent.suggestedFilename}".`,
+        );
+      } catch (err) {
+        if (isPickerAbortError(err)) {
+          toast.info("Save canceled.");
+          return;
+        }
+        try {
+          if (await saveViaCadreApi(intent, true)) {
+            toast.success(`Saved to ${intent.suggestedSavePath}`);
+            return;
+          }
+        } catch (apiErr) {
+          toast.error(apiErr instanceof Error ? apiErr.message : "Cadre save failed");
+          return;
+        }
+        downloadOperatorDoc(intent);
+        toast.info(`Saved via download as ${intent.suggestedFilename}`);
+      }
+    },
+    [],
+  );
+
+  const saveOperatorDocAsFile = useCallback(() => {
     const text = operatorDroppedAsset?.text || "";
     if (!operatorSurfaceIsDocument || !text.trim()) {
       toast.error("Operator document has no text.");
       return;
     }
 
-    const cadreTarget =
-      operatorDroppedAsset?.kind === "markdown"
-        ? resolveCadreSaveTarget(text, { kind: "markdown" })
-        : null;
-    const nextName = deriveOperatorSaveFilename({
-      kind: operatorDroppedAsset?.kind,
+    const intent = buildOperatorSaveIntent({
       text,
+      kind: operatorDroppedAsset?.kind,
+      mimeType: operatorDroppedAsset?.mimeType || "text/plain",
       fallbackName: operatorDroppedAsset?.name,
     });
-    const suggestedSavePath = cadreTarget?.suggestedRelativePath ?? nextName;
-    const fileTypes: SaveFilePickerOptions["types"] = [
-      {
-        description: "Text document",
-        accept: {
-          "text/plain": [".txt", ".md", ".markdown", ".log"],
-          "text/markdown": [".md", ".markdown"],
-          "application/json": [".json", ".jsonc"],
-          "application/javascript": [".js", ".jsx", ".mjs", ".cjs"],
-          "application/typescript": [".ts", ".tsx"],
-          "text/css": [".css"],
-          "text/html": [".html", ".htm"],
-          "text/yaml": [".yaml", ".yml"],
-        },
-      },
-    ];
 
     const electronSave = (window as Window & { echoMirageSave?: EchoMirageSaveApi }).echoMirageSave;
-    const picker = (window as Window & {
+    const pickerFn = (window as Window & {
       showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<SaveFilePickerHandle>;
     }).showSaveFilePicker;
 
-    try {
-      if (electronSave) {
-        const result = await electronSave.showDialog({
-          defaultRelativePath: suggestedSavePath,
-          content: text,
-        });
-        if (result.canceled) return;
-        const savedLabel = result.filePath ?? suggestedSavePath;
-        toast.success(
-          cadreTarget?.constitutionalPrefix
-            ? `Saved to Cadre route // ${cadreTarget.relativeDirectory} // ${savedLabel}`
-            : `Saved "${savedLabel}".`,
-        );
-        return;
-      }
-
-      if (picker) {
-        const handle = await picker({
-          suggestedName: suggestedSavePath,
-          types: fileTypes,
+    let pickerPromise: Promise<SaveFilePickerHandle> | null = null;
+    if (!electronSave && typeof pickerFn === "function") {
+      try {
+        pickerPromise = pickerFn({
+          suggestedName: intent.suggestedFilename,
+          types: intent.fileTypes,
           excludeAcceptAllOption: false,
         });
-        const writable = await handle.createWritable();
-        await writable.write(text);
-        await writable.close();
-        toast.success(
-          cadreTarget?.constitutionalPrefix
-            ? `Saved // ${cadreTarget.relativeDirectory}${cadreTarget.filename}`
-            : `Saved "${nextName}".`,
-        );
+      } catch (pickerErr) {
+        void completeOperatorSave(intent, { pickerPromise: null }).catch((err) => {
+          toast.error(err instanceof Error ? err.message : "Could not save operator document.");
+        });
         return;
       }
-
-      const blob = new Blob([text], { type: operatorDroppedAsset?.mimeType || "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = cadreTarget?.filename ?? nextName;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      toast.success(
-        cadreTarget?.constitutionalPrefix
-          ? `Downloaded // ${suggestedSavePath} (browser may omit folder path)`
-          : `Downloaded "${nextName}".`,
-      );
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save operator document.");
     }
-  }, [operatorDroppedAsset?.kind, operatorDroppedAsset?.mimeType, operatorDroppedAsset?.name, operatorDroppedAsset?.text, operatorSurfaceIsDocument]);
+
+    void completeOperatorSave(intent, { pickerPromise }).catch((err) => {
+      toast.error(err instanceof Error ? err.message : "Could not save operator document.");
+    });
+  }, [
+    completeOperatorSave,
+    operatorDroppedAsset?.kind,
+    operatorDroppedAsset?.mimeType,
+    operatorDroppedAsset?.name,
+    operatorDroppedAsset?.text,
+    operatorSurfaceIsDocument,
+  ]);
 
   const pasteClipboardToOperator = useCallback(async () => {
     try {
@@ -2135,14 +2208,33 @@ export default function CyberdeckPage() {
   // Hydrate keys / models / active provider from localStorage (weyland-compatible keys)
   useEffect(() => {
     const nextKeys: Record<string, string> = {};
+    const caches: Record<string, ProviderModelRow[]> = {};
+    const statusUpdates: Record<string, "idle" | "retrieving" | "invalid-key" | "error" | "ready"> =
+      {};
+    const verifiedUpdates: Record<string, boolean> = {};
     for (const id of PROVIDER_IDS) {
       const stored = localStorage.getItem(`key_${id}`);
       const fallback = DEFAULT_CLIENT_PROVIDER_KEYS[id] || "";
       const value = (stored || fallback || "").trim();
       if (value) nextKeys[id] = value;
+      const cached = loadProviderModelsCache(id);
+      if (cached.length > 0) {
+        caches[id] = cached;
+        if (value) {
+          statusUpdates[id] = "ready";
+          verifiedUpdates[id] = true;
+        }
+      }
     }
     setProviderKeys(nextKeys);
+    setModelCacheByProvider(caches);
+    if (Object.keys(statusUpdates).length > 0) {
+      setModelFetchStatusByProvider((prev) => ({ ...prev, ...statusUpdates }));
+      setVerifiedProviders((prev) => ({ ...prev, ...verifiedUpdates }));
+    }
     const ap = localStorage.getItem("active_provider");
+    const resolvedActive =
+      ap && (PROVIDER_IDS as readonly string[]).includes(ap) ? ap : "opencode";
     if (ap && (PROVIDER_IDS as readonly string[]).includes(ap)) setActiveProvider(ap);
     setModelByProvider((prev) => {
       const n = { ...prev };
@@ -2152,6 +2244,8 @@ export default function CyberdeckPage() {
       }
       return n;
     });
+    const bootModels = caches[resolvedActive];
+    if (bootModels?.length) setModelList(bootModels);
     setDidHydrateProviderState(true);
   }, []);
 
@@ -2345,34 +2439,28 @@ export default function CyberdeckPage() {
     [playModelTestErrorSound, setModelHealth, setRateLimitedProviders, setVerifiedProviders],
   );
 
-  const activateModelById = useCallback(
-    (modelId: string) => {
-      const key = providerKeys[activeProvider];
-      if (!modelId) return;
-      setModelByProvider((prev) => ({ ...prev, [activeProvider]: modelId }));
-      setVerifiedProviders((prev) => ({ ...prev, [activeProvider]: false }));
-      try {
-        localStorage.setItem(`ascii_model_${activeProvider}`, modelId);
-      } catch {
-        /* ignore */
-      }
-      playSystemSound("click", 0.02);
-      if (ENABLE_AUTOMATION) {
-        void probeSelectedModel(activeProvider, modelId, key || "");
-      }
-    },
-    [activeProvider, probeSelectedModel, providerKeys, setVerifiedProviders],
-  );
-
   const fetchModelsForProvider = useCallback(
-    async (provider: string) => {
+    async (provider: string, options?: { force?: boolean }) => {
+      const force = options?.force === true;
       if (rateLimitedProviders.has(provider)) return;
-      const currentKey = providerKeys[provider];
+      const currentKey = (providerKeys[provider] || DEFAULT_CLIENT_PROVIDER_KEYS[provider] || "").trim();
       if (!currentKey) return;
 
-      setModelList([]);
+      const cachedFromState = modelCacheByProvider[provider];
+      const cached =
+        cachedFromState && cachedFromState.length > 0
+          ? cachedFromState
+          : loadProviderModelsCache(provider);
+
+      if (!force && cached.length > 0) {
+        setModelCacheByProvider((prev) => ({ ...prev, [provider]: cached }));
+        setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "ready" }));
+        setVerifiedProviders((prev) => ({ ...prev, [provider]: true }));
+        setModelList((prevList) => (activeProvider === provider ? cached : prevList));
+        return;
+      }
+
       setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "retrieving" }));
-      setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
 
       try {
         const res = await fetch("/api/cyberdeck-models", {
@@ -2393,6 +2481,7 @@ export default function CyberdeckPage() {
           if (res.status === 429 || res.status === 502 || res.status === 503) {
             setRateLimitedProviders((prev) => new Set(prev).add(provider));
             setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "error" }));
+            setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
             setMessages((prev) => [
               ...prev,
               {
@@ -2407,13 +2496,20 @@ export default function CyberdeckPage() {
             ...prev,
             [provider]: invalid ? "invalid-key" : "error",
           }));
-          if (invalid && currentKey) {
+          setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
+          if (invalid && providerKeys[provider]) {
             setProviderKeys((prev) => {
               const next = { ...prev };
               delete next[provider];
               return next;
             });
             localStorage.removeItem(`key_${provider}`);
+            setModelCacheByProvider((prev) => {
+              const next = { ...prev };
+              delete next[provider];
+              return next;
+            });
+            localStorage.removeItem(providerModelsCacheKey(provider));
             setMessages((prev) => [
               ...prev,
               { role: "system", text: `INVALID_KEY // ${provider.toUpperCase()} AUTH_REJECTED` },
@@ -2430,8 +2526,11 @@ export default function CyberdeckPage() {
           ...prev,
           [provider]: json.authSource === "default",
         }));
-        setModelList(raw);
+        setModelCacheByProvider((prev) => ({ ...prev, [provider]: raw }));
+        saveProviderModelsCache(provider, raw);
         setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "ready" }));
+        setVerifiedProviders((prev) => ({ ...prev, [provider]: true }));
+        setModelList((prevList) => (activeProvider === provider ? raw : prevList));
         setModelByProvider((prev) => {
           const current = prev[provider] || "";
           const hasCurrent = current && raw.some((m) => m.id === current);
@@ -2442,52 +2541,133 @@ export default function CyberdeckPage() {
           return { ...prev, [provider]: nextModel };
         });
       } catch {
-        setModelList([]);
         setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "error" }));
+        setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
+        setModelList((prevList) => (activeProvider === provider ? [] : prevList));
       }
     },
-    [providerKeys, rateLimitedProviders, setVerifiedProviders],
+    [activeProvider, modelCacheByProvider, providerKeys, rateLimitedProviders],
   );
 
-  const handleManualConnect = useCallback(() => {
-    if (!hasProviderAuth) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "system", text: "CONNECT_SKIPPED // NO_PROVIDER_KEY // PASTE_KEY_IN_CHAT_OR_ENV" },
-      ]);
-      return;
-    }
-    if (rateLimitedProviders.has(activeProvider)) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "system",
-          text: `CONNECT_BLOCKED // ${activeProvider.toUpperCase()} // RATE_LIMIT // OPERATOR_ACTION_REQUIRED`,
-        },
-      ]);
-      return;
-    }
-    void fetchModelsForProvider(activeProvider);
-  }, [activeProvider, fetchModelsForProvider, hasProviderAuth, rateLimitedProviders]);
+  const providerHasKey = useCallback(
+    (providerId: string) =>
+      Boolean(providerKeys[providerId]) || Boolean(defaultKeyAvailableByProvider[providerId]),
+    [defaultKeyAvailableByProvider, providerKeys],
+  );
 
-  const handleManualProbe = useCallback(() => {
-    const key = providerKeys[activeProvider];
-    if (!modelID) {
-      setMessages((prev) => [...prev, { role: "system", text: "PROBE_SKIPPED // NO_MODEL_SELECTED" }]);
-      return;
+  const syncModelListFromCache = useCallback(
+    (providerId: string) => {
+      const cached =
+        modelCacheByProvider[providerId]?.length
+          ? modelCacheByProvider[providerId]
+          : loadProviderModelsCache(providerId);
+      if (cached.length > 0) {
+        setModelList(cached);
+        setModelCacheByProvider((prev) =>
+          prev[providerId]?.length ? prev : { ...prev, [providerId]: cached },
+        );
+        return;
+      }
+      setModelList([]);
+      if (providerHasKey(providerId) && !rateLimitedProviders.has(providerId)) {
+        void fetchModelsForProvider(providerId);
+      }
+    },
+    [fetchModelsForProvider, modelCacheByProvider, providerHasKey, rateLimitedProviders],
+  );
+
+  const refreshProviderModelsDebounced = useCallback(
+    (providerId: string) => {
+      const now = Date.now();
+      const last = providerRefreshAtRef.current[providerId] || 0;
+      if (now - last < PROVIDER_LINK_REFRESH_COOLDOWN_MS) {
+        toast.info("Refresh cooldown — wait before refreshing again.");
+        return;
+      }
+      providerRefreshAtRef.current[providerId] = now;
+      if (!providerHasKey(providerId)) return;
+      void fetchModelsForProvider(providerId, { force: true });
+    },
+    [fetchModelsForProvider, providerHasKey],
+  );
+
+  const handleProviderClick = useCallback(
+    (id: string) => {
+      const now = Date.now();
+      const tracker = providerClickTrackerRef.current;
+      const sameBurst =
+        tracker.providerId === id && now - tracker.lastClickAt < PROVIDER_CLICK_ESCALATION_MS;
+
+      if (id !== activeProvider) {
+        tracker.providerId = id;
+        tracker.count = 1;
+        tracker.lastClickAt = now;
+        setCredentialReplaceProvider(null);
+        selectProvider(id);
+        syncModelListFromCache(id);
+        return;
+      }
+
+      if (!sameBurst) {
+        tracker.providerId = id;
+        tracker.count = 1;
+        tracker.lastClickAt = now;
+        return;
+      }
+
+      tracker.count += 1;
+      tracker.lastClickAt = now;
+
+      if (tracker.count === 2) {
+        refreshProviderModelsDebounced(id);
+        return;
+      }
+      if (tracker.count >= 3) {
+        setCredentialReplaceProvider(id);
+        setGatewayKeyDraft("");
+      }
+    },
+    [activeProvider, refreshProviderModelsDebounced, selectProvider, syncModelListFromCache],
+  );
+
+  const submitGatewayKey = useCallback(async () => {
+    const trimmed = gatewayKeyDraft.trim();
+    if (!trimmed) return;
+    const provider = credentialReplaceProvider ?? activeProvider;
+    setProviderKeys((prev) => ({ ...prev, [provider]: trimmed }));
+    try {
+      localStorage.setItem(`key_${provider}`, trimmed);
+    } catch {
+      /* ignore */
     }
-    if (rateLimitedProviders.has(activeProvider)) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "system",
-          text: `PROBE_BLOCKED // ${activeProvider.toUpperCase()} // RATE_LIMIT // OPERATOR_ACTION_REQUIRED`,
-        },
-      ]);
-      return;
-    }
-    void probeSelectedModel(activeProvider, modelID, key || "");
-  }, [activeProvider, modelID, probeSelectedModel, providerKeys, rateLimitedProviders]);
+    setCredentialReplaceProvider(null);
+    setGatewayKeyDraft("");
+    setRateLimitedProviders((prev) => {
+      if (!prev.has(provider)) return prev;
+      const next = new Set(prev);
+      next.delete(provider);
+      return next;
+    });
+    await fetchModelsForProvider(provider, { force: true });
+  }, [activeProvider, credentialReplaceProvider, fetchModelsForProvider, gatewayKeyDraft]);
+
+  const activateModelById = useCallback(
+    (modelId: string) => {
+      const key = providerKeys[activeProvider];
+      if (!modelId) return;
+      setModelByProvider((prev) => ({ ...prev, [activeProvider]: modelId }));
+      try {
+        localStorage.setItem(`ascii_model_${activeProvider}`, modelId);
+      } catch {
+        /* ignore */
+      }
+      playSystemSound("click", 0.02);
+      if (ENABLE_AUTOMATION) {
+        void probeSelectedModel(activeProvider, modelId, key || "");
+      }
+    },
+    [activeProvider, probeSelectedModel, providerKeys],
+  );
 
   // Column-scoped arrows: rail / chat scroll / gateway (providers + models). Tab rail: Escape; Enter on rail → gateway + provider hover.
   useEffect(() => {
@@ -2860,7 +3040,7 @@ export default function CyberdeckPage() {
         if (providerKeyboardHighlightId == null) return;
         e.preventDefault();
         sfxNav.commit();
-        selectProvider(providerKeyboardHighlightId);
+        handleProviderClick(providerKeyboardHighlightId);
         setProviderKeyboardHighlightId(null);
         setModelKeyboardHighlightId(null);
       }
@@ -2875,7 +3055,7 @@ export default function CyberdeckPage() {
     modelList,
     navRailContext,
     providerKeyboardHighlightId,
-    selectProvider,
+    handleProviderClick,
     pasteClipboardToHeap,
     pasteClipboardToOperator,
     server,
@@ -2947,12 +3127,29 @@ export default function CyberdeckPage() {
     });
   }, [activeProvider, modelList]);
 
-  // Fetch models for selected provider (automation only — manual mode uses CONNECT).
+  // Bootstrap active provider link once after hydrate (cache-first; fetch only if missing).
   useEffect(() => {
-    if (!ENABLE_AUTOMATION) return;
-    if (!didHydrateProviderState) return;
-    void fetchModelsForProvider(activeProvider);
-  }, [activeProvider, didHydrateProviderState, fetchModelsForProvider]);
+    if (!didHydrateProviderState || providerBootstrapRef.current) return;
+    providerBootstrapRef.current = true;
+    const cached =
+      modelCacheByProvider[activeProvider]?.length
+        ? modelCacheByProvider[activeProvider]
+        : loadProviderModelsCache(activeProvider);
+    if (cached.length > 0) {
+      setModelList(cached);
+      return;
+    }
+    if (providerKeys[activeProvider] || defaultKeyAvailableByProvider[activeProvider]) {
+      void fetchModelsForProvider(activeProvider);
+    }
+  }, [
+    activeProvider,
+    defaultKeyAvailableByProvider,
+    didHydrateProviderState,
+    fetchModelsForProvider,
+    modelCacheByProvider,
+    providerKeys,
+  ]);
 
   useEffect(() => {
     const latest = messages[messages.length - 1];
@@ -3757,8 +3954,9 @@ const resolved = resolveUiTarget(userMessage);
       }
       setMessages((prev) => [
         ...prev,
-        { role: "system", text: `KEY FOR ${activeProvider.toUpperCase()} REGISTERED.` },
+        { role: "system", text: `KEY FOR ${activeProvider.toUpperCase()} REGISTERED // VALIDATING_LINK` },
       ]);
+      void fetchModelsForProvider(activeProvider, { force: true });
       setIsStreaming(false);
       return;
     }
@@ -5890,19 +6088,6 @@ duration_ms: ${durationMs}`;
                     MAINNET-UPLINK
                   </div>
 
-                  <div className="mb-3 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={clearSavedCustomTabState}
-                      className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-amber-500/60 hover:text-amber-200"
-                    >
-                      CLEAR TAB STATE
-                    </button>
-                    <div className="font-mono text-[9px] tracking-[0.08em] text-[#6a6a6a]">
-                      Clears live and saved custom tabs.
-                    </div>
-                  </div>
-
                   <div
                     className="cursor-default py-1 font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
                     style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
@@ -5914,6 +6099,13 @@ duration_ms: ${durationMs}`;
                     {providers.map((p) => {
                       const selected = activeProvider === p.id;
                       const kbHover = providerKeyboardHighlightId === p.id;
+                      const linkStatus = modelFetchStatusByProvider[p.id] || "idle";
+                      const tone = resolveProviderVisualTone({
+                        hasKey: providerHasKey(p.id),
+                        status: linkStatus,
+                        rateLimited: rateLimitedProviders.has(p.id),
+                      });
+                      const toneColors = providerToneColors(tone);
                       return (
                         <div
                           key={p.id}
@@ -5921,16 +6113,15 @@ duration_ms: ${durationMs}`;
                           className={`nav-row cursor-pointer py-[5px]${kbHover ? " nav-row-kb-hover" : ""}`}
                           style={
                             {
-                              "--nav-color": selected ? "#00ff00" : inactiveSubtleTextColor,
-                              "--nav-shadow": selected ? activeTextGlow : inactiveTextGlow,
-                              "--nav-hover-color": selected ? "#36ff73" : "#b0b0b0",
-                              "--nav-hover-shadow": selected
-                                ? "0 0 10px rgba(54, 255, 115, 0.30)"
-                                : inactiveTextGlow,
+                              "--nav-color": toneColors.color,
+                              "--nav-shadow": toneColors.shadow,
+                              "--nav-hover-color": toneColors.hoverColor,
+                              "--nav-hover-shadow": toneColors.hoverShadow,
+                              fontWeight: selected ? 600 : 400,
                             } as CSSProperties
                           }
                           onClick={() => {
-                            selectProvider(p.id);
+                            handleProviderClick(p.id);
                             setProviderKeyboardHighlightId(null);
                             setModelKeyboardHighlightId(null);
                           }}
@@ -5951,36 +6142,32 @@ duration_ms: ${durationMs}`;
                       transition: "opacity 0.2s",
                     }}
                   >
-                    {!ENABLE_AUTOMATION ? (
-                      <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleManualConnect}
-                          disabled={
-                            !hasProviderAuth ||
-                            providerModelFetchStatus === "retrieving" ||
-                            rateLimitedProviders.has(activeProvider)
-                          }
-                          className="rounded border border-green-800 px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-green-400 transition hover:border-green-500 hover:text-green-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    {(!hasProviderAuth || credentialReplaceProvider === activeProvider) ? (
+                      <div className="mb-3">
+                        <label
+                          htmlFor="gateway-provider-key"
+                          className="mb-1 block font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]"
                         >
-                          CONNECT
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleManualProbe}
-                          disabled={
-                            !hasProviderAuth ||
-                            !modelID ||
-                            Boolean(probeInFlightByProvider[activeProvider]) ||
-                            rateLimitedProviders.has(activeProvider)
-                          }
-                          className="rounded border border-[#2d2d2d] px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-amber-500/60 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          TEST MODEL
-                        </button>
-                        <div className="font-mono text-[9px] tracking-[0.06em] text-[#6a6a6a]">
-                          MANUAL_BRIDGE // ONE_REQUEST_PER_ACTION
-                        </div>
+                          {credentialReplaceProvider === activeProvider
+                            ? "ENTER NEW KEY"
+                            : "ENTER GATEWAY KEY"}
+                        </label>
+                        <input
+                          id="gateway-provider-key"
+                          type="password"
+                          value={gatewayKeyDraft}
+                          onChange={(e) => setGatewayKeyDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void submitGatewayKey();
+                            }
+                          }}
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="w-full rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[10px] text-green-300 outline-none focus:border-green-700"
+                          placeholder={`${activeProvider.toUpperCase()} API KEY`}
+                        />
                       </div>
                     ) : null}
                     <div
@@ -5991,7 +6178,7 @@ duration_ms: ${durationMs}`;
                     </div>
                     {!hasProviderAuth ? (
                       <div className="font-mono text-[10px]" style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}>
-                        NO_KEY // PASTE_IN_CHAT_OR_PRESS_CONNECT_AFTER_KEY
+                        NO_KEY // ENTER_KEY_ABOVE_OR_PASTE_IN_CHAT
                       </div>
                     ) : rateLimitedProviders.has(activeProvider) ? (
                       <div className="font-mono text-[10px] text-amber-300" style={{ textShadow: "0 0 8px rgba(255, 170, 0, 0.28)" }}>

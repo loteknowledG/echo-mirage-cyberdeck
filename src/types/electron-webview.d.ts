@@ -47,7 +47,7 @@ declare global {
     showDialog(options: {
       defaultRelativePath: string;
       content: string;
-    }): Promise<{ canceled: boolean; filePath?: string }>;
+    }): Promise<{ canceled: boolean; filePath?: string; error?: string }>;
   }
 
   interface Window {

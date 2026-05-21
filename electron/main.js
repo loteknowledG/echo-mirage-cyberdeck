@@ -339,23 +339,32 @@ ipcMain.handle('echo-mirage-browser:forward', async () => {
 });
 
 ipcMain.handle('echo-mirage-save:show-dialog', async (_event, options) => {
-  const relative = String(options?.defaultRelativePath || 'docs/cadre/operator-doc.md').replace(/\\/g, '/');
-  const content = String(options?.content || '');
-  const projectRoot = getEchoMirageProjectRoot();
-  const defaultPath = path.join(projectRoot, ...relative.split('/').filter(Boolean));
-  const win = BrowserWindow.getFocusedWindow();
-  const result = await dialog.showSaveDialog(win || undefined, {
-    defaultPath,
-    filters: [
-      { name: 'Markdown', extensions: ['md', 'markdown'] },
-      { name: 'Text', extensions: ['txt'] },
-    ],
-  });
-  if (result.canceled || !result.filePath) {
-    return { canceled: true };
+  try {
+    const relative = String(options?.defaultRelativePath || 'docs/cadre/operator-doc.md').replace(/\\/g, '/');
+    const content = String(options?.content || '');
+    const projectRoot = getEchoMirageProjectRoot();
+    const defaultPath = path.join(projectRoot, ...relative.split('/').filter(Boolean));
+    await fs.mkdir(path.dirname(defaultPath), { recursive: true });
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+    const result = await dialog.showSaveDialog(win, {
+      defaultPath,
+      filters: [
+        { name: 'Markdown', extensions: ['md', 'markdown'] },
+        { name: 'Text', extensions: ['txt'] },
+      ],
+    });
+    if (result.canceled || !result.filePath) {
+      return { canceled: true };
+    }
+    await fs.mkdir(path.dirname(result.filePath), { recursive: true });
+    await fs.writeFile(result.filePath, content, 'utf8');
+    return { canceled: false, filePath: result.filePath };
+  } catch (error) {
+    return {
+      canceled: true,
+      error: error instanceof Error ? error.message : 'Save dialog failed',
+    };
   }
-  await fs.writeFile(result.filePath, content, 'utf8');
-  return { canceled: false, filePath: result.filePath };
 });
 
 // Computer Use Layer IPC handlers
