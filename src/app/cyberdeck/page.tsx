@@ -85,6 +85,10 @@ import {
   type OperatorDocumentPickerKind,
 } from "@/lib/operator-document-types";
 import {
+  cleanOperatorPasteText,
+  operatorPasteWasCleaned,
+} from "@/lib/operator-paste-cleaner";
+import {
   buildOperatorSaveIntent,
   downloadOperatorDoc,
   isPickerAbortError,
@@ -1660,9 +1664,21 @@ export default function CyberdeckPage() {
   }, []);
 
   const setOperatorTextAsset = useCallback((asset: DroppedOperatorAsset) => {
-    const next = operatorKindManualRef.current ? asset : applyOperatorTextAutodetect(asset);
+    let prepared = asset;
+    if (asset.text) {
+      const cleanedText = cleanOperatorPasteText(asset.text);
+      if (cleanedText !== asset.text) {
+        prepared = {
+          ...asset,
+          text: cleanedText,
+          size: new Blob([cleanedText]).size,
+        };
+      }
+    }
+    const next = operatorKindManualRef.current ? prepared : applyOperatorTextAutodetect(prepared);
     setOperatorDroppedAsset(next);
     setOperatorDocNameDraft(next.name || "");
+    return operatorPasteWasCleaned(asset.text || "", next.text || "");
   }, []);
 
   const handleOperatorDocumentKindChange = useCallback((nextKind: OperatorDocumentPickerKind) => {
@@ -1962,7 +1978,7 @@ export default function CyberdeckPage() {
         return;
       }
 
-      setOperatorTextAsset({
+      const strippedWrapper = setOperatorTextAsset({
         kind: "text",
         name: operatorDroppedAsset?.name ?? "",
         mimeType: "text/plain",
@@ -1971,7 +1987,11 @@ export default function CyberdeckPage() {
       });
       setOperatorSurfaceMode("workspace");
       setOperatorDocMode("edit");
-      toast.success("Pasted clipboard into a new operator draft.");
+      toast.success(
+        strippedWrapper
+          ? "Pasted into operator — stripped chat code-fence wrapper."
+          : "Pasted clipboard into a new operator draft.",
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not paste clipboard text.");
     }
