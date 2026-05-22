@@ -150,7 +150,7 @@ export function CyberdeckOperatorPaneBody({
 
   const operatorDocText = operatorDroppedAsset?.text || "";
   const operatorShowsMarkdown = normalizeOperatorDocumentKind(operatorDocumentKind) === "markdown";
-  const operatorCanPickDocKind = Boolean(operatorDroppedAsset?.text);
+  const operatorCanPickDocKind = operatorSurfaceIsDocument;
   const operatorFileSizeLabel = operatorDroppedAsset
     ? `// ${Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB`
     : null;

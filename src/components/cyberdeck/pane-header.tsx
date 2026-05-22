@@ -25,9 +25,9 @@ export function CyberdeckPaneHeader({
   rightClassName,
 }: PaneHeaderProps) {
   return (
-    <div className={cn("flex items-center justify-between border-b border-[#141414] px-3 py-2", className)}>
+    <div className={cn("flex min-w-0 max-w-full items-center justify-between border-b border-[#141414] px-3 py-2", className)}>
       <div className={cn("min-w-0 flex-1 pr-3", leftClassName)}>{left}</div>
-      {right ? <div className={cn("min-w-0 pt-[1px]", rightClassName)}>{right}</div> : null}
+      {right ? <div className={cn("shrink-0 pt-[1px]", rightClassName)}>{right}</div> : null}
     </div>
   );
 }

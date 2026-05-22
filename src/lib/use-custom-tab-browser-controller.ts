@@ -19,7 +19,8 @@ type CustomTabBrowserKind =
   | "operators"
   | "memory-atlas"
   | "voice-lab"
-  | "flight-log";
+  | "flight-log"
+  | "glyph-channel";
 
 type CustomTabBrowserState = {
   id: string;

@@ -267,6 +267,14 @@ body,
   border-top: 1px solid rgba(57, 255, 136, 0.2);
 }
 
+/* ⟁ Glyph composer — match ECHO m-2 inset; mirage-pane-body adds pane padding. */
+.glyph-channel-composer {
+  box-sizing: border-box;
+  margin: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .pi-pane-host message-editor > div {
   background: rgba(5, 7, 8, 0.9) !important;
   border-color: rgba(57, 255, 136, 0.16) !important;
@@ -527,7 +535,15 @@ body,
 /* Cyberdeck network activity animation (text sweep only). */
 .cyberdeck-net-pane {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
+}
+
+.mirage-pane-body {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .cyberdeck-net-logo {

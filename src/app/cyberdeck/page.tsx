@@ -78,6 +78,7 @@ import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import {
   applyOperatorTextAutodetect,
+  createBlankOperatorDocument,
   isOperatorDocumentSurfaceKind,
   normalizeOperatorDocumentKind,
   operatorMimeTypeForKind,
@@ -90,6 +91,16 @@ import {
   operatorMarkdownWasHousekept,
 } from "@/lib/operator-markdown-housekeeping";
 import { parseConvertDocumentIntent } from "@/lib/muthur-document-conversion-intent";
+import { parseGlyphCommand, type GlyphCommand } from "@/lib/muthur-glyph-intent";
+import {
+  getGlyphChannelText,
+  GLYPH_MODE_UPDATE_EVENT,
+  readGlyphModeActive,
+  readGlyphPaneSettings,
+  renderGlyphOutput,
+  setGlyphChannelContent,
+  writeGlyphModeActive,
+} from "@/lib/glyph-channel";
 import {
   canNavigateOperatorFileBack,
   canNavigateOperatorFileForward,
@@ -124,6 +135,7 @@ import { CyberdeckOperatorsPaneBody } from "@/components/cyberdeck/operators-pan
 import { CyberdeckMemoryAtlasPaneBody } from "@/components/cyberdeck/memory-atlas-pane-body";
 import { CyberdeckVoiceLabPaneBody } from "@/components/cyberdeck/voice-lab-pane-body";
 import { CyberdeckFlightLogPaneBody } from "@/components/cyberdeck/flight-log-pane-body";
+import { CyberdeckGlyphChannelPaneBody } from "@/components/cyberdeck/glyph-channel-pane-body";
 import { CyberdeckSettingsPaneBody } from "@/components/cyberdeck/settings-pane-body";
 import { ProjectPaneBody } from "@/components/cyberdeck/project-pane-body";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
@@ -245,6 +257,7 @@ const CUSTOM_TAB_KINDS = [
   "memory-atlas",
   "voice-lab",
   "flight-log",
+  "glyph-channel",
   "catelog",
 ] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -278,6 +291,7 @@ type DroppedOperatorAsset = {
     | "css"
     | "html"
     | "javascript"
+    | "json"
     | "markdown"
     | "pdf"
     | "python"
@@ -448,6 +462,13 @@ function getOperatorFileKind(file: File): DroppedOperatorAsset["kind"] {
   if (lowerName.endsWith(".md") || lowerName.endsWith(".markdown") || file.type === "text/markdown") {
     return "markdown";
   }
+  if (
+    lowerName.endsWith(".json") ||
+    lowerName.endsWith(".jsonc") ||
+    file.type === "application/json"
+  ) {
+    return "json";
+  }
   if (isEditableOperatorFile(file)) {
     return "code";
   }
@@ -598,6 +619,14 @@ function normalizeCustomTabKind(kind: string) {
   if (nextKind === "flightlog" || nextKind === "flight_log") {
     return "flight-log" as CustomTabKind;
   }
+  if (
+    nextKind === "glyph" ||
+    nextKind === "glyph-channel" ||
+    nextKind === "glyph_channel" ||
+    nextKind === "glyphchannel"
+  ) {
+    return "glyph-channel" as CustomTabKind;
+  }
   if (CUSTOM_TAB_KINDS.includes(nextKind as CustomTabKind)) {
     return nextKind as CustomTabKind;
   }
@@ -627,6 +656,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "memory-atlas") return "M";
   if (kind === "voice-lab") return "V";
   if (kind === "flight-log") return "F";
+  if (kind === "glyph-channel") return "⟁";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
@@ -635,6 +665,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "memory-atlas") return "MEMORY ATLAS";
   if (kind === "voice-lab") return "VOICE LAB";
   if (kind === "flight-log") return "FLIGHT LOG";
+  if (kind === "glyph-channel") return "⟁ GLYPH";
   return kind.toUpperCase();
 }
 
@@ -677,7 +708,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|project|pi|diagnostics|diagnostic|catelog|catalog|command|operators|memory-atlas|voice-lab|flight-log)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|project|pi|diagnostics|diagnostic|catelog|catalog|command|operators|memory-atlas|voice-lab|flight-log|glyph-channel|glyph)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -717,14 +748,19 @@ export default function CyberdeckPage() {
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
-  const [operatorDroppedAsset, setOperatorDroppedAsset] = useState<DroppedOperatorAsset | null>(null);
+  const [operatorDroppedAsset, setOperatorDroppedAsset] = useState<DroppedOperatorAsset | null>(() =>
+    createBlankOperatorDocument(),
+  );
   const [operatorSurfaceMode, setOperatorSurfaceMode] = useState<"workspace" | "browser">("workspace");
   const [operatorBrowserEngine, setOperatorBrowserEngine] = useState("UNKNOWN");
-  const [operatorDocMode, setOperatorDocMode] = useState<"view" | "edit">("view");
-  const [operatorDocNameDraft, setOperatorDocNameDraft] = useState("");
+  const [operatorDocMode, setOperatorDocMode] = useState<"view" | "edit">("edit");
+  const [operatorDocNameDraft, setOperatorDocNameDraft] = useState(
+    () => createBlankOperatorDocument().name,
+  );
   const [operatorFileHistory, setOperatorFileHistory] = useState<string[]>([]);
   const [operatorFileHistoryIndex, setOperatorFileHistoryIndex] = useState(-1);
   const [operatorActiveFilePath, setOperatorActiveFilePath] = useState<string | null>(null);
+  const [glyphModeActive, setGlyphModeActive] = useState(false);
   const operatorFileHistoryRef = useRef<string[]>([]);
   const operatorFileHistoryIndexRef = useRef(-1);
   const operatorFolderRootsRef = useRef<OperatorDocFolderRoot[]>([]);
@@ -889,6 +925,117 @@ export default function CyberdeckPage() {
     });
   }, [syncInputCaret]);
 
+  const syncGlyphChannelTabGlyphs = useCallback(() => {
+    setCustomTabs((prev) =>
+      prev.map((tab) =>
+        tab.kind === "glyph-channel" ? { ...tab, glyph: "⟁", label: "⟁ GLYPH" } : tab,
+      ),
+    );
+  }, []);
+
+  const focusGlyphChannelTab = useCallback(() => {
+    const existing = customTabs.find((tab) => tab.kind === "glyph-channel");
+    if (existing) {
+      setActiveCustomTabId(existing.id);
+      syncGlyphChannelTabGlyphs();
+    } else {
+      const id = `tab-${crypto.randomUUID()}`;
+      setCustomTabs((prev) => [
+        ...prev,
+        { id, label: "⟁ GLYPH", glyph: "⟁", kind: "glyph-channel" },
+      ]);
+      setActiveCustomTabId(id);
+    }
+    setNavRailContext("tabs");
+    playSystemSound("chirp", 0.05);
+  }, [customTabs, syncGlyphChannelTabGlyphs]);
+
+  const railGlyphForServer = useCallback(
+    (btn: (typeof servers)[number]) => {
+      if (glyphModeActive && btn.id === "s") return "⟁";
+      return btn.glyph;
+    },
+    [glyphModeActive],
+  );
+
+  const railGlyphForCustomTab = useCallback((tab: CustomTab) => {
+    if (tab.kind === "glyph-channel") return "⟁";
+    return tab.glyph;
+  }, []);
+
+  const renderGlyphToChannel = useCallback(
+    async (engine: "ascii" | "figlet", text: string) => {
+      const { figletFont } = readGlyphPaneSettings();
+      const output = await renderGlyphOutput({
+        engine,
+        text,
+        font: engine === "figlet" ? figletFont : undefined,
+      });
+      await setGlyphChannelContent(output);
+      focusGlyphChannelTab();
+      return output;
+    },
+    [focusGlyphChannelTab],
+  );
+
+  const handleGlyphOperatorCommand = useCallback(
+    async (command: GlyphCommand) => {
+      switch (command.kind) {
+        case "mode-on":
+          setGlyphModeActive(true);
+          writeGlyphModeActive(true);
+          syncGlyphChannelTabGlyphs();
+          focusGlyphChannelTab();
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              text: "⟁ Glyph mode active. Use the ⟁ tab composer ($) to render figlet / ascii.",
+            },
+          ]);
+          return;
+        case "mode-off":
+          setGlyphModeActive(false);
+          writeGlyphModeActive(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              text: "⟁ Glyph mode off. Chat input resumes normal routing.",
+            },
+          ]);
+          return;
+        case "clear":
+          await setGlyphChannelContent("");
+          focusGlyphChannelTab();
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: "⟁ Glyph Channel cleared." },
+          ]);
+          return;
+        case "copy": {
+          const text = await getGlyphChannelText();
+          await copyTextToClipboard(text);
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: "⟁ Glyph Channel copied to clipboard." },
+          ]);
+          return;
+        }
+        case "render":
+          await renderGlyphToChannel(command.engine, command.text);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              text: `⟁ Rendered to Glyph Channel (${command.engine}).`,
+            },
+          ]);
+          return;
+      }
+    },
+    [focusGlyphChannelTab, renderGlyphToChannel, syncGlyphChannelTabGlyphs],
+  );
 
   const providers = [
     { id: "opencode" as const, name: "OPENCODE" },
@@ -1453,6 +1600,25 @@ export default function CyberdeckPage() {
   }, [deckMode]);
 
   useEffect(() => {
+    const active = readGlyphModeActive();
+    setGlyphModeActive(active);
+    if (active) syncGlyphChannelTabGlyphs();
+  }, [syncGlyphChannelTabGlyphs]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (event: Event) => {
+      const active = (event as CustomEvent<{ active?: boolean }>).detail?.active;
+      if (typeof active === "boolean") {
+        setGlyphModeActive(active);
+        if (active) syncGlyphChannelTabGlyphs();
+      }
+    };
+    window.addEventListener(GLYPH_MODE_UPDATE_EVENT, handler);
+    return () => window.removeEventListener(GLYPH_MODE_UPDATE_EVENT, handler);
+  }, [syncGlyphChannelTabGlyphs]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const storedInput = window.localStorage.getItem(INPUT_STORAGE_KEY);
@@ -1831,18 +1997,21 @@ export default function CyberdeckPage() {
     operatorKindManualRef.current = true;
     setOperatorDroppedAsset((prev) => {
       if (!prev) return prev;
-      const text = prev.text || "";
-      const mimeType = operatorMimeTypeForKind(nextKind);
-      const name = resolveOperatorDocumentNameForKind(nextKind, text, prev.name);
-      setOperatorDocNameDraft(name);
+      const name = resolveOperatorDocumentNameForKind(nextKind, prev.text || "", prev.name);
       return {
         ...prev,
         kind: nextKind,
-        mimeType,
+        mimeType: operatorMimeTypeForKind(nextKind),
         name,
       };
     });
   }, []);
+
+  useEffect(() => {
+    if (!operatorDroppedAsset) return;
+    if (document.activeElement === operatorNameInputRef.current) return;
+    setOperatorDocNameDraft(operatorDroppedAsset.name);
+  }, [operatorDroppedAsset?.kind, operatorDroppedAsset?.name]);
 
   const handleOperatorDocumentTextChange = useCallback((nextText: string) => {
     setOperatorDroppedAsset((prev) => {
@@ -1851,9 +2020,6 @@ export default function CyberdeckPage() {
         prev.kind === "markdown"
           ? resolveOperatorDocumentNameForKind("markdown", nextText, prev.name)
           : prev.name;
-      if (prev.kind === "markdown") {
-        setOperatorDocNameDraft(name);
-      }
       return {
         ...prev,
         text: nextText,
@@ -2179,7 +2345,13 @@ export default function CyberdeckPage() {
       return;
     }
 
-    if (kind === "markdown" || kind === "code" || kind === "text" || isEditableOperatorFile(file)) {
+    if (
+      kind === "markdown" ||
+      kind === "code" ||
+      kind === "text" ||
+      kind === "json" ||
+      isEditableOperatorFile(file)
+    ) {
       try {
         const text = await file.text();
         setOperatorTextAsset({ ...baseAsset, text });
@@ -3529,6 +3701,23 @@ export default function CyberdeckPage() {
     setStreamText("");
     setStreamToolTrace("");
     setGeneratedUI(null);
+
+    const glyphCommand = parseGlyphCommand(userMessage);
+    if (glyphCommand) {
+      try {
+        await handleGlyphOperatorCommand(glyphCommand);
+      } catch (err) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: `GLYPH // FAILED // ${err instanceof Error ? err.message : "Glyph command failed"}`,
+          },
+        ]);
+      }
+      setIsStreaming(false);
+      return;
+    }
 
     if (tabCommand?.kind === "create") {
       const id = `tab-${crypto.randomUUID()}`;
@@ -4904,7 +5093,7 @@ duration_ms: ${durationMs}`;
         } catch {
           nextAsset = baseAsset;
         }
-      } else if (kind === "markdown" || kind === "code" || kind === "text") {
+      } else if (kind === "markdown" || kind === "code" || kind === "text" || kind === "json") {
         try {
           const text = await file.text();
           nextAsset = { ...baseAsset, text };
@@ -5071,7 +5260,16 @@ duration_ms: ${durationMs}`;
   }, [customTabs]);
 
   const openOrFocusModuleTab = useCallback(
-    (target: "memory-atlas" | "catalog" | "operators" | "flight-log" | "voice-lab" | "settings" | "command" | "project") => {
+    (target:
+      | "memory-atlas"
+      | "catalog"
+      | "operators"
+      | "flight-log"
+      | "voice-lab"
+      | "glyph-channel"
+      | "settings"
+      | "command"
+      | "project") => {
       const existing = customTabs.find((tab) => tab.kind === target);
       if (existing) {
         setActiveCustomTabId(existing.id);
@@ -5118,6 +5316,7 @@ duration_ms: ${durationMs}`;
         target !== "operators" &&
         target !== "flight-log" &&
         target !== "voice-lab" &&
+        target !== "glyph-channel" &&
         target !== "settings" &&
         target !== "command" &&
         target !== "project"
@@ -5246,22 +5445,12 @@ duration_ms: ${durationMs}`;
                 </div>
               }
               right={
-                right || (
-                  <div className="flex items-center gap-2">
-                    {tab.kind === "web" ? (
-                      <div className="rounded border border-[#2d2d2d] px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                        ENGINE: {operatorBrowserEngine}
-                      </div>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={deleteActiveTab}
-                      className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-red-500/60 hover:text-red-200"
-                    >
-                      DELETE TAB
-                    </button>
+                right ||
+                (tab.kind === "web" ? (
+                  <div className="rounded border border-[#2d2d2d] px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+                    ENGINE: {operatorBrowserEngine}
                   </div>
-                )
+                ) : null)
               }
             />
             {content}
@@ -5497,16 +5686,26 @@ duration_ms: ${durationMs}`;
         return shell(<CyberdeckFlightLogPaneBody />);
       }
 
+      if (tab.kind === "glyph-channel") {
+        return (
+          <div
+            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
+            data-pointer-target="glyph-channel"
+          >
+            <CyberdeckGlyphChannelPaneBody />
+          </div>
+        );
+      }
+
       return shell(
         <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-          BLANK TAB // USE CHAT COMMANDS TO CONVERT TO DOCUMENT, WEB, CATALOG, COMMAND, OPERATORS, MEMORY-ATLAS, VOICE-LAB, FLIGHT-LOG, SETTINGS, CONNECTION, DIAGNOSTICS, OR PI.
+          BLANK TAB // USE CHAT COMMANDS TO CONVERT TO DOCUMENT, WEB, CATALOG, COMMAND, OPERATORS, MEMORY-ATLAS, VOICE-LAB, FLIGHT-LOG, GLYPH-CHANNEL, SETTINGS, CONNECTION, DIAGNOSTICS, OR PI.
         </div>,
       );
     },
     [
       activeProvider,
       connectionState,
-      deleteActiveTab,
       customTabBrowserNavigate,
       handleCustomTabDrop,
       heapEntries.length,
@@ -5543,6 +5742,7 @@ duration_ms: ${durationMs}`;
     { label: "Memory Atlas", kind: "memory-atlas", action: "convert" },
     { label: "Voice Lab", kind: "voice-lab", action: "convert" },
     { label: "Flight Log", kind: "flight-log", action: "convert" },
+    { label: "⟁ Glyph", kind: "glyph-channel", action: "convert" },
     { label: "Diagnostics", kind: "diagnostics", action: "convert" },
     { label: "Pi", kind: "pi", action: "convert" },
     { label: "Settings", action: "settings-pane" },
@@ -5844,7 +6044,9 @@ duration_ms: ${durationMs}`;
                 cursor: "pointer",
               }}
             >
-              {railServer === btn.id ? art.pushed(btn.glyph) : art.popped(btn.glyph)}
+              {railServer === btn.id
+                ? art.pushed(railGlyphForServer(btn))
+                : art.popped(railGlyphForServer(btn))}
             </pre>
           </cyberdeck-rail-tab>
         ))}
@@ -5874,7 +6076,9 @@ duration_ms: ${durationMs}`;
                 cursor: "pointer",
               }}
             >
-              {selectedRailTabId === tab.id ? art.pushed(tab.glyph) : art.popped(tab.glyph)}
+              {selectedRailTabId === tab.id
+                ? art.pushed(railGlyphForCustomTab(tab))
+                : art.popped(railGlyphForCustomTab(tab))}
             </pre>
           </cyberdeck-rail-tab>
         ))}
@@ -6071,7 +6275,13 @@ duration_ms: ${durationMs}`;
                       syncInputCaret();
                     }}
                     onBlur={() => setIsInputFocused(false)}
-                    placeholder={!hasProviderAuth ? "ENTER GATEWAY KEY..." : "Enter command or message..."}
+                    placeholder={
+                      !hasProviderAuth
+                        ? "ENTER GATEWAY KEY..."
+                        : glyphModeActive
+                          ? "⟁ Glyph mode on — compose on ⟁ tab; $ here is MUTHUR chat"
+                          : "Enter command or message..."
+                    }
                     className={`w-full rounded-none border-0 bg-black py-3 pl-9 pr-3 font-mono text-sm text-green-400 placeholder:text-green-800 transition-all focus:outline-none ${
                       isInputFocused ? "caret-transparent" : ""
                     }`}
@@ -6262,11 +6472,12 @@ duration_ms: ${durationMs}`;
           >
             <MirageHeader />
             <p className="sr-only">
-              Command. Catalog. Operators. Memory Atlas. Voice Lab. Flight Log. Settings. Craftwerk Cyberdeck
+              Command. Catalog. Operators. Memory Atlas. Voice Lab. Flight Log. ⟁ Glyph. Settings. Craftwerk Cyberdeck
               Corporation. ChatGPT // Lead. Cursor // Dev. Codex // Test. Samus-Manus // Memory. ASCII. REALMORPH.
             </p>
+            <div className="mirage-pane-body box-border flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden ps-2 pe-3">
             {server === "ct" ? (
-              <div className="flex flex-1 flex-col overflow-hidden">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                 <CardTablePane
                   activeHand={getCardTableState().activeHand}
                   stagedCardCount={selectedCardIds.length}
@@ -6593,6 +6804,7 @@ duration_ms: ${durationMs}`;
                 </div>
               ) : null}
             </div>
+          </div>
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

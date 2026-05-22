@@ -4,6 +4,7 @@ import { BsMarkdown } from "react-icons/bs";
 import { GrCss3 } from "react-icons/gr";
 import { RiJavascriptLine } from "react-icons/ri";
 import { TbBrandHtml5, TbBrandTypescript, TbFileTypeTxt } from "react-icons/tb";
+import { VscJson } from "react-icons/vsc";
 import { isMarkdownH1Document, parseMarkdownH1Title } from "@/lib/operator-markdown-title";
 import {
   buildCadreFilename,
@@ -15,6 +16,7 @@ export type OperatorDocumentPickerKind =
   | "css"
   | "html"
   | "javascript"
+  | "json"
   | "markdown"
   | "pdf"
   | "python"
@@ -32,6 +34,7 @@ export function normalizeOperatorDocumentKind(
     kind === "css" ||
     kind === "html" ||
     kind === "javascript" ||
+    kind === "json" ||
     kind === "markdown" ||
     kind === "pdf" ||
     kind === "python" ||
@@ -52,6 +55,7 @@ export const OPERATOR_DOC_TYPE_ENTRIES: Array<{
   { value: "css", label: "CSS", Icon: GrCss3, mimeType: "text/css" },
   { value: "html", label: "HTML", Icon: TbBrandHtml5, mimeType: "text/html" },
   { value: "javascript", label: "JavaScript", Icon: RiJavascriptLine, mimeType: "text/javascript" },
+  { value: "json", label: "JSON", Icon: VscJson, mimeType: "application/json" },
   { value: "markdown", label: "Markdown", Icon: BsMarkdown, mimeType: "text/markdown" },
   { value: "pdf", label: "PDF", Icon: AiOutlineFilePdf, mimeType: "application/pdf" },
   { value: "python", label: "Python", Icon: AiOutlinePython, mimeType: "text/x-python" },
@@ -72,6 +76,25 @@ export function operatorMimeTypeForKind(kind: OperatorDocumentPickerKind): strin
   );
 }
 
+/** Empty operator workspace document shown on first load. */
+export function createBlankOperatorDocument(): {
+  kind: OperatorDocumentPickerKind;
+  name: string;
+  mimeType: string;
+  size: number;
+  text: string;
+} {
+  const kind: OperatorDocumentPickerKind = "markdown";
+  const text = "";
+  return {
+    kind,
+    name: "operator-doc.md",
+    mimeType: operatorMimeTypeForKind(kind),
+    size: 0,
+    text,
+  };
+}
+
 export function inferOperatorPickerKindFromAsset(
   text: string,
   hints?: { fileName?: string; fileKind?: string; mimeType?: string },
@@ -86,6 +109,7 @@ export function inferOperatorPickerKindFromAsset(
   if (ext === "html" || ext === "htm") return "html";
   if (ext === "css") return "css";
   if (ext === "js" || ext === "mjs" || ext === "cjs") return "javascript";
+  if (ext === "json" || ext === "jsonc" || hints?.mimeType === "application/json") return "json";
   if (ext === "ts" || ext === "tsx") return "typescript";
   if (ext === "py") return "python";
   if (ext === "pdf") return "pdf";
