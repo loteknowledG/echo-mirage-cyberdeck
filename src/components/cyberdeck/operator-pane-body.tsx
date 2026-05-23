@@ -228,15 +228,15 @@ function OperatorDocumentToolbarRow({
 
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300}>
-      <div className="flex min-w-0 w-full flex-1 items-center gap-1.5">
-        <OperatorFileHistoryNav
-          canBack={operatorCanNavigateFileBack}
-          canForward={operatorCanNavigateFileForward}
-          onBack={onOperatorFileHistoryBack}
-          onForward={onOperatorFileHistoryForward}
-        />
+      <div className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1.5">
+        <div className="flex min-w-0 flex-[1_1_8rem] items-center gap-1.5 overflow-hidden">
+          <OperatorFileHistoryNav
+            canBack={operatorCanNavigateFileBack}
+            canForward={operatorCanNavigateFileForward}
+            onBack={onOperatorFileHistoryBack}
+            onForward={onOperatorFileHistoryForward}
+          />
 
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
           {operatorDocMode === "edit" ? (
             <input
               ref={operatorNameInputRef}
@@ -287,7 +287,7 @@ function OperatorDocumentToolbarRow({
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="ml-auto flex max-w-full basis-full flex-wrap items-center justify-end gap-1.5 sm:basis-auto">
           <OperatorDocTypePicker
             value={normalizeOperatorDocumentKind(operatorDocumentKind)}
             onChange={onOperatorDocumentKindChange}
@@ -456,7 +456,10 @@ export function CyberdeckOperatorPaneBody({
         }`}
       >
         <CyberdeckPaneHeader
-          className="z-20 shrink-0 bg-black"
+          className={cn(
+            "z-20 shrink-0 bg-black py-2",
+            operatorSurfaceIsDocument && operatorDroppedAsset && "items-start",
+          )}
           left={
             operatorSurfaceMode === "browser" ? (
               <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
