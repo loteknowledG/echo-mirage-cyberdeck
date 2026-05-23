@@ -1,12 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { CopyIcon } from "@radix-ui/react-icons";
+import { FaRegPaste } from "react-icons/fa6";
+import { GrFormEdit, GrFormView } from "react-icons/gr";
 import { LuScanLine } from "react-icons/lu";
 import {
   CyberdeckPaneHeader,
   CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { FigletFontPicker } from "@/components/cyberdeck/figlet-font-picker";
 import {
@@ -27,8 +32,8 @@ import {
 import { parseGlyphCommand } from "@/lib/muthur-glyph-intent";
 import { get } from "idb-keyval";
 
-const HEADER_BTN =
-  "rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200";
+const HEADER_ICON_BTN =
+  "inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200";
 
 const STATUS_BTN =
   "rounded border border-[#2d2d2d] bg-black px-1.5 py-0.5 font-mono text-[9px] tracking-[0.06em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200";
@@ -38,10 +43,30 @@ const GLYPH_ENGINES: GlyphPaneEngine[] = ["ascii", "figlet"];
 /** Block cursor nudge (px) — same idea as MUTHUR `top-[calc(50%+9px)]` in page.tsx. */
 const GLYPH_CURSOR_OFFSET = { top: 8, left: 0 } as const;
 
+type EchoMirageClipboardApi = { readText?: () => Promise<string> };
+
+async function readEchoMirageClipboardText(): Promise<string> {
+  const bridge = (window as Window & { echoMirageClipboard?: EchoMirageClipboardApi })
+    .echoMirageClipboard;
+  if (bridge?.readText) {
+    try {
+      return await bridge.readText();
+    } catch {
+      /* fall through */
+    }
+  }
+  if (typeof navigator !== "undefined" && navigator.clipboard?.readText) {
+    return navigator.clipboard.readText();
+  }
+  return "";
+}
+
 function cycleEngine(current: GlyphPaneEngine): GlyphPaneEngine {
   const idx = GLYPH_ENGINES.indexOf(current);
   return GLYPH_ENGINES[(idx + 1) % GLYPH_ENGINES.length];
 }
+
+type GlyphPaneMode = "view" | "edit";
 
 export function CyberdeckGlyphChannelPaneBody() {
   const [text, setText] = useState(GLYPH_CHANNEL_DEFAULT_TEXT);
@@ -51,12 +76,14 @@ export function CyberdeckGlyphChannelPaneBody() {
   const [statusLine, setStatusLine] = useState("⟁ READY");
   const [rendering, setRendering] = useState(false);
   const [glyphModeOn, setGlyphModeOn] = useState(false);
+  const [paneMode, setPaneMode] = useState<GlyphPaneMode>("view");
   const [inputFocused, setInputFocused] = useState(false);
   const [cursorBlinkOn, setCursorBlinkOn] = useState(true);
   const [cursorLeft, setCursorLeft] = useState(0);
   const [caretIndex, setCaretIndex] = useState(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
 
   const syncComposerCaret = useCallback(() => {
     const el = inputRef.current;
@@ -91,6 +118,30 @@ export function CyberdeckGlyphChannelPaneBody() {
       syncComposerCaret();
     });
   }, [syncComposerCaret]);
+
+  const focusEditor = useCallback(() => {
+    requestAnimationFrame(() => {
+      const el = editorRef.current;
+      if (!el || el.disabled) return;
+      el.focus({ preventScroll: true });
+      const end = el.value.length;
+      el.setSelectionRange(end, end);
+    });
+  }, []);
+
+  const setPaneModeWithFocus = useCallback(
+    (next: GlyphPaneMode) => {
+      setPaneMode(next);
+      if (next === "edit") {
+        setStatusLine("⟁ EDIT MODE // direct signal edit");
+        focusEditor();
+        return;
+      }
+      setStatusLine("⟁ VIEW MODE");
+      focusComposer();
+    },
+    [focusComposer, focusEditor],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -191,10 +242,13 @@ export function CyberdeckGlyphChannelPaneBody() {
         );
       } finally {
         setRendering(false);
-        requestAnimationFrame(() => focusComposer());
+        requestAnimationFrame(() => {
+          if (paneMode === "edit") focusEditor();
+          else focusComposer();
+        });
       }
     },
-    [applyOutput, focusComposer, settings.figletFont],
+    [applyOutput, focusComposer, focusEditor, paneMode, settings.figletFont],
   );
 
   const handleComposerSubmit = useCallback(async () => {
@@ -229,13 +283,21 @@ export function CyberdeckGlyphChannelPaneBody() {
       }
       return;
     }
+    if (command?.kind === "edit-on") {
+      setPaneModeWithFocus("edit");
+      return;
+    }
+    if (command?.kind === "edit-off") {
+      setPaneModeWithFocus("view");
+      return;
+    }
     if (command?.kind === "render") {
       await runRender(command.engine, command.text);
       return;
     }
 
     await runRender(settings.engine, line);
-  }, [applyOutput, composer, rendering, runRender, settings.engine, text]);
+  }, [applyOutput, composer, rendering, runRender, setPaneModeWithFocus, settings.engine, text]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -245,6 +307,21 @@ export function CyberdeckGlyphChannelPaneBody() {
       setStatusLine("⟁ COPY FAILED");
     }
   }, [text]);
+
+  const handlePasteClipboard = useCallback(async () => {
+    try {
+      const clipboardText = await readEchoMirageClipboardText();
+      if (!clipboardText.trim()) {
+        setStatusLine("⟁ PASTE FAILED // empty clipboard");
+        return;
+      }
+      applyOutput(clipboardText);
+      setPaneModeWithFocus("edit");
+      setStatusLine("⟁ PASTED");
+    } catch {
+      setStatusLine("⟁ PASTE FAILED");
+    }
+  }, [applyOutput, setPaneModeWithFocus]);
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-black">
@@ -261,24 +338,93 @@ export function CyberdeckGlyphChannelPaneBody() {
           </div>
         }
         right={
-          <button type="button" onClick={() => void handleCopy()} className={HEADER_BTN}>
-            COPY
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handlePasteClipboard()}
+              aria-label="Paste into glyph channel"
+              title="Paste into glyph channel"
+              className={HEADER_ICON_BTN}
+            >
+              <FaRegPaste className="h-3.5 w-3.5" />
+            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPaneModeWithFocus("view")}
+                aria-label="View mode"
+                title="View"
+                className={`${HEADER_ICON_BTN} ${
+                  paneMode === "view" ? "border-emerald-500/60 text-emerald-200" : ""
+                }`}
+              >
+                <GrFormView className="h-3.5 w-3.5" />
+              </button>
+              <Switch
+                checked={paneMode === "edit"}
+                onCheckedChange={(checked) => setPaneModeWithFocus(checked ? "edit" : "view")}
+                aria-label="Toggle glyph channel edit mode"
+                className="data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
+              />
+              <button
+                type="button"
+                onClick={() => setPaneModeWithFocus("edit")}
+                aria-label="Edit mode"
+                title="Edit"
+                className={`${HEADER_ICON_BTN} ${
+                  paneMode === "edit" ? "border-emerald-500/60 text-emerald-200" : ""
+                }`}
+              >
+                <GrFormEdit className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
         }
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-t border-[#141414]">
         <div className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto bg-black p-3">
-          <pre
-            className="m-0 block max-w-full whitespace-pre font-mono text-emerald-300/95 transition-[font-size] duration-150"
-            style={{
-              fontSize: `${(11 * settings.zoomPercent) / 100}px`,
-              lineHeight: 1.2,
-              textShadow: "0 0 8px rgba(52, 211, 153, 0.12)",
-            }}
-          >
-            {text}
-          </pre>
+          <div className="mb-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => void handleCopy()}
+              aria-label="Copy glyph channel signal"
+              title="Copy glyph channel signal"
+              className={HEADER_ICON_BTN}
+            >
+              <CopyIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {paneMode === "edit" ? (
+            <Textarea
+              ref={editorRef}
+              value={text}
+              onChange={(event) => applyOutput(event.target.value)}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoComplete="off"
+              autoCorrect="off"
+              wrap="off"
+              aria-label="Glyph channel signal editor"
+              className="m-0 block min-h-full w-full max-w-full resize-none overflow-visible rounded-none border-0 bg-black p-0 font-mono text-emerald-300/95 shadow-none focus-visible:ring-1 focus-visible:ring-emerald-500/40"
+              style={{
+                fontSize: `${(11 * settings.zoomPercent) / 100}px`,
+                lineHeight: 1.2,
+                textShadow: "0 0 8px rgba(52, 211, 153, 0.12)",
+              }}
+            />
+          ) : (
+            <pre
+              className="m-0 block max-w-full whitespace-pre font-mono text-emerald-300/95 transition-[font-size] duration-150"
+              style={{
+                fontSize: `${(11 * settings.zoomPercent) / 100}px`,
+                lineHeight: 1.2,
+                textShadow: "0 0 8px rgba(52, 211, 153, 0.12)",
+              }}
+            >
+              {text}
+            </pre>
+          )}
         </div>
 
         <footer className="cyberdeck-message-box w-full min-w-0 max-w-full shrink-0 bg-black p-0">
@@ -315,7 +461,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                 placeholder={
                   glyphModeOn
                     ? "⟁ Glyph mode — figlet ECHO MIRAGE or plain text to render"
-                    : "figlet ECHO MIRAGE · ascii clear · ascii mode"
+                    : "figlet ECHO MIRAGE · ascii edit · ascii view · ascii clear"
                 }
                 className={`box-border w-full min-w-0 rounded-none border-0 bg-black py-2 pl-9 pr-4 font-mono text-sm text-green-400 placeholder:text-green-800 transition-all focus:outline-none ${
                   inputFocused ? "caret-transparent" : ""

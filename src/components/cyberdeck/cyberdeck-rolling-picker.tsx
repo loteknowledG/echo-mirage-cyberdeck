@@ -3,15 +3,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { EmblaCarouselType } from "embla-carousel";
 import useEmblaCarousel from "embla-carousel-react";
+import { cn } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-const TOOLTIP_CONTENT_CLASS =
-  "z-50 rounded border border-[#2d2d2d] bg-black px-2 py-1 text-right font-mono text-[9px] tracking-[0.06em] text-emerald-200 shadow-md";
+import { CYBERDECK_PANE_TOOLTIP_CLASS } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
 
 const SNAP_ALIGN_THRESHOLD_PX = 0.5;
 const SNAP_TOOLTIP_VISIBLE_MS = 1400;
@@ -20,6 +19,8 @@ export type CyberdeckRollingPickerItem = {
   value: string;
   label: string;
   slide: ReactNode;
+  /** Shown while dragging or scrolling; defaults to `label`. */
+  labelSlide?: ReactNode;
 };
 
 function findClosestSnapIndex(emblaApi: EmblaCarouselType): number {
@@ -51,6 +52,8 @@ export type CyberdeckRollingPickerProps = {
   ariaLabel: string;
   /** Viewport around one slide (default: 7×7 icon cell). */
   viewportClassName?: string;
+  /** Icon when settled; text (or `labelSlide`) while drag / wheel scroll. */
+  showTextWhileScrolling?: boolean;
   tooltipSide?: "top" | "right" | "bottom" | "left";
   showTooltipOnSnap?: boolean;
 };
@@ -72,6 +75,7 @@ export function CyberdeckRollingPicker({
   onChange,
   ariaLabel,
   viewportClassName = "h-7 w-7",
+  showTextWhileScrolling = true,
   tooltipSide = "right",
   showTooltipOnSnap = true,
 }: CyberdeckRollingPickerProps) {
@@ -89,8 +93,20 @@ export function CyberdeckRollingPicker({
 
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const [tooltipLabel, setTooltipLabel] = useState("");
+  const [showLabels, setShowLabels] = useState(false);
+  const showLabelsRef = useRef(false);
   const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userDraggedRef = useRef(false);
+
+  const setScrollingLabels = useCallback((active: boolean) => {
+    showLabelsRef.current = active;
+    setShowLabels(active);
+    if (active && tooltipTimerRef.current) {
+      clearTimeout(tooltipTimerRef.current);
+      tooltipTimerRef.current = null;
+      setTooltipOpen(false);
+    }
+  }, []);
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
     axis: "y",
@@ -118,7 +134,7 @@ export function CyberdeckRollingPicker({
   }, []);
 
   const showSnapTooltip = useCallback((embla: EmblaCarouselType) => {
-    if (!showTooltipOnSnap) return;
+    if (!showTooltipOnSnap || showLabelsRef.current) return;
     const closest = findClosestSnapIndex(embla);
     if (snapOffsetPx(embla, closest) > SNAP_ALIGN_THRESHOLD_PX) return;
 
@@ -150,11 +166,13 @@ export function CyberdeckRollingPicker({
 
     const onPointerDown = () => {
       userDraggedRef.current = true;
+      if (showTextWhileScrolling) setScrollingLabels(true);
     };
 
     const onSettle = () => {
       isProgrammaticScrollRef.current = false;
       ensureSnappedToCenter(emblaApi);
+      if (showTextWhileScrolling) setScrollingLabels(false);
       if (!userDraggedRef.current) return;
       userDraggedRef.current = false;
       showSnapTooltip(emblaApi);
@@ -162,6 +180,9 @@ export function CyberdeckRollingPicker({
 
     const onScroll = () => {
       const engine = emblaApi.internalEngine();
+      if (showTextWhileScrolling && !isProgrammaticScrollRef.current && !engine.scrollBody.settled()) {
+        setScrollingLabels(true);
+      }
       if (engine.dragHandler.pointerDown()) return;
       if (!engine.scrollBody.settled()) return;
       ensureSnappedToCenter(emblaApi);
@@ -178,7 +199,7 @@ export function CyberdeckRollingPicker({
       emblaApi.off("settle", onSettle);
       emblaApi.off("scroll", onScroll);
     };
-  }, [emblaApi, emitSelection, ensureSnappedToCenter, showSnapTooltip]);
+  }, [emblaApi, emitSelection, ensureSnappedToCenter, setScrollingLabels, showSnapTooltip, showTextWhileScrolling]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -200,6 +221,25 @@ export function CyberdeckRollingPicker({
   const activeItem =
     items.find((item) => item.value === value) ?? items[0];
   const tooltipText = tooltipLabel || activeItem?.label || "";
+  const useLabelSlides = showTextWhileScrolling && showLabels;
+
+  const renderSlideContent = (item: CyberdeckRollingPickerItem, isActive: boolean) => {
+    if (useLabelSlides) {
+      return (
+        item.labelSlide ?? (
+          <span
+            className={cn(
+              "block max-w-full truncate px-1 font-mono text-[8px] leading-none tracking-[0.04em]",
+              isActive ? "text-emerald-200" : "text-[#8a8a8a]",
+            )}
+          >
+            {item.label}
+          </span>
+        )
+      );
+    }
+    return item.slide;
+  };
 
   if (items.length === 0) {
     return (
@@ -221,7 +261,11 @@ export function CyberdeckRollingPicker({
           <TooltipTrigger asChild>
             <div
               ref={emblaRef}
-              className={`cursor-default overflow-hidden touch-pan-y ${viewportClassName}`}
+              className={cn(
+                "cursor-default overflow-hidden touch-pan-y transition-[width] duration-150 ease-out",
+                viewportClassName,
+                useLabelSlides && "w-auto min-w-[5.25rem] max-w-[6.75rem]",
+              )}
             >
               <div className="flex h-full flex-col">
                 {items.map((item) => {
@@ -233,10 +277,14 @@ export function CyberdeckRollingPicker({
                     >
                       <div
                         className={
-                          isActive ? "text-emerald-200" : "text-[#8a8a8a]"
+                          useLabelSlides
+                            ? "flex w-full min-w-0 items-center justify-center"
+                            : isActive
+                              ? "text-emerald-200"
+                              : "text-[#8a8a8a]"
                         }
                       >
-                        {item.slide}
+                        {renderSlideContent(item, isActive)}
                       </div>
                     </div>
                   );
@@ -248,7 +296,7 @@ export function CyberdeckRollingPicker({
             side={tooltipSide}
             align="end"
             sideOffset={6}
-            className={TOOLTIP_CONTENT_CLASS}
+            className={CYBERDECK_PANE_TOOLTIP_CLASS}
           >
             {tooltipText}
           </TooltipContent>

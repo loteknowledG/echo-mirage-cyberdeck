@@ -283,8 +283,8 @@ export function ResizableHandle({ withHandle = false, stacked = false, className
     <div
       className={cn(
         stacked
-          ? 'relative z-20 flex-none self-stretch h-3 w-full flex items-center justify-center border-y border-slate-700/40 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-row-resize touch-none'
-          : 'relative z-20 flex-none self-stretch w-4 min-w-[14px] flex items-center justify-center border-x border-slate-700/40 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none',
+          ? 'relative z-20 flex-none self-stretch h-1 min-h-[6px] w-full flex items-center justify-center border-y border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-row-resize touch-none'
+          : 'relative z-20 flex-none self-stretch w-px min-w-[6px] flex items-center justify-center border-x border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none',
         className
       )}
       {...props}
@@ -292,10 +292,10 @@ export function ResizableHandle({ withHandle = false, stacked = false, className
       {withHandle ? (
         stacked ? (
           <div className="flex h-full w-full items-center justify-center">
-            <div className="h-[2px] w-14 rounded-full bg-slate-300/80 shadow-[0_0_12px_rgba(148,163,184,0.18)]" />
+            <div className="h-px w-14 rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />
           </div>
         ) : (
-          <div className="h-full w-1.5 rounded-full bg-slate-300/80 shadow-[0_0_12px_rgba(148,163,184,0.18)]" />
+          <div className="h-full w-px rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />
         )
       ) : null}
     </div>

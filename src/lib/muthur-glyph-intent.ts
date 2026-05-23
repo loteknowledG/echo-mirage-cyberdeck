@@ -5,6 +5,8 @@ export type GlyphCommand =
   | { kind: "mode-off" }
   | { kind: "clear" }
   | { kind: "copy" }
+  | { kind: "edit-on" }
+  | { kind: "edit-off" }
   | { kind: "render"; engine: GlyphRenderEngine; text: string };
 
 /** Parse MUTHUR ascii / figlet operator commands (`glyph` aliases ascii for compatibility). */
@@ -16,6 +18,8 @@ export function parseGlyphCommand(input: string): GlyphCommand | null {
   if (/^(?:ascii|glyph)\s+off\s*$/i.test(trimmed)) return { kind: "mode-off" };
   if (/^(?:ascii|glyph)\s+clear\s*$/i.test(trimmed)) return { kind: "clear" };
   if (/^(?:ascii|glyph)\s+copy\s*$/i.test(trimmed)) return { kind: "copy" };
+  if (/^(?:ascii|glyph)\s+edit\s*$/i.test(trimmed)) return { kind: "edit-on" };
+  if (/^(?:ascii|glyph)\s+view\s*$/i.test(trimmed)) return { kind: "edit-off" };
 
   const figlet = /^figlet\s+([\s\S]+)$/i.exec(trimmed);
   if (figlet?.[1]?.trim()) {

@@ -14,6 +14,8 @@ assert("glyph mode alias", parseGlyphCommand("glyph mode")?.kind === "mode-on");
 assert("mode off", parseGlyphCommand("ascii off")?.kind === "mode-off");
 assert("clear", parseGlyphCommand("ascii clear")?.kind === "clear");
 assert("copy", parseGlyphCommand("ascii copy")?.kind === "copy");
+assert("edit", parseGlyphCommand("ascii edit")?.kind === "edit-on");
+assert("view", parseGlyphCommand("ascii view")?.kind === "edit-off");
 const asciiText = parseGlyphCommand("ascii MUTHUR ONLINE");
 assert(
   "ascii text",

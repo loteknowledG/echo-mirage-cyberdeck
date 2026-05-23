@@ -6102,7 +6102,7 @@ duration_ms: ${durationMs}`;
           <div
             ref={chatColumnRef}
             onContextMenu={handleMiragePaneContextMenu}
-            className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full min-w-0 flex-col overflow-hidden border-b border-gray-800 bg-black md:border-b-0 md:border-r ${
+            className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full min-w-0 flex-col overflow-hidden border-b border-gray-800 bg-black md:border-b-0 ${
               networkActivityActive ? "is-net-active" : ""
             }`}
           >
@@ -6466,7 +6466,7 @@ duration_ms: ${durationMs}`;
             onDragOver={handleThirdColumnDragOver}
             onDragLeave={handleThirdColumnDragLeave}
             onDrop={handleThirdColumnDrop}
-            className={`cyberdeck-net-pane right flex h-full min-w-0 flex-col border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black md:border-l ${
+            className={`cyberdeck-net-pane right flex h-full min-w-0 flex-col border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
               networkActivityActive ? "is-net-active" : ""
             } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
           >

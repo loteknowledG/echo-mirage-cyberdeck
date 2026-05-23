@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Dispatch, DragEvent, RefObject, SetStateAction } from "react";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { FaRegPaste } from "react-icons/fa6";
@@ -14,9 +14,14 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { OperatorDocTypePicker } from "@/components/cyberdeck/operator-doc-type-picker";
 import {
+  CyberdeckPaneTooltip,
+  CyberdeckPaneTooltipProvider,
+} from "@/components/cyberdeck/cyberdeck-pane-tooltip";
+import {
   normalizeOperatorDocumentKind,
   type OperatorDocumentPickerKind,
 } from "@/lib/operator-document-types";
+import { cn } from "@/lib/utils";
 
 type DroppedOperatorAsset = {
   kind: string;
@@ -73,6 +78,38 @@ const OPERATOR_MARKDOWN_VIEW_CLASS =
 const OPERATOR_HEADER_ICON_BTN =
   "inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200";
 
+function OperatorToolbarIconButton({
+  label,
+  onClick,
+  disabled = false,
+  className = "",
+  children,
+}: {
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  const button = (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className={`${OPERATOR_HEADER_ICON_BTN} disabled:cursor-not-allowed disabled:opacity-30 ${className}`}
+    >
+      {children}
+    </button>
+  );
+
+  return (
+    <CyberdeckPaneTooltip label={label}>
+      {disabled ? <span className="inline-flex">{button}</span> : button}
+    </CyberdeckPaneTooltip>
+  );
+}
+
 function OperatorFileHistoryNav({
   canBack,
   canForward,
@@ -86,27 +123,214 @@ function OperatorFileHistoryNav({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      <button
-        type="button"
-        onClick={onBack}
-        disabled={!canBack}
-        aria-label="Go to previous file"
-        title="Go to previous file"
-        className={`${OPERATOR_HEADER_ICON_BTN} disabled:cursor-not-allowed disabled:opacity-30`}
-      >
+      <OperatorToolbarIconButton label="Previous file" onClick={onBack} disabled={!canBack}>
         <LuArrowLeft className="h-3.5 w-3.5" />
-      </button>
-      <button
-        type="button"
-        onClick={onForward}
-        disabled={!canForward}
-        aria-label="Go to next file"
-        title="Go to next file"
-        className={`${OPERATOR_HEADER_ICON_BTN} disabled:cursor-not-allowed disabled:opacity-30`}
-      >
+      </OperatorToolbarIconButton>
+      <OperatorToolbarIconButton label="Next file" onClick={onForward} disabled={!canForward}>
         <LuArrowRight className="h-3.5 w-3.5" />
-      </button>
+      </OperatorToolbarIconButton>
     </div>
+  );
+}
+
+function OperatorViewEditControls({
+  operatorDocMode,
+  onCommitOperatorDocName,
+  onSetOperatorDocMode,
+}: {
+  operatorDocMode: "view" | "edit";
+  onCommitOperatorDocName: () => void;
+  onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      <OperatorToolbarIconButton
+        label="View"
+        onClick={() => {
+          onCommitOperatorDocName();
+          onSetOperatorDocMode("view");
+        }}
+        className={operatorDocMode === "view" ? "border-emerald-500/60 text-emerald-200" : ""}
+      >
+        <GrFormView className="h-3.5 w-3.5" />
+      </OperatorToolbarIconButton>
+      <CyberdeckPaneTooltip label={operatorDocMode === "edit" ? "Switch to view" : "Switch to edit"}>
+        <span className="inline-flex">
+          <Switch
+            checked={operatorDocMode === "edit"}
+            onCheckedChange={(checked) => {
+              if (!checked) {
+                onCommitOperatorDocName();
+                onSetOperatorDocMode("view");
+                return;
+              }
+              onSetOperatorDocMode("edit");
+            }}
+            aria-label="Toggle operator view edit mode"
+            className="data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
+          />
+        </span>
+      </CyberdeckPaneTooltip>
+      <OperatorToolbarIconButton
+        label="Edit"
+        onClick={() => onSetOperatorDocMode("edit")}
+        className={operatorDocMode === "edit" ? "border-emerald-500/60 text-emerald-200" : ""}
+      >
+        <GrFormEdit className="h-3.5 w-3.5" />
+      </OperatorToolbarIconButton>
+    </div>
+  );
+}
+
+function OperatorDocumentToolbarRow({
+  operatorDocMode,
+  operatorDocNameDraft,
+  operatorNameInputRef,
+  operatorDroppedAsset,
+  operatorFileSizeLabel,
+  operatorDocumentKind,
+  operatorCanNavigateFileBack,
+  operatorCanNavigateFileForward,
+  folderPaneOpen,
+  onOperatorDocNameDraftChange,
+  onCommitOperatorDocName,
+  onSetOperatorDocMode,
+  onOperatorFileHistoryBack,
+  onOperatorFileHistoryForward,
+  onOperatorDocumentKindChange,
+  onCopyOperatorDocToClipboard,
+  onPasteClipboardToOperator,
+  onSaveOperatorDocAsFile,
+  onToggleFolderPane,
+}: {
+  operatorDocMode: "view" | "edit";
+  operatorDocNameDraft: string;
+  operatorNameInputRef: RefObject<HTMLInputElement>;
+  operatorDroppedAsset: DroppedOperatorAsset;
+  operatorFileSizeLabel: string | null;
+  operatorDocumentKind: OperatorDocumentPickerKind;
+  operatorCanNavigateFileBack: boolean;
+  operatorCanNavigateFileForward: boolean;
+  folderPaneOpen: boolean;
+  onOperatorDocNameDraftChange: (nextValue: string) => void;
+  onCommitOperatorDocName: () => void;
+  onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
+  onOperatorFileHistoryBack: () => void;
+  onOperatorFileHistoryForward: () => void;
+  onOperatorDocumentKindChange: (kind: OperatorDocumentPickerKind) => void;
+  onCopyOperatorDocToClipboard: () => void | Promise<void>;
+  onPasteClipboardToOperator: () => void | Promise<void>;
+  onSaveOperatorDocAsFile: () => void | Promise<void>;
+  onToggleFolderPane: () => void;
+}) {
+  const [nameFocused, setNameFocused] = useState(false);
+  const displayName = operatorDroppedAsset.name || "OPERATOR_DOC_SURFACE";
+
+  return (
+    <CyberdeckPaneTooltipProvider delayDuration={300}>
+      <div className="flex min-w-0 w-full flex-1 items-center gap-1.5">
+        <OperatorFileHistoryNav
+          canBack={operatorCanNavigateFileBack}
+          canForward={operatorCanNavigateFileForward}
+          onBack={onOperatorFileHistoryBack}
+          onForward={onOperatorFileHistoryForward}
+        />
+
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+          {operatorDocMode === "edit" ? (
+            <input
+              ref={operatorNameInputRef}
+              value={operatorDocNameDraft}
+              onChange={(event) => onOperatorDocNameDraftChange(event.target.value)}
+              onFocus={() => setNameFocused(true)}
+              onBlur={() => {
+                setNameFocused(false);
+                onCommitOperatorDocName();
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                onCommitOperatorDocName();
+                operatorNameInputRef.current?.blur();
+              }}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoComplete="off"
+              autoCorrect="off"
+              aria-label="Rename operator document"
+              className={cn(
+                "min-w-0 w-full flex-1 border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]",
+                nameFocused && "ring-1 ring-emerald-500/35 ring-offset-0 ring-offset-black",
+              )}
+              style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+            />
+          ) : (
+            <CyberdeckPaneTooltip
+              label={displayName}
+              contentClassName="max-w-[90vw] whitespace-nowrap text-left"
+            >
+              <span className="min-w-0 w-full flex-1 cursor-default overflow-hidden">
+                <CyberdeckPaneHeaderTitle
+                  className="block truncate"
+                  style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+                >
+                  {displayName}
+                </CyberdeckPaneHeaderTitle>
+              </span>
+            </CyberdeckPaneTooltip>
+          )}
+
+          {operatorFileSizeLabel ? (
+            <span className="shrink-0 font-mono text-[9px] tracking-[0.04em] text-[#5a5a5a]">
+              {operatorFileSizeLabel}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1.5">
+          <OperatorDocTypePicker
+            value={normalizeOperatorDocumentKind(operatorDocumentKind)}
+            onChange={onOperatorDocumentKindChange}
+          />
+
+          <OperatorToolbarIconButton
+            label="Copy"
+            onClick={() => void onCopyOperatorDocToClipboard()}
+          >
+            <CopyIcon className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+          <OperatorToolbarIconButton
+            label="Paste"
+            onClick={() => void onPasteClipboardToOperator()}
+          >
+            <FaRegPaste className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+          <OperatorToolbarIconButton
+            label="Save"
+            onClick={() => void onSaveOperatorDocAsFile()}
+          >
+            <DownloadIcon className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+
+          <OperatorViewEditControls
+            operatorDocMode={operatorDocMode}
+            onCommitOperatorDocName={onCommitOperatorDocName}
+            onSetOperatorDocMode={onSetOperatorDocMode}
+          />
+
+          <OperatorToolbarIconButton
+            label={folderPaneOpen ? "Close folders" : "Open folders"}
+            onClick={onToggleFolderPane}
+          >
+            {folderPaneOpen ? (
+              <LuPanelRightClose className="h-3.5 w-3.5" />
+            ) : (
+              <LuPanelRightOpen className="h-3.5 w-3.5" />
+            )}
+          </OperatorToolbarIconButton>
+        </div>
+      </div>
+    </CyberdeckPaneTooltipProvider>
   );
 }
 
@@ -150,7 +374,6 @@ export function CyberdeckOperatorPaneBody({
 
   const operatorDocText = operatorDroppedAsset?.text || "";
   const operatorShowsMarkdown = normalizeOperatorDocumentKind(operatorDocumentKind) === "markdown";
-  const operatorCanPickDocKind = operatorSurfaceIsDocument;
   const operatorFileSizeLabel = operatorDroppedAsset
     ? `// ${Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB`
     : null;
@@ -211,7 +434,7 @@ export function CyberdeckOperatorPaneBody({
 
   return (
     <div
-      className={`custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4 ${
+      className={`flex min-h-0 flex-1 flex-col bg-black p-4 ${
         isOperatorDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""
       }`}
       onDragOver={operatorSurfaceMode === "browser" ? (event) => {
@@ -228,49 +451,39 @@ export function CyberdeckOperatorPaneBody({
       } : onOperatorDrop}
     >
       <div
-        className={`flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors ${
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-sm border border-[#141414] bg-black transition-colors ${
           isOperatorDragOver ? "border-amber-500/60 ring-2 ring-amber-500/35 ring-inset" : ""
         }`}
       >
         <CyberdeckPaneHeader
+          className="z-20 shrink-0 bg-black"
           left={
             operatorSurfaceMode === "browser" ? (
               <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
                 MUTHUR_BROWSER
               </CyberdeckPaneHeaderTitle>
-            ) : operatorSurfaceIsDocument && operatorDocMode === "edit" ? (
-              <div className="flex min-w-0 items-center gap-2">
-                <OperatorFileHistoryNav
-                  canBack={operatorCanNavigateFileBack}
-                  canForward={operatorCanNavigateFileForward}
-                  onBack={onOperatorFileHistoryBack}
-                  onForward={onOperatorFileHistoryForward}
-                />
-                <input
-                  ref={operatorNameInputRef}
-                  value={operatorDocNameDraft}
-                  onChange={(event) => onOperatorDocNameDraftChange(event.target.value)}
-                  onBlur={onCommitOperatorDocName}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Enter") return;
-                    event.preventDefault();
-                    onCommitOperatorDocName();
-                    operatorNameInputRef.current?.blur();
-                  }}
-                  spellCheck={false}
-                  autoCapitalize="off"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  aria-label="Rename operator document"
-                  className="min-w-0 flex-1 border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]"
-                  style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-                />
-                {operatorFileSizeLabel ? (
-                  <span className="shrink-0 font-mono text-[9px] tracking-[0.04em] text-[#5a5a5a]">
-                    {operatorFileSizeLabel}
-                  </span>
-                ) : null}
-              </div>
+            ) : operatorSurfaceIsDocument && operatorDroppedAsset ? (
+              <OperatorDocumentToolbarRow
+                operatorDocMode={operatorDocMode}
+                operatorDocNameDraft={operatorDocNameDraft}
+                operatorNameInputRef={operatorNameInputRef}
+                operatorDroppedAsset={operatorDroppedAsset}
+                operatorFileSizeLabel={operatorFileSizeLabel}
+                operatorDocumentKind={operatorDocumentKind}
+                operatorCanNavigateFileBack={operatorCanNavigateFileBack}
+                operatorCanNavigateFileForward={operatorCanNavigateFileForward}
+                folderPaneOpen={folderPaneOpen}
+                onOperatorDocNameDraftChange={onOperatorDocNameDraftChange}
+                onCommitOperatorDocName={onCommitOperatorDocName}
+                onSetOperatorDocMode={onSetOperatorDocMode}
+                onOperatorFileHistoryBack={onOperatorFileHistoryBack}
+                onOperatorFileHistoryForward={onOperatorFileHistoryForward}
+                onOperatorDocumentKindChange={onOperatorDocumentKindChange}
+                onCopyOperatorDocToClipboard={onCopyOperatorDocToClipboard}
+                onPasteClipboardToOperator={onPasteClipboardToOperator}
+                onSaveOperatorDocAsFile={onSaveOperatorDocAsFile}
+                onToggleFolderPane={() => setFolderPaneOpen((open) => !open)}
+              />
             ) : (
               <div className="flex min-w-0 items-center gap-2">
                 {operatorSurfaceIsDocument ? (
@@ -296,74 +509,36 @@ export function CyberdeckOperatorPaneBody({
             )
           }
           right={
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void onPasteClipboardToOperator()}
-                aria-label="Paste into operator"
-                title="Paste into operator"
-                className={OPERATOR_HEADER_ICON_BTN}
-              >
-                <FaRegPaste className="h-3.5 w-3.5" />
-              </button>
-              {operatorSurfaceMode === "browser" ? (
-                <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em]">
-                  <span className="text-emerald-200">LIVE WEB</span>
-                  <span className="rounded border border-[#2d2d2d] px-2 py-0.5 text-[#8a8a8a]">
-                    ENGINE: {operatorBrowserEngine}
-                  </span>
-                </div>
-              ) : operatorSurfaceIsDocument ? (
-                <>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onCommitOperatorDocName();
-                        onSetOperatorDocMode("view");
-                      }}
-                      aria-label="View mode"
-                      title="View"
-                      className={`${OPERATOR_HEADER_ICON_BTN} ${
-                        operatorDocMode === "view" ? "border-emerald-500/60 text-emerald-200" : ""
-                      }`}
-                    >
-                      <GrFormView className="h-3.5 w-3.5" />
-                    </button>
-                    <Switch
-                      checked={operatorDocMode === "edit"}
-                      onCheckedChange={(checked) => {
-                        if (!checked) {
-                          onCommitOperatorDocName();
-                          onSetOperatorDocMode("view");
-                          return;
-                        }
-                        onSetOperatorDocMode("edit");
-                      }}
-                      aria-label="Toggle operator view edit mode"
-                      className="data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => onSetOperatorDocMode("edit")}
-                      aria-label="Edit mode"
-                      title="Edit"
-                      className={`${OPERATOR_HEADER_ICON_BTN} ${
-                        operatorDocMode === "edit" ? "border-emerald-500/60 text-emerald-200" : ""
-                      }`}
-                    >
-                      <GrFormEdit className="h-3.5 w-3.5" />
-                    </button>
+            operatorSurfaceMode === "browser" ? (
+              <CyberdeckPaneTooltipProvider delayDuration={300}>
+                <div className="flex items-center gap-2">
+                  <OperatorToolbarIconButton
+                    label="Paste"
+                    onClick={() => void onPasteClipboardToOperator()}
+                  >
+                    <FaRegPaste className="h-3.5 w-3.5" />
+                  </OperatorToolbarIconButton>
+                  <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em]">
+                    <span className="text-emerald-200">LIVE WEB</span>
+                    <span className="rounded border border-[#2d2d2d] px-2 py-0.5 text-[#8a8a8a]">
+                      ENGINE: {operatorBrowserEngine}
+                    </span>
                   </div>
-                </>
-              ) : operatorDroppedAsset ? (
-                <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                  {operatorDroppedAsset.kind.toUpperCase()}
                 </div>
-              ) : null}
-            </div>
+              </CyberdeckPaneTooltipProvider>
+            ) : operatorDroppedAsset && !operatorSurfaceIsDocument ? (
+              <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+                {operatorDroppedAsset.kind.toUpperCase()}
+              </div>
+            ) : null
+          }
+          leftClassName={
+            operatorSurfaceIsDocument && operatorDroppedAsset
+              ? "flex min-w-0 w-full flex-1 items-center pr-0"
+              : undefined
           }
         />
+        <div className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto">
         {operatorSurfaceMode === "browser" ? (
           <div
             className="flex min-h-0 flex-1 flex-col gap-3 p-3"
@@ -436,53 +611,6 @@ export function CyberdeckOperatorPaneBody({
         ) : operatorDroppedAsset ? (
           <div className="flex min-h-0 flex-1 overflow-hidden">
             <div className="custom-scrollbar min-w-0 flex-1 overflow-auto p-3">
-            {operatorCanPickDocKind ? (
-              <div className="mb-4 flex justify-end">
-                <OperatorDocTypePicker
-                  value={normalizeOperatorDocumentKind(operatorDocumentKind)}
-                  onChange={onOperatorDocumentKindChange}
-                />
-              </div>
-            ) : null}
-            {operatorSurfaceIsDocument ? (
-              <div className="mb-3 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => void onSaveOperatorDocAsFile()}
-                  aria-label="Save operator document"
-                  title={
-                    operatorShowsMarkdown
-                      ? "Save — Cadre folder + filename from H1 prefix (L-/E-/ER-/JR-/JP-/JF-)"
-                      : "Save operator document"
-                  }
-                  className={OPERATOR_HEADER_ICON_BTN}
-                >
-                  <DownloadIcon className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void onCopyOperatorDocToClipboard()}
-                  aria-label="Copy operator document"
-                  title="Copy operator document"
-                  className={OPERATOR_HEADER_ICON_BTN}
-                >
-                  <CopyIcon className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFolderPaneOpen((open) => !open)}
-                  aria-label={folderPaneOpen ? "Close document folders" : "Open document folders"}
-                  title={folderPaneOpen ? "Close document folders" : "Open document folders"}
-                  className={OPERATOR_HEADER_ICON_BTN}
-                >
-                  {folderPaneOpen ? (
-                    <LuPanelRightClose className="h-3.5 w-3.5" />
-                  ) : (
-                    <LuPanelRightOpen className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              </div>
-            ) : null}
             {operatorDroppedAsset.kind === "image" ? (
               <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
                 <div className="mb-2 flex items-center justify-between">
@@ -605,6 +733,7 @@ export function CyberdeckOperatorPaneBody({
             DROP OR PASTE CODE, TEXT, MARKDOWN, OR IMAGE FILES HERE TO VIEW AND EDIT THEM.
           </div>
         )}
+        </div>
       </div>
     </div>
   );
