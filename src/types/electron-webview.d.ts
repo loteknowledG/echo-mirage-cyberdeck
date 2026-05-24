@@ -50,9 +50,14 @@ declare global {
     }): Promise<{ canceled: boolean; filePath?: string; error?: string }>;
   }
 
+  interface EchoMirageOpenBridge {
+    pickConvertDocument(): Promise<{ canceled: boolean; filePath?: string; error?: string }>;
+  }
+
   interface Window {
     echoMirageBrowser?: EchoMirageBrowserBridge;
     echoMirageSave?: EchoMirageSaveBridge;
+    echoMirageOpen?: EchoMirageOpenBridge;
   }
 }
 

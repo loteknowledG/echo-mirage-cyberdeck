@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { Dispatch, DragEvent, RefObject, SetStateAction } from "react";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
+import { BsMarkdown } from "react-icons/bs";
 import { FaRegPaste } from "react-icons/fa6";
 import { GrFormEdit, GrFormView } from "react-icons/gr";
 import { LuArrowLeft, LuArrowRight, LuPanelRightClose, LuPanelRightOpen } from "react-icons/lu";
+import { isConvertibleDocumentPath } from "@/lib/muthur-document-conversion-intent";
+import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { OperatorDocFolderPane } from "@/components/cyberdeck/operator-doc-folder-pane";
 import type { OperatorDocFolderRoot } from "@/lib/operator-folder-nav";
@@ -64,6 +67,7 @@ type OperatorPaneBodyProps = {
   operatorCanNavigateFileForward: boolean;
   onOperatorFileHistoryBack: () => void;
   onOperatorFileHistoryForward: () => void;
+  onConvertDocumentToMarkdown: (filePath: string) => void | Promise<void>;
 };
 
 const ZOOM_LEVELS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const;
@@ -201,6 +205,7 @@ function OperatorDocumentToolbarRow({
   onCopyOperatorDocToClipboard,
   onPasteClipboardToOperator,
   onSaveOperatorDocAsFile,
+  onConvertDocumentToMarkdown,
   onToggleFolderPane,
 }: {
   operatorDocMode: "view" | "edit";
@@ -221,10 +226,61 @@ function OperatorDocumentToolbarRow({
   onCopyOperatorDocToClipboard: () => void | Promise<void>;
   onPasteClipboardToOperator: () => void | Promise<void>;
   onSaveOperatorDocAsFile: () => void | Promise<void>;
+  onConvertDocumentToMarkdown: (filePath: string) => void | Promise<void>;
   onToggleFolderPane: () => void;
 }) {
   const [nameFocused, setNameFocused] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const convertInputRef = useRef<HTMLInputElement>(null);
   const displayName = operatorDroppedAsset.name || "OPERATOR_DOC_SURFACE";
+
+  const runConvert = useCallback(
+    async (filePath: string) => {
+      setConverting(true);
+      try {
+        await onConvertDocumentToMarkdown(filePath);
+      } finally {
+        setConverting(false);
+      }
+    },
+    [onConvertDocumentToMarkdown],
+  );
+
+  const handlePickConvertDocument = useCallback(async () => {
+    const openBridge = window.echoMirageOpen;
+    if (openBridge?.pickConvertDocument) {
+      const result = await openBridge.pickConvertDocument();
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      if (!result.canceled && result.filePath) {
+        await runConvert(result.filePath);
+      }
+      return;
+    }
+    convertInputRef.current?.click();
+  }, [runConvert]);
+
+  const handleConvertFileInput = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+
+      const filePath = (file as File & { path?: string }).path;
+      if (!filePath) {
+        toast.error("Could not read a local file path. Use the Echo Mirage desktop app.");
+        return;
+      }
+      if (!isConvertibleDocumentPath(filePath)) {
+        toast.error("Only .pdf and .docx files can be converted.");
+        return;
+      }
+      await runConvert(filePath);
+    },
+    [runConvert],
+  );
 
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300}>
@@ -288,11 +344,27 @@ function OperatorDocumentToolbarRow({
         </div>
 
         <div className="ml-auto flex max-w-full basis-full flex-wrap items-center justify-end gap-1.5 sm:basis-auto">
+          <input
+            ref={convertInputRef}
+            type="file"
+            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="sr-only"
+            aria-hidden
+            tabIndex={-1}
+            onChange={(event) => void handleConvertFileInput(event)}
+          />
           <OperatorDocTypePicker
             value={normalizeOperatorDocumentKind(operatorDocumentKind)}
             onChange={onOperatorDocumentKindChange}
           />
 
+          <OperatorToolbarIconButton
+            label="Convert"
+            onClick={() => void handlePickConvertDocument()}
+            disabled={converting}
+          >
+            <BsMarkdown className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
           <OperatorToolbarIconButton
             label="Copy"
             onClick={() => void onCopyOperatorDocToClipboard()}
@@ -366,6 +438,7 @@ export function CyberdeckOperatorPaneBody({
   operatorCanNavigateFileForward,
   onOperatorFileHistoryBack,
   onOperatorFileHistoryForward,
+  onConvertDocumentToMarkdown,
 }: OperatorPaneBodyProps) {
   const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
   const [folderPaneOpen, setFolderPaneOpen] = useState(false);
@@ -485,6 +558,7 @@ export function CyberdeckOperatorPaneBody({
                 onCopyOperatorDocToClipboard={onCopyOperatorDocToClipboard}
                 onPasteClipboardToOperator={onPasteClipboardToOperator}
                 onSaveOperatorDocAsFile={onSaveOperatorDocAsFile}
+                onConvertDocumentToMarkdown={onConvertDocumentToMarkdown}
                 onToggleFolderPane={() => setFolderPaneOpen((open) => !open)}
               />
             ) : (

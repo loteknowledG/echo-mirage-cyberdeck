@@ -25,3 +25,7 @@ contextBridge.exposeInMainWorld('echoMirageComputerUse', {
 contextBridge.exposeInMainWorld('echoMirageSave', {
   showDialog: (options) => ipcRenderer.invoke('echo-mirage-save:show-dialog', options),
 });
+
+contextBridge.exposeInMainWorld('echoMirageOpen', {
+  pickConvertDocument: () => ipcRenderer.invoke('echo-mirage-open:pick-convert-document'),
+});

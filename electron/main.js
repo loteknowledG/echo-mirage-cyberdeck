@@ -338,6 +338,29 @@ ipcMain.handle('echo-mirage-browser:forward', async () => {
   }
 });
 
+ipcMain.handle('echo-mirage-open:pick-convert-document', async () => {
+  try {
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'PDF or Word', extensions: ['pdf', 'docx'] },
+        { name: 'PDF', extensions: ['pdf'] },
+        { name: 'Word', extensions: ['docx'] },
+      ],
+    });
+    if (result.canceled || !result.filePaths?.[0]) {
+      return { canceled: true };
+    }
+    return { canceled: false, filePath: result.filePaths[0] };
+  } catch (error) {
+    return {
+      canceled: true,
+      error: error instanceof Error ? error.message : 'Open document dialog failed',
+    };
+  }
+});
+
 ipcMain.handle('echo-mirage-save:show-dialog', async (_event, options) => {
   try {
     const relative = String(options?.defaultRelativePath || 'docs/cadre/operator-doc.md').replace(/\\/g, '/');

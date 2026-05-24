@@ -136,6 +136,7 @@ import { CyberdeckMemoryAtlasPaneBody } from "@/components/cyberdeck/memory-atla
 import { CyberdeckVoiceLabPaneBody } from "@/components/cyberdeck/voice-lab-pane-body";
 import { CyberdeckFlightLogPaneBody } from "@/components/cyberdeck/flight-log-pane-body";
 import { CyberdeckGlyphChannelPaneBody } from "@/components/cyberdeck/glyph-channel-pane-body";
+import { CyberdeckRolaDexPaneBody } from "@/components/cyberdeck/rola-dex-pane-body";
 import { CyberdeckSettingsPaneBody } from "@/components/cyberdeck/settings-pane-body";
 import { ProjectPaneBody } from "@/components/cyberdeck/project-pane-body";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
@@ -258,6 +259,7 @@ const CUSTOM_TAB_KINDS = [
   "voice-lab",
   "flight-log",
   "glyph-channel",
+  "rola-dex",
   "catelog",
 ] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -627,6 +629,14 @@ function normalizeCustomTabKind(kind: string) {
   ) {
     return "glyph-channel" as CustomTabKind;
   }
+  if (
+    nextKind === "preview" ||
+    nextKind === "rola-dex" ||
+    nextKind === "rola_dex" ||
+    nextKind === "roladex"
+  ) {
+    return "rola-dex" as CustomTabKind;
+  }
   if (CUSTOM_TAB_KINDS.includes(nextKind as CustomTabKind)) {
     return nextKind as CustomTabKind;
   }
@@ -657,6 +667,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "voice-lab") return "V";
   if (kind === "flight-log") return "F";
   if (kind === "glyph-channel") return "⟁";
+  if (kind === "rola-dex") return "▧";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
@@ -666,6 +677,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "voice-lab") return "VOICE LAB";
   if (kind === "flight-log") return "FLIGHT LOG";
   if (kind === "glyph-channel") return "⟁ GLYPH";
+  if (kind === "rola-dex") return "Rola Dex";
   return kind.toUpperCase();
 }
 
@@ -708,7 +720,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|project|pi|diagnostics|diagnostic|catelog|catalog|command|operators|memory-atlas|voice-lab|flight-log|glyph-channel|glyph)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|project|pi|diagnostics|diagnostic|catelog|catalog|command|operators|memory-atlas|voice-lab|flight-log|glyph-channel|glyph|rola-dex|preview|roladex)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -5267,6 +5279,7 @@ duration_ms: ${durationMs}`;
       | "flight-log"
       | "voice-lab"
       | "glyph-channel"
+      | "rola-dex"
       | "settings"
       | "command"
       | "project") => {
@@ -5317,6 +5330,7 @@ duration_ms: ${durationMs}`;
         target !== "flight-log" &&
         target !== "voice-lab" &&
         target !== "glyph-channel" &&
+        target !== "rola-dex" &&
         target !== "settings" &&
         target !== "command" &&
         target !== "project"
@@ -5697,9 +5711,20 @@ duration_ms: ${durationMs}`;
         );
       }
 
+      if (tab.kind === "rola-dex") {
+        return (
+          <div
+            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
+            data-pointer-target="rola-dex"
+          >
+            <CyberdeckRolaDexPaneBody />
+          </div>
+        );
+      }
+
       return shell(
         <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-          BLANK TAB // USE CHAT COMMANDS TO CONVERT TO DOCUMENT, WEB, CATALOG, COMMAND, OPERATORS, MEMORY-ATLAS, VOICE-LAB, FLIGHT-LOG, GLYPH-CHANNEL, SETTINGS, CONNECTION, DIAGNOSTICS, OR PI.
+          BLANK TAB // USE CHAT COMMANDS TO CONVERT TO DOCUMENT, WEB, CATALOG, COMMAND, OPERATORS, MEMORY-ATLAS, VOICE-LAB, FLIGHT-LOG, GLYPH-CHANNEL, ROLA-DEX, SETTINGS, CONNECTION, DIAGNOSTICS, OR PI.
         </div>,
       );
     },
@@ -5743,6 +5768,7 @@ duration_ms: ${durationMs}`;
     { label: "Voice Lab", kind: "voice-lab", action: "convert" },
     { label: "Flight Log", kind: "flight-log", action: "convert" },
     { label: "⟁ Glyph", kind: "glyph-channel", action: "convert" },
+    { label: "Rola Dex", kind: "rola-dex", action: "convert" },
     { label: "Diagnostics", kind: "diagnostics", action: "convert" },
     { label: "Pi", kind: "pi", action: "convert" },
     { label: "Settings", action: "settings-pane" },
@@ -6193,15 +6219,7 @@ duration_ms: ${durationMs}`;
                                 .filter(Boolean)
                                 .join(" · ")}
                             </span>
-) : server === "p" ? (
-                <div className="flex min-h-0 flex-1 flex-col">
-                  <ProjectPaneBody
-                    workspaceRoots={workspaceRoots}
-                    onAddRoot={handleAddWorkspaceRoot}
-                    onRemoveRoot={handleRemoveWorkspaceRoot}
-                  />
-                </div>
-              ) : null}
+                          ) : null}
                           <span className="whitespace-pre-wrap">{m.text}</span>
                         </>
                       )}
@@ -6767,6 +6785,7 @@ duration_ms: ${durationMs}`;
                   onOperatorBrowserUrlChange={setOperatorBrowserUrl}
                   onPasteClipboardToOperator={pasteClipboardToOperator}
                   onSaveOperatorDocAsFile={saveOperatorDocAsFile}
+                  onConvertDocumentToMarkdown={openConvertedMarkdownInOperator}
                   onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
                   onOperatorDocumentTextChange={handleOperatorDocumentTextChange}
                   onOperatorDocumentKindChange={handleOperatorDocumentKindChange}

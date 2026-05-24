@@ -7,7 +7,6 @@ import { GrFormEdit, GrFormView } from "react-icons/gr";
 import { LuScanLine } from "react-icons/lu";
 import {
   CyberdeckPaneHeader,
-  CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
 import { Switch } from "@/components/ui/switch";
@@ -331,9 +330,8 @@ export function CyberdeckGlyphChannelPaneBody() {
             <LuScanLine className="h-3.5 w-3.5 shrink-0 text-emerald-500/80" aria-hidden />
             <div className="flex flex-col">
               <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
-                ⟁ GLYPH CHANNEL
+                ⟁ ASCII
               </CyberdeckPaneHeaderTitle>
-              <CyberdeckPaneHeaderSubtitle>MACHINE SIGNAL LAYER // LOCAL PERSIST</CyberdeckPaneHeaderSubtitle>
             </div>
           </div>
         }

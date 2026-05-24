@@ -257,3 +257,15 @@
 .powerfist-preview-root .stackLog strong {
   color: var(--pf-amber);
 }
+
+/* Cyberdeck pane embed — fill pane height instead of viewport */
+.cyberdeck-rola-dex-pane .powerfist-preview-layout {
+  min-height: 0;
+  height: 100%;
+}
+
+.cyberdeck-rola-dex-pane .powerfist-preview-root {
+  min-height: 100%;
+  height: 100%;
+  overflow: auto;
+}
