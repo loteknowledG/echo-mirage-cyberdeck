@@ -24,6 +24,8 @@ const nextConfig = {
 	// Treat as external in the Node.js server runtime
 	serverExternalPackages: [
 		"google-photos-album-image-url-fetch",
+		"md-to-pdf",
+		"puppeteer",
 	],
 	webpack: (config, { dev }) => {
 		if (dev) {

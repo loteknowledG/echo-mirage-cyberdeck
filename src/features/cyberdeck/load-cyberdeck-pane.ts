@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import { normalizeCyberdeckPaneKind, type CyberdeckPaneKind } from "@/features/cyberdeck/pane-registry";
 
 export type CyberdeckPaneModule = {
-  default: ComponentType<Record<string, unknown>>;
+  default: ComponentType<any>;
 };
 
 /** Resolve a pane chunk only when activated — each branch is an isolated async boundary. */

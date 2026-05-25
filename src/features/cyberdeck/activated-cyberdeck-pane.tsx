@@ -13,7 +13,7 @@ type ActivatedCyberdeckPaneProps = Record<string, unknown> & {
  * chunk fetch happens here via loadCyberdeckPane().
  */
 export function ActivatedCyberdeckPane({ kind, ...props }: ActivatedCyberdeckPaneProps) {
-  const [Pane, setPane] = useState<ComponentType<Record<string, unknown>> | null>(null);
+  const [Pane, setPane] = useState<ComponentType<any> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
