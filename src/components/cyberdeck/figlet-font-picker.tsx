@@ -11,11 +11,6 @@ type FigletFontPickerProps = {
   onWheelSettled?: () => void;
 };
 
-function compactFontSlideLabel(font: string): string {
-  if (font.length <= 7) return font;
-  return `${font.slice(0, 6)}…`;
-}
-
 /** Figlet font rolodex — same Y-axis picker as operator document type. */
 export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFontPickerProps) {
   const [fonts, setFonts] = useState<string[]>([]);
@@ -52,8 +47,8 @@ export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFont
         value: font,
         label: font,
         slide: (
-          <span className="block max-w-full truncate px-0.5 font-mono text-[8px] leading-none tracking-[0.04em]">
-            {compactFontSlideLabel(font)}
+          <span className="block whitespace-nowrap px-0.5 font-mono text-[8px] leading-none tracking-[0.04em]">
+            {font}
           </span>
         ),
       })),
@@ -66,7 +61,7 @@ export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFont
   if (fonts.length === 0) {
     return (
       <div
-        className="flex h-7 w-[4.75rem] shrink-0 items-center justify-center rounded border border-[#2d2d2d] bg-black font-mono text-[8px] text-[#6a6a6a]"
+        className="flex h-7 min-w-[5.25rem] shrink-0 items-center justify-center rounded border border-[#2d2d2d] bg-black px-1 font-mono text-[8px] text-[#6a6a6a]"
         title={loadError ?? "Loading fonts"}
       >
         …
@@ -83,7 +78,8 @@ export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFont
         onWheelSettled?.();
       }}
       ariaLabel="Figlet font"
-      viewportClassName="h-7 min-w-[4.5rem] w-[4.5rem]"
+      viewportClassName="h-7 min-w-[5.25rem] w-auto max-w-[10rem]"
+      alwaysShowLabel
       showTextWhileScrolling
       showTooltipOnSnap
       tooltipSide="top"

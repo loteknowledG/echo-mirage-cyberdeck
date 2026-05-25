@@ -14,10 +14,10 @@ type OpenMenuFn = (tabId: string, clientX: number, clientY: number) => void;
  * Call {@link createHandlers} per tab with that tab's id.
  */
 export function useRailTabLongPress(options: {
-  selectedRailTabId: string;
   openMenu: OpenMenuFn;
+  getSelectedRailTabId: () => string;
 }) {
-  const { selectedRailTabId, openMenu } = options;
+  const { openMenu, getSelectedRailTabId } = options;
 
   const timerRef = useRef<number | null>(null);
   const originRef = useRef<{ x: number; y: number } | null>(null);
@@ -46,7 +46,7 @@ export function useRailTabLongPress(options: {
   const createHandlers = useCallback(
     (tabId: string) => {
       const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
-        if (selectedRailTabId !== tabId) return;
+        if (getSelectedRailTabId() !== tabId) return;
         if (event.pointerType === "mouse") return;
 
         clearTimer();
@@ -115,7 +115,7 @@ export function useRailTabLongPress(options: {
         onPointerLeave,
       };
     },
-    [clearTimer, openMenu, releaseCaptureSafe, selectedRailTabId],
+    [clearTimer, getSelectedRailTabId, openMenu, releaseCaptureSafe],
   );
 
   const consumeClickIfLongPress = useCallback((tabId: string): boolean => {

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
+import type { CSSProperties, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, startTransition } from "react";
+import { flushSync } from "react-dom";
 import { Streamdown } from "streamdown";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { art } from "@/lib/TerminalArt";
@@ -53,6 +55,7 @@ import {
   looksLikeBrowserSearchOffer,
   looksLikeCaptchaBlock,
   looksLikeOperatorWebIntent,
+  normalizeOperatorBrowserUrl,
   parseBrowserCommand,
   parseBrowserUseModeCommand,
 } from "@/lib/browser-intents";
@@ -134,6 +137,7 @@ import {
   CyberdeckPaneHeaderValue,
 } from "@/components/cyberdeck/pane-header";
 import { CyberdeckOperatorPaneBody } from "@/components/cyberdeck/operator-pane-body";
+import { CyberdeckTabDocumentPane } from "@/components/cyberdeck/cyberdeck-tab-document-pane";
 import { CyberdeckDiagnosticPaneBody } from "@/components/cyberdeck/diagnostic-pane-body";
 import { CyberdeckPiChatPaneBody } from "@/components/cyberdeck/pi-chat-pane-body";
 import { CyberdeckCatalogPaneBody } from "@/components/cyberdeck/catalog-pane-body";
@@ -334,6 +338,31 @@ type CustomTab = {
   browserUrl?: string;
   asset?: DroppedOperatorAsset | null;
 };
+
+type CustomTabContextMenuAction =
+  | { label: string; kind: CustomTabKind; action: "convert" }
+  | { label: string; action: "settings-pane" | "connection-pane" };
+
+const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
+  { label: "Project", kind: "project", action: "convert" },
+  { label: "Command", kind: "command", action: "convert" },
+  { label: "Document", kind: "document", action: "convert" },
+  { label: "Web", kind: "web", action: "convert" },
+  { label: "Catalog", kind: "catalog", action: "convert" },
+  { label: "Operators", kind: "operators", action: "convert" },
+  { label: "Memory Atlas", kind: "memory-atlas", action: "convert" },
+  { label: "Voice Lab", kind: "voice-lab", action: "convert" },
+  { label: "Flight Log", kind: "flight-log", action: "convert" },
+  { label: "Ascii", kind: "glyph-channel", action: "convert" },
+  { label: "Rola Dex", kind: "rola-dex", action: "convert" },
+  { label: "Sound Profile", kind: "sound-profile", action: "convert" },
+  { label: "Diagnostics", kind: "diagnostics", action: "convert" },
+  { label: "Pi", kind: "pi", action: "convert" },
+  { label: "Settings", action: "settings-pane" },
+  { label: "Connection", action: "connection-pane" },
+] as CustomTabContextMenuAction[]).sort((a, b) =>
+  a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+);
 
 type CyberdeckChatHistoryMessage = {
   role: "user" | "assistant";
@@ -2621,30 +2650,40 @@ export default function CyberdeckPage() {
 
   const handleTabClick = useCallback(
     (id: string) => {
-      closeRailTabContextMenu();
-      closeMirageContextMenu();
-      closeGatewayPaneContextMenu();
       const { customTabs, activeCustomTabId, server } = useCyberdeckTabStore.getState();
       const isCustomTab = customTabs.some((tab) => tab.id === id);
-      if (isCustomTab) {
-        if (activeCustomTabId !== id) {
-          useCyberdeckTabStore.getState().selectTab(id, true);
-          emitSignal({ source: "ui", type: "select", payload: { tabId: id, kind: "custom" }, severity: "info" });
-          playSystemSound("chirp", 0.03);
-        } else {
-          playSystemSound("click", 0.02);
-        }
-        return;
-      }
+      const willChange = isCustomTab
+        ? activeCustomTabId !== id
+        : activeCustomTabId !== null || server !== id;
 
-      const changed = activeCustomTabId !== null || server !== id;
-      useCyberdeckTabStore.getState().selectTab(id, false);
-      if (changed) {
-        emitSignal({ source: "ui", type: "select", payload: { tabId: id, kind: "fixed" }, severity: "info" });
+      // Paint rail + panes in the same frame as the click (before audio / page setState).
+      flushSync(() => {
+        if (isCustomTab) {
+          if (willChange) useCyberdeckTabStore.getState().selectTab(id, true);
+        } else {
+          useCyberdeckTabStore.getState().selectTab(id, false);
+        }
+      });
+
+      if (willChange) {
         playSystemSound("chirp", 0.03);
+        emitSignal({
+          source: "ui",
+          type: "select",
+          payload: { tabId: id, kind: isCustomTab ? "custom" : "fixed" },
+          severity: "info",
+        });
       } else {
         playSystemSound("click", 0.02);
       }
+
+      startTransition(() => {
+        closeRailTabContextMenu();
+        closeMirageContextMenu();
+        closeGatewayPaneContextMenu();
+        setNavRailContext("gateway");
+        setServerKeyboardHighlightId(null);
+      });
     },
     [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu],
   );
@@ -5182,7 +5221,9 @@ duration_ms: ${durationMs}`;
   }, [loadOperatorAssetFromFile, openOperatorFile]);
 
   const updateCustomTab = useCallback((tabId: string, updater: (tab: CustomTab) => CustomTab) => {
-    useCyberdeckTabStore.getState().setCustomTabs((prev) => prev.map((tab) => (tab.id === tabId ? updater(tab) : tab)));
+    useCyberdeckTabStore.getState().setCustomTabs((prev) =>
+      prev.map((tab) => (tab.id === tabId ? updater(tab as CustomTab) : (tab as CustomTab))),
+    );
   }, []);
 
   const convertCustomTab = useCallback(
@@ -5194,20 +5235,54 @@ duration_ms: ${durationMs}`;
         glyph?: string;
       },
     ) => {
-      updateCustomTab(tabId, (tab) => {
-        const nextLabel = options?.label || tab.label || nextKind.toUpperCase();
-        const nextGlyph = options?.glyph || tab.glyph || defaultCustomTabGlyphForKind(nextKind);
+      if (nextKind === "document") {
+        const sourceTab = useCyberdeckTabStore.getState().customTabs.find((t) => t.id === tabId);
+        const sourceAsset = sourceTab?.asset as DroppedOperatorAsset | null | undefined;
+        flushSync(() => {
+          if (sourceAsset) {
+            operatorKindManualRef.current = false;
+            setOperatorDroppedAsset(sourceAsset);
+            setOperatorDocNameDraft(sourceAsset.name);
+            setOperatorSurfaceMode("workspace");
+            setOperatorDocMode("view");
+          }
+          const store = useCyberdeckTabStore.getState();
+          store.setActiveCustomTabId(null);
+          store.setServer("m");
+          store.mountFixedServer("m");
+        });
+        setNavRailContext("gateway");
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: sourceAsset
+              ? `TAB_DOCUMENT // OPENED ØPERATOR // ${sourceAsset.name}`
+              : "TAB_DOCUMENT // OPENED ØPERATOR WORKSPACE",
+          },
+        ]);
+        playSystemSound("chirp", 0.05);
+        return;
+      }
 
-        return {
-          ...tab,
-          kind: nextKind,
-          label: nextLabel,
-          glyph: nextGlyph,
-          browserUrl: nextKind === "web" ? tab.browserUrl || OPERATOR_BROWSER_HOME_URL : undefined,
-          asset: nextKind === "document" ? tab.asset ?? null : null,
-        };
+      flushSync(() => {
+        updateCustomTab(tabId, (tab) => {
+          const nextLabel = options?.label || tab.label || nextKind.toUpperCase();
+          const nextGlyph = options?.glyph || tab.glyph || defaultCustomTabGlyphForKind(nextKind);
+
+          return {
+            ...tab,
+            kind: nextKind,
+            label: nextLabel,
+            glyph: nextGlyph,
+            browserUrl: nextKind === "web" ? tab.browserUrl || OPERATOR_BROWSER_HOME_URL : undefined,
+            asset: null,
+          };
+        });
+        const store = useCyberdeckTabStore.getState();
+        store.setActiveCustomTabId(tabId);
+        store.mountCustomTab(tabId);
       });
-      useCyberdeckTabStore.getState().setActiveCustomTabId(tabId);
       setNavRailContext("tabs");
       setMessages((prev) => [
         ...prev,
@@ -5676,68 +5751,10 @@ duration_ms: ${durationMs}`;
       }
 
       if (tab.kind === "document") {
-        return shell(
-          <div
-            className="flex min-h-0 flex-1 flex-col gap-3 p-3"
-            onDragOver={(event) => {
-              event.preventDefault();
-            }}
-            onDrop={(event) => void handleCustomTabDrop(event, tab.id)}
-          >
-            {tab.asset ? (
-              <>
-                <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                  {tab.asset.mimeType || "application/octet-stream"} // {Math.max(1, Math.round(tab.asset.size / 1024))} KB
-                </div>
-                {tab.asset.kind === "image" ? (
-                  <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
-                    {tab.asset.imageSrc ? (
-                      <img
-                        src={tab.asset.imageSrc}
-                        alt={tab.asset.name}
-                        className="max-h-[72vh] w-full rounded-sm border border-[#1c1c1c] object-contain"
-                        draggable={false}
-                      />
-                    ) : (
-                      <div className="rounded-sm border border-dashed border-[#1c1c1c] bg-black p-4 font-mono text-[10px] leading-snug text-[#8a8a8a]">
-                        Could not load image preview.
-                      </div>
-                    )}
-                  </div>
-                ) : tab.asset.kind === "markdown" ? (
-                  <div className="rounded-sm border border-green-900/70 bg-black/70 p-3">
-                    <Streamdown className="prose prose-invert prose-pre:bg-black prose-pre:text-green-300 max-w-none text-[12px] leading-snug text-green-200">
-                      {tab.asset.text || ""}
-                    </Streamdown>
-                  </div>
-                ) : tab.asset.text ? (
-                  <Textarea
-                    value={tab.asset.text}
-                    onChange={(event) =>
-                      updateCustomTab(tab.id, (current) => ({
-                        ...current,
-                        asset: current.asset ? { ...current.asset, text: event.target.value } : current.asset,
-                      }))
-                    }
-                    spellCheck={false}
-                    autoCapitalize="off"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    wrap="off"
-                    className="min-h-0 resize-none overflow-hidden rounded-sm border border-[#1c1c1c] bg-black px-3 py-3 font-mono text-[12px] leading-snug text-green-200 shadow-none focus-visible:ring-1 focus-visible:ring-amber-500/40"
-                  />
-                ) : (
-                  <pre className="min-h-[50vh] whitespace-pre-wrap break-words rounded-sm border border-[#1c1c1c] bg-black p-3 font-mono text-[12px] leading-snug text-green-200">
-                    {tab.asset.name}
-                  </pre>
-                )}
-              </>
-            ) : (
-              <div className="flex min-h-[50vh] items-center justify-center rounded-sm border border-dashed border-[#1c1c1c] bg-black/70 p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-                DROP A DOCUMENT, IMAGE, OR TEXT FILE HERE TO START WORKING.
-              </div>
-            )}
-          </div>,
+        return (
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <CyberdeckTabDocumentPane tabId={tab.id} />
+          </div>
         );
       }
 
@@ -5922,28 +5939,6 @@ duration_ms: ${durationMs}`;
     ],
   );
 
-  const customTabContextMenuActions: Array<
-    | { label: string; kind: CustomTabKind; action: "convert" }
-    | { label: string; action: "settings-pane" | "connection-pane" }
-  > = [
-    { label: "Project", kind: "project", action: "convert" },
-    { label: "Command", kind: "command", action: "convert" },
-    { label: "Document", kind: "document", action: "convert" },
-    { label: "Web", kind: "web", action: "convert" },
-    { label: "Catalog", kind: "catalog", action: "convert" },
-    { label: "Operators", kind: "operators", action: "convert" },
-    { label: "Memory Atlas", kind: "memory-atlas", action: "convert" },
-    { label: "Voice Lab", kind: "voice-lab", action: "convert" },
-    { label: "Flight Log", kind: "flight-log", action: "convert" },
-    { label: "⟁ Glyph", kind: "glyph-channel", action: "convert" },
-    { label: "Rola Dex", kind: "rola-dex", action: "convert" },
-    { label: "Sound Profile", kind: "sound-profile", action: "convert" },
-    { label: "Diagnostics", kind: "diagnostics", action: "convert" },
-    { label: "Pi", kind: "pi", action: "convert" },
-    { label: "Settings", action: "settings-pane" },
-    { label: "Connection", action: "connection-pane" },
-  ];
-
   /* Weyland: col2 = nav, col3 = terminal. Echo: flipped → col2 = terminal (chat), col3 = nav (gateway). */
   return (
     <div
@@ -5963,7 +5958,10 @@ duration_ms: ${durationMs}`;
         operatorBrowserUrl={operatorBrowserUrl}
         buildUiPayload={buildCyberdeckUiPayload}
       />
-      <CyberdeckCustomTabBrowserSync operatorBrowserRef={operatorBrowserRef} updateCustomTab={updateCustomTab} />
+      <CyberdeckCustomTabBrowserSync
+        operatorBrowserRef={operatorBrowserRef}
+        updateCustomTab={updateCustomTab}
+      />
       <IndicateOverlay />
       {railTabContextMenu || mirageContextMenu || gatewayPaneContextMenu ? (
         <div
@@ -6033,7 +6031,7 @@ duration_ms: ${durationMs}`;
               </>
             ) : (
               <>
-                {customTabContextMenuActions.map((action) =>
+                {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) =>
                   action.action === "convert" ? (
                     <button
                       key={action.label}
@@ -6225,12 +6223,8 @@ duration_ms: ${durationMs}`;
         navRailContext={navRailContext}
         serverKeyboardHighlightId={serverKeyboardHighlightId}
         railGlyphForServer={railGlyphForServer}
-        railGlyphForCustomTab={railGlyphForCustomTab}
-        onTabClick={(id) => {
-          setNavRailContext("gateway");
-          setServerKeyboardHighlightId(null);
-          handleTabClick(id);
-        }}
+        railGlyphForCustomTab={(tab) => railGlyphForCustomTab(tab as CustomTab)}
+        onTabClick={handleTabClick}
         onCreateBlankTab={createBlankTab}
         onRailContextMenu={handleRailTabContextMenu}
         createRailTabLongPressHandlers={createRailTabLongPressHandlers}
@@ -6672,7 +6666,7 @@ duration_ms: ${durationMs}`;
                 />
               </CyberdeckFixedServerPane>
             ) : null}
-            <CyberdeckCustomTabPanes renderTab={renderCustomTabSurface} />
+            <CyberdeckCustomTabPanes renderTab={(tab) => renderCustomTabSurface(tab as CustomTab)} />
             <CyberdeckGatewaySettingsPane className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
                   {droppedMarkdown ? (
                     <div className="mb-4 rounded-sm border border-amber-700/70 bg-black p-3">

@@ -56,6 +56,8 @@ export type CyberdeckRollingPickerProps = {
   viewportClassName?: string;
   /** Icon when settled; text (or `labelSlide`) while drag / wheel scroll. */
   showTextWhileScrolling?: boolean;
+  /** Keep label visible and viewport expanded when idle (not only while scrolling). */
+  alwaysShowLabel?: boolean;
   tooltipSide?: "top" | "right" | "bottom" | "left";
   showTooltipOnSnap?: boolean;
 };
@@ -79,6 +81,7 @@ export function CyberdeckRollingPicker({
   ariaLabel,
   viewportClassName = "h-7 w-7",
   showTextWhileScrolling = true,
+  alwaysShowLabel = false,
   tooltipSide = "right",
   showTooltipOnSnap = true,
 }: CyberdeckRollingPickerProps) {
@@ -243,7 +246,7 @@ export function CyberdeckRollingPicker({
   const activeItem =
     items.find((item) => item.value === value) ?? items[0];
   const tooltipText = tooltipLabel || activeItem?.label || "";
-  const useLabelSlides = showTextWhileScrolling && showLabels;
+  const useLabelSlides = alwaysShowLabel || (showTextWhileScrolling && showLabels);
 
   const renderSlideContent = (item: CyberdeckRollingPickerItem, isActive: boolean) => {
     if (useLabelSlides) {
@@ -286,7 +289,8 @@ export function CyberdeckRollingPicker({
               className={cn(
                 "cursor-default overflow-hidden touch-pan-y transition-[width] duration-150 ease-out",
                 viewportClassName,
-                useLabelSlides && "w-auto min-w-[5.25rem] max-w-[6.75rem]",
+                useLabelSlides && "w-auto",
+                useLabelSlides && !alwaysShowLabel && "min-w-[5.25rem] max-w-[6.75rem]",
               )}
             >
               <div className="flex h-full flex-col">

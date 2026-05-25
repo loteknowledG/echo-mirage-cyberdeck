@@ -484,15 +484,13 @@ export function CyberdeckGlyphChannelPaneBody() {
                       focusComposer();
                     }}
                   />
-                  {settings.engine === "figlet" ? (
-                    <FigletFontPicker
-                      value={settings.figletFont}
-                      onChange={(figletFont) =>
-                        setSettings((prev) => ({ ...prev, figletFont }))
-                      }
-                      onWheelSettled={focusComposer}
-                    />
-                  ) : null}
+                  <FigletFontPicker
+                    value={settings.figletFont}
+                    onChange={(figletFont) =>
+                      setSettings((prev) => ({ ...prev, figletFont }))
+                    }
+                    onWheelSettled={focusComposer}
+                  />
                   <button
                     type="button"
                     className={STATUS_BTN}
