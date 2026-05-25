@@ -23,6 +23,7 @@ import {
   normalizeGlyphChannelText,
   readGlyphModeActive,
   readGlyphPaneSettings,
+  appendGlyphChannelText,
   renderGlyphOutput,
   setGlyphChannelContent,
   subscribeGlyphChannelContent,
@@ -77,6 +78,8 @@ export function CyberdeckGlyphChannelPaneBody() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const signalScrollRef = useRef<HTMLDivElement>(null);
+  const scrollFigletAfterTextRef = useRef(false);
 
   const syncComposerCaret = useCallback(() => {
     const el = inputRef.current;
@@ -159,11 +162,20 @@ export function CyberdeckGlyphChannelPaneBody() {
 
   useEffect(
     () =>
-      subscribeGlyphChannelContent((next) => {
+      subscribeGlyphChannelContent((next, options) => {
         setText(next);
+        if (options?.scrollToBottom) scrollFigletAfterTextRef.current = true;
       }),
     [],
   );
+
+  useLayoutEffect(() => {
+    if (!scrollFigletAfterTextRef.current) return;
+    scrollFigletAfterTextRef.current = false;
+    const el = signalScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, left: 0, behavior: "smooth" });
+  }, [text]);
 
   useEffect(() => {
     setGlyphModeOn(readGlyphModeActive());
@@ -222,7 +234,12 @@ export function CyberdeckGlyphChannelPaneBody() {
           text: payload,
           font: engine === "figlet" ? settings.figletFont : undefined,
         });
-        applyOutput(output);
+        const merged =
+          engine === "figlet" && text.trim()
+            ? appendGlyphChannelText(text, output)
+            : output;
+        applyOutput(merged);
+        if (engine === "figlet") scrollFigletAfterTextRef.current = true;
         setSettings((prev) => ({ ...prev, engine }));
         setStatusLine(
           engine === "figlet"
@@ -241,7 +258,7 @@ export function CyberdeckGlyphChannelPaneBody() {
         });
       }
     },
-    [applyOutput, focusComposer, focusEditor, paneMode, settings.figletFont],
+    [applyOutput, focusComposer, focusEditor, paneMode, settings.figletFont, text],
   );
 
   const handleComposerSubmit = useCallback(async () => {
@@ -375,7 +392,10 @@ export function CyberdeckGlyphChannelPaneBody() {
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-t border-[#141414]">
-        <div className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto bg-black p-3">
+        <div
+          ref={signalScrollRef}
+          className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto bg-black p-3"
+        >
           <div className="mb-3 flex justify-end gap-2">
             <button
               type="button"

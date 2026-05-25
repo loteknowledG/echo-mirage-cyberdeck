@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from "react";
-import type { Context, Model, SimpleStreamOptions } from "@mariozechner/pi-ai";
 
 type PiChatPaneBodyProps = {
   server: string;
@@ -59,7 +58,7 @@ async function promptForProviderKey(
   return true;
 }
 
-function createEmptyAssistantMessage(model: Model<any>) {
+function createEmptyAssistantMessage(model: { api: string; provider: string; id: string }) {
   return {
     role: "assistant" as const,
     content: [] as Array<{ type: "text"; text: string }>,
@@ -116,9 +115,9 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
         };
 
         const streamFn = async (
-          model: Model<any>,
-          context: Context,
-          options?: SimpleStreamOptions,
+          model: { api: string; provider: string; id: string },
+          context: { systemPrompt?: string; messages: unknown[] },
+          options?: { apiKey?: string; signal?: AbortSignal },
         ) => {
           const stream = createAssistantMessageEventStream();
 

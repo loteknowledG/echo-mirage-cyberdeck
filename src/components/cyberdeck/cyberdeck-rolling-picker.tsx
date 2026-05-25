@@ -14,6 +14,7 @@ import { CYBERDECK_PANE_TOOLTIP_CLASS } from "@/components/cyberdeck/cyberdeck-p
 
 const SNAP_ALIGN_THRESHOLD_PX = 0.5;
 const SNAP_TOOLTIP_VISIBLE_MS = 1400;
+const WHEEL_DELTA_TRIGGER_PX = 4;
 
 export type CyberdeckRollingPickerItem = {
   value: string;
@@ -178,10 +179,21 @@ export function CyberdeckRollingPicker({
       if (showTextWhileScrolling) setScrollingLabels(true);
     };
 
-    const onWheel = () => {
+    const onWheel = (event: WheelEvent) => {
       if (isProgrammaticScrollRef.current) return;
+      if (itemsRef.current.length <= 1) return;
+      if (Math.abs(event.deltaY) < WHEEL_DELTA_TRIGGER_PX) return;
+
+      event.preventDefault();
+      event.stopPropagation();
       userDraggedRef.current = true;
       if (showTextWhileScrolling) setScrollingLabels(true);
+
+      const direction = event.deltaY > 0 ? 1 : -1;
+      const currentIndex = findClosestSnapIndex(emblaApi);
+      const nextIndex = normalizeIndex(currentIndex + direction, itemsRef.current.length);
+      isProgrammaticScrollRef.current = true;
+      emblaApi.scrollTo(nextIndex);
     };
 
     const onSettle = () => {
@@ -215,7 +227,7 @@ export function CyberdeckRollingPicker({
     emblaApi.on("pointerDown", onPointerDown);
     emblaApi.on("settle", onSettle);
     emblaApi.on("scroll", onScroll);
-    emblaApi.rootNode().addEventListener("wheel", onWheel, { passive: true });
+    emblaApi.rootNode().addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
       emblaApi.off("select", onSelect);
@@ -247,6 +259,7 @@ export function CyberdeckRollingPicker({
     items.find((item) => item.value === value) ?? items[0];
   const tooltipText = tooltipLabel || activeItem?.label || "";
   const useLabelSlides = alwaysShowLabel || (showTextWhileScrolling && showLabels);
+  const shouldRenderTooltip = showTooltipOnSnap && Boolean(tooltipText);
 
   const renderSlideContent = (item: CyberdeckRollingPickerItem, isActive: boolean) => {
     if (useLabelSlides) {
@@ -276,57 +289,63 @@ export function CyberdeckRollingPicker({
     );
   }
 
+  const viewport = (
+    <div
+      ref={emblaRef}
+      className={cn(
+        "cursor-default overflow-hidden touch-pan-y transition-[width] duration-150 ease-out",
+        viewportClassName,
+        useLabelSlides && "w-auto",
+        useLabelSlides && !alwaysShowLabel && "min-w-[5.25rem] max-w-[6.75rem]",
+      )}
+    >
+      <div className="flex h-full flex-col">
+        {items.map((item) => {
+          const isActive = item.value === value;
+          return (
+            <div
+              key={item.value}
+              className="flex min-h-0 flex-[0_0_100%] items-center justify-center px-0.5"
+            >
+              <div
+                className={
+                  useLabelSlides
+                    ? "flex w-full min-w-0 items-center justify-center"
+                    : isActive
+                      ? "text-emerald-200"
+                      : "text-[#8a8a8a]"
+                }
+              >
+                {renderSlideContent(item, isActive)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <TooltipProvider delayDuration={300}>
       <div
         className="flex shrink-0 flex-col items-center rounded border border-[#2d2d2d] bg-black"
         aria-label={ariaLabel}
       >
-        <Tooltip open={tooltipOpen} onOpenChange={setTooltipOpen}>
-          <TooltipTrigger asChild>
-            <div
-              ref={emblaRef}
-              className={cn(
-                "cursor-default overflow-hidden touch-pan-y transition-[width] duration-150 ease-out",
-                viewportClassName,
-                useLabelSlides && "w-auto",
-                useLabelSlides && !alwaysShowLabel && "min-w-[5.25rem] max-w-[6.75rem]",
-              )}
+        {shouldRenderTooltip ? (
+          <Tooltip open={tooltipOpen} onOpenChange={setTooltipOpen}>
+            <TooltipTrigger asChild>{viewport}</TooltipTrigger>
+            <TooltipContent
+              side={tooltipSide}
+              align="end"
+              sideOffset={6}
+              className={CYBERDECK_PANE_TOOLTIP_CLASS}
             >
-              <div className="flex h-full flex-col">
-                {items.map((item) => {
-                  const isActive = item.value === value;
-                  return (
-                    <div
-                      key={item.value}
-                      className="flex min-h-0 flex-[0_0_100%] items-center justify-center px-0.5"
-                    >
-                      <div
-                        className={
-                          useLabelSlides
-                            ? "flex w-full min-w-0 items-center justify-center"
-                            : isActive
-                              ? "text-emerald-200"
-                              : "text-[#8a8a8a]"
-                        }
-                      >
-                        {renderSlideContent(item, isActive)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent
-            side={tooltipSide}
-            align="end"
-            sideOffset={6}
-            className={CYBERDECK_PANE_TOOLTIP_CLASS}
-          >
-            {tooltipText}
-          </TooltipContent>
-        </Tooltip>
+              {tooltipText}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          viewport
+        )}
       </div>
     </TooltipProvider>
   );

@@ -73,15 +73,15 @@ export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFont
     <CyberdeckRollingPicker
       items={items}
       value={resolvedValue}
-      onChange={(font) => {
-        onChange(font);
+      onChange={onChange}
+      onUserSelect={() => {
         onWheelSettled?.();
       }}
       ariaLabel="Figlet font"
       viewportClassName="h-7 min-w-[5.25rem] w-auto max-w-[10rem]"
       alwaysShowLabel
       showTextWhileScrolling
-      showTooltipOnSnap
+      showTooltipOnSnap={false}
       tooltipSide="top"
     />
   );

@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
-export const CYBERDECK_SERVER_IDS = ["m", "s", "p", "b", "ct"] as const;
+export const CYBERDECK_SERVER_IDS = ["m", "s", "b", "ct"] as const;
 export type CyberdeckServerId = (typeof CYBERDECK_SERVER_IDS)[number];
 
 export type CyberdeckCustomTab = {

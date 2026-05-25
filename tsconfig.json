@@ -29,5 +29,19 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", ".history"]
+  "exclude": [
+    "node_modules",
+    ".history",
+    ".memory",
+    ".atlas",
+    ".powerfist",
+    "logs",
+    "generated",
+    "screenshots",
+    "audio",
+    "spectrograms",
+    "exports",
+    "dist",
+    "tmp"
+  ]
 }

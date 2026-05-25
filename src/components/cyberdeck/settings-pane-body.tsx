@@ -5,7 +5,6 @@ import {
   CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
-import { Knob } from "@/components/ui/knob";
 import { Switch } from "@/components/ui/switch";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
 import type { Identity } from "@/lib/identity/identity-types";
@@ -13,9 +12,6 @@ import type { Identity } from "@/lib/identity/identity-types";
 type CyberdeckSettingsPaneBodyProps = {
   voiceEnabled: boolean;
   onVoiceToggle: () => void;
-  /** MUTHUR Web Audio master gain scalar (see `muthurMasterGain`); UI uses 5–125 ≙ 0.05–1.25. */
-  muthurMasterVolume: number;
-  onMuthurMasterVolumeChange: (volume: number) => void;
   deckMode: "realmorphism" | "ascii";
   onDeckModeToggle: () => void;
   audioMuted: boolean;
@@ -27,8 +23,6 @@ type CyberdeckSettingsPaneBodyProps = {
 export function CyberdeckSettingsPaneBody({
   voiceEnabled,
   onVoiceToggle,
-  muthurMasterVolume,
-  onMuthurMasterVolumeChange,
   deckMode,
   onDeckModeToggle,
   audioMuted,
@@ -77,35 +71,6 @@ export function CyberdeckSettingsPaneBody({
                 ; IDE hook voice label is one line in{" "}
                 <span className="text-[#9a9a9a]">.cursor/hooks/cursor-tts-voice.txt</span> (e.g. warp-spider).
               </p>
-              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#1c1c1c] pt-3">
-                <div className="flex flex-col items-start gap-1.5">
-                  <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">MASTER GAIN // WEB AUDIO BUS</div>
-                  <div className="text-[9px] tracking-[0.04em] text-[#5f5f5f]">
-                    Dial controls MUTHUR master gain (stored with other voice dials). Drag vertically or scroll.
-                  </div>
-                  <Knob
-                    label="VOL"
-                    unit="%"
-                    min={5}
-                    max={125}
-                    step={1}
-                    value={Math.round(muthurMasterVolume * 100)}
-                    onValueChange={(v) => {
-                      onMuthurMasterVolumeChange(v / 100);
-                      emitSignal({
-                        source: "settings",
-                        type: "updated",
-                        payload: { key: "muthur_master_volume", value: v },
-                        severity: "info",
-                      });
-                    }}
-                    mode="power"
-                    size="sm"
-                    theme="dark"
-                    className="[&_fieldset]:gap-1 [&_legend]:font-mono [&_legend]:text-[9px] [&_legend]:tracking-[0.08em] [&_legend]:text-[#6a6a6a]"
-                  />
-                </div>
-              </div>
               <div className="flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3">
                 <div className="min-w-0">
                   <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">CYBERDECK SPEECH</div>

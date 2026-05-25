@@ -10,15 +10,11 @@ import { Switch } from "@/components/ui/switch";
 type VoiceLabPaneBodyProps = {
   voiceEnabled: boolean;
   onVoiceToggle: () => void;
-  muthurMasterVolume: number;
-  onMuthurMasterVolumeChange: (volume: number) => void;
 };
 
 export function CyberdeckVoiceLabPaneBody({
   voiceEnabled,
   onVoiceToggle,
-  muthurMasterVolume,
-  onMuthurMasterVolumeChange,
 }: VoiceLabPaneBodyProps) {
   return (
     <div className="custom-scrollbar flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-black p-3">
@@ -36,26 +32,6 @@ export function CyberdeckVoiceLabPaneBody({
         <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 font-mono text-[10px]">
           <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3 text-[#8e8e8e]">
             PROFILE: <span className="text-[#cfcfcf]">mechanicus-voice</span>
-          </div>
-          <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
-            <div className="mb-1 text-[9px] tracking-[0.08em] text-[#8a8a8a]">MASTER GAIN</div>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={5}
-                max={125}
-                step={1}
-                value={Math.round(muthurMasterVolume * 100)}
-                onChange={(e) => onMuthurMasterVolumeChange(Number(e.target.value) / 100)}
-                aria-label="Master gain volume"
-                className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-[#1c1c1c] accent-green-500"
-                style={{ accentColor: "#22c55e" }}
-              />
-              <span className="min-w-[32px] text-right font-mono text-[10px] text-[#cfcfcf]">
-                {Math.round(muthurMasterVolume * 100)}%
-              </span>
-              <span className="text-[9px] tracking-[0.08em] text-[#6a6a6a]">VOL</span>
-            </div>
           </div>
           <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
             <div className="mb-2 text-[9px] tracking-[0.08em] text-[#8a8a8a]">VOICE ENABLE</div>

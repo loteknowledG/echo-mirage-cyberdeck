@@ -28,7 +28,7 @@ export const MiragePaneLayer = memo(function MiragePaneLayer({
       )}
       aria-hidden={ariaHidden ?? !visible}
     >
-      {children}
+      {visible ? children : null}
     </div>
   );
 }, (prev, next) => {

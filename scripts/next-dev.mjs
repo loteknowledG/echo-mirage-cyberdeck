@@ -25,7 +25,9 @@ function rewritePrintedUrls(line) {
     );
 }
 
-const child = spawn(process.execPath, [nextCli, 'dev', '-p', '3050'], {
+// Webpack dev is the compile/refactor baseline until MUTHUR/operator extraction shrinks the graph.
+// Turbopack evaluation comes later — do not mix with god-route modularization.
+const child = spawn(process.execPath, [nextCli, 'dev', '--webpack', '-p', '3050'], {
   cwd: root,
   stdio: ['inherit', 'pipe', 'pipe'],
   env: process.env,

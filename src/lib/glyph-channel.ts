@@ -35,6 +35,15 @@ export function normalizeGlyphChannelText(raw: string): string {
   return raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
 
+/** Join new figlet/ascii output below existing channel text (blank line between blocks). */
+export function appendGlyphChannelText(existing: string, addition: string): string {
+  const base = normalizeGlyphChannelText(existing).trimEnd();
+  const next = normalizeGlyphChannelText(addition).trim();
+  if (!base) return next;
+  if (!next) return base;
+  return `${base}\n\n${next}`;
+}
+
 export function readGlyphModeActive(): boolean {
   if (typeof window === "undefined") return false;
   return window.localStorage.getItem(GLYPH_MODE_STORAGE_KEY) === "1";
@@ -111,25 +120,36 @@ export async function getGlyphChannelText(): Promise<string> {
   return GLYPH_CHANNEL_DEFAULT_TEXT;
 }
 
-export async function setGlyphChannelContent(raw: string): Promise<string> {
+export type GlyphChannelUpdateOptions = {
+  scrollToBottom?: boolean;
+};
+
+export async function setGlyphChannelContent(
+  raw: string,
+  options?: GlyphChannelUpdateOptions,
+): Promise<string> {
   const text = normalizeGlyphChannelText(raw);
   await set(GLYPH_CHANNEL_STORAGE_KEY, text);
   if (typeof window !== "undefined") {
     window.dispatchEvent(
-      new CustomEvent(GLYPH_CHANNEL_UPDATE_EVENT, { detail: { text } }),
+      new CustomEvent(GLYPH_CHANNEL_UPDATE_EVENT, {
+        detail: { text, scrollToBottom: options?.scrollToBottom ?? false },
+      }),
     );
   }
   return text;
 }
 
 export function subscribeGlyphChannelContent(
-  listener: (text: string) => void,
+  listener: (text: string, options?: GlyphChannelUpdateOptions) => void,
 ): () => void {
   if (typeof window === "undefined") return () => undefined;
 
   const handler = (event: Event) => {
-    const detail = (event as CustomEvent<{ text?: string }>).detail;
-    if (typeof detail?.text === "string") listener(detail.text);
+    const detail = (event as CustomEvent<{ text?: string; scrollToBottom?: boolean }>).detail;
+    if (typeof detail?.text === "string") {
+      listener(detail.text, { scrollToBottom: detail.scrollToBottom });
+    }
   };
 
   window.addEventListener(GLYPH_CHANNEL_UPDATE_EVENT, handler);

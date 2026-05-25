@@ -34,6 +34,5 @@ Keep Echo Mirage responsive and layout-driven. Prefer CSS/layout fixes over meas
 
 ## Related Docs
 - [Archive Design](./archive-design.md)
-- [Project Group Init](./project-group-init.md)
 - [Memory Spec](./echo-mirage-memory-spec.md)
 - [MUTHUR Voice](./MUTHUR_VOICE.md)
