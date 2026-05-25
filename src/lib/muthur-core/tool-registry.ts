@@ -2,6 +2,8 @@ import path from "node:path";
 import { promises as fs } from "node:fs";
 import { Bash, OverlayFs } from "just-bash";
 import { convertDocumentToMarkdown } from "@/lib/muthur-document-conversion.server";
+import { convertMarkdownFileToDocx } from "@/lib/markdown-to-docx.server";
+import { convertMarkdownFileToPdf } from "@/lib/markdown-to-pdf.server";
 import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
@@ -212,6 +214,60 @@ async function runConvertDocumentToMarkdown(call: ToolCall): Promise<ToolResult>
   }
 }
 
+async function runExportMarkdownToDocx(call: ToolCall): Promise<ToolResult> {
+  const filePath = getStringArg(call, "filePath") || getStringArg(call, "path");
+  if (!filePath) {
+    return { ok: false, error: "export_markdown_to_docx requires filePath." };
+  }
+
+  try {
+    const result = await convertMarkdownFileToDocx(filePath);
+    return {
+      ok: true,
+      output: {
+        sourcePath: result.sourcePath,
+        outputPath: result.outputPath,
+        suggestedFilename: result.suggestedFilename,
+        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        kind: "docx",
+        bytes: result.buffer.length,
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Markdown to DOCX export failed.",
+    };
+  }
+}
+
+async function runExportMarkdownToPdf(call: ToolCall): Promise<ToolResult> {
+  const filePath = getStringArg(call, "filePath") || getStringArg(call, "path");
+  if (!filePath) {
+    return { ok: false, error: "export_markdown_to_pdf requires filePath." };
+  }
+
+  try {
+    const result = await convertMarkdownFileToPdf(filePath);
+    return {
+      ok: true,
+      output: {
+        sourcePath: result.sourcePath,
+        outputPath: result.outputPath,
+        suggestedFilename: result.suggestedFilename,
+        mimeType: "application/pdf",
+        kind: "pdf",
+        bytes: result.buffer.length,
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Markdown to PDF export failed.",
+    };
+  }
+}
+
 async function runClock(call: ToolCall): Promise<ToolResult> {
   const mode = getStringArg(call, "mode").toLowerCase() || "datetime";
   const now = new Date();
@@ -253,6 +309,18 @@ export function createMuthurToolRegistry(): ToolRegistry {
         description:
           "Converts a local .pdf or .docx file to markdown using Microsoft MarkItDown (pip install 'markitdown[pdf,docx]'). Returns markdown for OperatorMarkdownViewer.",
         run: runConvertDocumentToMarkdown,
+      },
+      export_markdown_to_docx: {
+        name: "export_markdown_to_docx",
+        description:
+          "Converts a local .md or .markdown file to Word (.docx) using @mohtasham/md-to-docx. Writes output beside the source file when possible.",
+        run: runExportMarkdownToDocx,
+      },
+      export_markdown_to_pdf: {
+        name: "export_markdown_to_pdf",
+        description:
+          "Converts a local .md or .markdown file to PDF using md-to-pdf (Puppeteer). Writes output beside the source file when possible.",
+        run: runExportMarkdownToPdf,
       },
     },
   };

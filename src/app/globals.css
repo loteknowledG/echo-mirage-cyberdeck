@@ -345,11 +345,10 @@ body,
   text-shadow: none;
   box-shadow: 2px 2px 0 0 #222;
   transition:
-    transform 90ms cubic-bezier(0.4, 2, 0.6, 1),
-    color 90ms ease,
-    text-shadow 90ms ease,
-    opacity 90ms ease,
-    box-shadow 90ms ease;
+    color 60ms ease,
+    text-shadow 60ms ease,
+    opacity 60ms ease,
+    box-shadow 60ms ease;
 }
 
 .cyberdeck-server-rail .ascii-btn.is-pushed {

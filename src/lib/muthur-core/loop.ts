@@ -1,4 +1,5 @@
 import type { MuthurLoopState, ToolLoopStep, ToolRegistry } from "./types";
+import { parseExportMarkdownToDocxIntent, parseExportMarkdownToPdfIntent } from "@/lib/markdown-to-docx-intent";
 
 export function createEmptyToolRegistry(): ToolRegistry {
   return { tools: {} };
@@ -117,6 +118,22 @@ function deriveConvertDocumentCall(intent: string) {
   return null;
 }
 
+function deriveExportMarkdownToDocxCall(intent: string) {
+  const parsed = parseExportMarkdownToDocxIntent(intent);
+  if (parsed?.filePath) {
+    return { filePath: parsed.filePath };
+  }
+  return null;
+}
+
+function deriveExportMarkdownToPdfCall(intent: string) {
+  const parsed = parseExportMarkdownToPdfIntent(intent);
+  if (parsed?.filePath) {
+    return { filePath: parsed.filePath };
+  }
+  return null;
+}
+
 function deriveClockCall(intent: string) {
   const text = intent.trim();
   const lower = text.toLowerCase();
@@ -155,6 +172,56 @@ export function runMuthurCoreLoop(intent: string, _registry: ToolRegistry): Muth
       },
       toolResult: null,
       note: "Phase 1: document conversion to markdown (MarkItDown).",
+    };
+    steps.push(step);
+
+    return {
+      intent: normalizedIntent,
+      steps,
+      finalized: false,
+      finalResponse: "",
+    };
+  }
+
+  const exportDocxCall = deriveExportMarkdownToDocxCall(normalizedIntent);
+  if (exportDocxCall) {
+    const step: ToolLoopStep = {
+      index: 0,
+      intent: normalizedIntent,
+      action: "tool",
+      toolCall: {
+        toolName: "export_markdown_to_docx",
+        args: {
+          filePath: exportDocxCall.filePath,
+        },
+      },
+      toolResult: null,
+      note: "Phase 1: markdown export to DOCX (@mohtasham/md-to-docx).",
+    };
+    steps.push(step);
+
+    return {
+      intent: normalizedIntent,
+      steps,
+      finalized: false,
+      finalResponse: "",
+    };
+  }
+
+  const exportPdfCall = deriveExportMarkdownToPdfCall(normalizedIntent);
+  if (exportPdfCall) {
+    const step: ToolLoopStep = {
+      index: 0,
+      intent: normalizedIntent,
+      action: "tool",
+      toolCall: {
+        toolName: "export_markdown_to_pdf",
+        args: {
+          filePath: exportPdfCall.filePath,
+        },
+      },
+      toolResult: null,
+      note: "Phase 1: markdown export to PDF (md-to-pdf).",
     };
     steps.push(step);
 

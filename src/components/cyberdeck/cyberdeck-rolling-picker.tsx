@@ -49,6 +49,8 @@ export type CyberdeckRollingPickerProps = {
   items: CyberdeckRollingPickerItem[];
   value: string;
   onChange: (value: string) => void;
+  /** Fires when the user finishes a drag/wheel gesture on a settled slide. */
+  onUserSelect?: (value: string) => void;
   ariaLabel: string;
   /** Viewport around one slide (default: 7×7 icon cell). */
   viewportClassName?: string;
@@ -73,6 +75,7 @@ export function CyberdeckRollingPicker({
   items,
   value,
   onChange,
+  onUserSelect,
   ariaLabel,
   viewportClassName = "h-7 w-7",
   showTextWhileScrolling = true,
@@ -87,6 +90,9 @@ export function CyberdeckRollingPicker({
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+
+  const onUserSelectRef = useRef(onUserSelect);
+  onUserSelectRef.current = onUserSelect;
 
   const isProgrammaticScrollRef = useRef(false);
   const itemsLengthRef = useRef(items.length);
@@ -169,12 +175,26 @@ export function CyberdeckRollingPicker({
       if (showTextWhileScrolling) setScrollingLabels(true);
     };
 
+    const onWheel = () => {
+      if (isProgrammaticScrollRef.current) return;
+      userDraggedRef.current = true;
+      if (showTextWhileScrolling) setScrollingLabels(true);
+    };
+
     const onSettle = () => {
       isProgrammaticScrollRef.current = false;
       ensureSnappedToCenter(emblaApi);
       if (showTextWhileScrolling) setScrollingLabels(false);
-      if (!userDraggedRef.current) return;
+      const dragged = userDraggedRef.current;
       userDraggedRef.current = false;
+      if (dragged) {
+        const index = findClosestSnapIndex(emblaApi);
+        const entry = itemsRef.current[normalizeIndex(index, itemsRef.current.length)];
+        if (entry) {
+          onUserSelectRef.current?.(entry.value);
+        }
+      }
+      if (!dragged) return;
       showSnapTooltip(emblaApi);
     };
 
@@ -192,12 +212,14 @@ export function CyberdeckRollingPicker({
     emblaApi.on("pointerDown", onPointerDown);
     emblaApi.on("settle", onSettle);
     emblaApi.on("scroll", onScroll);
+    emblaApi.rootNode().addEventListener("wheel", onWheel, { passive: true });
 
     return () => {
       emblaApi.off("select", onSelect);
       emblaApi.off("pointerDown", onPointerDown);
       emblaApi.off("settle", onSettle);
       emblaApi.off("scroll", onScroll);
+      emblaApi.rootNode().removeEventListener("wheel", onWheel);
     };
   }, [emblaApi, emitSelection, ensureSnappedToCenter, setScrollingLabels, showSnapTooltip, showTextWhileScrolling]);
 

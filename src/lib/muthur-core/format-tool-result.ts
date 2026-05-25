@@ -114,6 +114,52 @@ export function formatConvertDocumentResult(result: unknown): string {
   return parts.join("\n\n");
 }
 
+export function formatExportMarkdownToDocxResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] export_markdown_to_docx returned no output.";
+  }
+
+  const payload = result as {
+    sourcePath?: string;
+    outputPath?: string;
+    suggestedFilename?: string;
+    bytes?: number;
+  };
+
+  const parts = [
+    "[TOOL] EXPORT_MARKDOWN_TO_DOCX // @mohtasham/md-to-docx",
+    payload.sourcePath ? `SOURCE // ${payload.sourcePath}` : null,
+    payload.outputPath ? `OUTPUT // ${payload.outputPath}` : null,
+    payload.suggestedFilename ? `FILENAME // ${payload.suggestedFilename}` : null,
+    typeof payload.bytes === "number" ? `DOCX_BYTES // ${payload.bytes}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
+export function formatExportMarkdownToPdfResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] export_markdown_to_pdf returned no output.";
+  }
+
+  const payload = result as {
+    sourcePath?: string;
+    outputPath?: string;
+    suggestedFilename?: string;
+    bytes?: number;
+  };
+
+  const parts = [
+    "[TOOL] EXPORT_MARKDOWN_TO_PDF // md-to-pdf",
+    payload.sourcePath ? `SOURCE // ${payload.sourcePath}` : null,
+    payload.outputPath ? `OUTPUT // ${payload.outputPath}` : null,
+    payload.suggestedFilename ? `FILENAME // ${payload.suggestedFilename}` : null,
+    typeof payload.bytes === "number" ? `PDF_BYTES // ${payload.bytes}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
 /** Narrated summary for legacy heuristic responses (not used in OpenAI tool messages). */
 export function summarizeToolResult(toolName: string, intent: string, output: unknown): string {
   if (toolName === "localfs" && output && typeof output === "object") {

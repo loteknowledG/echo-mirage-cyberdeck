@@ -1,6 +1,8 @@
 import {
   formatClockResult,
   formatConvertDocumentResult,
+  formatExportMarkdownToDocxResult,
+  formatExportMarkdownToPdfResult,
   formatJustBashResult,
   formatLocalFsResult,
 } from "@/lib/muthur-core/format-tool-result";
@@ -38,6 +40,12 @@ export async function executeRegistryToolForOpenAi(
   }
   if (functionName === "convert_document_to_markdown") {
     return formatConvertDocumentResult(result.output);
+  }
+  if (functionName === "export_markdown_to_docx") {
+    return formatExportMarkdownToDocxResult(result.output);
+  }
+  if (functionName === "export_markdown_to_pdf") {
+    return formatExportMarkdownToPdfResult(result.output);
   }
   return formatJustBashResult(result.output);
 }

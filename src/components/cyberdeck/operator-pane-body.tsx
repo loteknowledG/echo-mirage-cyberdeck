@@ -17,6 +17,10 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { OperatorDocTypePicker } from "@/components/cyberdeck/operator-doc-type-picker";
 import {
+  OperatorExportPicker,
+  type OperatorExportFormat,
+} from "@/components/cyberdeck/operator-export-picker";
+import {
   CyberdeckPaneTooltip,
   CyberdeckPaneTooltipProvider,
 } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
@@ -68,6 +72,7 @@ type OperatorPaneBodyProps = {
   onOperatorFileHistoryBack: () => void;
   onOperatorFileHistoryForward: () => void;
   onConvertDocumentToMarkdown: (filePath: string) => void | Promise<void>;
+  onExportOperatorMarkdown: (format: OperatorExportFormat) => void | Promise<void>;
 };
 
 const ZOOM_LEVELS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const;
@@ -206,6 +211,7 @@ function OperatorDocumentToolbarRow({
   onPasteClipboardToOperator,
   onSaveOperatorDocAsFile,
   onConvertDocumentToMarkdown,
+  onExportOperatorMarkdown,
   onToggleFolderPane,
 }: {
   operatorDocMode: "view" | "edit";
@@ -227,10 +233,12 @@ function OperatorDocumentToolbarRow({
   onPasteClipboardToOperator: () => void | Promise<void>;
   onSaveOperatorDocAsFile: () => void | Promise<void>;
   onConvertDocumentToMarkdown: (filePath: string) => void | Promise<void>;
+  onExportOperatorMarkdown: (format: OperatorExportFormat) => void | Promise<void>;
   onToggleFolderPane: () => void;
 }) {
   const [nameFocused, setNameFocused] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const convertInputRef = useRef<HTMLInputElement>(null);
   const displayName = operatorDroppedAsset.name || "OPERATOR_DOC_SURFACE";
 
@@ -359,12 +367,25 @@ function OperatorDocumentToolbarRow({
           />
 
           <OperatorToolbarIconButton
-            label="Convert"
+            label="Import MD"
             onClick={() => void handlePickConvertDocument()}
             disabled={converting}
           >
             <BsMarkdown className="h-3.5 w-3.5" />
           </OperatorToolbarIconButton>
+          <OperatorExportPicker
+            disabled={
+              exporting || normalizeOperatorDocumentKind(operatorDocumentKind) !== "markdown"
+            }
+            onExport={async (format) => {
+              setExporting(true);
+              try {
+                await onExportOperatorMarkdown(format);
+              } finally {
+                setExporting(false);
+              }
+            }}
+          />
           <OperatorToolbarIconButton
             label="Copy"
             onClick={() => void onCopyOperatorDocToClipboard()}
@@ -439,6 +460,7 @@ export function CyberdeckOperatorPaneBody({
   onOperatorFileHistoryBack,
   onOperatorFileHistoryForward,
   onConvertDocumentToMarkdown,
+  onExportOperatorMarkdown,
 }: OperatorPaneBodyProps) {
   const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
   const [folderPaneOpen, setFolderPaneOpen] = useState(false);
@@ -559,6 +581,7 @@ export function CyberdeckOperatorPaneBody({
                 onPasteClipboardToOperator={onPasteClipboardToOperator}
                 onSaveOperatorDocAsFile={onSaveOperatorDocAsFile}
                 onConvertDocumentToMarkdown={onConvertDocumentToMarkdown}
+                onExportOperatorMarkdown={onExportOperatorMarkdown}
                 onToggleFolderPane={() => setFolderPaneOpen((open) => !open)}
               />
             ) : (

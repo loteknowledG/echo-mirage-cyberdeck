@@ -88,19 +88,59 @@ Future:
 
 ---
 
-### CONVERT
+### CONVERT (IMPORT)
 
-Direct conversion utility.
+PDF or DOCX → markdown via MarkItDown.
 
 ```text
-muthur convert handbook.pdf
+muthur md handbook.pdf
+muthur convert handbook.pdf to markdown
 ```
+
+Operator pane: **Import MD** toolbar button (PDF/DOCX picker).
 
 Example internal execution:
 
 ```text
 py -m markitdown handbook.pdf -o handbook.md
 ```
+
+Requires:
+
+```text
+pip install "markitdown[pdf,docx]"
+```
+
+---
+
+### EXPORT (DOCX / PDF)
+
+Markdown → Word via `@mohtasham/md-to-docx`, or PDF via `md-to-pdf`.
+
+```text
+export to docx
+export to pdf
+muthur export to docx
+muthur export to pdf
+muthur docx docs/L.md
+muthur pdf docs/L.md
+muthur export handbook.md to docx
+muthur export handbook.md to pdf
+```
+
+Operator pane: **export rolodex** — scroll to **Export to DOCX** or **Export to PDF**, release to run (current markdown document).
+
+Output:
+
+- browser download of `.docx` / `.pdf`, or
+- `handbook.md` → `handbook.docx` / `handbook.pdf` beside source when invoked with a file path
+
+Engines:
+
+- DOCX: Node library `@mohtasham/md-to-docx`
+- PDF: `md-to-pdf` (Puppeteer/Chromium)
+
+MarkItDown is import-only (PDF/DOCX → MD).
 
 ---
 
@@ -207,6 +247,24 @@ Recovery:
 2. retry with safe filename
 3. fallback OCR
 4. inspect stderr
+
+---
+
+### EXPORT FAILURE
+
+Possible causes:
+
+- empty markdown
+- unsupported source extension (must be `.md` / `.markdown`)
+- write permission denied beside source file
+- `@mohtasham/md-to-docx` or `md-to-pdf` runtime error (PDF requires Chromium/Puppeteer)
+
+Recovery:
+
+1. confirm operator document kind is markdown
+2. retry export from operator **export rolodex** (DOCX or PDF)
+3. test `muthur docx path/to/file.md` or `muthur pdf path/to/file.md` from chat
+4. inspect API `/api/convert-markdown-to-docx` or `/api/convert-markdown-to-pdf` response
 
 ---
 

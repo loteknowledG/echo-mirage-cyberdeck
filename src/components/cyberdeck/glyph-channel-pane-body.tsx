@@ -12,6 +12,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
+import { GlyphEnginePicker } from "@/components/cyberdeck/glyph-engine-picker";
 import { FigletFontPicker } from "@/components/cyberdeck/figlet-font-picker";
 import {
   GLYPH_CHANNEL_DEFAULT_TEXT,
@@ -37,8 +38,6 @@ const HEADER_ICON_BTN =
 const STATUS_BTN =
   "rounded border border-[#2d2d2d] bg-black px-1.5 py-0.5 font-mono text-[9px] tracking-[0.06em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200";
 
-const GLYPH_ENGINES: GlyphPaneEngine[] = ["ascii", "figlet"];
-
 /** Block cursor nudge (px) — same idea as MUTHUR `top-[calc(50%+9px)]` in page.tsx. */
 const GLYPH_CURSOR_OFFSET = { top: 8, left: 0 } as const;
 
@@ -58,11 +57,6 @@ async function readEchoMirageClipboardText(): Promise<string> {
     return navigator.clipboard.readText();
   }
   return "";
-}
-
-function cycleEngine(current: GlyphPaneEngine): GlyphPaneEngine {
-  const idx = GLYPH_ENGINES.indexOf(current);
-  return GLYPH_ENGINES[(idx + 1) % GLYPH_ENGINES.length];
 }
 
 type GlyphPaneMode = "view" | "edit";
@@ -483,17 +477,13 @@ export function CyberdeckGlyphChannelPaneBody() {
             <div className="min-w-0 border-t border-[#1a1a1a]">
               <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 px-2 py-1">
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 overflow-hidden">
-                  <button
-                    type="button"
-                    className={`${STATUS_BTN} ${settings.engine === "figlet" ? "border-emerald-500/50 text-emerald-200" : ""}`}
-                    onClick={() => {
-                      setSettings((prev) => ({ ...prev, engine: cycleEngine(prev.engine) }));
+                  <GlyphEnginePicker
+                    value={settings.engine}
+                    onChange={(engine) => {
+                      setSettings((prev) => ({ ...prev, engine }));
                       focusComposer();
                     }}
-                    title="Cycle render engine"
-                  >
-                    {settings.engine.toUpperCase()}
-                  </button>
+                  />
                   {settings.engine === "figlet" ? (
                     <FigletFontPicker
                       value={settings.figletFont}
@@ -514,7 +504,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                     }
                     title="Decrease display zoom"
                   >
-                    ZOOM −
+                    −
                   </button>
                   <span className="font-mono text-[9px] text-[#6a6a6a]">{settings.zoomPercent}%</span>
                   <button
@@ -528,7 +518,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                     }
                     title="Increase display zoom"
                   >
-                    ZOOM +
+                    +
                   </button>
                 </div>
 

@@ -93,6 +93,42 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   {
     type: "function",
     function: {
+      name: "export_markdown_to_docx",
+      description:
+        "Convert a local markdown file to Word DOCX via @mohtasham/md-to-docx. Use for operator document export and cadre handoff.",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: {
+            type: "string",
+            description: "Absolute or relative path to a .md or .markdown file on the dev machine.",
+          },
+        },
+        required: ["filePath"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "export_markdown_to_pdf",
+      description:
+        "Convert a local markdown file to PDF via md-to-pdf (Puppeteer). Use for operator document export and cadre handoff.",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: {
+            type: "string",
+            description: "Absolute or relative path to a .md or .markdown file on the dev machine.",
+          },
+        },
+        required: ["filePath"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "clock",
       description: "Current date/time on the server machine.",
       parameters: {
