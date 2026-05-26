@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchWithTimeout, MODEL_LIST_TIMEOUT_MS } from "@/lib/fetch-with-timeout";
 
 const MODEL_LIST_URL: Record<string, string> = {
   opencode: "https://opencode.ai/zen/v1/models",
@@ -42,10 +43,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const upstream = await fetch(url, {
+    const upstream = await fetchWithTimeout(url, {
       method: "GET",
       headers: { Authorization: `Bearer ${resolvedApiKey}` },
-    });
+    }, MODEL_LIST_TIMEOUT_MS);
 
     if (!upstream.ok) {
       return NextResponse.json(

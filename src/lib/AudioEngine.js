@@ -180,6 +180,56 @@ function classifyKey(key) {
   return "symbol";
 }
 
+/** Fixed semitone ladder — each letter always maps to the same pitch (word memory by ear). */
+const MEMORIZE_LETTER_SEMITONES = [
+  0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24, 27, 29, 31, 34, 36, 39, 41, 43, 46, 48, 51, 53,
+  55, 58, 60,
+];
+const MEMORIZE_ROOT_HZ = 220;
+
+function isDeckAudioMuted() {
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return true;
+  try {
+    return window.localStorage.getItem("echo-mirage-audio-muted-v1") !== "0";
+  } catch {
+    return true;
+  }
+}
+
+function memorizePitchHz(key) {
+  if (key === " ") return MEMORIZE_ROOT_HZ * Math.pow(2, 7 / 12);
+  if (key === "Backspace" || key === "Delete") return MEMORIZE_ROOT_HZ * Math.pow(2, -5 / 12);
+  if (key === "Enter") return MEMORIZE_ROOT_HZ * 2;
+  if (/^[0-9]$/.test(key)) {
+    const idx = key.charCodeAt(0) - 48;
+    return MEMORIZE_ROOT_HZ * 2 * Math.pow(2, (idx * 2) / 12);
+  }
+  if (/^[a-zA-Z]$/.test(key)) {
+    const idx = key.toLowerCase().charCodeAt(0) - 97;
+    return MEMORIZE_ROOT_HZ * Math.pow(2, MEMORIZE_LETTER_SEMITONES[idx] / 12);
+  }
+  if (key.length === 1) {
+    const idx = key.charCodeAt(0) % 17;
+    return MEMORIZE_ROOT_HZ * 1.5 * Math.pow(2, (idx * 2) / 12);
+  }
+  return null;
+}
+
+/** Stable pitch per key for MUTHUR chat — same character always same tone. */
+export function playMemorizeKeySound(key, options = {}) {
+  if (!enabled || isDeckAudioMuted()) return;
+  const hz = memorizePitchHz(key);
+  if (!hz) return;
+  const volume = (options.volume ?? 1) * 2.6 * KEYBOARD_EFFECTS_GAIN;
+  playTone({
+    freqStart: hz,
+    freqEnd: hz * 0.985,
+    duration: 0.058,
+    type: "sine",
+    volume: volume * 0.042,
+  });
+}
+
 function playFallbackClip(kind, volume = 0.4) {
   if (typeof Audio === "undefined") return;
   const v = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 0.4));
@@ -352,6 +402,10 @@ export function playNavigationSound(variant = "step") {
 export function bindKeyboardSfx(target = window, options = {}) {
   const handler = (event) => {
     if (!enabled || event.repeat) return;
+    const t = event.target;
+    if (t instanceof HTMLElement && t.closest("[data-muthur-memorize-input]")) {
+      return;
+    }
     playKeySound(event.key, options);
   };
 

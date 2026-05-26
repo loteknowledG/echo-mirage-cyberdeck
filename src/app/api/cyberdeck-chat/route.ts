@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
-import { createMuthurToolRegistry } from "@/lib/muthur-core/tool-registry";
+import {
+  fetchWithTimeout,
+  MEMORY_CONTEXT_TIMEOUT_MS,
+  MODEL_LIST_TIMEOUT_MS,
+  MODEL_PROBE_TIMEOUT_MS,
+} from "@/lib/fetch-with-timeout";
+import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
+import { EMPTY_TOOL_REGISTRY } from "@/lib/muthur-core/empty-tool-registry";
 import { muthurChatWithModelTools } from "@/lib/muthur-core/muthur-provider-chat";
 import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
+import type { ToolRegistry } from "@/lib/muthur-core/types";
 
 interface MemoryCacheEntry {
   context: string;
@@ -10,7 +18,15 @@ interface MemoryCacheEntry {
 }
 
 const _memoryContextCache = new Map<string, MemoryCacheEntry>();
-const MEMORY_CONTEXT_TTL_MS = 30_000;
+const MEMORY_CONTEXT_TTL_MS = 60_000;
+
+let muthurBootPromise: Promise<void> | null = null;
+
+async function resolveToolRegistry(): Promise<ToolRegistry> {
+  if (!ENABLE_AUTOMATION) return EMPTY_TOOL_REGISTRY;
+  const { createMuthurToolRegistry } = await import("@/lib/muthur-core/tool-registry");
+  return createMuthurToolRegistry();
+}
 
 function hashQuery(query: string): string {
   let hash = 0;
@@ -23,6 +39,31 @@ function hashQuery(query: string): string {
   return Math.abs(hash).toString(16);
 }
 
+async function ensureMuthurBooted(): Promise<void> {
+  if (!muthurBootPromise) {
+    muthurBootPromise = (async () => {
+      const { bootMuthur } = await import("@/muthur/boot/boot_muthur");
+      await bootMuthur({ workspaceRoot: process.cwd() });
+    })().catch((err) => {
+      muthurBootPromise = null;
+      throw err;
+    });
+  }
+  await muthurBootPromise;
+}
+
+function buildMemoryPrompt(clientMemory: unknown, serverMemory: string): string {
+  const client =
+    typeof clientMemory === "string" && clientMemory.trim() ? clientMemory.trim() : "";
+  if (client) {
+    return `\n\nPersistent MUTHUR memory:\n${client}`;
+  }
+  if (serverMemory.trim()) {
+    return `\n\nMUTHUR Memory Context:\n${serverMemory.trim()}`;
+  }
+  return "";
+}
+
 async function getMuthurMemoryContext(message: string): Promise<string> {
   const queryHash = hashQuery(message);
   const now = Date.now();
@@ -33,11 +74,13 @@ async function getMuthurMemoryContext(message: string): Promise<string> {
   }
 
   try {
-    const { bootMuthur, buildMemoryContext } = await import("@/muthur/boot/boot_muthur");
+    await ensureMuthurBooted();
+    const { buildMemoryContext } = await import("@/muthur/boot/boot_muthur");
 
-    await bootMuthur({ workspaceRoot: process.cwd() });
-
-    const ctx = await buildMemoryContext(message);
+    const ctx = await Promise.race([
+      buildMemoryContext(message),
+      new Promise<string>((resolve) => setTimeout(() => resolve(""), MEMORY_CONTEXT_TIMEOUT_MS)),
+    ]);
     const context = ctx || "";
 
     if (context.trim().length > 0) {
@@ -121,10 +164,8 @@ export async function POST(request: Request) {
       history,
     } = body;
     const chatHistory = normalizeChatHistory(history);
-    const memoryPrompt =
-      typeof memoryContext === "string" && memoryContext.trim()
-        ? `\n\nPersistent MUTHUR memory:\n${memoryContext.trim()}`
-        : "";
+    const clientHasMemory =
+      typeof memoryContext === "string" && memoryContext.trim().length > 0;
     const browserPrompt =
       typeof browserContext === "string" && browserContext.trim()
         ? `\n\nLive browser pane snapshot:\n${browserContext.trim()}`
@@ -141,7 +182,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, valid: false, status: 401 }, { status: 401 });
       }
       try {
-        const res = await fetch(endpoint, {
+        const res = await fetchWithTimeout(endpoint, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${resolvedApiKey}`,
@@ -157,7 +198,7 @@ export async function POST(request: Request) {
             temperature: 0,
             stream: false,
           }),
-        });
+        }, MODEL_PROBE_TIMEOUT_MS);
         const data = res.ok ? ((await res.json()) as { choices?: { message?: { content?: string } }[] }) : {};
         const content = String(data?.choices?.[0]?.message?.content || "").trim();
         return NextResponse.json({
@@ -166,8 +207,12 @@ export async function POST(request: Request) {
           valid: content.length > 0,
           rateLimited: res.status === 429,
         });
-      } catch {
-        return NextResponse.json({ ok: false, valid: false, status: 0 }, { status: 500 });
+      } catch (err) {
+        const timedOut = err instanceof Error && err.message.includes("timed out");
+        return NextResponse.json(
+          { ok: false, valid: false, status: timedOut ? 408 : 0, rateLimited: false },
+          { status: timedOut ? 408 : 500 },
+        );
       }
     }
 
@@ -196,10 +241,10 @@ export async function POST(request: Request) {
       }
 
       try {
-        const testRes = await fetch(testEndpoint, {
+        const testRes = await fetchWithTimeout(testEndpoint, {
           method: "GET",
           headers: { Authorization: `Bearer ${apiKey}` },
-        });
+        }, MODEL_LIST_TIMEOUT_MS);
         return NextResponse.json({ 
           connected: testRes.ok, 
           status: testRes.status 
@@ -255,20 +300,13 @@ export async function POST(request: Request) {
         const model =
           (typeof modelFromBody === "string" && modelFromBody.trim()) || defaultModelForProvider(provider);
 
-        const serverMemoryCtx = await getMuthurMemoryContext(message);
-        const serverMemoryPrompt = serverMemoryCtx.trim()
-          ? `\n\nMUTHUR Memory Context:\n${serverMemoryCtx.trim()}`
-          : "";
-        const clientMemoryPrompt =
-          typeof memoryContext === "string" && memoryContext.trim()
-            ? `\n\nClient memory context:\n${memoryContext.trim()}`
-            : "";
+        const serverMemoryCtx = clientHasMemory ? "" : await getMuthurMemoryContext(message);
+        const memoryPrompt = buildMemoryPrompt(memoryContext, serverMemoryCtx);
 
         const systemContent =
           "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
           "\n\nYou may call tools: justbash (workspace shell), localfs (read paths on the machine; mkdir and write_text only inside this project workspace), clock (server time). Use tools when the user asks about the repo, files, time, or when inspection is more reliable than guessing." +
-          serverMemoryPrompt +
-          clientMemoryPrompt +
+          memoryPrompt +
           browserPrompt;
 
         const baseMessages: Record<string, unknown>[] = [
@@ -277,12 +315,12 @@ export async function POST(request: Request) {
           { role: "user", content: message },
         ];
 
-        return muthurChatWithModelTools({
+        return await muthurChatWithModelTools({
           endpoint,
           apiKey: resolvedApiKey,
           model,
           baseMessages,
-          registry: createMuthurToolRegistry(),
+          registry: await resolveToolRegistry(),
         });
       }
     }
@@ -334,20 +372,15 @@ export async function POST(request: Request) {
     const envModel = process.env.OPENCODE_MODEL || "trinity-large-preview-free";
     const endpoint = "https://opencode.ai/zen/v1/chat/completions";
 
-    const fallbackMemoryCtx = await getMuthurMemoryContext(typeof message === "string" ? message : "");
-    const fallbackMemoryPrompt = fallbackMemoryCtx.trim()
-      ? `\n\nMUTHUR Memory Context:\n${fallbackMemoryCtx.trim()}`
-      : "";
-    const fallbackClientMemoryPrompt =
-      typeof memoryContext === "string" && memoryContext.trim()
-        ? `\n\nClient memory context:\n${memoryContext.trim()}`
-        : "";
+    const fallbackMemoryCtx = clientHasMemory
+      ? ""
+      : await getMuthurMemoryContext(typeof message === "string" ? message : "");
+    const fallbackMemoryPrompt = buildMemoryPrompt(memoryContext, fallbackMemoryCtx);
 
     const systemContent =
       "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
       "\n\nYou may call tools: justbash (workspace shell), localfs (read paths on the machine; mkdir and write_text only inside this project workspace), clock (server time). Use tools when the user asks about the repo, files, time, or when inspection is more reliable than guessing." +
       fallbackMemoryPrompt +
-      fallbackClientMemoryPrompt +
       browserPrompt;
 
     const baseMessages: Record<string, unknown>[] = [
@@ -357,16 +390,16 @@ export async function POST(request: Request) {
     ];
 
     if (envApiKey.trim()) {
-      return muthurChatWithModelTools({
+      return await muthurChatWithModelTools({
         endpoint,
         apiKey: envApiKey.trim(),
         model: envModel,
         baseMessages,
-        registry: createMuthurToolRegistry(),
+        registry: await resolveToolRegistry(),
       });
     }
 
-    const providerResponse = await fetch(endpoint, {
+    const providerResponse = await fetchWithTimeout(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

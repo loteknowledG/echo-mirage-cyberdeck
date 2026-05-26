@@ -7,7 +7,9 @@ interface IdentityBundle {
   voiceProfile: VoiceProfile | null;
 }
 
-export async function loadIdentityBundle(): Promise<IdentityBundle> {
+let identityLoadPromise: Promise<IdentityBundle> | null = null;
+
+async function fetchIdentityBundle(): Promise<IdentityBundle> {
   const result: IdentityBundle = {
     identity: null,
     permissions: null,
@@ -33,6 +35,13 @@ export async function loadIdentityBundle(): Promise<IdentityBundle> {
   }
 
   return result;
+}
+
+export async function loadIdentityBundle(): Promise<IdentityBundle> {
+  if (!identityLoadPromise) {
+    identityLoadPromise = fetchIdentityBundle();
+  }
+  return identityLoadPromise;
 }
 
 export { getDefaultIdentity };

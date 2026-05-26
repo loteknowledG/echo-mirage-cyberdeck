@@ -21,6 +21,11 @@ function normalizeWebpackWatchIgnored(ignored) {
 
 const nextConfig = {
 	devIndicators: false,
+	allowedDevOrigins: ["127.0.0.1", "localhost"],
+	turbopack: {},
+	experimental: {
+		webpackMemoryOptimizations: true,
+	},
 	// Treat as external in the Node.js server runtime
 	serverExternalPackages: [
 		"google-photos-album-image-url-fetch",
@@ -29,6 +34,16 @@ const nextConfig = {
 	],
 	webpack: (config, { dev }) => {
 		if (dev) {
+			config.parallelism = 1;
+			config.cache = false;
+			config.optimization = {
+				...(config.optimization ?? {}),
+				splitChunks: {
+					...(config.optimization?.splitChunks ?? {}),
+					chunks: "all",
+					maxSize: 244_000,
+				},
+			};
 			config.experiments = {
 				...config.experiments,
 				lazyCompilation: {

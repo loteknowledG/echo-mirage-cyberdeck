@@ -31,6 +31,10 @@ export function bindDeckKeyboardSfx(...args: Parameters<DeckAudioModule["bindKey
   return () => unbind?.();
 }
 
+export function playDeckMemorizeKeySound(...args: Parameters<DeckAudioModule["playMemorizeKeySound"]>) {
+  void loadDeckAudio().then((audio) => audio.playMemorizeKeySound(...args));
+}
+
 export function playDeckBleepBloop(...args: Parameters<DeckAudioModule["playBleepBloop"]>) {
   void loadDeckAudio().then((audio) => audio.playBleepBloop(...args));
 }

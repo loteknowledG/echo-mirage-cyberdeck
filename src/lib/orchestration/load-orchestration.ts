@@ -42,7 +42,9 @@ function isValidHandoffHistory(obj: unknown): obj is HandoffHistory {
   return Array.isArray(o.entries);
 }
 
-export async function loadOrchestrationBundle(): Promise<OrchestrationBundle> {
+let orchestrationLoadPromise: Promise<OrchestrationBundle> | null = null;
+
+async function fetchOrchestrationBundle(): Promise<OrchestrationBundle> {
   const result: OrchestrationBundle = {
     agentRoles: null,
     toolRegistry: null,
@@ -76,4 +78,11 @@ export async function loadOrchestrationBundle(): Promise<OrchestrationBundle> {
   }
 
   return result;
+}
+
+export async function loadOrchestrationBundle(): Promise<OrchestrationBundle> {
+  if (!orchestrationLoadPromise) {
+    orchestrationLoadPromise = fetchOrchestrationBundle();
+  }
+  return orchestrationLoadPromise;
 }

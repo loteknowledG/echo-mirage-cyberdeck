@@ -360,11 +360,11 @@ export function CyberdeckGlyphChannelPaneBody() {
         }
         right={
           <div className="flex items-center gap-2">
-            <CyberdeckControlTooltip label="Paste into glyph channel">
+            <CyberdeckControlTooltip label="Paste into ASCII">
               <button
                 type="button"
                 onClick={() => void handlePasteClipboard()}
-                aria-label="Paste into glyph channel"
+                aria-label="Paste into ASCII"
                 className={realmorphismControlClass(deckMode, {
                   size: "toolbar",
                   legacyClassName: HEADER_ICON_BTN,
@@ -394,7 +394,7 @@ export function CyberdeckGlyphChannelPaneBody() {
               <Switch
                 checked={paneMode === "edit"}
                 onCheckedChange={(checked) => setPaneModeWithFocus(checked ? "edit" : "view")}
-                aria-label="Toggle glyph channel edit mode"
+                aria-label="Toggle ASCII edit mode"
                 className={cn(
                   "realmorphism-switch",
                   deckMode === "ascii" &&
@@ -429,11 +429,11 @@ export function CyberdeckGlyphChannelPaneBody() {
           className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto bg-black p-3"
         >
           <div className="mb-3 flex justify-end gap-2">
-            <CyberdeckControlTooltip label="Copy glyph channel signal">
+            <CyberdeckControlTooltip label="Copy ASCII">
               <button
                 type="button"
                 onClick={() => void handleCopy()}
-                aria-label="Copy glyph channel signal"
+                aria-label="Copy ASCII"
                 className={realmorphismControlClass(deckMode, {
                   size: "toolbar",
                   signal: true,
@@ -454,7 +454,7 @@ export function CyberdeckGlyphChannelPaneBody() {
               autoComplete="off"
               autoCorrect="off"
               wrap="off"
-              aria-label="Glyph channel signal editor"
+              aria-label="ASCII editor"
               className="m-0 block min-h-full w-full max-w-full resize-none overflow-visible rounded-none border-0 bg-black p-0 font-mono text-emerald-300/95 shadow-none focus-visible:ring-1 focus-visible:ring-emerald-500/40"
               style={{
                 fontSize: `${(11 * settings.zoomPercent) / 100}px`,
@@ -506,10 +506,10 @@ export function CyberdeckGlyphChannelPaneBody() {
                 autoCapitalize="off"
                 autoComplete="off"
                 autoCorrect="off"
-                aria-label="Glyph channel command input"
+                aria-label="ASCII command input"
                 placeholder={
                   glyphModeOn
-                    ? "⟁ Glyph mode — figlet ECHO MIRAGE or plain text to render"
+                    ? "⟁ ASCII mode — figlet ECHO MIRAGE or plain text to render"
                     : "figlet ECHO MIRAGE · ascii edit · ascii view · ascii clear"
                 }
                 className={`box-border w-full min-w-0 rounded-none border-0 bg-black py-2 pl-9 pr-4 font-mono text-sm text-green-400 placeholder:text-green-800 transition-all focus:outline-none ${

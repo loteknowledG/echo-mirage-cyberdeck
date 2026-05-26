@@ -4,3 +4,6 @@
  * no auto reconnect, retries, polling, or orchestration loops.
  */
 export const ENABLE_AUTOMATION = false;
+
+/** Ping selected model via chat completion when picking from the gateway list. */
+export const ENABLE_MODEL_PROBE = false;

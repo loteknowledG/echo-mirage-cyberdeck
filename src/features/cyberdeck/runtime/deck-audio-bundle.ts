@@ -3,6 +3,7 @@
 export {
   bindKeyboardSfx,
   unlockKeyboardSfx,
+  playMemorizeKeySound,
   playNavigationSound,
   playSystemSound,
   startSonarLoop,

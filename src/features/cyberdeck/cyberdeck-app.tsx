@@ -158,14 +158,23 @@ import { cn } from "@/lib/utils";
 import { useCyberdeckTabStore, getCyberdeckSelectedRailTabId, type CyberdeckServerId } from "@/lib/cyberdeck-tab-store";
 import { CyberdeckServerRail } from "@/components/cyberdeck/cyberdeck-server-rail";
 import { CyberdeckTabPersistence } from "@/components/cyberdeck/cyberdeck-tab-persistence";
-import { CyberdeckFixedServerPane, CyberdeckCustomTabPanes, CyberdeckGatewaySettingsPane } from "@/components/cyberdeck/cyberdeck-pane-slots";
+import {
+  CyberdeckCustomTabPanes,
+  CyberdeckFixedServerPane,
+  CyberdeckGatewaySettingsPane,
+} from "@/components/cyberdeck/cyberdeck-pane-slots";
+import {
+  MuthurCommandInput,
+  type MuthurCommandInputHandle,
+} from "@/components/cyberdeck/muthur-command-input";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
 import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration";
 import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
-import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
+import { ENABLE_AUTOMATION, ENABLE_MODEL_PROBE } from "@/lib/cyberdeck/automation-config";
+import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import {
   PROVIDER_CLICK_ESCALATION_MS,
   PROVIDER_LINK_REFRESH_COOLDOWN_MS,
@@ -270,7 +279,9 @@ const fixedServers = [
 const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
 const CHAT_STORAGE_KEY = "echo-mirage-chat-messages-v1";
 const CHAT_STREAM_STORAGE_KEY = "echo-mirage-chat-stream-text-v1";
-const INPUT_STORAGE_KEY = "echo-mirage-chat-input-v1";
+const CHAT_UPLINK_TIMEOUT_MS = 120_000;
+const MODEL_PROBE_MIN_INTERVAL_MS = 15_000;
+const PROVIDER_RATE_LIMIT_COOLDOWN_MS = 90_000;
 const INPUT_HISTORY_KEY = "echo-mirage-chat-history-v1";
 const UI_STATE_STORAGE_KEY = "echo-mirage-ui-state-v1";
 
@@ -321,6 +332,24 @@ function gatewayKeySysMessage(providerId: string): string {
     return "ENTER OPENCODE KEY BELOW. create one by visiting OpenCode console.";
   }
   return `ENTER ${providerId.toUpperCase()} KEY BELOW.`;
+}
+
+const GATEWAY_KEY_SYS_TIPS = new Set(PROVIDER_IDS.map((id) => gatewayKeySysMessage(id)));
+
+function isGatewayKeySysTip(text: string): boolean {
+  return GATEWAY_KEY_SYS_TIPS.has(text.trim());
+}
+
+function providerHasClientKey(
+  providerId: string,
+  providerKeys: Record<string, string>,
+  defaultKeyAvailableByProvider: Record<string, boolean>,
+): boolean {
+  return Boolean(
+    providerKeys[providerId]?.trim() ||
+      DEFAULT_CLIENT_PROVIDER_KEYS[providerId] ||
+      defaultKeyAvailableByProvider[providerId],
+  );
 }
 
 const GATEWAY_LINK_PARTS =
@@ -821,10 +850,8 @@ export default function CyberdeckApp() {
   }, []);
 
 
-  const [input, setInput] = useState("");
   const [inputHistory, setInputHistory] = useState<string[]>([]);
-  const [inputHistoryIndex, setInputHistoryIndex] = useState<number | null>(null);
-  const [inputHistoryDraft, setInputHistoryDraft] = useState("");
+  const [canSendInput, setCanSendInput] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatHydrated, setChatHydrated] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -868,11 +895,7 @@ export default function CyberdeckApp() {
   const [gatewayPaneContextMenu, setGatewayPaneContextMenu] = useState<{ x: number; y: number } | null>(
     null,
   );
-  const [isInputFocused, setIsInputFocused] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
-  const [inputCursorBlinkOn, setInputCursorBlinkOn] = useState(true);
-  const [inputCursorLeft, setInputCursorLeft] = useState(0);
-  const [inputCaretIndex, setInputCaretIndex] = useState(0);
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
@@ -937,7 +960,7 @@ export default function CyberdeckApp() {
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messageInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<MuthurCommandInputHandle>(null);
   const messageScrollRef = useRef<HTMLDivElement>(null);
   const serverRailRef = useRef<HTMLElement | null>(null);
   const chatColumnRef = useRef<HTMLDivElement>(null);
@@ -946,6 +969,10 @@ export default function CyberdeckApp() {
   const gatewayBlankSettingsRef = useRef<HTMLDivElement>(null);
   const cyberdeckRootRef = useRef<HTMLDivElement>(null);
   const chatAbortRef = useRef<AbortController | null>(null);
+  const modelProbeAbortRef = useRef<AbortController | null>(null);
+  const modelProbeCacheRef = useRef<Record<string, { status: string; at: number }>>({});
+  const modelProbeLastAtRef = useRef<Record<string, number>>({});
+  const providerRateLimitUntilRef = useRef<Record<string, number>>({});
   const lastSpokenAssistantTextRef = useRef<string>("");
   const assistantVoiceBlocksRef = useRef<string[]>([]);
   const speakQueueActiveRef = useRef(false);
@@ -984,37 +1011,9 @@ export default function CyberdeckApp() {
   const providerRefreshAtRef = useRef<Record<string, number>>({});
   const providerBootstrapRef = useRef(false);
 
-  const syncInputCaret = useCallback(() => {
-    const el = messageInputRef.current;
-    if (!el) return;
-    const idx = el.selectionStart ?? 0;
-    const displayIndex = input.length === 0 ? 0 : Math.max(0, Math.min(input.length - 1, idx));
-    setInputCaretIndex(displayIndex);
-
-    // Measure monospace text width before caret to place a block cursor overlay.
-    const computed = window.getComputedStyle(el);
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.font = computed.font;
-    const before = input.slice(0, displayIndex);
-    const padLeft = Number.parseFloat(computed.paddingLeft || "0") || 0;
-    const charWidth = input[displayIndex] ? ctx.measureText(input[displayIndex]).width : 0;
-    const x = padLeft + ctx.measureText(before).width + charWidth - el.scrollLeft;
-    setInputCursorLeft(Math.max(padLeft, x));
-  }, [input]);
-
-  const moveInputCaretToEnd = useCallback((nextValue: string) => {
-    requestAnimationFrame(() => {
-      const el = messageInputRef.current;
-      if (!el) return;
-      const end = nextValue.length;
-      el.focus({ preventScroll: true });
-      el.setSelectionRange(end, end);
-      setInputCaretIndex(nextValue.length === 0 ? 0 : nextValue.length - 1);
-      syncInputCaret();
-    });
-  }, [syncInputCaret]);
+  const handleCanSendInputChange = useCallback((canSend: boolean) => {
+    setCanSendInput((prev) => (prev === canSend ? prev : canSend));
+  }, []);
 
   const syncGlyphChannelTabGlyphs = useCallback(() => {
     useCyberdeckTabStore.getState().setCustomTabs((prev) =>
@@ -1149,7 +1148,11 @@ export default function CyberdeckApp() {
     Boolean(probeInFlightByProvider[activeProvider]) ||
     providerModelFetchStatus === "retrieving" ||
     isStreaming;
-  const hasProviderAuth = Boolean(providerKeys[activeProvider]) || Boolean(defaultKeyAvailableByProvider[activeProvider]);
+  const hasProviderAuth = providerHasClientKey(
+    activeProvider,
+    providerKeys,
+    defaultKeyAvailableByProvider,
+  );
   const providerLinkReady = providerModelFetchStatus === "ready";
   const isConnected = hasProviderAuth && providerLinkReady && Boolean(modelID);
   const connectionState: "offline" | "connecting" | "connected" = scanActivityActive
@@ -1712,10 +1715,6 @@ export default function CyberdeckApp() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const storedInput = window.localStorage.getItem(INPUT_STORAGE_KEY);
-      if (typeof storedInput === "string") {
-        setInput(storedInput);
-      }
       const stored = window.localStorage.getItem(CHAT_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as unknown;
@@ -1764,15 +1763,6 @@ export default function CyberdeckApp() {
       /* ignore */
     }
   }, [messages, chatHydrated]);
-
-  useEffect(() => {
-    if (!chatHydrated) return;
-    try {
-      window.localStorage.setItem(INPUT_STORAGE_KEY, input);
-    } catch {
-      /* ignore */
-    }
-  }, [input, chatHydrated]);
 
   useEffect(() => {
     if (!chatHydrated) return;
@@ -2855,22 +2845,6 @@ export default function CyberdeckApp() {
   }, [messages, streamText]);
 
   useEffect(() => {
-    if (!isInputFocused || isStreaming) {
-      setInputCursorBlinkOn(true);
-      return;
-    }
-    const id = window.setInterval(() => {
-      setInputCursorBlinkOn((prev) => !prev);
-    }, 530);
-    return () => window.clearInterval(id);
-  }, [isInputFocused, isStreaming]);
-
-  useLayoutEffect(() => {
-    if (!isInputFocused) return;
-    syncInputCaret();
-  }, [input, inputCaretIndex, isInputFocused, syncInputCaret]);
-
-  useEffect(() => {
     if (scanActivityActive) {
       startDeckSonarLoop(3200, CYBERDECK_SONAR_VOL_SCAN);
     } else {
@@ -2937,16 +2911,26 @@ export default function CyberdeckApp() {
     };
   }, [isStreaming, scanActivityActive]);
 
-  // When the active gateway has no stored key, mirror Weyland: one [SYS] line per provider (deduped).
+  // After keys hydrate: prompt only when this provider truly has no client key (gateway field handles entry).
   useEffect(() => {
-    if (providerKeys[activeProvider] || defaultKeyAvailableByProvider[activeProvider]) return;
+    if (!didHydrateProviderState) return;
+    if (providerHasClientKey(activeProvider, providerKeys, defaultKeyAvailableByProvider)) return;
     const tip = gatewayKeySysMessage(activeProvider);
     setMessages((prev) => {
       const last = prev[prev.length - 1];
       if (last?.role === "system" && last.text === tip) return prev;
       return [...prev, { role: "system", text: tip }];
     });
-  }, [activeProvider, defaultKeyAvailableByProvider, providerKeys]);
+  }, [activeProvider, defaultKeyAvailableByProvider, didHydrateProviderState, providerKeys]);
+
+  // Drop stale key prompts from saved chat once a key is present.
+  useEffect(() => {
+    if (!didHydrateProviderState || !hasProviderAuth) return;
+    setMessages((prev) => {
+      const next = prev.filter((m) => !(m.role === "system" && isGatewayKeySysTip(m.text)));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [didHydrateProviderState, hasProviderAuth]);
 
   const setModelHealth = useCallback((provider: string, model: string, status: string) => {
     setModelHealthByProvider((prev) => ({
@@ -2957,13 +2941,34 @@ export default function CyberdeckApp() {
 
   const probeSelectedModel = useCallback(
     async (provider: string, model: string, key: string) => {
-      if (!provider || !model) return;
+      if (!provider || !model || !ENABLE_MODEL_PROBE) return;
+
+      const cacheKey = `${provider}::${model}`;
+      const cached = modelProbeCacheRef.current[cacheKey];
+      if (cached && Date.now() - cached.at < 120_000) {
+        setModelHealth(provider, model, cached.status);
+        return;
+      }
+
+      const lastProbeAt = modelProbeLastAtRef.current[provider] || 0;
+      if (Date.now() - lastProbeAt < MODEL_PROBE_MIN_INTERVAL_MS) {
+        return;
+      }
+      modelProbeLastAtRef.current[provider] = Date.now();
+
+      if (modelProbeAbortRef.current) {
+        modelProbeAbortRef.current.abort();
+      }
+      const abortCtl = new AbortController();
+      modelProbeAbortRef.current = abortCtl;
+
       setProbeInFlightByProvider((prev) => ({ ...prev, [provider]: model }));
       setModelHealth(provider, model, "testing");
       try {
         const res = await fetch("/api/cyberdeck-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: abortCtl.signal,
           body: JSON.stringify({ probe: true, provider, apiKey: key, model }),
         });
         const data = (await res.json()) as {
@@ -2972,29 +2977,29 @@ export default function CyberdeckApp() {
           rateLimited?: boolean;
           status?: number;
         };
-        const failHealth = data.rateLimited ? "amber" : "grey";
-        if (data.rateLimited) {
-          setRateLimitedProviders((prev) => new Set(prev).add(provider));
-        } else {
-          setRateLimitedProviders((prev) => {
-            const next = new Set(prev);
-            next.delete(provider);
-            return next;
-          });
-        }
+        const httpStatus = data.status ?? res.status;
+        const modelRateLimited = httpStatus === 429;
+
         if (!res.ok || data.ok === false) {
-          const httpStatus = data.status ?? res.status;
-          const halt =
-            data.rateLimited || httpStatus === 429 || httpStatus === 502 || httpStatus === 503;
-          if (halt) {
+          const failHealth = modelRateLimited ? "amber" : "grey";
+          if (modelRateLimited) {
+            providerRateLimitUntilRef.current[provider] = Date.now() + PROVIDER_RATE_LIMIT_COOLDOWN_MS;
+          } else if (httpStatus === 502 || httpStatus === 503) {
             setRateLimitedProviders((prev) => new Set(prev).add(provider));
           }
           const line = `MODEL_TEST ${provider.toUpperCase()}/${model}: HTTP_${httpStatus}${
-            halt ? " // OPERATOR_ACTION_REQUIRED" : " FAILURE"
+            modelRateLimited
+              ? " // MODEL_RATE_LIMIT"
+              : httpStatus === 502 || httpStatus === 503
+                ? " // OPERATOR_ACTION_REQUIRED"
+                : " // FAILURE"
           }`;
           playModelTestErrorSound(line);
           setModelHealth(provider, model, failHealth);
-          setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
+          modelProbeCacheRef.current[cacheKey] = { status: failHealth, at: Date.now() };
+          if (!modelRateLimited) {
+            setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
+          }
           setMessages((prev) => [
             ...prev,
             {
@@ -3004,8 +3009,17 @@ export default function CyberdeckApp() {
           ]);
           return;
         }
+
         const valid = Boolean(data.valid);
-        setModelHealth(provider, model, valid ? "green" : "amber");
+        const health = valid ? "green" : "amber";
+        setModelHealth(provider, model, health);
+        modelProbeCacheRef.current[cacheKey] = { status: health, at: Date.now() };
+        setRateLimitedProviders((prev) => {
+          const next = new Set(prev);
+          next.delete(provider);
+          return next;
+        });
+        delete providerRateLimitUntilRef.current[provider];
         const isVerified = valid || provider === "opencode";
         setVerifiedProviders((prev) => ({ ...prev, [provider]: isVerified }));
         const line = valid
@@ -3020,6 +3034,7 @@ export default function CyberdeckApp() {
           },
         ]);
       } catch (err) {
+        if (abortCtl.signal.aborted) return;
         playModelTestErrorSound(`MODEL_TEST ${provider.toUpperCase()}/${model}: FAILURE`);
         setModelHealth(provider, model, "grey");
         setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
@@ -3031,6 +3046,9 @@ export default function CyberdeckApp() {
           },
         ]);
       } finally {
+        if (modelProbeAbortRef.current === abortCtl) {
+          modelProbeAbortRef.current = null;
+        }
         setProbeInFlightByProvider((prev) => {
           if (prev[provider] !== model) return prev;
           return { ...prev, [provider]: "" };
@@ -3080,7 +3098,11 @@ export default function CyberdeckApp() {
             return;
           }
           if (res.status === 429 || res.status === 502 || res.status === 503) {
-            setRateLimitedProviders((prev) => new Set(prev).add(provider));
+            if (res.status === 429) {
+              providerRateLimitUntilRef.current[provider] = Date.now() + PROVIDER_RATE_LIMIT_COOLDOWN_MS;
+            } else {
+              setRateLimitedProviders((prev) => new Set(prev).add(provider));
+            }
             setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "error" }));
             setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
             setMessages((prev) => [
@@ -3152,7 +3174,7 @@ export default function CyberdeckApp() {
 
   const providerHasKey = useCallback(
     (providerId: string) =>
-      Boolean(providerKeys[providerId]) || Boolean(defaultKeyAvailableByProvider[providerId]),
+      providerHasClientKey(providerId, providerKeys, defaultKeyAvailableByProvider),
     [defaultKeyAvailableByProvider, providerKeys],
   );
 
@@ -3263,7 +3285,7 @@ export default function CyberdeckApp() {
         /* ignore */
       }
       playDeckSystemSound("click", 0.02);
-      if (ENABLE_AUTOMATION) {
+      if (ENABLE_MODEL_PROBE) {
         void probeSelectedModel(activeProvider, modelId, key || "");
       }
     },
@@ -3297,7 +3319,8 @@ export default function CyberdeckApp() {
       const inRail = !!(serverRailRef.current && serverRailRef.current.contains(t));
       const inChatCol = !!(chatColumnRef.current && chatColumnRef.current.contains(t));
       const inGateway = !!(gatewayColumnRef.current && gatewayColumnRef.current.contains(t));
-      const inChatInput = messageInputRef.current !== null && t === messageInputRef.current;
+      const inChatInput =
+        messageInputRef.current?.element != null && t === messageInputRef.current.element;
       const isEditableTarget =
         t.isContentEditable ||
         t.tagName === "INPUT" ||
@@ -3327,7 +3350,7 @@ export default function CyberdeckApp() {
 
       // Tab: message box ↔ deck columns/surfaces; includes chat log (col2) in sequencer.
       if (e.key === "Tab" && !e.repeat) {
-        const msg = messageInputRef.current;
+        const msg = messageInputRef.current?.element;
         if (!msg || msg.disabled) {
           /* fall through */
         } else if (inGateway && !inChatInput) {
@@ -3835,39 +3858,32 @@ export default function CyberdeckApp() {
 
   const screenshotRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    const inputEl = messageInputRef.current;
-    if (!inputEl) return;
-    const onPaste = (e: ClipboardEvent) => {
-      const items = Array.from(e.clipboardData?.items ?? []);
-      for (const item of items) {
-        if (item.type.startsWith("image/")) {
-          const file = item.getAsFile();
-          if (!file) continue;
-          const reader = new FileReader();
-          reader.onload = () => {
-            const dataUrl = reader.result as string;
-            screenshotRef.current = dataUrl;
-            void loadComputerUse().then((cu) => {
-              cu.setLastSurfaceClassification({
-                surface: "unknown",
-                confidence: "low",
-                reason: "Screenshot available for inspection",
-                rawTitle: "Screenshot",
-              });
-            });
-          };
-          reader.readAsDataURL(file);
-          break;
-        }
-      }
-    };
-    inputEl.addEventListener("paste", onPaste);
-    return () => inputEl.removeEventListener("paste", onPaste);
+  const handlePasteImageToChat = useCallback((dataUrl: string) => {
+    screenshotRef.current = dataUrl;
+    void loadComputerUse().then((cu) => {
+      cu.setLastSurfaceClassification({
+        surface: "unknown",
+        confidence: "low",
+        reason: "Screenshot available for inspection",
+        rawTitle: "Screenshot",
+      });
+    });
   }, []);
 
-  const handleSend = async () => {
-    if (!input.trim() || isStreaming) return;
+  const handleSend = async (messageText?: string) => {
+    const userMessage = (messageText ?? messageInputRef.current?.getValue() ?? "").trim();
+    if (!userMessage || isStreaming) return;
+    const providerCooldownUntil = providerRateLimitUntilRef.current[activeProvider] || 0;
+    if (providerCooldownUntil && Date.now() < providerCooldownUntil) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          text: `SEND_COOLDOWN // ${activeProvider.toUpperCase()} // WAIT_${Math.ceil((providerCooldownUntil - Date.now()) / 1000)}S`,
+        },
+      ]);
+      return;
+    }
     if (rateLimitedProviders.has(activeProvider)) {
       setMessages((prev) => [
         ...prev,
@@ -3879,12 +3895,9 @@ export default function CyberdeckApp() {
       return;
     }
 
-    const userMessage = input.trim();
     const tabCommand = parseCustomTabCommand(userMessage);
     setInputHistory((prev) => [...prev, userMessage]);
-    setInputHistoryIndex(null);
-    setInputHistoryDraft("");
-    setInput("");
+    messageInputRef.current?.clear();
     setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
     setIsStreaming(true);
     setStreamText("");
@@ -4107,21 +4120,26 @@ ${diff}`;
                   { role: "system", text: "⚠️ MUTHUR_REVIEW // INVALID_FORMAT" },
                 ]);
                 setStreamText("");
-                setIsStreaming(false);
               } else {
                 setMessages((prev) => [
                   ...prev,
                   { role: "assistant", text: "✅ " + reviewText },
                 ]);
                 setStreamText("");
-                setIsStreaming(false);
               }
+            } else {
+              setMessages((prev) => [
+                ...prev,
+                { role: "system", text: "MUTHUR_REVIEW // FAILED // NO_STREAM" },
+              ]);
+              setStreamText("");
             }
           } else {
             setMessages((prev) => [
               ...prev,
               { role: "system", text: "MUTHUR_REVIEW // FAILED // API_ERROR" },
             ]);
+            setStreamText("");
           }
         }
       } catch {
@@ -4129,6 +4147,9 @@ ${diff}`;
           ...prev,
           { role: "system", text: "MUTHUR_REVIEW // FAILED // ERROR" },
         ]);
+        setStreamText("");
+      } finally {
+        setIsStreaming(false);
       }
       return;
     }
@@ -4545,7 +4566,7 @@ const resolved = resolveUiTarget(userMessage);
       const getTargetElement = (target: CanonicalTarget): HTMLElement | null => {
         switch (target) {
           case "COMMAND_INPUT":
-            return messageInputRef.current;
+            return messageInputRef.current?.element ?? null;
           case "VOICE_LAB":
             return (
               document.querySelector<HTMLElement>('[data-pointer-target="voice-lab"]') ??
@@ -4673,41 +4694,52 @@ const resolved = resolveUiTarget(userMessage);
         `URL: ${operatorBrowserUrl}`;
     }
 
+    let uplinkTimedOut = false;
     try {
       const abortCtl = new AbortController();
       chatAbortRef.current = abortCtl;
+      const uplinkTimeout = window.setTimeout(() => {
+        uplinkTimedOut = true;
+        abortCtl.abort();
+      }, CHAT_UPLINK_TIMEOUT_MS);
       const memoryContext = buildMuthurMemoryContext(muthurMemoryRef.current, userMessage);
       const history = buildCyberdeckChatHistory(messages);
       const latestAssistantMessage =
         [...messages].reverse().find((message) => message.role === "assistant")?.text || "";
-      const res = await fetch("/api/cyberdeck-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: abortCtl.signal,
-        body: JSON.stringify({
-          message: userMessage,
-          provider: activeProvider,
-          apiKey: providerKeys[activeProvider] || "",
-          model: modelID,
-          memoryContext,
-          browserContext: browserContextForRequest,
-          history,
-        }),
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/cyberdeck-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: abortCtl.signal,
+          body: JSON.stringify({
+            message: userMessage,
+            provider: activeProvider,
+            apiKey: providerKeys[activeProvider] || "",
+            model: modelID,
+            memoryContext,
+            browserContext: browserContextForRequest,
+            history,
+          }),
+        });
+      } finally {
+        window.clearTimeout(uplinkTimeout);
+      }
 
       if (!res.ok) {
-        let detail = "";
+        let rawDetail = "";
         try {
           const ct = res.headers.get("content-type") || "";
           if (ct.includes("application/json")) {
             const payload = (await res.json()) as { error?: string; message?: string };
-            detail = String(payload?.error || payload?.message || "").trim();
+            rawDetail = String(payload?.error || payload?.message || "").trim();
           } else {
-            detail = (await res.text()).trim();
+            rawDetail = (await res.text()).trim();
           }
         } catch {
           /* ignore parse errors */
         }
+        const detail = formatUplinkErrorDetail(res.status, rawDetail);
         const statusLine = `API error ${res.status}`;
         throw new Error(detail ? `${statusLine}: ${detail}` : statusLine);
       }
@@ -4992,7 +5024,26 @@ duration_ms: ${durationMs}`;
     } catch (err) {
       const msg = String(err);
       if (msg.includes("AbortError")) {
-        setMessages((prev) => [...prev, { role: "system", text: "REQUEST_ABORTED // STREAM_HALTED" }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: uplinkTimedOut
+              ? "UPLINK_TIMEOUT // PROVIDER_OR_NETWORK // OPERATOR_ACTION_REQUIRED"
+              : "REQUEST_ABORTED // STREAM_HALTED",
+          },
+        ]);
+        setStreamText("");
+        return;
+      }
+      if (msg.includes("timed out")) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: "UPLINK_TIMEOUT // PROVIDER_OR_NETWORK // OPERATOR_ACTION_REQUIRED",
+          },
+        ]);
         setStreamText("");
         return;
       }
@@ -5002,13 +5053,19 @@ duration_ms: ${durationMs}`;
         const modelLabel = modelID || "UNSET_MODEL";
         const haltStatuses = new Set(["429", "502", "503"]);
         if (haltStatuses.has(status)) {
-          setRateLimitedProviders((prev) => new Set(prev).add(activeProvider));
+          if (status === "429") {
+            providerRateLimitUntilRef.current[activeProvider] = Date.now() + PROVIDER_RATE_LIMIT_COOLDOWN_MS;
+          } else {
+            setRateLimitedProviders((prev) => new Set(prev).add(activeProvider));
+          }
         }
         const hint =
           status === "401" || status === "403"
             ? "CHECK_API_KEY"
             : status === "429"
               ? "RATE_LIMIT // OPERATOR_ACTION_REQUIRED"
+              : status === "500"
+                ? "UPLINK_INTERNAL_ERROR // CHECK_DEV_TERMINAL // RETRY"
               : status === "502" || status === "503"
                 ? "PROVIDER_UNAVAILABLE // OPERATOR_ACTION_REQUIRED"
                 : "CHECK_PROVIDER_MODEL_OR_NETWORK";
@@ -5019,56 +5076,16 @@ duration_ms: ${durationMs}`;
             text: `API_FAILURE // ${activeProvider.toUpperCase()} / ${modelLabel} // HTTP_${status} // ${hint}`,
           },
         ]);
+        setStreamText("");
+        return;
       }
-      setMessages((prev) => [...prev, { role: "error", text: String(err) }]);
+      setMessages((prev) => [...prev, { role: "error", text: msg.slice(0, 280) }]);
     } finally {
       chatAbortRef.current = null;
       setStreamToolTrace("");
       setIsStreaming(false);
     }
   };
-
-  const handleInputHistoryKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter") {
-        handleSend();
-        return;
-      }
-
-      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-      if (inputHistory.length === 0) return;
-
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        const nextIndex =
-          inputHistoryIndex === null ? inputHistory.length - 1 : Math.max(0, inputHistoryIndex - 1);
-        if (inputHistoryIndex === null) {
-          setInputHistoryDraft(input);
-        }
-        const nextValue = inputHistory[nextIndex] ?? "";
-        setInput(nextValue);
-        setInputHistoryIndex(nextIndex);
-        moveInputCaretToEnd(nextValue);
-        return;
-      }
-
-      if (e.key === "ArrowDown" && inputHistoryIndex !== null) {
-        e.preventDefault();
-        const nextIndex = inputHistoryIndex + 1;
-        if (nextIndex >= inputHistory.length) {
-          setInput(inputHistoryDraft);
-          setInputHistoryIndex(null);
-          moveInputCaretToEnd(inputHistoryDraft);
-          return;
-        }
-        const nextValue = inputHistory[nextIndex] ?? "";
-        setInput(nextValue);
-        setInputHistoryIndex(nextIndex);
-        moveInputCaretToEnd(nextValue);
-      }
-    },
-    [handleSend, input, inputHistory, inputHistoryDraft, inputHistoryIndex, moveInputCaretToEnd],
-  );
 
   const handleStop = useCallback(() => {
     abortMotherSpeech();
@@ -5842,7 +5859,8 @@ duration_ms: ${durationMs}`;
             break;
           }
         }
-        const memoryContextQuery = lastUserChat.trim() || input.trim() || undefined;
+        const memoryContextQuery =
+          lastUserChat.trim() || messageInputRef.current?.getValue().trim() || undefined;
         return shell(
           <ActivatedCyberdeckPane
             kind="diagnostics"
@@ -5938,7 +5956,6 @@ duration_ms: ${durationMs}`;
       customTabBrowserNavigate,
       handleCustomTabDrop,
       heapEntries.length,
-      input,
       messages,
       messages.length,
       modelID,
@@ -6406,48 +6423,18 @@ duration_ms: ${durationMs}`;
               <div className="m-2 rounded-sm border border-green-900/70 bg-black transition-colors transition-shadow focus-within:border-green-500/80 focus-within:shadow-[0_0_0_1px_rgba(34,197,94,0.45),0_0_18px_rgba(34,197,94,0.2)]">
                 <div className="relative flex items-center px-2 py-2">
                   <span className="pointer-events-none absolute left-3 text-lg font-bold text-green-500">$</span>
-                  <input
+                  <MuthurCommandInput
                     ref={messageInputRef}
-                    data-pointer-target="command-input"
-                    value={input}
-                    onChange={(e) => {
-                      setInput(e.target.value);
-                      if (inputHistoryIndex !== null) {
-                        setInputHistoryIndex(null);
-                      }
-                      setInputCaretIndex(e.target.selectionStart ?? e.target.value.length);
-                    }}
-                    onKeyDown={handleInputHistoryKeyDown}
-                    onKeyUp={syncInputCaret}
-                    onClick={syncInputCaret}
-                    onSelect={syncInputCaret}
-                    onFocus={() => {
-                      setIsInputFocused(true);
-                      setChatKeyboardHighlightIndex(null);
-                      syncInputCaret();
-                    }}
-                    onBlur={() => setIsInputFocused(false)}
-                    placeholder={
-                      !hasProviderAuth
-                        ? "ENTER GATEWAY KEY..."
-                        : glyphModeActive
-                          ? "⟁ Glyph mode on — compose on ⟁ tab; $ here is MUTHUR chat"
-                          : "Enter command or message..."
-                    }
-                    className={`w-full rounded-none border-0 bg-black py-3 pl-9 pr-3 font-mono text-sm text-green-400 placeholder:text-green-800 transition-all focus:outline-none ${
-                      isInputFocused ? "caret-transparent" : ""
-                    }`}
-                    disabled={false}
+                    inputHistory={inputHistory}
+                    hasProviderAuth={hasProviderAuth}
+                    glyphModeActive={glyphModeActive}
+                    isStreaming={isStreaming}
+                    chatHydrated={chatHydrated}
+                    onSubmit={(text) => void handleSend(text)}
+                    onCanSendChange={handleCanSendInputChange}
+                    onFocusExtra={() => setChatKeyboardHighlightIndex(null)}
+                    onPasteImage={handlePasteImageToChat}
                   />
-                    {isInputFocused && !isStreaming && inputCursorBlinkOn ? (
-                      <span
-                        aria-hidden
-                        className="pointer-events-none absolute top-[calc(50%+9px)] -translate-y-1/2 bg-green-400 px-[1px] font-mono text-sm leading-5 text-black"
-                        style={{ left: `${inputCursorLeft}px` }}
-                      >
-                        {input[inputCaretIndex] ? input[inputCaretIndex] : "\u00A0"}
-                      </span>
-                  ) : null}
                 </div>
                 <div className="flex items-center justify-between px-3 py-2">
                   <button
@@ -6579,11 +6566,11 @@ duration_ms: ${durationMs}`;
                       </>
                     ) : null}
                     {!isStreaming ? (
-                      <CyberdeckControlTooltip label="Send" disabled={!input.trim()}>
+                      <CyberdeckControlTooltip label="Send" disabled={!canSendInput}>
                       <button
                         type="button"
                         onClick={() => void handleSend()}
-                        disabled={!input.trim()}
+                        disabled={!canSendInput}
                         aria-label="Send"
                         className={realmorphismControlClass(deckMode, {
                           size: "send",

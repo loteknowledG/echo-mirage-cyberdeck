@@ -1,4 +1,6 @@
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
+import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { executeRegistryToolForOpenAi } from "@/lib/muthur-core/execute-openai-tool";
 import { MUTHUR_OPENAI_TOOLS } from "@/lib/muthur-core/openai-tool-definitions";
 import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
@@ -27,6 +29,14 @@ const PLAIN_HEADERS = {
   Connection: "keep-alive",
 } as const;
 
+function upstreamErrorResponse(status: number, raw: string): Response {
+  const detail = formatUplinkErrorDetail(status, raw);
+  return new Response(detail, {
+    status,
+    headers: PLAIN_HEADERS,
+  });
+}
+
 function toolsUsedHeaders(toolsUsed: string[]): Record<string, string> {
   if (toolsUsed.length === 0) return {};
   return { "X-Muthur-Tools-Used": toolsUsed.join(", ") };
@@ -50,7 +60,7 @@ function responsePlainText(text: string, toolsUsed: string[]): Response {
 }
 
 async function fetchStreamPlainNoTools(endpoint: string, apiKey: string, model: string, messages: JsonMessage[]) {
-  return fetch(endpoint, {
+  return fetchWithTimeout(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -82,10 +92,16 @@ export async function muthurChatWithModelTools(options: {
   const toolsUsed: string[] = [];
 
   if (!ENABLE_AUTOMATION) {
-    const streamRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, fallbackMessages);
+    let streamRes: Response;
+    try {
+      streamRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, fallbackMessages);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upstream request failed";
+      return upstreamErrorResponse(502, msg);
+    }
     if (!streamRes.ok) {
       const errText = await streamRes.text().catch(() => "");
-      return new Response(errText || `Upstream error ${streamRes.status}`, { status: streamRes.status });
+      return upstreamErrorResponse(streamRes.status, errText);
     }
     return new Response(await streamOpenAiCompatibleResponse(streamRes), {
       headers: {
@@ -96,7 +112,7 @@ export async function muthurChatWithModelTools(options: {
   }
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const res = await fetch(endpoint, {
+    const res = await fetchWithTimeout(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -117,7 +133,8 @@ export async function muthurChatWithModelTools(options: {
         console.warn("[muthur-openai-chat] tools request failed; falling back to stream without tools", res.status);
         const streamRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, fallbackMessages);
         if (!streamRes.ok) {
-          return new Response(errText || `Upstream error ${res.status}`, { status: 502 });
+          const fallbackErr = await streamRes.text().catch(() => "");
+          return upstreamErrorResponse(streamRes.status, fallbackErr || errText);
         }
         return new Response(await streamOpenAiCompatibleResponse(streamRes), {
           headers: {
@@ -126,7 +143,7 @@ export async function muthurChatWithModelTools(options: {
           },
         });
       }
-      return new Response(errText || `Upstream error ${res.status}`, { status: 502 });
+      return upstreamErrorResponse(res.status, errText);
     }
 
     const data = (await res.json()) as {
@@ -186,7 +203,7 @@ export async function muthurChatWithModelTools(options: {
   const finalRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, messages);
   if (!finalRes.ok) {
     const t = await finalRes.text().catch(() => "");
-    return new Response(t || "Stream failed", { status: 502 });
+    return upstreamErrorResponse(finalRes.status, t);
   }
 
   return new Response(await streamOpenAiCompatibleResponse(finalRes), {
