@@ -6468,11 +6468,12 @@ duration_ms: ${durationMs}`;
                     {isStreaming ? "STREAMING" : ""}
                   </button>
                   <div className="flex items-center gap-2">
+                    <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
+                    <CyberdeckControlTooltip label={voiceEnabled ? "Voice on" : "Voice off"}>
                     <button
                       type="button"
                       onClick={toggleVoiceEnabled}
                       aria-label={voiceEnabled ? "Voice on" : "Voice off"}
-                      title={voiceEnabled ? "Voice on" : "Voice off"}
                       className={voiceControlClass(deckMode, voiceEnabled, voiceHealth)}
                     >
                       {voiceEnabled ? (
@@ -6511,6 +6512,7 @@ duration_ms: ${durationMs}`;
                           </svg>
                         )}
                       </button>
+                    </CyberdeckControlTooltip>
                     {voiceEnabled && voiceBlockTotal > 0 ? (
                       <>
                         <span
@@ -6519,12 +6521,12 @@ duration_ms: ${durationMs}`;
                         >
                           {voiceBlockTotal > 1 ? `${voiceBlockFocusIndex + 1}/${voiceBlockTotal}` : `${voiceBlockTotal}`}
                         </span>
+                        <CyberdeckControlTooltip label="Stop speech (Esc)" disabled={!voicePlaybackBusy}>
                         <button
                           type="button"
                           onClick={() => abortMotherSpeech()}
                           disabled={!voicePlaybackBusy}
                           aria-label="Stop speech"
-                          title="Stop speech (Esc)"
                           className={realmorphismControlClass(deckMode, {
                             size: "compact",
                             amber: true,
@@ -6533,6 +6535,11 @@ duration_ms: ${durationMs}`;
                         >
                           ‖
                         </button>
+                        </CyberdeckControlTooltip>
+                        <CyberdeckControlTooltip
+                          label="Earlier paragraph (more context)"
+                          disabled={voiceBlockFocusIndex <= 0}
+                        >
                         <button
                           type="button"
                           onClick={() => {
@@ -6543,7 +6550,6 @@ duration_ms: ${durationMs}`;
                           }}
                           disabled={voiceBlockFocusIndex <= 0}
                           aria-label="Speak earlier paragraph"
-                          title="Earlier paragraph (more context)"
                           className={realmorphismControlClass(deckMode, {
                             size: "compact",
                             signal: true,
@@ -6552,6 +6558,8 @@ duration_ms: ${durationMs}`;
                         >
                           ◀
                         </button>
+                        </CyberdeckControlTooltip>
+                        <CyberdeckControlTooltip label="Replay entire last reply">
                         <button
                           type="button"
                           onClick={() => {
@@ -6559,7 +6567,6 @@ duration_ms: ${durationMs}`;
                             replayFullLastAssistant();
                           }}
                           aria-label="Replay full response"
-                          title="Replay entire last reply"
                           className={realmorphismControlClass(deckMode, {
                             size: "compact",
                             signal: true,
@@ -6568,15 +6575,16 @@ duration_ms: ${durationMs}`;
                         >
                           ↻
                         </button>
+                        </CyberdeckControlTooltip>
                       </>
                     ) : null}
                     {!isStreaming ? (
+                      <CyberdeckControlTooltip label="Send" disabled={!input.trim()}>
                       <button
                         type="button"
                         onClick={() => void handleSend()}
                         disabled={!input.trim()}
                         aria-label="Send"
-                        title="Send"
                         className={realmorphismControlClass(deckMode, {
                           size: "send",
                           signal: true,
@@ -6601,12 +6609,13 @@ duration_ms: ${durationMs}`;
                           <path d="M11.3 13.7L20.4 3.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                         </svg>
                       </button>
+                      </CyberdeckControlTooltip>
                     ) : (
+                      <CyberdeckControlTooltip label="Stop">
                       <button
                         type="button"
                         onClick={handleStop}
                         aria-label="Stop"
-                        title="Stop"
                         className={realmorphismControlClass(deckMode, {
                           size: "icon",
                           amber: true,
@@ -6618,7 +6627,9 @@ duration_ms: ${durationMs}`;
                           <rect x="6.5" y="6.5" width="11" height="11" rx="1.2" />
                         </svg>
                       </button>
+                      </CyberdeckControlTooltip>
                     )}
+                    </CyberdeckPaneTooltipProvider>
                   </div>
                 </div>
               </div>
