@@ -71,6 +71,8 @@ Optional prefix: `/tab` or `tab:`
 
 ## ASCII / Glyph channel
 
+MUTHUR uses an **ASCII skill** (`ascii.render`): she picks template + style + intent; the renderer handles geometry. She should **not** hand-count spaces.
+
 | Command | Effect |
 |---------|--------|
 | `ascii mode` · `glyph mode` · `ascii on` | Enable glyph routing mode |
@@ -79,8 +81,32 @@ Optional prefix: `/tab` or `tab:`
 | `ascii copy` · `glyph copy` | Copy glyph channel to clipboard |
 | `ascii edit` · `glyph edit` | Glyph channel edit mode |
 | `ascii view` · `glyph view` | Glyph channel view mode |
-| `ascii <text>` · `glyph <text>` | Render ASCII art to glyph channel |
-| `figlet <text>` | Render FIGlet to glyph channel |
+| `ascii render {…json…}` | Structured ASCII via `ascii.render` |
+| `ascii <text>` · `glyph <text>` | Render plain ASCII to glyph channel |
+| `figlet <text>` | Render FIGlet to glyph channel (append) |
+| `figlet --font Impossible <text>` | FIGlet with explicit font |
+
+**Templates:** `hud_box`, `sonar_title`, `boot_panel`, `warning_panel`, `operator_status`, `route_verify_report`
+
+**Style profiles:** `weyland`, `muthur`, `echo_mirage`, `retro_terminal`, `alarm`, `stealth`
+
+**Model `ascii.render` JSON** (in ` ```ascii-render ` fence, auto-applied):
+
+```json
+{
+  "tool": "ascii.render",
+  "template": "sonar_title",
+  "text": "ECHO MIRAGE",
+  "subtitle": "bridge live // operator visible",
+  "style": "echo_mirage",
+  "width": 72,
+  "merge": "append"
+}
+```
+
+Legacy figlet directive: `[GLYPH:engine=figlet text="ECHO MIRAGE" font=Impossible merge=append]`
+
+API: `GET/POST /api/ascii/render` — catalog + server render.
 
 ---
 

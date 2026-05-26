@@ -4,10 +4,12 @@ import {
   listFigletFonts,
   resolveFigletFontName,
 } from "@/lib/figlet-fonts.server";
+import { ensureCustomFigletFontsLoaded } from "@/lib/figlet-custom-fonts.server";
 
 export { DEFAULT_FIGLET_FONT, resolveFigletFontName };
 
 export async function renderFigletText(text: string, font?: string): Promise<string> {
+  ensureCustomFigletFontsLoaded();
   const fonts = await listFigletFonts();
   const fontName = resolveFigletFontName(font, fonts);
   return new Promise((resolve, reject) => {

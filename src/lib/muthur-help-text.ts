@@ -138,11 +138,19 @@ rola-dex, sound-profile, connection, blank`,
 
   glyph: `[MUTHUR HELP // GLYPH / ASCII]
 
-glyph mode · glyph off
-glyph clear · glyph copy
+MUTHUR co-creates art via the ASCII skill — intent + template, not hand-spaced art.
+
+ascii.render JSON (in \`\`\`ascii-render fence):
+  template: hud_box | sonar_title | boot_panel | warning_panel |
+            operator_status | route_verify_report
+  style: weyland | muthur | echo_mirage | retro_terminal | alarm | stealth
+
+glyph mode · glyph off · glyph clear · glyph copy
 glyph edit · glyph view
-glyph <text>            — ASCII art
-figlet <text>           — FIGlet banner`,
+figlet <text> · figlet --font Impossible <text>
+ascii render { ...json... }
+
+Legacy: [GLYPH:engine=figlet text="…" font=Impossible merge=append]`,
 
   browser: `[MUTHUR HELP // BROWSER]
 

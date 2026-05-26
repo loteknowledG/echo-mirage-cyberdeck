@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { CopyIcon } from "@radix-ui/react-icons";
 import { FaRegPaste } from "react-icons/fa6";
 import { GrFormEdit, GrFormView } from "react-icons/gr";
-import { LuScanLine } from "react-icons/lu";
+import { LuRedo2, LuScanLine, LuTrash2, LuUndo2 } from "react-icons/lu";
 import {
   CyberdeckPaneHeader,
   CyberdeckPaneHeaderTitle,
@@ -16,6 +16,7 @@ import {
   LEGACY_SEND_CONTROL,
   realmorphismControlClass,
 } from "@/lib/cyberdeck/realmorphism-control";
+import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { GlyphEnginePicker } from "@/components/cyberdeck/glyph-engine-picker";
@@ -28,19 +29,23 @@ import {
   GLYPH_CHANNEL_DEFAULT_TEXT,
   GLYPH_CHANNEL_STORAGE_KEY,
   GLYPH_MODE_UPDATE_EVENT,
+  GLYPH_PANE_MODE_UPDATE_EVENT,
+  mergeGlyphChannelContent,
+  writeGlyphPaneSettings,
   type GlyphPaneEngine,
   type GlyphPaneSettings,
   normalizeGlyphChannelText,
   readGlyphModeActive,
   readGlyphPaneSettings,
-  appendGlyphChannelText,
+  insertGlyphChannelTextAt,
   renderGlyphOutput,
   setGlyphChannelContent,
   subscribeGlyphChannelContent,
   writeGlyphModeActive,
-  writeGlyphPaneSettings,
 } from "@/lib/glyph-channel";
-import { parseGlyphCommand } from "@/lib/muthur-glyph-intent";
+import { isFigletAllFonts } from "@/lib/figlet-fonts";
+import { resolveGlyphCommand } from "@/lib/muthur-glyph-intent";
+import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
 import { get } from "idb-keyval";
 
 const HEADER_ICON_BTN =
@@ -74,7 +79,16 @@ type GlyphPaneMode = "view" | "edit";
 
 export function CyberdeckGlyphChannelPaneBody() {
   const deckMode = useDeckMode();
-  const [text, setText] = useState(GLYPH_CHANNEL_DEFAULT_TEXT);
+  const history = useGlyphTextHistory(GLYPH_CHANNEL_DEFAULT_TEXT);
+  const {
+    text,
+    canUndo,
+    canRedo,
+    setText: setHistoryText,
+    undo,
+    redo,
+    reset: resetHistory,
+  } = history;
   const [hydrated, setHydrated] = useState(false);
   const [composer, setComposer] = useState("");
   const [settings, setSettings] = useState<GlyphPaneSettings>(() => readGlyphPaneSettings());
@@ -157,7 +171,7 @@ export function CyberdeckGlyphChannelPaneBody() {
         const saved = await get<string>(GLYPH_CHANNEL_STORAGE_KEY);
         if (!mounted) return;
         if (typeof saved === "string" && saved.trim()) {
-          setText(normalizeGlyphChannelText(saved));
+          resetHistory(normalizeGlyphChannelText(saved));
         }
         setSettings(readGlyphPaneSettings());
       } catch {
@@ -174,10 +188,10 @@ export function CyberdeckGlyphChannelPaneBody() {
   useEffect(
     () =>
       subscribeGlyphChannelContent((next, options) => {
-        setText(next);
+        setHistoryText(next, "immediate");
         if (options?.scrollToBottom) scrollFigletAfterTextRef.current = true;
       }),
-    [],
+    [setHistoryText],
   );
 
   useLayoutEffect(() => {
@@ -197,6 +211,15 @@ export function CyberdeckGlyphChannelPaneBody() {
     window.addEventListener(GLYPH_MODE_UPDATE_EVENT, handler);
     return () => window.removeEventListener(GLYPH_MODE_UPDATE_EVENT, handler);
   }, []);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const mode = (event as CustomEvent<{ mode?: "view" | "edit" }>).detail?.mode;
+      if (mode === "view" || mode === "edit") setPaneModeWithFocus(mode);
+    };
+    window.addEventListener(GLYPH_PANE_MODE_UPDATE_EVENT, handler);
+    return () => window.removeEventListener(GLYPH_PANE_MODE_UPDATE_EVENT, handler);
+  }, [setPaneModeWithFocus]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -227,46 +250,116 @@ export function CyberdeckGlyphChannelPaneBody() {
   }, []);
 
   const applyOutput = useCallback(
-    (next: string) => {
+    (next: string, historyMode: "immediate" | "debounced" | "skip" = "immediate") => {
       const normalized = normalizeGlyphChannelText(next);
-      setText(normalized);
+      setHistoryText(normalized, historyMode);
       if (hydrated) persistOutput(normalized);
     },
-    [hydrated, persistOutput],
+    [setHistoryText, hydrated, persistOutput],
   );
 
+  const handleUndo = useCallback(() => {
+    const restored = undo();
+    if (restored == null) return;
+    if (hydrated) void setGlyphChannelContent(restored).catch(() => undefined);
+    setStatusLine("⟁ UNDO");
+  }, [undo, hydrated]);
+
+  const handleRedo = useCallback(() => {
+    const restored = redo();
+    if (restored == null) return;
+    if (hydrated) void setGlyphChannelContent(restored).catch(() => undefined);
+    setStatusLine("⟁ REDO");
+  }, [redo, hydrated]);
+
   const runRender = useCallback(
-    async (engine: GlyphPaneEngine, payload: string) => {
+    async (
+      engine: GlyphPaneEngine,
+      payload: string,
+      options?: { font?: string; merge?: "append" | "replace"; decorate?: boolean },
+    ) => {
+      const editSelection =
+        paneMode === "edit" && editorRef.current
+          ? {
+              start: editorRef.current.selectionStart ?? text.length,
+              end: editorRef.current.selectionEnd ?? text.length,
+            }
+          : null;
+
+      const figletFont = options?.font?.trim() || settings.figletFont;
+      if (engine === "figlet" && options?.font?.trim()) {
+        setSettings((prev) => {
+          const next = { ...prev, figletFont: options.font!.trim() };
+          writeGlyphPaneSettings(next);
+          return next;
+        });
+      }
+
       setRendering(true);
-      setStatusLine(`⟁ RENDERING // ${engine.toUpperCase()}`);
+      setStatusLine(
+        engine === "figlet" && isFigletAllFonts(figletFont)
+          ? "⟁ RENDERING // ALL FONTS"
+          : `⟁ RENDERING // ${engine.toUpperCase()}`,
+      );
       try {
         const output = await renderGlyphOutput({
           engine,
           text: payload,
-          font: engine === "figlet" ? settings.figletFont : undefined,
+          font: engine === "figlet" ? figletFont : undefined,
+          decorate: options?.decorate ?? !editSelection,
         });
-        const merged =
-          engine === "figlet" && text.trim()
-            ? appendGlyphChannelText(text, output)
-            : output;
+        const normalizedOutput = normalizeGlyphChannelText(output);
+        let merged: string;
+        let caretAfter: number | null = null;
+
+        if (editSelection) {
+          merged = insertGlyphChannelTextAt(
+            text,
+            editSelection.start,
+            editSelection.end,
+            normalizedOutput,
+          );
+          caretAfter = editSelection.start + normalizedOutput.length;
+        } else {
+          const mergeMode =
+            options?.merge ?? (engine === "figlet" && text.trim() ? "append" : "replace");
+          merged = mergeGlyphChannelContent(text, normalizedOutput, mergeMode);
+        }
+
         applyOutput(merged);
-        if (engine === "figlet") scrollFigletAfterTextRef.current = true;
+        if (engine === "figlet" && !editSelection) scrollFigletAfterTextRef.current = true;
         setSettings((prev) => ({ ...prev, engine }));
         setStatusLine(
           engine === "figlet"
-            ? `⟁ FIGLET // ${settings.figletFont} // ${payload.slice(0, 32)}${payload.length > 32 ? "…" : ""}`
+            ? isFigletAllFonts(figletFont)
+              ? `⟁ FIGLET // ALL // ${payload.slice(0, 32)}${payload.length > 32 ? "…" : ""}`
+              : `⟁ FIGLET // ${figletFont} // ${payload.slice(0, 32)}${payload.length > 32 ? "…" : ""}`
             : `⟁ ${engine.toUpperCase()} // OK`,
         );
+
+        requestAnimationFrame(() => {
+          if (paneMode === "edit" && editorRef.current) {
+            const el = editorRef.current;
+            el.focus({ preventScroll: true });
+            if (caretAfter != null) {
+              el.setSelectionRange(caretAfter, caretAfter);
+            }
+          } else if (paneMode === "edit") {
+            focusEditor();
+          } else {
+            focusComposer();
+          }
+        });
       } catch (err) {
         setStatusLine(
           `⟁ FAILED // ${err instanceof Error ? err.message : "Render failed"}`,
         );
-      } finally {
-        setRendering(false);
         requestAnimationFrame(() => {
           if (paneMode === "edit") focusEditor();
           else focusComposer();
         });
+      } finally {
+        setRendering(false);
       }
     },
     [applyOutput, focusComposer, focusEditor, paneMode, settings.figletFont, text],
@@ -276,7 +369,7 @@ export function CyberdeckGlyphChannelPaneBody() {
     const line = composer.trim();
     if (!line || rendering) return;
 
-    const command = parseGlyphCommand(line);
+    const command = resolveGlyphCommand(line);
     setComposer("");
 
     if (command?.kind === "mode-on") {
@@ -312,13 +405,53 @@ export function CyberdeckGlyphChannelPaneBody() {
       setPaneModeWithFocus("view");
       return;
     }
+    if (command?.kind === "ascii-skill") {
+      setRendering(true);
+      setStatusLine(`⟁ RENDERING // ${command.request.template.toUpperCase()}`);
+      try {
+        const res = await fetch("/api/ascii/render", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(command.request),
+        });
+        const payload = (await res.json()) as { ok?: boolean; output?: string; error?: string };
+        if (!payload.ok || typeof payload.output !== "string") {
+          throw new Error(payload.error || "ascii.render failed");
+        }
+        const mergeMode = command.request.merge ?? "append";
+        const merged = mergeGlyphChannelContent(
+          text,
+          payload.output,
+          mergeMode === "replace" ? "replace" : "append",
+        );
+        applyOutput(merged);
+        if (mergeMode === "append") scrollFigletAfterTextRef.current = true;
+        setStatusLine(`⟁ ${command.request.template} // ${command.request.style ?? "echo_mirage"}`);
+      } catch (err) {
+        setStatusLine(`⟁ FAILED // ${err instanceof Error ? err.message : "ascii.render failed"}`);
+      } finally {
+        setRendering(false);
+      }
+      return;
+    }
     if (command?.kind === "render") {
-      await runRender(command.engine, command.text);
+      await runRender(command.engine, command.text, {
+        font: command.font,
+        merge: command.merge,
+        decorate: command.decorate,
+      });
       return;
     }
 
     await runRender(settings.engine, line);
   }, [applyOutput, composer, rendering, runRender, setPaneModeWithFocus, settings.engine, text]);
+
+  const handleClear = useCallback(() => {
+    if (!text.trim()) return;
+    applyOutput("");
+    setStatusLine("⟁ CHANNEL CLEARED");
+    focusComposer();
+  }, [applyOutput, focusComposer, text]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -344,6 +477,9 @@ export function CyberdeckGlyphChannelPaneBody() {
     }
   }, [applyOutput, setPaneModeWithFocus]);
 
+  const toolbarIconBtn = (disabled?: boolean) =>
+    `${HEADER_ICON_BTN}${disabled ? " disabled:opacity-40 disabled:pointer-events-none" : ""}`;
+
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-black">
@@ -359,96 +495,157 @@ export function CyberdeckGlyphChannelPaneBody() {
           </div>
         }
         right={
-          <div className="flex items-center gap-2">
-            <CyberdeckControlTooltip label="Paste into ASCII">
+          <div className="flex items-center gap-1">
+            <CyberdeckControlTooltip label="View">
               <button
                 type="button"
-                onClick={() => void handlePasteClipboard()}
-                aria-label="Paste into ASCII"
+                onClick={() => setPaneModeWithFocus("view")}
+                aria-label="View mode"
                 className={realmorphismControlClass(deckMode, {
                   size: "toolbar",
-                  legacyClassName: HEADER_ICON_BTN,
+                  latched: paneMode === "view",
+                  signal: true,
+                  legacyClassName: `${HEADER_ICON_BTN} ${
+                    paneMode === "view" ? "border-emerald-500/60 text-emerald-200" : ""
+                  }`,
                 })}
               >
-                <FaRegPaste className="h-3.5 w-3.5" />
+                <GrFormView className="h-3.5 w-3.5" />
               </button>
             </CyberdeckControlTooltip>
-            <div className="flex items-center gap-1">
-              <CyberdeckControlTooltip label="View">
-                <button
-                  type="button"
-                  onClick={() => setPaneModeWithFocus("view")}
-                  aria-label="View mode"
-                  className={realmorphismControlClass(deckMode, {
-                    size: "toolbar",
-                    latched: paneMode === "view",
-                    signal: true,
-                    legacyClassName: `${HEADER_ICON_BTN} ${
-                      paneMode === "view" ? "border-emerald-500/60 text-emerald-200" : ""
-                    }`,
-                  })}
-                >
-                  <GrFormView className="h-3.5 w-3.5" />
-                </button>
-              </CyberdeckControlTooltip>
-              <Switch
-                checked={paneMode === "edit"}
-                onCheckedChange={(checked) => setPaneModeWithFocus(checked ? "edit" : "view")}
-                aria-label="Toggle ASCII edit mode"
-                className={cn(
-                  "realmorphism-switch",
-                  deckMode === "ascii" &&
-                    "data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]",
-                )}
-              />
-              <CyberdeckControlTooltip label="Edit">
-                <button
-                  type="button"
-                  onClick={() => setPaneModeWithFocus("edit")}
-                  aria-label="Edit mode"
-                  className={realmorphismControlClass(deckMode, {
-                    size: "toolbar",
-                    latched: paneMode === "edit",
-                    signal: true,
-                    legacyClassName: `${HEADER_ICON_BTN} ${
-                      paneMode === "edit" ? "border-emerald-500/60 text-emerald-200" : ""
-                    }`,
-                  })}
-                >
-                  <GrFormEdit className="h-3.5 w-3.5" />
-                </button>
-              </CyberdeckControlTooltip>
-            </div>
+            <Switch
+              checked={paneMode === "edit"}
+              onCheckedChange={(checked) => setPaneModeWithFocus(checked ? "edit" : "view")}
+              aria-label="Toggle ASCII edit mode"
+              className={cn(
+                "realmorphism-switch",
+                deckMode === "ascii" &&
+                  "data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]",
+              )}
+            />
+            <CyberdeckControlTooltip label="Edit">
+              <button
+                type="button"
+                onClick={() => setPaneModeWithFocus("edit")}
+                aria-label="Edit mode"
+                className={realmorphismControlClass(deckMode, {
+                  size: "toolbar",
+                  latched: paneMode === "edit",
+                  signal: true,
+                  legacyClassName: `${HEADER_ICON_BTN} ${
+                    paneMode === "edit" ? "border-emerald-500/60 text-emerald-200" : ""
+                  }`,
+                })}
+              >
+                <GrFormEdit className="h-3.5 w-3.5" />
+              </button>
+            </CyberdeckControlTooltip>
           </div>
         }
       />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-t border-[#141414]">
+      <div
+        data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
+        className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
+      >
+        <CyberdeckControlTooltip label="Undo">
+          <button
+            type="button"
+            onClick={handleUndo}
+            disabled={!canUndo || rendering}
+            aria-label="Undo"
+            className={realmorphismControlClass(deckMode, {
+              size: "toolbar",
+              signal: true,
+              legacyClassName: toolbarIconBtn(!canUndo || rendering),
+            })}
+          >
+            <LuUndo2 className="h-3.5 w-3.5" />
+          </button>
+        </CyberdeckControlTooltip>
+        <CyberdeckControlTooltip label="Redo">
+          <button
+            type="button"
+            onClick={handleRedo}
+            disabled={!canRedo || rendering}
+            aria-label="Redo"
+            className={realmorphismControlClass(deckMode, {
+              size: "toolbar",
+              signal: true,
+              legacyClassName: toolbarIconBtn(!canRedo || rendering),
+            })}
+          >
+            <LuRedo2 className="h-3.5 w-3.5" />
+          </button>
+        </CyberdeckControlTooltip>
+        <CyberdeckControlTooltip label="Copy ASCII">
+          <button
+            type="button"
+            onClick={() => void handleCopy()}
+            aria-label="Copy ASCII"
+            className={realmorphismControlClass(deckMode, {
+              size: "toolbar",
+              signal: true,
+              legacyClassName: HEADER_ICON_BTN,
+            })}
+          >
+            <CopyIcon className="h-3.5 w-3.5" />
+          </button>
+        </CyberdeckControlTooltip>
+        <CyberdeckControlTooltip label="Clear ASCII channel">
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={!text.trim() || rendering}
+            aria-label="Clear ASCII channel"
+            className={realmorphismControlClass(deckMode, {
+              size: "toolbar",
+              signal: true,
+              legacyClassName: toolbarIconBtn(!text.trim() || rendering),
+            })}
+          >
+            <LuTrash2 className="h-3.5 w-3.5" />
+          </button>
+        </CyberdeckControlTooltip>
+        <CyberdeckControlTooltip label="Paste into ASCII">
+          <button
+            type="button"
+            onClick={() => void handlePasteClipboard()}
+            aria-label="Paste into ASCII"
+            className={realmorphismControlClass(deckMode, {
+              size: "toolbar",
+              signal: true,
+              legacyClassName: HEADER_ICON_BTN,
+            })}
+          >
+            <FaRegPaste className="h-3.5 w-3.5" />
+          </button>
+        </CyberdeckControlTooltip>
+      </div>
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div
           ref={signalScrollRef}
           className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto bg-black p-3"
         >
-          <div className="mb-3 flex justify-end gap-2">
-            <CyberdeckControlTooltip label="Copy ASCII">
-              <button
-                type="button"
-                onClick={() => void handleCopy()}
-                aria-label="Copy ASCII"
-                className={realmorphismControlClass(deckMode, {
-                  size: "toolbar",
-                  signal: true,
-                  legacyClassName: HEADER_ICON_BTN,
-                })}
-              >
-                <CopyIcon className="h-3.5 w-3.5" />
-              </button>
-            </CyberdeckControlTooltip>
-          </div>
           {paneMode === "edit" ? (
             <Textarea
               ref={editorRef}
               value={text}
-              onChange={(event) => applyOutput(event.target.value)}
+              onChange={(event) => applyOutput(event.target.value, "debounced")}
+              onKeyDown={(event) => {
+                if (!event.ctrlKey && !event.metaKey) return;
+                const key = event.key.toLowerCase();
+                if (key === "z" && !event.shiftKey) {
+                  event.preventDefault();
+                  handleUndo();
+                  return;
+                }
+                if (key === "y" || (key === "z" && event.shiftKey)) {
+                  event.preventDefault();
+                  handleRedo();
+                }
+              }}
               spellCheck={false}
               autoCapitalize="off"
               autoComplete="off"

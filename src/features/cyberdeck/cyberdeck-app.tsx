@@ -89,16 +89,20 @@ import {
   pdfFilenameFromMarkdownName,
   type OperatorExportFormat,
 } from "@/lib/markdown-to-docx-intent";
-import { parseGlyphCommand, type GlyphCommand } from "@/lib/muthur-glyph-intent";
+import { parseGlyphResponseActions, resolveGlyphCommand, type GlyphApplyAction, type GlyphCommand } from "@/lib/muthur-glyph-intent";
+import type { AsciiRenderRequest } from "@/lib/muthur-ascii-skill/types";
 import {
+  buildGlyphContextSnapshot,
+  dispatchGlyphPaneMode,
   getGlyphChannelText,
   GLYPH_MODE_UPDATE_EVENT,
+  mergeGlyphChannelContent,
   readGlyphModeActive,
   readGlyphPaneSettings,
-  appendGlyphChannelText,
   renderGlyphOutput,
   setGlyphChannelContent,
   writeGlyphModeActive,
+  writeGlyphPaneSettings,
 } from "@/lib/glyph-channel";
 import {
   canNavigateOperatorFileBack,
@@ -1061,25 +1065,88 @@ export default function CyberdeckApp() {
   }, []);
 
   const renderGlyphToChannel = useCallback(
-    async (engine: "ascii" | "figlet", text: string) => {
-      const { figletFont } = readGlyphPaneSettings();
+    async (options: {
+      engine: "ascii" | "figlet";
+      text: string;
+      font?: string;
+      merge?: "append" | "replace";
+      decorate?: boolean;
+    }) => {
+      const { engine, text, font, merge, decorate } = options;
+      const paneSettings = readGlyphPaneSettings();
+      const figletFont = font?.trim() || paneSettings.figletFont;
+      if (engine === "figlet" && font?.trim()) {
+        writeGlyphPaneSettings({ ...paneSettings, figletFont: font.trim() });
+      }
+
       const existing = await getGlyphChannelText();
       const output = await renderGlyphOutput({
         engine,
         text,
         font: engine === "figlet" ? figletFont : undefined,
+        decorate,
       });
-      const merged =
-        engine === "figlet" && existing.trim()
-          ? appendGlyphChannelText(existing, output)
-          : output;
+      const mergeMode =
+        merge ?? (engine === "figlet" && existing.trim() ? "append" : "replace");
+      const merged = mergeGlyphChannelContent(existing, output, mergeMode);
       await setGlyphChannelContent(merged, {
-        scrollToBottom: engine === "figlet",
+        scrollToBottom: mergeMode === "append",
       });
       focusGlyphChannelTab();
       return merged;
     },
     [focusGlyphChannelTab],
+  );
+
+  const setRawGlyphChannelText = useCallback(
+    async (raw: string, merge: "append" | "replace" = "replace") => {
+      const existing = await getGlyphChannelText();
+      const merged = mergeGlyphChannelContent(existing, raw, merge);
+      await setGlyphChannelContent(merged, { scrollToBottom: merge === "append" });
+      focusGlyphChannelTab();
+      return merged;
+    },
+    [focusGlyphChannelTab],
+  );
+
+  const renderAsciiSkillToChannel = useCallback(
+    async (request: AsciiRenderRequest) => {
+      const res = await fetch("/api/ascii/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
+      const payload = (await res.json()) as { ok?: boolean; output?: string; error?: string };
+      if (!payload.ok || typeof payload.output !== "string") {
+        throw new Error(payload.error || "ascii.render failed");
+      }
+      await setRawGlyphChannelText(payload.output, request.merge ?? "append");
+      return payload.output;
+    },
+    [setRawGlyphChannelText],
+  );
+
+  const applyGlyphActionsFromMuthur = useCallback(
+    async (actions: GlyphApplyAction[]) => {
+      for (const action of actions) {
+        if (action.kind === "set") {
+          await setRawGlyphChannelText(action.text, action.merge ?? "replace");
+          continue;
+        }
+        if (action.kind === "ascii-skill") {
+          await renderAsciiSkillToChannel(action.request);
+          continue;
+        }
+        await renderGlyphToChannel({
+          engine: action.engine,
+          text: action.text,
+          font: action.font,
+          merge: action.merge,
+          decorate: action.decorate,
+        });
+      }
+    },
+    [renderAsciiSkillToChannel, renderGlyphToChannel, setRawGlyphChannelText],
   );
 
   const handleGlyphOperatorCommand = useCallback(
@@ -1094,7 +1161,7 @@ export default function CyberdeckApp() {
             ...prev,
             {
               role: "assistant",
-              text: "⟁ Glyph mode active. Use the ⟁ tab composer ($) to render figlet / ascii.",
+              text: "⟁ Glyph mode active. Compose in chat or the ⟁ tab — ask MUTHUR to suggest fonts or render figlet/ascii.",
             },
           ]);
           return;
@@ -1126,19 +1193,58 @@ export default function CyberdeckApp() {
           ]);
           return;
         }
+        case "edit-on":
+          dispatchGlyphPaneMode("edit");
+          focusGlyphChannelTab();
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: "⟁ Glyph Channel edit mode on." },
+          ]);
+          return;
+        case "edit-off":
+          dispatchGlyphPaneMode("view");
+          focusGlyphChannelTab();
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: "⟁ Glyph Channel view mode." },
+          ]);
+          return;
+        case "set":
+          await setRawGlyphChannelText(command.text, command.merge ?? "replace");
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: "⟁ Pasted art to Glyph Channel." },
+          ]);
+          return;
         case "render":
-          await renderGlyphToChannel(command.engine, command.text);
+          await renderGlyphToChannel({
+            engine: command.engine,
+            text: command.text,
+            font: command.font,
+            merge: command.merge,
+            decorate: command.decorate,
+          });
           setMessages((prev) => [
             ...prev,
             {
               role: "assistant",
-              text: `⟁ Rendered to Glyph Channel (${command.engine}).`,
+              text: `⟁ Rendered to Glyph Channel (${command.engine}${command.font ? ` // ${command.font}` : ""}).`,
+            },
+          ]);
+          return;
+        case "ascii-skill":
+          await renderAsciiSkillToChannel(command.request);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              text: `⟁ ASCII skill rendered (${command.request.template} // ${command.request.style ?? "echo_mirage"}).`,
             },
           ]);
           return;
       }
     },
-    [focusGlyphChannelTab, renderGlyphToChannel, syncGlyphChannelTabGlyphs],
+    [focusGlyphChannelTab, renderAsciiSkillToChannel, renderGlyphToChannel, setRawGlyphChannelText, syncGlyphChannelTabGlyphs],
   );
 
   const providers = [
@@ -3935,7 +4041,7 @@ export default function CyberdeckApp() {
     setStreamToolTrace("");
     setGeneratedUI(null);
 
-    const glyphCommand = parseGlyphCommand(userMessage);
+    const glyphCommand = resolveGlyphCommand(userMessage);
     if (glyphCommand) {
       try {
         await handleGlyphOperatorCommand(glyphCommand);
@@ -4748,6 +4854,7 @@ const resolved = resolveUiTarget(userMessage);
       const history = buildCyberdeckChatHistory(messages);
       const latestAssistantMessage =
         [...messages].reverse().find((message) => message.role === "assistant")?.text || "";
+      const glyphContext = await buildGlyphContextSnapshot();
       let res: Response;
       try {
         res = await fetch("/api/cyberdeck-chat", {
@@ -4761,6 +4868,7 @@ const resolved = resolveUiTarget(userMessage);
             model: modelID,
             memoryContext,
             browserContext: browserContextForRequest,
+            glyphContext,
             history,
           }),
         });
@@ -4849,10 +4957,9 @@ const resolved = resolveUiTarget(userMessage);
       }
 
       // Clean up fullText - remove excessive === lines and trim
-      const cleanedText = fullText
-        .replace(/^=+\s*$/gm, "")
+      const glyphResponse = parseGlyphResponseActions(fullText);
+      const cleanedText = glyphResponse.displayText
         .replace(/^=+$\n?/g, "")
-        .replace(/\n{3,}/g, "\n\n")
         .trim();
 
       // Check if response is a tool invocation JSON - don't show raw JSON to user
@@ -4995,6 +5102,27 @@ duration_ms: ${durationMs}`;
       
       setMessages((prev) => [...prev, { role: "assistant", text: cleanedText }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
+
+      if (glyphResponse.actions.length > 0) {
+        try {
+          await applyGlyphActionsFromMuthur(glyphResponse.actions);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: `⟁ GLYPH // ${glyphResponse.actions.length} directive(s) applied to ASCII pane`,
+            },
+          ]);
+        } catch (err) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: `⟁ GLYPH // FAILED // ${err instanceof Error ? err.message : "Glyph directive failed"}`,
+            },
+          ]);
+        }
+      }
       
       // Check for MUTHUR exec commands like [EXEC: typecheck] or [EXEC: read path=src/app/page.tsx]
       const execMatch = fullText.match(/\[EXEC:(\w+)(?:\s+(.*))?\]/i);

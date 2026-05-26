@@ -1,4 +1,9 @@
-import { parseGlyphCommand } from "../src/lib/muthur-glyph-intent";
+import {
+  parseGlyphCommand,
+  parseGlyphNaturalLanguageIntent,
+  parseGlyphResponseActions,
+  resolveGlyphCommand,
+} from "../src/lib/muthur-glyph-intent";
 import { renderGlyph } from "../src/lib/glyph-render.server";
 
 function assert(label: string, condition: boolean) {
@@ -23,6 +28,36 @@ assert(
 );
 const figletCmd = parseGlyphCommand("figlet ECHO MIRAGE");
 assert("figlet", figletCmd?.kind === "render" && figletCmd.engine === "figlet");
+
+const figletFont = parseGlyphCommand('figlet --font Impossible ECHO MIRAGE');
+assert(
+  "figlet font flag",
+  figletFont?.kind === "render" &&
+    figletFont.engine === "figlet" &&
+    figletFont.font === "Impossible" &&
+    figletFont.text === "ECHO MIRAGE",
+);
+
+const muthurPrefix = parseGlyphCommand("muthur, figlet ECHO");
+assert("muthur prefix", muthurPrefix?.kind === "render" && muthurPrefix.engine === "figlet");
+
+const nl = parseGlyphNaturalLanguageIntent("render ECHO MIRAGE in Impossible font");
+assert(
+  "natural language figlet",
+  nl?.kind === "render" && nl.engine === "figlet" && nl.text === "ECHO MIRAGE",
+);
+
+const resolved = resolveGlyphCommand("make a figlet banner for TEST");
+assert(
+  "resolve banner",
+  resolved?.kind === "render" && resolved.engine === "figlet" && resolved.text === "TEST",
+);
+
+const glyphReply = parseGlyphResponseActions(
+  'Try Impossible.\n[GLYPH:engine=figlet text="ECHO" font=Impossible merge=append]',
+);
+assert("glyph directive parsed", glyphReply.actions.length === 1);
+assert("glyph directive stripped", !glyphReply.displayText.includes("[GLYPH:"));
 
 async function run() {
   const rendered = await renderGlyph({ engine: "ascii", text: "TEST" });

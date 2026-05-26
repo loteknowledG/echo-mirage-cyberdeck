@@ -8,6 +8,10 @@ import {
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { EMPTY_TOOL_REGISTRY } from "@/lib/muthur-core/empty-tool-registry";
 import type { ToolRegistry } from "@/lib/muthur-core/types";
+import {
+  buildGlyphContextPrompt,
+  MUTHUR_GLYPH_DOCTRINE,
+} from "@/lib/muthur-glyph-doctrine";
 
 async function chatWithModelTools(
   ...args: Parameters<(typeof import("@/lib/muthur-core/muthur-provider-chat"))["muthurChatWithModelTools"]>
@@ -179,6 +183,7 @@ export async function POST(request: Request) {
       model: modelFromBody,
       memoryContext,
       browserContext,
+      glyphContext,
       history,
     } = body;
     const chatHistory = normalizeChatHistory(history);
@@ -190,6 +195,10 @@ export async function POST(request: Request) {
       typeof browserContext === "string" && browserContext.trim()
         ? `\n\nLive browser pane snapshot:\n${browserContext.trim()}`
         : "";
+    const glyphPrompt = buildGlyphContextPrompt(
+      typeof glyphContext === "string" ? glyphContext : "",
+    );
+    const glyphDoctrine = `\n\n${MUTHUR_GLYPH_DOCTRINE}`;
 
     // Model probe (non-stream), same contract as weyland-yutani transmit chat stream:false
     if (probe === true && provider && modelFromBody) {
@@ -327,8 +336,10 @@ export async function POST(request: Request) {
         const systemContent =
           "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
           "\n\nYou may call tools: justbash (workspace shell), localfs (read paths on the machine; mkdir and write_text only inside this project workspace), clock (server time). Use tools when the user asks about the repo, files, time, or when inspection is more reliable than guessing." +
+          glyphDoctrine +
           memoryPrompt +
-          browserPrompt;
+          browserPrompt +
+          glyphPrompt;
 
         const baseMessages: Record<string, unknown>[] = [
           { role: "system", content: systemContent },
@@ -402,8 +413,10 @@ export async function POST(request: Request) {
     const systemContent =
       "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
       "\n\nYou may call tools: justbash (workspace shell), localfs (read paths on the machine; mkdir and write_text only inside this project workspace), clock (server time). Use tools when the user asks about the repo, files, time, or when inspection is more reliable than guessing." +
+      glyphDoctrine +
       fallbackMemoryPrompt +
-      browserPrompt;
+      browserPrompt +
+      glyphPrompt;
 
     const baseMessages: Record<string, unknown>[] = [
       { role: "system", content: systemContent },

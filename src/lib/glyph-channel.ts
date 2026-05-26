@@ -6,6 +6,10 @@ export const GLYPH_MODE_STORAGE_KEY = "echo-mirage-glyph-mode";
 export const GLYPH_SETTINGS_STORAGE_KEY = "echo-mirage-glyph-settings";
 export const GLYPH_CHANNEL_UPDATE_EVENT = "echo-mirage-glyph-channel-update";
 export const GLYPH_MODE_UPDATE_EVENT = "echo-mirage-glyph-mode-update";
+export const GLYPH_PANE_MODE_UPDATE_EVENT = "echo-mirage-glyph-pane-mode-update";
+
+export type GlyphPaneViewMode = "view" | "edit";
+export type GlyphMergeMode = "append" | "replace";
 
 export type GlyphPaneEngine = "ascii" | "figlet";
 
@@ -36,12 +40,35 @@ export function normalizeGlyphChannelText(raw: string): string {
 }
 
 /** Join new figlet/ascii output below existing channel text (blank line between blocks). */
+export function mergeGlyphChannelContent(
+  existing: string,
+  incoming: string,
+  merge: GlyphMergeMode,
+): string {
+  if (merge === "replace") return normalizeGlyphChannelText(incoming);
+  return appendGlyphChannelText(existing, incoming);
+}
+
 export function appendGlyphChannelText(existing: string, addition: string): string {
   const base = normalizeGlyphChannelText(existing).trimEnd();
   const next = normalizeGlyphChannelText(addition).trim();
   if (!base) return next;
   if (!next) return base;
   return `${base}\n\n${next}`;
+}
+
+/** Insert rendered output at a cursor range in the channel text. */
+export function insertGlyphChannelTextAt(
+  existing: string,
+  start: number,
+  end: number,
+  addition: string,
+): string {
+  const base = normalizeGlyphChannelText(existing);
+  const insert = normalizeGlyphChannelText(addition);
+  const safeStart = Math.max(0, Math.min(start, base.length));
+  const safeEnd = Math.max(safeStart, Math.min(end, base.length));
+  return `${base.slice(0, safeStart)}${insert}${base.slice(safeEnd)}`;
 }
 
 export function readGlyphModeActive(): boolean {
@@ -89,10 +116,32 @@ export function writeGlyphPaneSettings(settings: GlyphPaneSettings): void {
   window.localStorage.setItem(GLYPH_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
 }
 
+export function dispatchGlyphPaneMode(mode: GlyphPaneViewMode): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(GLYPH_PANE_MODE_UPDATE_EVENT, { detail: { mode } }));
+}
+
+export async function buildGlyphContextSnapshot(): Promise<string> {
+  const text = await getGlyphChannelText();
+  const settings = readGlyphPaneSettings();
+  const mode = readGlyphModeActive();
+  const preview =
+    text.length > 4000 ? `${text.slice(0, 4000)}\n…(${text.length - 4000} more chars)` : text;
+  return [
+    `Engine: ${settings.engine}`,
+    `Figlet font: ${settings.figletFont}`,
+    `Glyph mode: ${mode ? "on" : "off"}`,
+    `Channel length: ${text.length} chars`,
+    "Current content:",
+    preview.trim() || "(empty)",
+  ].join("\n");
+}
+
 export async function renderGlyphOutput(options: {
   engine: GlyphPaneEngine;
   text: string;
   font?: string;
+  decorate?: boolean;
 }): Promise<string> {
   const res = await fetch("/api/glyph/render", {
     method: "POST",
@@ -101,6 +150,7 @@ export async function renderGlyphOutput(options: {
       engine: options.engine,
       text: options.text,
       font: options.font,
+      decorate: options.decorate,
     }),
   });
   const payload = (await res.json()) as { ok?: boolean; output?: string; error?: string };

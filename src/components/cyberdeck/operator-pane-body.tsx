@@ -6,7 +6,7 @@ import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { BsMarkdown } from "react-icons/bs";
 import { FaRegPaste } from "react-icons/fa6";
 import { GrFormEdit, GrFormView } from "react-icons/gr";
-import { LuArrowLeft, LuArrowRight, LuPanelRightClose, LuPanelRightOpen } from "react-icons/lu";
+import { LuArrowLeft, LuArrowRight, LuPanelRightClose, LuPanelRightOpen, LuRedo2, LuTrash2, LuUndo2 } from "react-icons/lu";
 import { isConvertibleDocumentPath } from "@/lib/muthur-document-conversion-intent";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -37,6 +37,8 @@ import {
   realmorphismActionClass,
   realmorphismControlClass,
 } from "@/lib/cyberdeck/realmorphism-control";
+import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
+import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
 
 type DroppedOperatorAsset = {
   kind: string;
@@ -212,56 +214,159 @@ function OperatorViewEditControls({
   );
 }
 
-function OperatorDocumentToolbarRow({
+function OperatorDocumentTitleRow({
   operatorDocMode,
   operatorDocNameDraft,
   operatorNameInputRef,
   operatorDroppedAsset,
   operatorFileSizeLabel,
-  operatorDocumentKind,
   operatorCanNavigateFileBack,
   operatorCanNavigateFileForward,
-  folderPaneOpen,
   onOperatorDocNameDraftChange,
   onCommitOperatorDocName,
-  onSetOperatorDocMode,
   onOperatorFileHistoryBack,
   onOperatorFileHistoryForward,
-  onOperatorDocumentKindChange,
-  onCopyOperatorDocToClipboard,
-  onPasteClipboardToOperator,
-  onSaveOperatorDocAsFile,
-  onConvertDocumentToMarkdown,
-  onExportOperatorMarkdown,
-  onToggleFolderPane,
 }: {
   operatorDocMode: "view" | "edit";
   operatorDocNameDraft: string;
   operatorNameInputRef: RefObject<HTMLInputElement>;
   operatorDroppedAsset: DroppedOperatorAsset;
   operatorFileSizeLabel: string | null;
-  operatorDocumentKind: OperatorDocumentPickerKind;
   operatorCanNavigateFileBack: boolean;
   operatorCanNavigateFileForward: boolean;
-  folderPaneOpen: boolean;
   onOperatorDocNameDraftChange: (nextValue: string) => void;
   onCommitOperatorDocName: () => void;
-  onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
   onOperatorFileHistoryBack: () => void;
   onOperatorFileHistoryForward: () => void;
+}) {
+  const [nameFocused, setNameFocused] = useState(false);
+  const displayName = operatorDroppedAsset.name || "OPERATOR_DOC_SURFACE";
+
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <OperatorFileHistoryNav
+        canBack={operatorCanNavigateFileBack}
+        canForward={operatorCanNavigateFileForward}
+        onBack={onOperatorFileHistoryBack}
+        onForward={onOperatorFileHistoryForward}
+      />
+      {operatorDocMode === "edit" ? (
+        <input
+          ref={operatorNameInputRef}
+          value={operatorDocNameDraft}
+          onChange={(event) => onOperatorDocNameDraftChange(event.target.value)}
+          onFocus={() => setNameFocused(true)}
+          onBlur={() => {
+            setNameFocused(false);
+            onCommitOperatorDocName();
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            onCommitOperatorDocName();
+            operatorNameInputRef.current?.blur();
+          }}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoComplete="off"
+          autoCorrect="off"
+          aria-label="Rename operator document"
+          className={cn(
+            "min-w-0 w-full max-w-[min(100%,28rem)] flex-1 border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]",
+            nameFocused && "ring-1 ring-emerald-500/35 ring-offset-0 ring-offset-black",
+          )}
+          style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+        />
+      ) : (
+        <CyberdeckPaneTooltip
+          label={displayName}
+          contentClassName="max-w-[90vw] whitespace-nowrap text-left"
+        >
+          <span className="min-w-0 flex-1 cursor-default overflow-hidden">
+            <CyberdeckPaneHeaderTitle
+              className="block truncate"
+              style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+            >
+              {displayName}
+            </CyberdeckPaneHeaderTitle>
+          </span>
+        </CyberdeckPaneTooltip>
+      )}
+      {operatorFileSizeLabel ? (
+        <span className="shrink-0 font-mono text-[9px] tracking-[0.04em] text-[#5a5a5a]">
+          {operatorFileSizeLabel}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function OperatorDocumentHeaderControls({
+  operatorDocMode,
+  folderPaneOpen,
+  onCommitOperatorDocName,
+  onSetOperatorDocMode,
+  onToggleFolderPane,
+}: {
+  operatorDocMode: "view" | "edit";
+  folderPaneOpen: boolean;
+  onCommitOperatorDocName: () => void;
+  onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
+  onToggleFolderPane: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      <OperatorViewEditControls
+        operatorDocMode={operatorDocMode}
+        onCommitOperatorDocName={onCommitOperatorDocName}
+        onSetOperatorDocMode={onSetOperatorDocMode}
+      />
+      <OperatorToolbarIconButton
+        label={folderPaneOpen ? "Close folders" : "Open folders"}
+        onClick={onToggleFolderPane}
+      >
+        {folderPaneOpen ? (
+          <LuPanelRightClose className="h-3.5 w-3.5" />
+        ) : (
+          <LuPanelRightOpen className="h-3.5 w-3.5" />
+        )}
+      </OperatorToolbarIconButton>
+    </div>
+  );
+}
+
+function OperatorDocumentToolStrip({
+  operatorDocumentKind,
+  canUndo,
+  canRedo,
+  canClear,
+  onUndo,
+  onRedo,
+  onClear,
+  onOperatorDocumentKindChange,
+  onCopyOperatorDocToClipboard,
+  onPasteClipboardToOperator,
+  onSaveOperatorDocAsFile,
+  onConvertDocumentToMarkdown,
+  onExportOperatorMarkdown,
+}: {
+  operatorDocumentKind: OperatorDocumentPickerKind;
+  canUndo: boolean;
+  canRedo: boolean;
+  canClear: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  onClear: () => void;
   onOperatorDocumentKindChange: (kind: OperatorDocumentPickerKind) => void;
   onCopyOperatorDocToClipboard: () => void | Promise<void>;
   onPasteClipboardToOperator: () => void | Promise<void>;
   onSaveOperatorDocAsFile: () => void | Promise<void>;
   onConvertDocumentToMarkdown: (filePath: string) => void | Promise<void>;
   onExportOperatorMarkdown: (format: OperatorExportFormat) => void | Promise<void>;
-  onToggleFolderPane: () => void;
 }) {
-  const [nameFocused, setNameFocused] = useState(false);
   const [converting, setConverting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const convertInputRef = useRef<HTMLInputElement>(null);
-  const displayName = operatorDroppedAsset.name || "OPERATOR_DOC_SURFACE";
 
   const runConvert = useCallback(
     async (filePath: string) => {
@@ -312,139 +417,70 @@ function OperatorDocumentToolbarRow({
   );
 
   return (
-    <>
-      <div className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1.5">
-        <div className="flex min-w-0 flex-[1_1_8rem] items-center gap-1.5">
-          <OperatorFileHistoryNav
-            canBack={operatorCanNavigateFileBack}
-            canForward={operatorCanNavigateFileForward}
-            onBack={onOperatorFileHistoryBack}
-            onForward={onOperatorFileHistoryForward}
-          />
-
-          {operatorDocMode === "edit" ? (
-            <input
-              ref={operatorNameInputRef}
-              value={operatorDocNameDraft}
-              onChange={(event) => onOperatorDocNameDraftChange(event.target.value)}
-              onFocus={() => setNameFocused(true)}
-              onBlur={() => {
-                setNameFocused(false);
-                onCommitOperatorDocName();
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter") return;
-                event.preventDefault();
-                onCommitOperatorDocName();
-                operatorNameInputRef.current?.blur();
-              }}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoComplete="off"
-              autoCorrect="off"
-              aria-label="Rename operator document"
-              className={cn(
-                "min-w-0 w-full flex-1 border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]",
-                nameFocused && "ring-1 ring-emerald-500/35 ring-offset-0 ring-offset-black",
-              )}
-              style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-            />
-          ) : (
-            <CyberdeckPaneTooltip
-              label={displayName}
-              contentClassName="max-w-[90vw] whitespace-nowrap text-left"
-            >
-              <span className="min-w-0 w-full flex-1 cursor-default overflow-hidden">
-                <CyberdeckPaneHeaderTitle
-                  className="block truncate"
-                  style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-                >
-                  {displayName}
-                </CyberdeckPaneHeaderTitle>
-              </span>
-            </CyberdeckPaneTooltip>
-          )}
-
-          {operatorFileSizeLabel ? (
-            <span className="shrink-0 font-mono text-[9px] tracking-[0.04em] text-[#5a5a5a]">
-              {operatorFileSizeLabel}
-            </span>
-          ) : null}
-        </div>
-
-        <div className="ml-auto flex max-w-full basis-full flex-wrap items-center justify-end gap-1.5 sm:basis-auto">
-          <input
-            ref={convertInputRef}
-            type="file"
-            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            className="sr-only"
-            aria-hidden
-            tabIndex={-1}
-            onChange={(event) => void handleConvertFileInput(event)}
-          />
-          <OperatorDocTypePicker
-            value={normalizeOperatorDocumentKind(operatorDocumentKind)}
-            onChange={onOperatorDocumentKindChange}
-          />
-
-          <OperatorToolbarIconButton
-            label="Import MD"
-            onClick={() => void handlePickConvertDocument()}
-            disabled={converting}
-          >
-            <BsMarkdown className="h-3.5 w-3.5" />
-          </OperatorToolbarIconButton>
-          <OperatorExportPicker
-            disabled={
-              exporting || normalizeOperatorDocumentKind(operatorDocumentKind) !== "markdown"
-            }
-            onExport={async (format) => {
-              setExporting(true);
-              try {
-                await onExportOperatorMarkdown(format);
-              } finally {
-                setExporting(false);
-              }
-            }}
-          />
-          <OperatorToolbarIconButton
-            label="Copy"
-            onClick={() => void onCopyOperatorDocToClipboard()}
-          >
-            <CopyIcon className="h-3.5 w-3.5" />
-          </OperatorToolbarIconButton>
-          <OperatorToolbarIconButton
-            label="Paste"
-            onClick={() => void onPasteClipboardToOperator()}
-          >
-            <FaRegPaste className="h-3.5 w-3.5" />
-          </OperatorToolbarIconButton>
-          <OperatorToolbarIconButton
-            label="Save"
-            onClick={() => void onSaveOperatorDocAsFile()}
-          >
-            <DownloadIcon className="h-3.5 w-3.5" />
-          </OperatorToolbarIconButton>
-
-          <OperatorViewEditControls
-            operatorDocMode={operatorDocMode}
-            onCommitOperatorDocName={onCommitOperatorDocName}
-            onSetOperatorDocMode={onSetOperatorDocMode}
-          />
-
-          <OperatorToolbarIconButton
-            label={folderPaneOpen ? "Close folders" : "Open folders"}
-            onClick={onToggleFolderPane}
-          >
-            {folderPaneOpen ? (
-              <LuPanelRightClose className="h-3.5 w-3.5" />
-            ) : (
-              <LuPanelRightOpen className="h-3.5 w-3.5" />
-            )}
-          </OperatorToolbarIconButton>
-        </div>
-      </div>
-    </>
+    <div
+      data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
+      className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
+    >
+      <input
+        ref={convertInputRef}
+        type="file"
+        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        className="sr-only"
+        aria-hidden
+        tabIndex={-1}
+        onChange={(event) => void handleConvertFileInput(event)}
+      />
+      <OperatorToolbarIconButton label="Undo" onClick={onUndo} disabled={!canUndo}>
+        <LuUndo2 className="h-3.5 w-3.5" />
+      </OperatorToolbarIconButton>
+      <OperatorToolbarIconButton label="Redo" onClick={onRedo} disabled={!canRedo}>
+        <LuRedo2 className="h-3.5 w-3.5" />
+      </OperatorToolbarIconButton>
+      <OperatorToolbarIconButton label="Clear document" onClick={onClear} disabled={!canClear}>
+        <LuTrash2 className="h-3.5 w-3.5" />
+      </OperatorToolbarIconButton>
+      <span className="mx-0.5 h-4 w-px shrink-0 bg-[#2d2d2d]" aria-hidden />
+      <OperatorDocTypePicker
+        value={normalizeOperatorDocumentKind(operatorDocumentKind)}
+        onChange={onOperatorDocumentKindChange}
+      />
+      <OperatorToolbarIconButton
+        label="Import MD"
+        onClick={() => void handlePickConvertDocument()}
+        disabled={converting}
+      >
+        <BsMarkdown className="h-3.5 w-3.5" />
+      </OperatorToolbarIconButton>
+      <OperatorExportPicker
+        disabled={exporting || normalizeOperatorDocumentKind(operatorDocumentKind) !== "markdown"}
+        onExport={async (format) => {
+          setExporting(true);
+          try {
+            await onExportOperatorMarkdown(format);
+          } finally {
+            setExporting(false);
+          }
+        }}
+      />
+      <OperatorToolbarIconButton
+        label="Copy"
+        onClick={() => void onCopyOperatorDocToClipboard()}
+      >
+        <CopyIcon className="h-3.5 w-3.5" />
+      </OperatorToolbarIconButton>
+      <OperatorToolbarIconButton
+        label="Paste"
+        onClick={() => void onPasteClipboardToOperator()}
+      >
+        <FaRegPaste className="h-3.5 w-3.5" />
+      </OperatorToolbarIconButton>
+      <OperatorToolbarIconButton
+        label="Save"
+        onClick={() => void onSaveOperatorDocAsFile()}
+      >
+        <DownloadIcon className="h-3.5 w-3.5" />
+      </OperatorToolbarIconButton>
+    </div>
   );
 }
 
@@ -488,6 +524,17 @@ export function CyberdeckOperatorPaneBody({
   const [folderPaneOpen, setFolderPaneOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState<number>(1);
   const imageZoomIndexRef = useRef(3);
+  const operatorAssetKeyRef = useRef("");
+  const operatorApplyRef = useRef(false);
+  const operatorDocHistoryTextRef = useRef("");
+  const {
+    canUndo: operatorCanUndo,
+    canRedo: operatorCanRedo,
+    setText: setOperatorDocHistoryText,
+    undo: undoOperatorDoc,
+    redo: redoOperatorDoc,
+    reset: resetOperatorDocHistory,
+  } = useGlyphTextHistory("");
 
   const operatorDocText = operatorDroppedAsset?.text || "";
   const operatorShowsMarkdown = normalizeOperatorDocumentKind(operatorDocumentKind) === "markdown";
@@ -503,6 +550,67 @@ export function CyberdeckOperatorPaneBody({
     imageZoomIndexRef.current = 3;
     setImageZoom(1);
   }, [operatorDroppedAsset?.imageSrc]);
+
+  const applyOperatorDocText = useCallback(
+    (next: string, mode: "immediate" | "debounced" | "skip" = "immediate") => {
+      operatorApplyRef.current = true;
+      setOperatorDocHistoryText(next, mode);
+      onOperatorDocumentTextChange(next);
+      operatorDocHistoryTextRef.current = next;
+      queueMicrotask(() => {
+        operatorApplyRef.current = false;
+      });
+    },
+    [onOperatorDocumentTextChange, setOperatorDocHistoryText],
+  );
+
+  useEffect(() => {
+    if (!operatorSurfaceIsDocument || !operatorDroppedAsset) return;
+    const key = `${operatorDroppedAsset.kind}::${operatorDroppedAsset.name}`;
+    if (key !== operatorAssetKeyRef.current) {
+      operatorAssetKeyRef.current = key;
+      resetOperatorDocHistory(operatorDocText);
+      operatorDocHistoryTextRef.current = operatorDocText;
+      return;
+    }
+    if (operatorApplyRef.current) return;
+    if (operatorDocText === operatorDocHistoryTextRef.current) return;
+    setOperatorDocHistoryText(operatorDocText, "immediate");
+    operatorDocHistoryTextRef.current = operatorDocText;
+  }, [
+    operatorDocText,
+    operatorDroppedAsset,
+    operatorSurfaceIsDocument,
+    resetOperatorDocHistory,
+    setOperatorDocHistoryText,
+  ]);
+
+  const handleOperatorUndo = useCallback(() => {
+    const restored = undoOperatorDoc();
+    if (restored == null) return;
+    operatorApplyRef.current = true;
+    onOperatorDocumentTextChange(restored);
+    operatorDocHistoryTextRef.current = restored;
+    queueMicrotask(() => {
+      operatorApplyRef.current = false;
+    });
+  }, [onOperatorDocumentTextChange, undoOperatorDoc]);
+
+  const handleOperatorRedo = useCallback(() => {
+    const restored = redoOperatorDoc();
+    if (restored == null) return;
+    operatorApplyRef.current = true;
+    onOperatorDocumentTextChange(restored);
+    operatorDocHistoryTextRef.current = restored;
+    queueMicrotask(() => {
+      operatorApplyRef.current = false;
+    });
+  }, [onOperatorDocumentTextChange, redoOperatorDoc]);
+
+  const handleOperatorClear = useCallback(() => {
+    if (!operatorDocText.trim()) return;
+    applyOperatorDocText("", "immediate");
+  }, [applyOperatorDocText, operatorDocText]);
 
   useEffect(() => {
     if (operatorSurfaceMode !== "browser") return;
@@ -574,38 +682,25 @@ export function CyberdeckOperatorPaneBody({
         }`}
       >
         <CyberdeckPaneHeader
-          className={cn(
-            "z-20 shrink-0 bg-black py-2",
-            operatorSurfaceIsDocument && operatorDroppedAsset && "items-start",
-          )}
+          className="z-20 shrink-0 bg-black py-2"
           left={
             operatorSurfaceMode === "browser" ? (
               <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
                 MUTHUR_BROWSER
               </CyberdeckPaneHeaderTitle>
             ) : operatorSurfaceIsDocument && operatorDroppedAsset ? (
-              <OperatorDocumentToolbarRow
+              <OperatorDocumentTitleRow
                 operatorDocMode={operatorDocMode}
                 operatorDocNameDraft={operatorDocNameDraft}
                 operatorNameInputRef={operatorNameInputRef}
                 operatorDroppedAsset={operatorDroppedAsset}
                 operatorFileSizeLabel={operatorFileSizeLabel}
-                operatorDocumentKind={operatorDocumentKind}
                 operatorCanNavigateFileBack={operatorCanNavigateFileBack}
                 operatorCanNavigateFileForward={operatorCanNavigateFileForward}
-                folderPaneOpen={folderPaneOpen}
                 onOperatorDocNameDraftChange={onOperatorDocNameDraftChange}
                 onCommitOperatorDocName={onCommitOperatorDocName}
-                onSetOperatorDocMode={onSetOperatorDocMode}
                 onOperatorFileHistoryBack={onOperatorFileHistoryBack}
                 onOperatorFileHistoryForward={onOperatorFileHistoryForward}
-                onOperatorDocumentKindChange={onOperatorDocumentKindChange}
-                onCopyOperatorDocToClipboard={onCopyOperatorDocToClipboard}
-                onPasteClipboardToOperator={onPasteClipboardToOperator}
-                onSaveOperatorDocAsFile={onSaveOperatorDocAsFile}
-                onConvertDocumentToMarkdown={onConvertDocumentToMarkdown}
-                onExportOperatorMarkdown={onExportOperatorMarkdown}
-                onToggleFolderPane={() => setFolderPaneOpen((open) => !open)}
               />
             ) : (
               <div className="flex min-w-0 items-center gap-2">
@@ -633,32 +728,57 @@ export function CyberdeckOperatorPaneBody({
           }
           right={
             operatorSurfaceMode === "browser" ? (
-                <div className="flex items-center gap-2">
-                  <OperatorToolbarIconButton
-                    label="Paste"
-                    onClick={() => void onPasteClipboardToOperator()}
-                  >
-                    <FaRegPaste className="h-3.5 w-3.5" />
-                  </OperatorToolbarIconButton>
-                  <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em]">
-                    <span className="text-emerald-200">LIVE WEB</span>
-                    <span className="rounded border border-[#2d2d2d] px-2 py-0.5 text-[#8a8a8a]">
-                      ENGINE: {operatorBrowserEngine}
-                    </span>
-                  </div>
-                </div>
+              <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em]">
+                <span className="text-emerald-200">LIVE WEB</span>
+                <span className="rounded border border-[#2d2d2d] px-2 py-0.5 text-[#8a8a8a]">
+                  ENGINE: {operatorBrowserEngine}
+                </span>
+              </div>
+            ) : operatorSurfaceIsDocument && operatorDroppedAsset ? (
+              <OperatorDocumentHeaderControls
+                operatorDocMode={operatorDocMode}
+                folderPaneOpen={folderPaneOpen}
+                onCommitOperatorDocName={onCommitOperatorDocName}
+                onSetOperatorDocMode={onSetOperatorDocMode}
+                onToggleFolderPane={() => setFolderPaneOpen((open) => !open)}
+              />
             ) : operatorDroppedAsset && !operatorSurfaceIsDocument ? (
               <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
                 {operatorDroppedAsset.kind.toUpperCase()}
               </div>
             ) : null
           }
-          leftClassName={
-            operatorSurfaceIsDocument && operatorDroppedAsset
-              ? "flex min-w-0 w-full flex-1 items-center pr-0"
-              : undefined
-          }
         />
+        {operatorSurfaceMode === "browser" ? (
+          <div
+            data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
+            className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
+          >
+            <OperatorToolbarIconButton
+              label="Paste"
+              onClick={() => void onPasteClipboardToOperator()}
+            >
+              <FaRegPaste className="h-3.5 w-3.5" />
+            </OperatorToolbarIconButton>
+          </div>
+        ) : null}
+        {operatorSurfaceIsDocument && operatorDroppedAsset ? (
+          <OperatorDocumentToolStrip
+            operatorDocumentKind={operatorDocumentKind}
+            canUndo={operatorCanUndo}
+            canRedo={operatorCanRedo}
+            canClear={Boolean(operatorDocText.trim())}
+            onUndo={handleOperatorUndo}
+            onRedo={handleOperatorRedo}
+            onClear={handleOperatorClear}
+            onOperatorDocumentKindChange={onOperatorDocumentKindChange}
+            onCopyOperatorDocToClipboard={onCopyOperatorDocToClipboard}
+            onPasteClipboardToOperator={onPasteClipboardToOperator}
+            onSaveOperatorDocAsFile={onSaveOperatorDocAsFile}
+            onConvertDocumentToMarkdown={onConvertDocumentToMarkdown}
+            onExportOperatorMarkdown={onExportOperatorMarkdown}
+          />
+        ) : null}
         <div className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto">
         {operatorSurfaceMode === "browser" ? (
           <div
@@ -837,7 +957,20 @@ export function CyberdeckOperatorPaneBody({
                 <Textarea
                   ref={operatorEditorRef}
                   value={operatorDocText}
-                  onChange={(event) => onOperatorDocumentTextChange(event.target.value)}
+                  onChange={(event) => applyOperatorDocText(event.target.value, "debounced")}
+                  onKeyDown={(event) => {
+                    if (!event.ctrlKey && !event.metaKey) return;
+                    const key = event.key.toLowerCase();
+                    if (key === "z" && !event.shiftKey) {
+                      event.preventDefault();
+                      handleOperatorUndo();
+                      return;
+                    }
+                    if (key === "y" || (key === "z" && event.shiftKey)) {
+                      event.preventDefault();
+                      handleOperatorRedo();
+                    }
+                  }}
                   spellCheck={false}
                   autoCapitalize="off"
                   autoComplete="off"

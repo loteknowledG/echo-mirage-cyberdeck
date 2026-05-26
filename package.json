@@ -20,6 +20,7 @@
     "lint:watch": "eslint --ext .js,.jsx,.ts,.tsx . --fix --watch",
     "lmstudio:probe": "node scripts/lmstudio-probe.js",
     "registry:build": "tsx ./scripts/build-registry.ts",
+    "fonts:sync": "node scripts/sync-figlet-fonts.mjs",
     "probe:memory-cards": "tsx scripts/probe-memory-card-registry.ts && tsx scripts/probe-memory-card-parser-regression.ts",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",

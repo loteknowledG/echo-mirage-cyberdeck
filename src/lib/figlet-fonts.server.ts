@@ -1,6 +1,7 @@
 import figlet from "figlet";
 import { promisify } from "util";
 import { DEFAULT_FIGLET_FONT } from "@/lib/figlet-fonts";
+import { ensureCustomFigletFontsLoaded } from "@/lib/figlet-custom-fonts.server";
 
 const listFigletFontsAsync = promisify(figlet.fonts.bind(figlet)) as () => Promise<string[]>;
 
@@ -8,11 +9,24 @@ export { DEFAULT_FIGLET_FONT };
 
 let cachedFonts: string[] | null = null;
 
-/** Sorted figlet.js built-in font names (328). */
+function mergeFontLists(bundled: readonly string[], custom: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const name of [...bundled, ...custom]) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(name);
+  }
+  return merged.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+/** Sorted figlet.js built-in font names plus assets/figlet-fonts extras. */
 export async function listFigletFonts(): Promise<string[]> {
   if (cachedFonts) return cachedFonts;
-  const fonts = await listFigletFontsAsync();
-  cachedFonts = fonts.slice().sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  const custom = ensureCustomFigletFontsLoaded();
+  const bundled = await listFigletFontsAsync();
+  cachedFonts = mergeFontLists(bundled, custom);
   return cachedFonts;
 }
 

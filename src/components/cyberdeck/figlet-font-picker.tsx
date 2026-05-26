@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CyberdeckRollingPicker } from "@/components/cyberdeck/cyberdeck-rolling-picker";
-import { DEFAULT_FIGLET_FONT } from "@/lib/figlet-fonts";
+import { DEFAULT_FIGLET_FONT, FIGLET_FONT_ALL, isFigletAllFonts } from "@/lib/figlet-fonts";
 
 type FigletFontPickerProps = {
   value: string;
@@ -41,9 +41,17 @@ export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFont
     };
   }, []);
 
+  const pickerFonts = useMemo(() => {
+    if (fonts.length === 0) return fonts;
+    if (fonts.some((font) => isFigletAllFonts(font))) return fonts;
+    return [...fonts, FIGLET_FONT_ALL].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
+  }, [fonts]);
+
   const items = useMemo(
     () =>
-      fonts.map((font) => ({
+      pickerFonts.map((font) => ({
         value: font,
         label: font,
         slide: (
@@ -52,13 +60,16 @@ export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFont
           </span>
         ),
       })),
-    [fonts],
+    [pickerFonts],
   );
 
-  const resolvedValue =
-    fonts.find((font) => font.toLowerCase() === value.toLowerCase()) ?? fonts[0] ?? value;
+  const resolvedValue = isFigletAllFonts(value)
+    ? FIGLET_FONT_ALL
+    : pickerFonts.find((font) => font.toLowerCase() === value.toLowerCase()) ??
+      pickerFonts[0] ??
+      value;
 
-  if (fonts.length === 0) {
+  if (pickerFonts.length === 0) {
     return (
       <div
         className="flex h-7 min-w-[5.25rem] shrink-0 items-center justify-center rounded border border-[#2d2d2d] bg-black px-1 font-mono text-[8px] text-[#6a6a6a]"
