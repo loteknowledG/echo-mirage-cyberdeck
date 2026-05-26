@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import EmblaCarousel, { EmblaCarouselType } from "embla-carousel";
 import { type ExecutionCard, EXECUTION_CARD_REGISTRY, EXECUTION_HANDS } from "@/lib/computer-use/execution-card-registry";
+import { useDeckMode } from "@/lib/deck-mode";
+import { realmorphismActionClass } from "@/lib/cyberdeck/realmorphism-control";
 
 type RollADeckProps = {
   onPlayCard?: (cardId: string, deckIndex: number) => void;
@@ -59,6 +61,7 @@ function CardSlide({
   isSelected: boolean;
   onClick: () => void;
 }) {
+  const deckMode = useDeckMode();
   const riskColor = RISK_COLORS[card.risk] ?? "#8a8a8a";
   const categoryColor = CATEGORY_COLORS[card.category] ?? "#8a8a8a";
 
@@ -110,7 +113,7 @@ function CardSlide({
           {!card.requiresConfirmation && <div />}
           <button
             type="button"
-            className="rounded-xl border border-emerald-500/60 bg-emerald-500/15 px-4 py-2 font-mono text-[11px] tracking-[0.08em] text-emerald-400 transition hover:bg-emerald-500/25"
+            className={realmorphismActionClass(deckMode, "accent")}
             onClick={(e) => {
               e.stopPropagation();
               onClick();

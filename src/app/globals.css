@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&display=swap');
 @import url("https://cdn.jsdelivr.net/npm/hack-font@3/build/web/hack.css");
+@import "../styles/cyberdeck-realmorphism.css";
 /* Import Mrs Saint Delafield from Google Fonts */
 /* If Google Fonts import is blocked, you can self-host a WOFF2 at /public/fonts/MrsSaintDelafield.woff2 */
 html,
@@ -435,6 +436,45 @@ body,
   text-shadow: 0 0 10px rgba(255, 176, 0, 0.45);
 }
 
+.panel-loader-wave {
+  background-image: linear-gradient(
+    90deg,
+    rgba(110, 231, 183, 0.15) 0%,
+    rgba(110, 231, 183, 0.55) 50%,
+    rgba(110, 231, 183, 0.15) 100%
+  );
+  background-size: 220% 100%;
+  animation: cyberdeck-probe-wave 1.4s linear infinite;
+}
+
+.panel-loader-bar {
+  position: relative;
+  height: 2px;
+  width: min(12rem, 70vw);
+  overflow: hidden;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.panel-loader-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.85), transparent);
+  animation: panel-loader-sweep 1.2s ease-in-out infinite;
+}
+
+@keyframes panel-loader-sweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
 /* Match weyland-yutani `index.css` .nav-row (green hover band + lift). */
 .nav-row {
   color: var(--nav-color, inherit);
@@ -694,32 +734,33 @@ body,
   animation: cyberdeck-cogitating-sweep 1.35s linear infinite;
 }
 
-/* Echo Mirage ASCII override mode */
-[data-deck-mode="ascii"] {
+/* Echo Mirage wireframe override — content zone only ([data-morphism="realmorphism"]).
+   Asciimorphism chrome (rail, echo/mirage/pane headers) is never touched. */
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] {
   text-shadow: none !important;
 }
 
-[data-deck-mode="ascii"] .terminal-window,
-[data-deck-mode="ascii"] * {
+[data-deck-mode="ascii"] [data-morphism="realmorphism"],
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] * {
   backdrop-filter: none !important;
 }
 
-[data-deck-mode="ascii"] .rounded,
-[data-deck-mode="ascii"] .rounded-sm,
-[data-deck-mode="ascii"] .rounded-\[6px\] {
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] .rounded,
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] .rounded-sm,
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] .rounded-\[6px\] {
   border-radius: 0 !important;
 }
 
-[data-deck-mode="ascii"] .shadow-\[0_12px_30px_rgba\(0\,0\,0\,0\.65\)\],
-[data-deck-mode="ascii"] .shadow-\[0_0_0_1px_rgba\(16\,185\,129\,0\.30\)_inset\,0_0_14px_rgba\(16\,185\,129\,0\.22\)\,0_3px_10px_rgba\(0\,0\,0\,0\.5\)\],
-[data-deck-mode="ascii"] .shadow-\[0_0_0_1px_rgba\(245\,158\,11\,0\.20\)_inset\,0_0_12px_rgba\(245\,158\,11\,0\.12\)\,0_3px_10px_rgba\(0\,0\,0\,0\.5\)\] {
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] .shadow-\[0_12px_30px_rgba\(0\,0\,0\,0\.65\)\],
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] .shadow-\[0_0_0_1px_rgba\(16\,185\,129\,0\.30\)_inset\,0_0_14px_rgba\(16\,185\,129\,0\.22\)\,0_3px_10px_rgba\(0\,0\,0\,0\.5\)\],
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] .shadow-\[0_0_0_1px_rgba\(245\,158\,11\,0\.20\)_inset\,0_0_12px_rgba\(245\,158\,11\,0\.12\)\,0_3px_10px_rgba\(0\,0\,0\,0\.5\)\] {
   box-shadow: none !important;
 }
 
-[data-deck-mode="ascii"] div,
-[data-deck-mode="ascii"] section,
-[data-deck-mode="ascii"] article,
-[data-deck-mode="ascii"] aside {
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] div:not([data-morphism="asciimorphism"]),
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] section:not([data-morphism="asciimorphism"]),
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] article:not([data-morphism="asciimorphism"]),
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] aside:not([data-morphism="asciimorphism"]) {
   border-style: dashed;
 }
 

@@ -1,0 +1,346 @@
+/**
+ * Cyberdeck Realmorphism — three-plane color system + ink layer
+ *
+ * Asciimorphism and Realmorphism do not mix. Tokens and utilities apply only inside
+ * [data-morphism="realmorphism"] (content zone). Asciimorphism chrome uses
+ * [data-morphism="asciimorphism"] (server rail, pane/echo/mirage headers) and is out of scope.
+ *
+ * Asciimorphism = ASCII art as components (`f:\dev\asciimorphism`). Not deck-mode `ascii`.
+ *
+ * Physical planes (must stay perceptually distinct):
+ *   1. host   — surface the control sits on (ground / bench)
+ *   2. wall   — extruded shadow edge (orthogonal hue vs host)
+ *   3. face   — control top (lighter than host)
+ *
+ * Ink layer (4th — never copy a plane fill):
+ *   Text and glyphs on realmorphism controls; not used on asciimorphism chrome.
+ *
+ * Deck mode (data-deck-mode on root):
+ *   - realmorphism — content zone uses these tokens when controls are wired
+ *   - ascii        — wireframe override on content zone only (see globals.css)
+ */
+
+[data-deck-mode="realmorphism"] {
+  /* ── Plane 1: host (ground / panel bench) ───────────────────────────── */
+  --realmorphism-host: #060708;
+  --realmorphism-host-raised: #0e1011;
+
+  /* ── Plane 2: wall (shadow extrusion / isometric edge) ────────────────── */
+  --realmorphism-wall: #2a6b56;
+  --realmorphism-wall-hover: #3a9174;
+  --realmorphism-wall-amber: #8a6530;
+  --realmorphism-wall-amber-hover: #b8873f;
+
+  /* ── Plane 3: face (control top) ──────────────────────────────────────── */
+  --realmorphism-face: #171c19;
+  --realmorphism-face-border: #2a3530;
+  --realmorphism-face-active: #12241c;
+  --realmorphism-face-active-border: #2f6b52;
+  --realmorphism-face-amber: #1c1810;
+  --realmorphism-face-amber-border: #6b5428;
+
+  /* ── Ink on host (labels, body copy on bench) ─────────────────────────── */
+  --realmorphism-ink-on-host: #9eada7;
+  --realmorphism-ink-on-host-muted: #6f7a75;
+
+  /* ── Ink on face (text on control tops) ───────────────────────────────── */
+  --realmorphism-ink-on-face: #e8efeb;
+  --realmorphism-ink-on-face-active: #d6ffec;
+  --realmorphism-ink-on-face-amber: #fde68a;
+
+  /* Glyphs on realmorphism controls only */
+  --realmorphism-glyph-rest: #d4dcd8;
+  --realmorphism-glyph-hover: #a8b8ff;
+  --realmorphism-glyph-latched: #8fffc8;
+
+  /* ── Shared ink roles ─────────────────────────────────────────────────── */
+  --realmorphism-ink-signal: #7dffb4;
+  --realmorphism-ink-caution: #fcd34d;
+  --realmorphism-ink-disabled: #56605c;
+
+  --realmorphism-inset: rgba(0, 0, 0, 0.52);
+  --realmorphism-inset-active: rgba(16, 185, 129, 0.22);
+
+  /* ── Shadow recipes (hard offset — no blur) ───────────────────────────── */
+  --realmorphism-shadow-rest: 2px 2px 0 1px var(--realmorphism-wall);
+  --realmorphism-shadow-hover: 4px 4px 0 1px var(--realmorphism-wall-hover);
+  --realmorphism-shadow-amber-rest: 2px 2px 0 1px var(--realmorphism-wall-amber);
+  --realmorphism-shadow-amber-hover: 4px 4px 0 1px var(--realmorphism-wall-amber-hover);
+  --realmorphism-shadow-inset: inset 1px 1px 0 0 var(--realmorphism-inset);
+  --realmorphism-shadow-inset-active: inset 1px 1px 0 0 var(--realmorphism-inset-active);
+
+  /* Curve — matches realmorphism Button / realmorphism-button (0.5rem). */
+  --realmorphism-radius: 0.5rem;
+  --realmorphism-radius-sm: 0.375rem;
+
+  /* Invisible hit pad — covers hard-offset wall (rest 2+1px, hover 4+1px). */
+  --realmorphism-hit-inset: 5px;
+
+  --button-wall: var(--realmorphism-wall);
+  --surface-extrusion: var(--realmorphism-wall);
+  --info-pane-inset: var(--realmorphism-inset);
+  --realmorphism-host-foreground: var(--realmorphism-ink-on-host);
+  --realmorphism-face-foreground: var(--realmorphism-ink-on-face);
+  --realmorphism-face-active-foreground: var(--realmorphism-ink-on-face-active);
+  --realmorphism-face-amber-foreground: var(--realmorphism-ink-on-face-amber);
+}
+
+/* Ink utilities — content zone only */
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-ink-host {
+  color: var(--realmorphism-ink-on-host);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-ink-host-muted {
+  color: var(--realmorphism-ink-on-host-muted);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-ink-face {
+  color: var(--realmorphism-ink-on-face);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-ink-face-active {
+  color: var(--realmorphism-ink-on-face-active);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-glyph {
+  color: var(--realmorphism-glyph-rest);
+  text-shadow: none;
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-glyph-hover {
+  color: var(--realmorphism-glyph-hover);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-glyph-latched {
+  color: var(--realmorphism-glyph-latched);
+}
+
+/* ── Host bench (pane footers, recessed areas) ─────────────────────────── */
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-host-surface.cyberdeck-message-box {
+  background-color: var(--realmorphism-host);
+  border-top-color: var(--realmorphism-face-border);
+}
+
+/* ── Interactive controls: curved face + hard-offset wall shadow ────────── */
+/*
+ * Rounded corners match F:\dev\realmorphism (rounded-md / 0.5rem on button face).
+ * Wall uses the same curve via box-shadow on the face element.
+ *
+ * Hit pad: box-shadow does not extend the pointer target. A transparent ::before
+ * (see F:\dev\realmorphism button.tsx before:-inset-1) keeps cursor/hover stable
+ * over the wall extrusion.
+ */
+
+[data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu),
+[data-deck-mode="realmorphism"] button.realmorphism-switch {
+  position: relative;
+  cursor: pointer;
+}
+
+[data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu)::before,
+[data-deck-mode="realmorphism"] button.realmorphism-switch::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--realmorphism-hit-inset));
+  border-radius: inherit;
+  background: transparent;
+  pointer-events: auto;
+}
+
+[data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu):disabled::before,
+[data-deck-mode="realmorphism"] button.realmorphism-switch:disabled::before {
+  pointer-events: none;
+}
+
+[data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu) svg,
+[data-deck-mode="realmorphism"] button.realmorphism-switch svg {
+  pointer-events: none;
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control {
+  border-radius: var(--realmorphism-radius);
+  border-color: var(--realmorphism-face-border);
+  background-color: var(--realmorphism-face);
+  color: var(--realmorphism-ink-on-face);
+  box-shadow: var(--realmorphism-shadow-rest);
+  text-shadow: none;
+  transform: translate(0, 0);
+  transition:
+    transform 150ms ease-out,
+    box-shadow 150ms ease-out,
+    color 150ms ease-out,
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control:hover:not(:disabled) {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--realmorphism-shadow-hover);
+  color: var(--realmorphism-glyph-hover);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: none;
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control:disabled {
+  color: var(--realmorphism-ink-disabled);
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-off:not(:hover) {
+  color: var(--realmorphism-ink-disabled);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-amber {
+  border-color: var(--realmorphism-face-amber-border);
+  background-color: var(--realmorphism-face-amber);
+  color: var(--realmorphism-ink-on-face-amber);
+  box-shadow: var(--realmorphism-shadow-amber-rest);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-amber:hover:not(:disabled) {
+  box-shadow: var(--realmorphism-shadow-amber-hover);
+  color: var(--realmorphism-ink-caution);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-latched {
+  border-color: var(--realmorphism-face-active-border);
+  background-color: var(--realmorphism-face-active);
+  color: var(--realmorphism-ink-on-face-active);
+  box-shadow: var(--realmorphism-shadow-inset-active);
+  transform: translate(2px, 2px);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-latched:hover:not(:disabled) {
+  transform: translate(0, 0);
+  box-shadow: var(--realmorphism-shadow-hover);
+  color: var(--realmorphism-glyph-latched);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-latched:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: none;
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-danger {
+  color: #fca5a5;
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-danger:hover:not(:disabled) {
+  color: #fecaca;
+}
+
+/* Flat menu rows (also used on fixed overlays outside morphism zone) */
+
+[data-deck-mode="realmorphism"] .realmorphism-control.is-menu {
+  border-radius: var(--realmorphism-radius-sm);
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--realmorphism-ink-on-host);
+  box-shadow: none;
+  transform: none;
+}
+
+[data-deck-mode="realmorphism"] .realmorphism-control.is-menu:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background-color: var(--realmorphism-host-raised);
+  color: var(--realmorphism-ink-on-face-active);
+}
+
+[data-deck-mode="realmorphism"] .realmorphism-control.is-menu.is-danger {
+  color: #fca5a5;
+}
+
+[data-deck-mode="realmorphism"] .realmorphism-control.is-menu.is-danger:hover:not(:disabled) {
+  color: #fecaca;
+}
+
+/* Controls outside [data-morphism="realmorphism"] (boot overlay, etc.) */
+
+[data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu) {
+  border-radius: var(--realmorphism-radius);
+  border-color: var(--realmorphism-face-border);
+  background-color: var(--realmorphism-face);
+  color: var(--realmorphism-ink-on-face);
+  box-shadow: var(--realmorphism-shadow-rest);
+  text-shadow: none;
+  transform: translate(0, 0);
+  transition:
+    transform 150ms ease-out,
+    box-shadow 150ms ease-out,
+    color 150ms ease-out,
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+[data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu):hover:not(:disabled) {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--realmorphism-shadow-hover);
+  color: var(--realmorphism-glyph-hover);
+}
+
+[data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu):active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: none;
+}
+
+[data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu):disabled {
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.size-tile.is-latched {
+  transform: translate(1px, 1px);
+}
+
+/* ── Toggle switches (settings) — same curve + shadow language ─────────── */
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] button.realmorphism-switch {
+  border-radius: var(--realmorphism-radius);
+  border-color: var(--realmorphism-face-border);
+  background-color: var(--realmorphism-face);
+  box-shadow: var(--realmorphism-shadow-rest);
+  text-shadow: none;
+  background-image: none;
+  transition:
+    transform 150ms ease-out,
+    box-shadow 150ms ease-out,
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] button.realmorphism-switch:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--realmorphism-shadow-hover);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] button.realmorphism-switch[data-state="checked"] {
+  border-color: var(--realmorphism-face-active-border);
+  background-color: var(--realmorphism-face-active);
+  box-shadow: var(--realmorphism-shadow-inset-active);
+  transform: translate(2px, 2px);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] button.realmorphism-switch[data-state="checked"]:hover {
+  transform: translate(0, 0);
+  box-shadow: var(--realmorphism-shadow-hover);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] button.realmorphism-switch > span {
+  border-radius: var(--realmorphism-radius-sm);
+  background-image: none;
+}
+
+/*
+ * Out of scope (always asciimorphism — do not style here):
+ *   .cyberdeck-server-rail, .ascii-btn
+ *   .cyberdeck-ascii-header, [data-morphism="asciimorphism"]
+ *   EchoHeader, MirageHeader
+ */

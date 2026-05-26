@@ -21,6 +21,7 @@ import {
   type OperatorExportFormat,
 } from "@/components/cyberdeck/operator-export-picker";
 import {
+  CyberdeckControlTooltip,
   CyberdeckPaneTooltip,
   CyberdeckPaneTooltipProvider,
 } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
@@ -29,6 +30,13 @@ import {
   type OperatorDocumentPickerKind,
 } from "@/lib/operator-document-types";
 import { cn } from "@/lib/utils";
+import { useDeckMode } from "@/lib/deck-mode";
+import {
+  LEGACY_SWITCH_EMERALD,
+  LEGACY_TOOLBAR_ICON,
+  realmorphismActionClass,
+  realmorphismControlClass,
+} from "@/lib/cyberdeck/realmorphism-control";
 
 type DroppedOperatorAsset = {
   kind: string;
@@ -84,29 +92,40 @@ const OPERATOR_DOC_SURFACE_CLASS =
 const OPERATOR_MARKDOWN_VIEW_CLASS =
   "max-w-none font-mono text-[12px] leading-snug text-green-200 [&_h1]:my-2 [&_h1]:font-mono [&_h1]:text-[12px] [&_h1]:font-normal [&_h2]:my-2 [&_h2]:font-mono [&_h2]:text-[12px] [&_h3]:font-mono [&_h3]:text-[12px] [&_p]:my-1 [&_li]:my-0 [&_pre]:my-2 [&_pre]:bg-black [&_pre]:text-green-300";
 
-const OPERATOR_HEADER_ICON_BTN =
-  "inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200";
+const OPERATOR_HEADER_ICON_BTN = LEGACY_TOOLBAR_ICON;
 
 function OperatorToolbarIconButton({
   label,
   onClick,
   disabled = false,
   className = "",
+  latched = false,
   children,
 }: {
   label: string;
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
+  latched?: boolean;
   children: ReactNode;
 }) {
+  const deckMode = useDeckMode();
   const button = (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className={`${OPERATOR_HEADER_ICON_BTN} disabled:cursor-not-allowed disabled:opacity-30 ${className}`}
+      className={cn(
+        realmorphismControlClass(deckMode, {
+          size: "toolbar",
+          latched,
+          signal: latched,
+          legacyClassName: OPERATOR_HEADER_ICON_BTN,
+        }),
+        disabled && "disabled:cursor-not-allowed disabled:opacity-30",
+        className,
+      )}
     >
       {children}
     </button>
@@ -151,15 +170,17 @@ function OperatorViewEditControls({
   onCommitOperatorDocName: () => void;
   onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
 }) {
+  const deckMode = useDeckMode();
+
   return (
     <div className="flex shrink-0 items-center gap-1">
       <OperatorToolbarIconButton
         label="View"
+        latched={operatorDocMode === "view"}
         onClick={() => {
           onCommitOperatorDocName();
           onSetOperatorDocMode("view");
         }}
-        className={operatorDocMode === "view" ? "border-emerald-500/60 text-emerald-200" : ""}
       >
         <GrFormView className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
@@ -176,14 +197,14 @@ function OperatorViewEditControls({
               onSetOperatorDocMode("edit");
             }}
             aria-label="Toggle operator view edit mode"
-            className="data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
+            className={cn("realmorphism-switch shrink-0", deckMode === "ascii" && LEGACY_SWITCH_EMERALD)}
           />
         </span>
       </CyberdeckPaneTooltip>
       <OperatorToolbarIconButton
         label="Edit"
+        latched={operatorDocMode === "edit"}
         onClick={() => onSetOperatorDocMode("edit")}
-        className={operatorDocMode === "edit" ? "border-emerald-500/60 text-emerald-200" : ""}
       >
         <GrFormEdit className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
@@ -291,9 +312,9 @@ function OperatorDocumentToolbarRow({
   );
 
   return (
-    <CyberdeckPaneTooltipProvider delayDuration={300}>
+    <>
       <div className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1.5">
-        <div className="flex min-w-0 flex-[1_1_8rem] items-center gap-1.5 overflow-hidden">
+        <div className="flex min-w-0 flex-[1_1_8rem] items-center gap-1.5">
           <OperatorFileHistoryNav
             canBack={operatorCanNavigateFileBack}
             canForward={operatorCanNavigateFileForward}
@@ -423,7 +444,7 @@ function OperatorDocumentToolbarRow({
           </OperatorToolbarIconButton>
         </div>
       </div>
-    </CyberdeckPaneTooltipProvider>
+    </>
   );
 }
 
@@ -462,6 +483,7 @@ export function CyberdeckOperatorPaneBody({
   onConvertDocumentToMarkdown,
   onExportOperatorMarkdown,
 }: OperatorPaneBodyProps) {
+  const deckMode = useDeckMode();
   const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
   const [folderPaneOpen, setFolderPaneOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState<number>(1);
@@ -528,6 +550,7 @@ export function CyberdeckOperatorPaneBody({
   };
 
   return (
+    <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
     <div
       className={`flex min-h-0 flex-1 flex-col bg-black p-4 ${
         isOperatorDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""
@@ -610,7 +633,6 @@ export function CyberdeckOperatorPaneBody({
           }
           right={
             operatorSurfaceMode === "browser" ? (
-              <CyberdeckPaneTooltipProvider delayDuration={300}>
                 <div className="flex items-center gap-2">
                   <OperatorToolbarIconButton
                     label="Paste"
@@ -625,7 +647,6 @@ export function CyberdeckOperatorPaneBody({
                     </span>
                   </div>
                 </div>
-              </CyberdeckPaneTooltipProvider>
             ) : operatorDroppedAsset && !operatorSurfaceIsDocument ? (
               <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
                 {operatorDroppedAsset.kind.toUpperCase()}
@@ -656,7 +677,7 @@ export function CyberdeckOperatorPaneBody({
                 type="button"
                 onClick={() => operatorBrowserRef.current?.goBack()}
                 disabled={!operatorBrowserRef.current?.canGoBack()}
-                className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
+                className={realmorphismActionClass(deckMode, "neutral")}
               >
                 BACK
               </button>
@@ -664,14 +685,14 @@ export function CyberdeckOperatorPaneBody({
                 type="button"
                 onClick={() => operatorBrowserRef.current?.goForward()}
                 disabled={!operatorBrowserRef.current?.canGoForward()}
-                className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
+                className={realmorphismActionClass(deckMode, "neutral")}
               >
                 FORWARD
               </button>
               <button
                 type="button"
                 onClick={() => operatorBrowserRef.current?.reload()}
-                className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                className={realmorphismActionClass(deckMode, "neutral")}
               >
                 RELOAD
               </button>
@@ -694,7 +715,7 @@ export function CyberdeckOperatorPaneBody({
               <button
                 type="button"
                 onClick={navigateBrowser}
-                className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                className={realmorphismActionClass(deckMode, "accent")}
               >
                 GO
               </button>
@@ -718,50 +739,74 @@ export function CyberdeckOperatorPaneBody({
                     IMAGE PREVIEW
                   </div>
                   <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const idx = imageZoomIndexRef.current;
-                        if (idx > 0) {
-                          imageZoomIndexRef.current = idx - 1;
-                          setImageZoom(ZOOM_LEVELS[idx - 1]);
-                        }
-                      }}
+                    <CyberdeckControlTooltip
+                      label="Zoom out"
                       disabled={imageZoomIndexRef.current === 0}
-                      className="flex h-5 w-5 items-center justify-center rounded border border-[#2d2d2d] bg-black font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-30"
-                      title="Zoom out"
                     >
-                      −
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const idx = imageZoomIndexRef.current;
+                          if (idx > 0) {
+                            imageZoomIndexRef.current = idx - 1;
+                            setImageZoom(ZOOM_LEVELS[idx - 1]);
+                          }
+                        }}
+                        disabled={imageZoomIndexRef.current === 0}
+                        aria-label="Zoom out"
+                        className={realmorphismControlClass(deckMode, {
+                          size: "micro",
+                          legacyClassName:
+                            "flex h-5 w-5 items-center justify-center rounded border border-[#2d2d2d] bg-black font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-30",
+                        })}
+                      >
+                        −
+                      </button>
+                    </CyberdeckControlTooltip>
                     <span className="w-10 text-center font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
                       {Math.round(imageZoom * 100)}%
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const idx = imageZoomIndexRef.current;
-                        if (idx < ZOOM_LEVELS.length - 1) {
-                          imageZoomIndexRef.current = idx + 1;
-                          setImageZoom(ZOOM_LEVELS[idx + 1]);
-                        }
-                      }}
+                    <CyberdeckControlTooltip
+                      label="Zoom in"
                       disabled={imageZoomIndexRef.current === ZOOM_LEVELS.length - 1}
-                      className="flex h-5 w-5 items-center justify-center rounded border border-[#2d2d2d] bg-black font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-30"
-                      title="Zoom in"
                     >
-                      +
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        imageZoomIndexRef.current = 3;
-                        setImageZoom(1);
-                      }}
-                      className="ml-1 flex h-5 items-center justify-center rounded border border-[#2d2d2d] bg-black px-1.5 font-mono text-[8px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                      title="Reset zoom"
-                    >
-                      FIT
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const idx = imageZoomIndexRef.current;
+                          if (idx < ZOOM_LEVELS.length - 1) {
+                            imageZoomIndexRef.current = idx + 1;
+                            setImageZoom(ZOOM_LEVELS[idx + 1]);
+                          }
+                        }}
+                        disabled={imageZoomIndexRef.current === ZOOM_LEVELS.length - 1}
+                        aria-label="Zoom in"
+                        className={realmorphismControlClass(deckMode, {
+                          size: "micro",
+                          legacyClassName:
+                            "flex h-5 w-5 items-center justify-center rounded border border-[#2d2d2d] bg-black font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-30",
+                        })}
+                      >
+                        +
+                      </button>
+                    </CyberdeckControlTooltip>
+                    <CyberdeckControlTooltip label="Reset zoom">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          imageZoomIndexRef.current = 3;
+                          setImageZoom(1);
+                        }}
+                        aria-label="Reset zoom"
+                        className={realmorphismControlClass(deckMode, {
+                          size: "compact",
+                          legacyClassName:
+                            "ml-1 flex h-5 items-center justify-center rounded border border-[#2d2d2d] bg-black px-1.5 font-mono text-[8px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200",
+                        })}
+                      >
+                        FIT
+                      </button>
+                    </CyberdeckControlTooltip>
                   </div>
                 </div>
                 {operatorDroppedAsset.imageSrc ? (
@@ -836,5 +881,6 @@ export function CyberdeckOperatorPaneBody({
         </div>
       </div>
     </div>
+    </CyberdeckPaneTooltipProvider>
   );
 }

@@ -8,6 +8,8 @@ import {
 } from "@/components/cyberdeck/pane-header";
 import { getFlightLogEntries, subscribeFlightLog, type FlightLogEntry } from "@/lib/flight-log";
 import { useSignalHistory, type DeckSignal } from "@/lib/cyberdeck/signal-router";
+import { useDeckMode } from "@/lib/deck-mode";
+import { realmorphismFilterClass } from "@/lib/cyberdeck/realmorphism-control";
 
 type FlightLogView = "log" | "signals";
 
@@ -49,6 +51,7 @@ function severityTone(severity: DeckSignal["severity"]): string {
 }
 
 export function CyberdeckFlightLogPaneBody() {
+  const deckMode = useDeckMode();
   const [entries, setEntries] = useState<FlightLogEntry[]>(() => getFlightLogEntries());
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
   const [view, setView] = useState<FlightLogView>("log");
@@ -84,11 +87,7 @@ export function CyberdeckFlightLogPaneBody() {
               <button
                 type="button"
                 onClick={() => setView("log")}
-                className={`rounded-sm border px-2 py-1 font-mono text-[9px] tracking-[0.08em] transition ${
-                  view === "log"
-                    ? "border-emerald-500/60 text-emerald-200"
-                    : "border-[#2d2d2d] text-[#9a9a9a] hover:border-emerald-500/50 hover:text-emerald-100"
-                }`}
+                className={realmorphismFilterClass(deckMode, view === "log", "signal")}
                 aria-pressed={view === "log"}
               >
                 [ LOG ]
@@ -96,11 +95,7 @@ export function CyberdeckFlightLogPaneBody() {
               <button
                 type="button"
                 onClick={() => setView("signals")}
-                className={`rounded-sm border px-2 py-1 font-mono text-[9px] tracking-[0.08em] transition ${
-                  view === "signals"
-                    ? "border-amber-500/60 text-amber-200"
-                    : "border-[#2d2d2d] text-[#9a9a9a] hover:border-amber-500/50 hover:text-amber-100"
-                }`}
+                className={realmorphismFilterClass(deckMode, view === "signals", "amber")}
                 aria-pressed={view === "signals"}
               >
                 [ SIGNALS ]

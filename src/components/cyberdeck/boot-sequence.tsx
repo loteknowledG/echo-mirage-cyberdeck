@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
+import { useDeckMode } from "@/lib/deck-mode";
+import { realmorphismActionClass } from "@/lib/cyberdeck/realmorphism-control";
 
 const BOOT_KEY = "echo-mirage-boot-completed-v1";
 
@@ -18,6 +20,7 @@ const BOOT_LINES = [
 ];
 
 export function CyberdeckBootSequence() {
+  const deckMode = useDeckMode();
   const [visibleCount, setVisibleCount] = useState(0);
   const [rendered, setRendered] = useState(false);
   const [fadingOut, setFadingOut] = useState(false);
@@ -74,7 +77,7 @@ export function CyberdeckBootSequence() {
           setFadingOut(true);
           window.setTimeout(() => setRendered(false), 220);
         }}
-        className="absolute right-3 top-2 border border-[#2a2a2a] px-2 py-1 text-[9px] uppercase tracking-[0.08em] text-[#9c9c9c] hover:border-emerald-500/50 hover:text-emerald-200"
+        className={`absolute right-3 top-2 ${realmorphismActionClass(deckMode, "neutral")}`}
       >
         Skip
       </button>

@@ -1,5 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
+/**
+ * Deck content surface mode. Does not affect fixed asciimorphism chrome (rail, headers).
+ *
+ * - `realmorphism` — content controls use the Realmorphism plane system (when wired).
+ * - `ascii`        — wireframe override on the content zone only (NOT asciimorphism;
+ *                     does not change ASCII-art components on rail/headers).
+ */
 export type DeckMode = "realmorphism" | "ascii";
 
 export const DECK_MODE_STORAGE_KEY = "echo-mirage-deck-mode-v1";
@@ -24,4 +33,25 @@ export function saveDeckMode(mode: DeckMode) {
   } catch {
     // ignore storage write failures
   }
+}
+
+/** Sync deck content mode from the cyberdeck root [data-deck-mode] attribute. */
+export function useDeckMode(): DeckMode {
+  const [mode, setMode] = useState<DeckMode>(() => loadDeckMode());
+
+  useEffect(() => {
+    const root = document.querySelector("[data-deck-mode]");
+    if (!root) return;
+
+    const sync = () => {
+      setMode(normalizeDeckMode(root.getAttribute("data-deck-mode")));
+    };
+
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(root, { attributes: true, attributeFilter: ["data-deck-mode"] });
+    return () => observer.disconnect();
+  }, []);
+
+  return mode;
 }

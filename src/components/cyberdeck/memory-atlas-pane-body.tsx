@@ -8,10 +8,17 @@ import {
 } from "@/components/cyberdeck/pane-header";
 import { ATLAS_ENTITIES } from "@/lib/mock/atlas";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
+import { useDeckMode } from "@/lib/deck-mode";
+import {
+  LEGACY_TILE_NEUTRAL,
+  LEGACY_TILE_SELECTED,
+  realmorphismControlClass,
+} from "@/lib/cyberdeck/realmorphism-control";
 
 let lastSelectedEntityId = ATLAS_ENTITIES[0]?.id ?? "";
 
 export function CyberdeckMemoryAtlasPaneBody() {
+  const deckMode = useDeckMode();
   const [selectedEntityId, setSelectedEntityId] = useState<string>(lastSelectedEntityId);
   const selectedEntity = useMemo(
     () => ATLAS_ENTITIES.find((entity) => entity.id === selectedEntityId) ?? ATLAS_ENTITIES[0],
@@ -52,11 +59,13 @@ export function CyberdeckMemoryAtlasPaneBody() {
                       severity: "info",
                     });
                   }}
-                  className={`mb-1 block w-full border px-2 py-2 text-left text-[9px] tracking-[0.06em] transition ${
-                    selectedEntity?.id === entity.id
-                      ? "border-emerald-500/55 bg-emerald-950/25 text-emerald-200"
-                      : "border-[#252525] text-[#b8b8b8] hover:border-amber-500/35 hover:text-amber-200"
-                  }`}
+                  className={realmorphismControlClass(deckMode, {
+                    size: "tile",
+                    latched: selectedEntity?.id === entity.id,
+                    signal: selectedEntity?.id === entity.id,
+                    legacyClassName:
+                      selectedEntity?.id === entity.id ? LEGACY_TILE_SELECTED : LEGACY_TILE_NEUTRAL,
+                  })}
                 >
                   <div>{entity.label.toUpperCase()}</div>
                   <div className="mt-1 text-[8px] text-[#818181]">ID :: {entity.id}</div>

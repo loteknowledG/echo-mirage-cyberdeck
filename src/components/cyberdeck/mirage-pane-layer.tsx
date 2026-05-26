@@ -32,10 +32,10 @@ export const MiragePaneLayer = memo(function MiragePaneLayer({
     </div>
   );
 }, (prev, next) => {
-  if (!prev.visible && !next.visible) return true;
-  return (
-    prev.visible === next.visible &&
-    prev.className === next.className &&
-    prev.paneKey === next.paneKey
-  );
+  // Skip reconciliation only while the layer stays hidden (keep-alive perf).
+  // Visible layers must reconcile so pane props (settings toggles, etc.) stay in sync.
+  if (!prev.visible && !next.visible) {
+    return prev.className === next.className && prev.paneKey === next.paneKey;
+  }
+  return false;
 });

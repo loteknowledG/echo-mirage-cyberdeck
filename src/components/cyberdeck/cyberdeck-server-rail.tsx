@@ -2,6 +2,7 @@
 
 import { useEffect, type MouseEvent, type RefObject } from "react";
 import { art } from "@/lib/TerminalArt";
+import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import { useCyberdeckTabStore } from "@/lib/cyberdeck-tab-store";
 import type { CyberdeckServerId } from "@/lib/cyberdeck-tab-store";
 
@@ -64,6 +65,7 @@ export function CyberdeckServerRail({
   return (
     <aside
       ref={railRef as RefObject<HTMLElement>}
+      data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
       tabIndex={-1}
       aria-label="Server rail"
       className="cyberdeck-server-rail z-40 flex w-12 flex-shrink-0 flex-col items-center border-r border-gray-800 bg-black py-4 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 md:min-h-0 md:overflow-y-auto md:overscroll-y-contain max-md:sticky max-md:top-[max(0px,env(safe-area-inset-top))] max-md:self-start max-md:bg-black/95 max-md:backdrop-blur-sm max-md:h-auto max-md:w-full max-md:flex-row max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory max-md:border-b max-md:border-r-0 max-md:px-2 max-md:py-2 max-md:touch-pan-x"

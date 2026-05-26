@@ -1,6 +1,11 @@
+import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
+
 export function MirageHeader() {
   return (
-    <header className="flex w-full min-w-0 max-w-full shrink-0 flex-col items-start gap-1 overflow-x-hidden overflow-y-hidden border-b border-gray-800 bg-black px-4 py-2">
+    <header
+      data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
+      className="flex w-full min-w-0 max-w-full shrink-0 flex-col items-start gap-1 overflow-x-hidden overflow-y-hidden border-b border-gray-800 bg-black px-4 py-2"
+    >
       <pre
         className="cyberdeck-net-logo m-0 max-w-full overflow-hidden whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
         style={{ textShadow: "0 0 5px #00ff00" }}

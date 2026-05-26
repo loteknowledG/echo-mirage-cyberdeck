@@ -83,7 +83,7 @@ export function CyberdeckRollingPicker({
   viewportClassName = "h-7 w-7",
   showTextWhileScrolling = true,
   alwaysShowLabel = false,
-  tooltipSide = "right",
+  tooltipSide = "top",
   showTooltipOnSnap = true,
 }: CyberdeckRollingPickerProps) {
   const valueRef = useRef(value);
@@ -336,7 +336,7 @@ export function CyberdeckRollingPicker({
             <TooltipTrigger asChild>{viewport}</TooltipTrigger>
             <TooltipContent
               side={tooltipSide}
-              align="end"
+              align="center"
               sideOffset={6}
               className={CYBERDECK_PANE_TOOLTIP_CLASS}
             >

@@ -6,6 +6,7 @@ import {
   CyberdeckPaneHeaderTitle,
   CyberdeckPaneHeaderValue,
 } from "@/components/cyberdeck/pane-header";
+import { CyberdeckActionButton } from "@/components/cyberdeck/action-button";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
 
 const CATALOG_CARDS = [
@@ -49,8 +50,9 @@ export function CyberdeckCatalogPaneBody() {
               </div>
             </div>
             <div className="mt-2 flex gap-2">
-              <button
-                type="button"
+              <CyberdeckActionButton
+                className="flex-1"
+                variant="neutral"
                 onClick={() =>
                   emitSignal({
                     source: "catalog",
@@ -59,12 +61,12 @@ export function CyberdeckCatalogPaneBody() {
                     severity: "info",
                   })
                 }
-                className="flex-1 rounded-sm border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] text-[#9a9a9a] transition hover:border-emerald-500/60 hover:text-emerald-200"
               >
                 [VIEW]
-              </button>
-              <button
-                type="button"
+              </CyberdeckActionButton>
+              <CyberdeckActionButton
+                className="flex-1"
+                variant="accent"
                 onClick={() =>
                   emitSignal({
                     source: "catalog",
@@ -73,10 +75,9 @@ export function CyberdeckCatalogPaneBody() {
                     severity: "info",
                   })
                 }
-                className="flex-1 rounded-sm border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] text-[#9a9a9a] transition hover:border-amber-500/60 hover:text-amber-200"
               >
                 [CONFIGURE]
-              </button>
+              </CyberdeckActionButton>
             </div>
           </article>
         ))}

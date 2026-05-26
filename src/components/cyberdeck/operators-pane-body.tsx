@@ -8,6 +8,9 @@ import {
 import { useOperators, type OperatorState } from "@/lib/operators";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
 import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
+import { useDeckMode } from "@/lib/deck-mode";
+import { LEGACY_OPERATOR_CARD, realmorphismControlClass } from "@/lib/cyberdeck/realmorphism-control";
+import { cn } from "@/lib/utils";
 
 type CyberdeckOperatorsPaneBodyProps = {
   orchestration: OrchestrationBundle | null;
@@ -21,6 +24,7 @@ function statusTone(status: OperatorState) {
 }
 
 export function CyberdeckOperatorsPaneBody({ orchestration }: CyberdeckOperatorsPaneBodyProps) {
+  const deckMode = useDeckMode();
   const { operators, stateCounts } = useOperators();
   const activeTask = orchestration?.activeTask;
   const agentRoles = orchestration?.agentRoles;
@@ -63,7 +67,13 @@ export function CyberdeckOperatorsPaneBody({ orchestration }: CyberdeckOperators
                     severity: "info",
                   })
                 }
-                className={`text-left rounded-sm border bg-black/80 p-3 font-mono text-[10px] transition hover:border-emerald-500/60 focus:outline-none focus-visible:border-emerald-500/70 ${statusTone(status)}`}
+                className={cn(
+                  realmorphismControlClass(deckMode, {
+                    size: "tile",
+                    legacyClassName: LEGACY_OPERATOR_CARD,
+                  }),
+                  statusTone(status),
+                )}
               >
                 <div className="flex items-center justify-between text-[#d8d8d8]">
                   <span>{operator.callsign.toUpperCase()} // {operator.role.toUpperCase()}</span>

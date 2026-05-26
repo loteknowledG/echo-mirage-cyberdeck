@@ -127,6 +127,10 @@ import {
 } from "@/components/cyberdeck/pane-header";
 import dynamic from "next/dynamic";
 import { PanelLoader } from "@/features/cyberdeck/panel-loader";
+import {
+  CyberdeckControlTooltip,
+  CyberdeckPaneTooltipProvider,
+} from "@/components/cyberdeck/cyberdeck-pane-tooltip";
 import { MiragePaneLayer } from "@/components/cyberdeck/mirage-pane-layer";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
 import { EchoHeader } from "@/components/cyberdeck/echo-header";
@@ -136,6 +140,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { loadDeckMode, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
+import { MORPHISM_ZONE_REALMORPHISM } from "@/lib/cyberdeck/morphism-zones";
+import {
+  LEGACY_COMPACT_AMBER,
+  LEGACY_COMPACT_CONTROL,
+  LEGACY_SEND_CONTROL,
+  LEGACY_STOP_CONTROL,
+  realmorphismActionClass,
+  realmorphismControlClass,
+  realmorphismMenuItemClass,
+  voiceControlClass,
+} from "@/lib/cyberdeck/realmorphism-control";
 import { isMuted, playBeep, setMuted } from "@/lib/deck-audio";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
 import { useDebouncedEffect } from "@/lib/use-debounced-effect";
@@ -1627,20 +1642,6 @@ export default function CyberdeckApp() {
     if (!voiceEnabled) return;
     void speakMother(MUTHUR_PRESET.testPhrase);
   }, [speakMother, voiceEnabled]);
-
-  const voiceButtonClassName = !voiceEnabled || voiceHealth === "off"
-    ? "border-gray-700 bg-black text-gray-400 hover:border-gray-500"
-    : voiceHealth === "backend"
-      ? "border-emerald-500/90 bg-emerald-500/10 text-emerald-200 shadow-[0_0_0_1px_rgba(16,185,129,0.30)_inset,0_0_14px_rgba(16,185,129,0.22),0_3px_10px_rgba(0,0,0,0.5)]"
-      : voiceHealth === "fallback"
-        ? "border-amber-500/80 bg-amber-500/10 text-amber-300 shadow-[0_0_0_1px_rgba(245,158,11,0.20)_inset,0_0_12px_rgba(245,158,11,0.12),0_3px_10px_rgba(0,0,0,0.5)]"
-        : "border-emerald-700/80 bg-black text-emerald-300 shadow-[0_0_0_1px_rgba(16,185,129,0.16)_inset,0_3px_10px_rgba(0,0,0,0.5)]";
-
-  const voiceButtonTransform = !voiceEnabled || voiceHealth === "off"
-    ? "translateY(0)"
-    : voiceHealth === "backend"
-      ? "translateY(-1px)"
-      : "translateY(0)";
 
   useEffect(() => {
     try {
@@ -5775,7 +5776,7 @@ duration_ms: ${durationMs}`;
               <button
                 type="button"
                 onClick={() => customTabBrowserNavigate(tab.id, tab.browserUrl || OPERATOR_BROWSER_HOME_URL)}
-                className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
+                className={realmorphismActionClass(deckMode, "neutral")}
               >
                 OPEN
               </button>
@@ -6019,7 +6020,7 @@ duration_ms: ${durationMs}`;
                     closeRailTabContextMenu();
                     focusFixedServerPanel(id);
                   }}
-                  className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                  className={realmorphismMenuItemClass(deckMode)}
                 >
                   {railTabContextMenu.serverId === "m"
                     ? "Focus operator panel"
@@ -6040,7 +6041,7 @@ duration_ms: ${durationMs}`;
                       .then(() => toast.success(`Copied server id: ${id}`))
                       .catch(() => toast.error("Could not copy."));
                   }}
-                  className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                  className={realmorphismMenuItemClass(deckMode)}
                 >
                   Copy server id
                 </button>
@@ -6057,7 +6058,7 @@ duration_ms: ${durationMs}`;
                         convertCustomTab(railTabContextMenu.tabId, action.kind);
                         closeRailTabContextMenu();
                       }}
-                      className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                      className={realmorphismMenuItemClass(deckMode)}
                     >
                       {action.label}
                     </button>
@@ -6070,7 +6071,7 @@ duration_ms: ${durationMs}`;
                         closeRailTabContextMenu();
                         handleModelLabelClick("b");
                       }}
-                      className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                      className={realmorphismMenuItemClass(deckMode)}
                     >
                       {action.label}
                     </button>
@@ -6083,7 +6084,7 @@ duration_ms: ${durationMs}`;
                         closeRailTabContextMenu();
                         handleModelLabelClick("s");
                       }}
-                      className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                      className={realmorphismMenuItemClass(deckMode)}
                     >
                       {action.label}
                     </button>
@@ -6097,7 +6098,7 @@ duration_ms: ${durationMs}`;
                     deleteActiveTab();
                     closeRailTabContextMenu();
                   }}
-                  className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#ff8f8f] transition hover:bg-[#171717] hover:text-red-200"
+                  className={realmorphismMenuItemClass(deckMode, true)}
                 >
                   Delete
                 </button>
@@ -6123,7 +6124,7 @@ duration_ms: ${durationMs}`;
                   closeMirageContextMenu();
                   replayFullLastAssistant();
                 }}
-                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                className={realmorphismMenuItemClass(deckMode)}
               >
                 Speak last message
               </button>
@@ -6134,7 +6135,7 @@ duration_ms: ${durationMs}`;
                   closeMirageContextMenu();
                   void copyMirageLastAssistant();
                 }}
-                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                className={realmorphismMenuItemClass(deckMode)}
               >
                 Copy last assistant message
               </button>
@@ -6145,7 +6146,7 @@ duration_ms: ${durationMs}`;
                   closeMirageContextMenu();
                   void copyMirageSelectionOrLastMessage();
                 }}
-                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                className={realmorphismMenuItemClass(deckMode)}
               >
                 Copy selection or last message
               </button>
@@ -6156,7 +6157,7 @@ duration_ms: ${durationMs}`;
                   closeMirageContextMenu();
                   handleModelLabelClick("b");
                 }}
-                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                className={realmorphismMenuItemClass(deckMode)}
               >
                 Open Settings
               </button>
@@ -6167,7 +6168,7 @@ duration_ms: ${durationMs}`;
                   closeMirageContextMenu();
                   handleModelLabelClick("s");
                 }}
-                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                className={realmorphismMenuItemClass(deckMode)}
               >
                 Open connection panel
               </button>
@@ -6191,7 +6192,7 @@ duration_ms: ${durationMs}`;
                   closeGatewayPaneContextMenu();
                   void copyMirageSelectionOrLastMessage();
                 }}
-                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                className={realmorphismMenuItemClass(deckMode)}
               >
                 Copy selection or last message
               </button>
@@ -6202,7 +6203,7 @@ duration_ms: ${durationMs}`;
                   closeGatewayPaneContextMenu();
                   handleModelLabelClick("b");
                 }}
-                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                className={realmorphismMenuItemClass(deckMode)}
               >
                 Open Settings
               </button>
@@ -6213,7 +6214,7 @@ duration_ms: ${durationMs}`;
                   closeGatewayPaneContextMenu();
                   handleModelLabelClick("s");
                 }}
-                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                className={realmorphismMenuItemClass(deckMode)}
               >
                 Open connection panel
               </button>
@@ -6224,7 +6225,7 @@ duration_ms: ${durationMs}`;
                   closeGatewayPaneContextMenu();
                   openOrFocusDiagnosticsTab();
                 }}
-                className="flex w-full items-center rounded px-3 py-2 text-left font-mono text-[10px] tracking-[0.08em] text-[#cfcfcf] transition hover:bg-[#171717] hover:text-emerald-200"
+                className={realmorphismMenuItemClass(deckMode)}
               >
                 Open Diagnostics tab
               </button>
@@ -6251,6 +6252,7 @@ duration_ms: ${durationMs}`;
         }}
       />
 
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-morphism={MORPHISM_ZONE_REALMORPHISM}>
         <ResizablePanelGroup
           orientation={isMobileLayout ? "vertical" : "horizontal"}
           className="min-h-0 min-w-0 flex-1"
@@ -6400,7 +6402,7 @@ duration_ms: ${durationMs}`;
               </div>
             </div>
 
-            <footer className="cyberdeck-message-box shrink-0 bg-black p-0">
+            <footer className="cyberdeck-message-box realmorphism-host-surface shrink-0 border-t bg-black p-0">
               <div className="m-2 rounded-sm border border-green-900/70 bg-black transition-colors transition-shadow focus-within:border-green-500/80 focus-within:shadow-[0_0_0_1px_rgba(34,197,94,0.45),0_0_18px_rgba(34,197,94,0.2)]">
                 <div className="relative flex items-center px-2 py-2">
                   <span className="pointer-events-none absolute left-3 text-lg font-bold text-green-500">$</span>
@@ -6471,8 +6473,7 @@ duration_ms: ${durationMs}`;
                       onClick={toggleVoiceEnabled}
                       aria-label={voiceEnabled ? "Voice on" : "Voice off"}
                       title={voiceEnabled ? "Voice on" : "Voice off"}
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-[6px] border text-[10px] font-mono transition-[transform,box-shadow,background-color,border-color,color] duration-150 ease-out hover:-translate-y-px hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-200 active:translate-y-px active:scale-[0.98] ${voiceButtonClassName}`}
-                      style={{ transform: voiceButtonTransform }}
+                      className={voiceControlClass(deckMode, voiceEnabled, voiceHealth)}
                     >
                       {voiceEnabled ? (
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
@@ -6524,7 +6525,11 @@ duration_ms: ${durationMs}`;
                           disabled={!voicePlaybackBusy}
                           aria-label="Stop speech"
                           title="Stop speech (Esc)"
-                          className="inline-flex h-8 min-w-[1.75rem] items-center justify-center rounded-[6px] border border-gray-700 bg-black px-1 font-mono text-[11px] text-gray-400 transition hover:border-amber-600/80 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-35"
+                          className={realmorphismControlClass(deckMode, {
+                            size: "compact",
+                            amber: true,
+                            legacyClassName: LEGACY_COMPACT_AMBER,
+                          })}
                         >
                           ‖
                         </button>
@@ -6539,7 +6544,11 @@ duration_ms: ${durationMs}`;
                           disabled={voiceBlockFocusIndex <= 0}
                           aria-label="Speak earlier paragraph"
                           title="Earlier paragraph (more context)"
-                          className="inline-flex h-8 min-w-[1.75rem] items-center justify-center rounded-[6px] border border-gray-700 bg-black px-1 font-mono text-[11px] text-gray-400 transition hover:border-emerald-600/80 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-35"
+                          className={realmorphismControlClass(deckMode, {
+                            size: "compact",
+                            signal: true,
+                            legacyClassName: LEGACY_COMPACT_CONTROL,
+                          })}
                         >
                           ◀
                         </button>
@@ -6551,7 +6560,11 @@ duration_ms: ${durationMs}`;
                           }}
                           aria-label="Replay full response"
                           title="Replay entire last reply"
-                          className="inline-flex h-8 min-w-[1.75rem] items-center justify-center rounded-[6px] border border-gray-700 bg-black px-1 font-mono text-[11px] text-gray-400 transition hover:border-emerald-600/80 hover:text-emerald-200"
+                          className={realmorphismControlClass(deckMode, {
+                            size: "compact",
+                            signal: true,
+                            legacyClassName: LEGACY_COMPACT_CONTROL,
+                          })}
                         >
                           ↻
                         </button>
@@ -6564,7 +6577,11 @@ duration_ms: ${durationMs}`;
                         disabled={!input.trim()}
                         aria-label="Send"
                         title="Send"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-[6px] border border-emerald-700/80 bg-black text-emerald-300 origin-center shadow-[0_0_0_1px_rgba(16,185,129,0.16)_inset,0_3px_10px_rgba(0,0,0,0.5)] transition-[transform,box-shadow,background-color,border-color,color] duration-150 ease-out hover:-translate-y-px hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-200 active:translate-y-px active:scale-[0.98] active:ease-in active:shadow-[0_0_0_1px_rgba(16,185,129,0.18)_inset,0_1px_4px_rgba(0,0,0,0.55)] disabled:cursor-not-allowed disabled:opacity-40"
+                        className={realmorphismControlClass(deckMode, {
+                          size: "send",
+                          signal: true,
+                          legacyClassName: LEGACY_SEND_CONTROL,
+                        })}
                       >
                         <svg
                           viewBox="0 0 24 24"
@@ -6590,7 +6607,12 @@ duration_ms: ${durationMs}`;
                         onClick={handleStop}
                         aria-label="Stop"
                         title="Stop"
-                        className="rounded border border-red-700 px-2 py-1 text-[10px] font-mono text-red-300 transition hover:border-red-500 hover:text-red-200"
+                        className={realmorphismControlClass(deckMode, {
+                          size: "icon",
+                          amber: true,
+                          latched: true,
+                          legacyClassName: LEGACY_STOP_CONTROL,
+                        })}
                       >
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
                           <rect x="6.5" y="6.5" width="11" height="11" rx="1.2" />
@@ -6647,7 +6669,12 @@ duration_ms: ${durationMs}`;
                         </div>
                         <button
                           type="button"
-                          className="rounded border border-amber-700 px-2 py-[2px] font-mono text-[10px] text-amber-300 hover:border-amber-500"
+                          className={realmorphismControlClass(deckMode, {
+                            size: "action",
+                            amber: true,
+                            legacyClassName:
+                              "rounded border border-amber-700 px-2 py-[2px] font-mono text-[10px] text-amber-300 hover:border-amber-500",
+                          })}
                           onClick={() => {
                             setDroppedMarkdown(null);
                             setDroppedMarkdownName("");
@@ -6915,6 +6942,7 @@ duration_ms: ${durationMs}`;
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+        </div>
     </div>
   );
 }

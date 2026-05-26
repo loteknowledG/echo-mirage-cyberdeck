@@ -9,6 +9,9 @@ import {
   LuFolderPlus,
   LuX,
 } from "react-icons/lu";
+import { useDeckMode } from "@/lib/deck-mode";
+import { realmorphismActionClass } from "@/lib/cyberdeck/realmorphism-control";
+import { cn } from "@/lib/utils";
 import {
   listDirectoryChildren,
   mergeFolderTreeNodes,
@@ -23,6 +26,7 @@ type OperatorDocFolderPaneProps = {
 };
 
 export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDocFolderPaneProps) {
+  const deckMode = useDeckMode();
   const [roots, setRoots] = useState<OperatorDocFolderRoot[]>([]);
   const [tree, setTree] = useState<Record<string, OperatorFolderTreeNode[]>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -202,10 +206,12 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
           type="button"
           onClick={() => void handleAddFolder()}
           disabled={isPicking}
-          className="flex w-full items-center gap-1.5 rounded border border-[#2d2d2d] bg-black px-2 py-1.5 font-mono text-[9px] tracking-[0.06em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:opacity-40"
+          className={cn(realmorphismActionClass(deckMode, "neutral"), "w-full py-1.5")}
         >
-          <LuFolderPlus size={11} />
-          {isPicking ? "PICKING…" : "ADD FOLDER"}
+          <span className="flex w-full items-center gap-1.5">
+            <LuFolderPlus size={11} />
+            {isPicking ? "PICKING…" : "ADD FOLDER"}
+          </span>
         </button>
       </div>
       <div className="custom-scrollbar flex-1 overflow-y-auto py-1">

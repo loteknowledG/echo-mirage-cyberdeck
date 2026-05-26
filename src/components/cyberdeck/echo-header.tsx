@@ -1,6 +1,11 @@
+import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
+
 export function EchoHeader() {
   return (
-    <header className="relative flex w-full shrink-0 items-end justify-end gap-3 overflow-visible border-b border-gray-800 bg-black px-6 py-2">
+    <header
+      data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
+      className="relative flex w-full shrink-0 items-end justify-end gap-3 overflow-visible border-b border-gray-800 bg-black px-6 py-2"
+    >
       <pre
         className="cyberdeck-net-logo m-0 min-w-0 shrink whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
         style={{ textShadow: "0 0 5px #00ff00" }}

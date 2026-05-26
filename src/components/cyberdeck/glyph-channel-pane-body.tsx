@@ -11,9 +11,19 @@ import {
 } from "@/components/cyberdeck/pane-header";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useDeckMode } from "@/lib/deck-mode";
+import {
+  LEGACY_SEND_CONTROL,
+  realmorphismControlClass,
+} from "@/lib/cyberdeck/realmorphism-control";
+import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { GlyphEnginePicker } from "@/components/cyberdeck/glyph-engine-picker";
 import { FigletFontPicker } from "@/components/cyberdeck/figlet-font-picker";
+import {
+  CyberdeckControlTooltip,
+  CyberdeckPaneTooltipProvider,
+} from "@/components/cyberdeck/cyberdeck-pane-tooltip";
 import {
   GLYPH_CHANNEL_DEFAULT_TEXT,
   GLYPH_CHANNEL_STORAGE_KEY,
@@ -63,6 +73,7 @@ async function readEchoMirageClipboardText(): Promise<string> {
 type GlyphPaneMode = "view" | "edit";
 
 export function CyberdeckGlyphChannelPaneBody() {
+  const deckMode = useDeckMode();
   const [text, setText] = useState(GLYPH_CHANNEL_DEFAULT_TEXT);
   const [hydrated, setHydrated] = useState(false);
   const [composer, setComposer] = useState("");
@@ -334,6 +345,7 @@ export function CyberdeckGlyphChannelPaneBody() {
   }, [applyOutput, setPaneModeWithFocus]);
 
   return (
+    <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-black">
       <CyberdeckPaneHeader
         left={
@@ -348,44 +360,64 @@ export function CyberdeckGlyphChannelPaneBody() {
         }
         right={
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void handlePasteClipboard()}
-              aria-label="Paste into glyph channel"
-              title="Paste into glyph channel"
-              className={HEADER_ICON_BTN}
-            >
-              <FaRegPaste className="h-3.5 w-3.5" />
-            </button>
-            <div className="flex items-center gap-1">
+            <CyberdeckControlTooltip label="Paste into glyph channel">
               <button
                 type="button"
-                onClick={() => setPaneModeWithFocus("view")}
-                aria-label="View mode"
-                title="View"
-                className={`${HEADER_ICON_BTN} ${
-                  paneMode === "view" ? "border-emerald-500/60 text-emerald-200" : ""
-                }`}
+                onClick={() => void handlePasteClipboard()}
+                aria-label="Paste into glyph channel"
+                className={realmorphismControlClass(deckMode, {
+                  size: "toolbar",
+                  legacyClassName: HEADER_ICON_BTN,
+                })}
               >
-                <GrFormView className="h-3.5 w-3.5" />
+                <FaRegPaste className="h-3.5 w-3.5" />
               </button>
+            </CyberdeckControlTooltip>
+            <div className="flex items-center gap-1">
+              <CyberdeckControlTooltip label="View">
+                <button
+                  type="button"
+                  onClick={() => setPaneModeWithFocus("view")}
+                  aria-label="View mode"
+                  className={realmorphismControlClass(deckMode, {
+                    size: "toolbar",
+                    latched: paneMode === "view",
+                    signal: true,
+                    legacyClassName: `${HEADER_ICON_BTN} ${
+                      paneMode === "view" ? "border-emerald-500/60 text-emerald-200" : ""
+                    }`,
+                  })}
+                >
+                  <GrFormView className="h-3.5 w-3.5" />
+                </button>
+              </CyberdeckControlTooltip>
               <Switch
                 checked={paneMode === "edit"}
                 onCheckedChange={(checked) => setPaneModeWithFocus(checked ? "edit" : "view")}
                 aria-label="Toggle glyph channel edit mode"
-                className="data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]"
+                className={cn(
+                  "realmorphism-switch",
+                  deckMode === "ascii" &&
+                    "data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]",
+                )}
               />
-              <button
-                type="button"
-                onClick={() => setPaneModeWithFocus("edit")}
-                aria-label="Edit mode"
-                title="Edit"
-                className={`${HEADER_ICON_BTN} ${
-                  paneMode === "edit" ? "border-emerald-500/60 text-emerald-200" : ""
-                }`}
-              >
-                <GrFormEdit className="h-3.5 w-3.5" />
-              </button>
+              <CyberdeckControlTooltip label="Edit">
+                <button
+                  type="button"
+                  onClick={() => setPaneModeWithFocus("edit")}
+                  aria-label="Edit mode"
+                  className={realmorphismControlClass(deckMode, {
+                    size: "toolbar",
+                    latched: paneMode === "edit",
+                    signal: true,
+                    legacyClassName: `${HEADER_ICON_BTN} ${
+                      paneMode === "edit" ? "border-emerald-500/60 text-emerald-200" : ""
+                    }`,
+                  })}
+                >
+                  <GrFormEdit className="h-3.5 w-3.5" />
+                </button>
+              </CyberdeckControlTooltip>
             </div>
           </div>
         }
@@ -397,15 +429,20 @@ export function CyberdeckGlyphChannelPaneBody() {
           className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto bg-black p-3"
         >
           <div className="mb-3 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => void handleCopy()}
-              aria-label="Copy glyph channel signal"
-              title="Copy glyph channel signal"
-              className={HEADER_ICON_BTN}
-            >
-              <CopyIcon className="h-3.5 w-3.5" />
-            </button>
+            <CyberdeckControlTooltip label="Copy glyph channel signal">
+              <button
+                type="button"
+                onClick={() => void handleCopy()}
+                aria-label="Copy glyph channel signal"
+                className={realmorphismControlClass(deckMode, {
+                  size: "toolbar",
+                  signal: true,
+                  legacyClassName: HEADER_ICON_BTN,
+                })}
+              >
+                <CopyIcon className="h-3.5 w-3.5" />
+              </button>
+            </CyberdeckControlTooltip>
           </div>
           {paneMode === "edit" ? (
             <Textarea
@@ -495,8 +532,8 @@ export function CyberdeckGlyphChannelPaneBody() {
             </div>
 
             <div className="min-w-0 border-t border-[#1a1a1a]">
-              <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 px-2 py-1">
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 overflow-hidden">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 px-2 py-2">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
                   <GlyphEnginePicker
                     value={settings.engine}
                     onChange={(engine) => {
@@ -511,43 +548,62 @@ export function CyberdeckGlyphChannelPaneBody() {
                     }
                     onWheelSettled={focusComposer}
                   />
-                  <button
-                    type="button"
-                    className={STATUS_BTN}
-                    onClick={() =>
-                      setSettings((prev) => ({
-                        ...prev,
-                        zoomPercent: Math.max(50, prev.zoomPercent - 10),
-                      }))
-                    }
-                    title="Decrease display zoom"
-                  >
-                    −
-                  </button>
+                  <CyberdeckControlTooltip label="Decrease display zoom">
+                    <button
+                      type="button"
+                      className={realmorphismControlClass(deckMode, {
+                        size: "compact",
+                        signal: true,
+                        legacyClassName: STATUS_BTN,
+                      })}
+                      onClick={() =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          zoomPercent: Math.max(50, prev.zoomPercent - 10),
+                        }))
+                      }
+                      aria-label="Decrease display zoom"
+                    >
+                      −
+                    </button>
+                  </CyberdeckControlTooltip>
                   <span className="font-mono text-[9px] text-[#6a6a6a]">{settings.zoomPercent}%</span>
-                  <button
-                    type="button"
-                    className={STATUS_BTN}
-                    onClick={() =>
-                      setSettings((prev) => ({
-                        ...prev,
-                        zoomPercent: Math.min(200, prev.zoomPercent + 10),
-                      }))
-                    }
-                    title="Increase display zoom"
-                  >
-                    +
-                  </button>
+                  <CyberdeckControlTooltip label="Increase display zoom">
+                    <button
+                      type="button"
+                      className={realmorphismControlClass(deckMode, {
+                        size: "compact",
+                        signal: true,
+                        legacyClassName: STATUS_BTN,
+                      })}
+                      onClick={() =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          zoomPercent: Math.min(200, prev.zoomPercent + 10),
+                        }))
+                      }
+                      aria-label="Increase display zoom"
+                    >
+                      +
+                    </button>
+                  </CyberdeckControlTooltip>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => void handleComposerSubmit()}
+                <CyberdeckControlTooltip
+                  label="Render"
                   disabled={!composer.trim() || rendering}
-                  aria-label="Render"
-                  title="Render"
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border border-emerald-700/80 bg-black text-emerald-300 shadow-[0_0_0_1px_rgba(16,185,129,0.16)_inset] transition hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
                 >
+                  <button
+                    type="button"
+                    onClick={() => void handleComposerSubmit()}
+                    disabled={!composer.trim() || rendering}
+                    aria-label="Render"
+                    className={realmorphismControlClass(deckMode, {
+                      size: "send",
+                      signal: true,
+                      legacyClassName: LEGACY_SEND_CONTROL,
+                    })}
+                  >
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
                     <path
                       d="M3 11.5L20.5 3.5L13.5 20.5L11.2 13.8L3 11.5Z"
@@ -558,6 +614,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                     />
                   </svg>
                 </button>
+                </CyberdeckControlTooltip>
               </div>
 
               <p
@@ -573,5 +630,6 @@ export function CyberdeckGlyphChannelPaneBody() {
         </footer>
       </div>
     </div>
+    </CyberdeckPaneTooltipProvider>
   );
 }

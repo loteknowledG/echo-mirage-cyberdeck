@@ -20,22 +20,33 @@ export type CyberdeckPaneKind = (typeof CYBERDECK_PANE_KINDS)[number];
 
 export type CyberdeckPaneRegistryEntry = {
   label: string;
+  /** UX sub-steps shown while the pane chunk compiles (cold webpack can be slow). */
+  fetchHints?: readonly string[];
 };
 
 export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneRegistryEntry> = {
-  operator: { label: "OPERATOR" },
+  operator: {
+    label: "OPERATOR",
+    fetchHints: ["ROUTING", "TOOLBAR", "MARKDOWN RENDERER", "FOLDER NAV", "EXPORT PIPELINE"],
+  },
   settings: { label: "SETTINGS" },
-  document: { label: "DOCUMENT" },
-  diagnostics: { label: "DIAGNOSTIC" },
-  pi: { label: "PI CHAT" },
+  document: {
+    label: "DOCUMENT",
+    fetchHints: ["SURFACE", "FILE INGEST", "EDITOR"],
+  },
+  diagnostics: {
+    label: "DIAGNOSTIC",
+    fetchHints: ["BUS", "MEMORY", "VOICE", "HEAP"],
+  },
+  pi: { label: "PI CHAT", fetchHints: ["CHAT CORE", "STREAM"] },
   catalog: { label: "CATALOG" },
   operators: { label: "OPERATORS" },
   "memory-atlas": { label: "MEMORY ATLAS" },
-  "voice-lab": { label: "VOICE LAB" },
+  "voice-lab": { label: "VOICE LAB", fetchHints: ["PRESET", "AUDIO CHAIN"] },
   "flight-log": { label: "FLIGHT LOG" },
-  "glyph-channel": { label: "GLYPH CHANNEL" },
-  "rola-dex": { label: "ROLA-DEX" },
-  "sound-profile": { label: "SOUND PROFILE" },
+  "glyph-channel": { label: "GLYPH CHANNEL", fetchHints: ["GLYPH BUS", "RENDER"] },
+  "rola-dex": { label: "ROLA-DEX", fetchHints: ["DEX", "CAROUSEL"] },
+  "sound-profile": { label: "SOUND PROFILE", fetchHints: ["PROFILE", "SFX"] },
 };
 
 const TAB_KIND_ALIASES: Record<string, CyberdeckPaneKind> = {
@@ -54,4 +65,10 @@ export function paneLabelForKind(kind: string): string {
   const normalized = normalizeCyberdeckPaneKind(kind);
   if (!normalized) return kind.toUpperCase();
   return CYBERDECK_PANE_REGISTRY[normalized].label;
+}
+
+export function paneFetchHintsForKind(kind: string): readonly string[] {
+  const normalized = normalizeCyberdeckPaneKind(kind);
+  if (!normalized) return [];
+  return CYBERDECK_PANE_REGISTRY[normalized].fetchHints ?? [];
 }

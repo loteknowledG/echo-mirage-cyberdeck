@@ -7,6 +7,15 @@ import {
   CyberdeckPaneHeaderValue,
 } from "@/components/cyberdeck/pane-header";
 import { EXECUTION_CARD_REGISTRY, EXECUTION_HANDS, getHandCards, type ExecutionCard } from "@/lib/computer-use/execution-card-registry";
+import { useDeckMode } from "@/lib/deck-mode";
+import {
+  LEGACY_ACTION_DANGER,
+  LEGACY_ACTION_NEUTRAL,
+  realmorphismActionClass,
+  realmorphismControlClass,
+  realmorphismFilterClass,
+} from "@/lib/cyberdeck/realmorphism-control";
+import { cn } from "@/lib/utils";
 
 type CardTablePaneProps = {
   activeHand: string | null;
@@ -63,6 +72,7 @@ function ExecutionCardTile({
   isSelected: boolean;
   onClick: () => void;
 }) {
+  const deckMode = useDeckMode();
   const riskColor = RISK_COLORS[card.risk] ?? "#8a8a8a";
   const categoryColor = CATEGORY_COLORS[card.category] ?? "#8a8a8a";
 
@@ -70,12 +80,18 @@ function ExecutionCardTile({
     <button
       type="button"
       onClick={onClick}
-      className={`
-        group relative w-full rounded-sm border bg-black p-2 text-left transition-all
-        ${isSelected ? `border-[#22c55e]/60 bg-[#22c55e]/5` : `border-[#1c1c1c] hover:border-[#3a3a3a]`}
-        ${card.risk === "restricted" && !isSelected ? "border-[#ef4444]/20" : ""}
-        ${!card.enabled ? "opacity-50" : ""}
-      `}
+      className={cn(
+        realmorphismControlClass(deckMode, {
+          size: "tile",
+          latched: isSelected,
+          signal: isSelected,
+          legacyClassName: isSelected
+            ? "group relative w-full rounded-sm border bg-black p-2 text-left transition-all border-[#22c55e]/60 bg-[#22c55e]/5"
+            : "group relative w-full rounded-sm border bg-black p-2 text-left transition-all border-[#1c1c1c] hover:border-[#3a3a3a]",
+        }),
+        card.risk === "restricted" && !isSelected && "border-[#ef4444]/20",
+        !card.enabled && "opacity-50",
+      )}
     >
       <div className="mb-1 flex items-start justify-between gap-1">
         <span className="font-mono text-[9px] tracking-[0.06em]" style={{ color: categoryColor }}>
@@ -108,6 +124,8 @@ function HandSelector({
   activeHandId: string | null;
   onSelect: (handId: string) => void;
 }) {
+  const deckMode = useDeckMode();
+
   return (
     <div className="flex flex-wrap gap-1">
       {hands.map((hand) => {
@@ -117,10 +135,7 @@ function HandSelector({
             key={hand.id}
             type="button"
             onClick={() => onSelect(hand.id)}
-            className={`
-              rounded-sm border px-2 py-1 font-mono text-[8px] tracking-[0.04em] transition-all
-              ${isActive ? "border-[#22c55e]/50 bg-[#22c55e]/10 text-[#22c55e]" : "border-[#1c1c1c] text-[#6a6a6a] hover:border-[#3a3a3a] hover:text-[#8a8a8a]"}
-            `}
+            className={realmorphismFilterClass(deckMode, isActive, "signal")}
           >
             {hand.name}
           </button>
@@ -175,6 +190,7 @@ export function CardTablePane({
   onStageCard,
   selectedCardIds,
 }: CardTablePaneProps) {
+  const deckMode = useDeckMode();
   const hasStack = stackDepth > 0;
   const hasStaged = selectedCardIds.length > 0 || stagedCardCount > 0;
   const canPush = hasStaged && !hasStack;
@@ -199,7 +215,7 @@ export function CardTablePane({
             <button
               type="button"
               onClick={onClose}
-              className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-red-500/60 hover:text-red-200"
+              className={realmorphismActionClass(deckMode, "danger")}
             >
               CLOSE
             </button>
@@ -340,11 +356,13 @@ export function CardTablePane({
                 type="button"
                 onClick={onPushHandToStack}
                 disabled={!canPush}
-                className={`flex-1 rounded border px-3 py-2 font-mono text-[9px] tracking-[0.08em] transition ${
-                  canPush
-                    ? "border-[#2d2d2d] bg-black text-[#8a8a8a] hover:border-emerald-500/60 hover:text-emerald-200"
-                    : "cursor-not-allowed border-[#141414] bg-black/50 text-[#3a3a3a]"
-                }`}
+                className={realmorphismControlClass(deckMode, {
+                  size: "wide",
+                  off: !canPush,
+                  legacyClassName: canPush
+                    ? LEGACY_ACTION_NEUTRAL
+                    : "cursor-not-allowed rounded border border-[#141414] bg-black/50 px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#3a3a3a]",
+                })}
               >
                 PUSH TO STACK
               </button>
@@ -352,11 +370,15 @@ export function CardTablePane({
                 type="button"
                 onClick={onClearDeck}
                 disabled={!hasStaged && !hasStack}
-                className={`flex-1 rounded border px-3 py-2 font-mono text-[9px] tracking-[0.08em] transition ${
-                  hasStaged || hasStack
-                    ? "border-[#2d2d2d] bg-black text-[#8a8a8a] hover:border-red-500/60 hover:text-red-200"
-                    : "cursor-not-allowed border-[#141414] bg-black/50 text-[#3a3a3a]"
-                }`}
+                className={realmorphismControlClass(deckMode, {
+                  size: "wide",
+                  danger: hasStaged || hasStack,
+                  off: !hasStaged && !hasStack,
+                  legacyClassName:
+                    hasStaged || hasStack
+                      ? LEGACY_ACTION_DANGER
+                      : "cursor-not-allowed rounded border border-[#141414] bg-black/50 px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#3a3a3a]",
+                })}
               >
                 CLEAR DECK
               </button>
@@ -365,11 +387,14 @@ export function CardTablePane({
               type="button"
               onClick={onExecute}
               disabled={!canExecute}
-              className={`w-full rounded border px-3 py-2 font-mono text-[9px] tracking-[0.08em] transition ${
-                canExecute
-                  ? "border-[#2d2d2d] bg-black text-[#8a8a8a] hover:border-amber-500/60 hover:text-amber-200"
-                  : "cursor-not-allowed border-[#141414] bg-black/50 text-[#3a3a3a]"
-              }`}
+              className={realmorphismControlClass(deckMode, {
+                size: "wide",
+                amber: canExecute,
+                off: !canExecute,
+                legacyClassName: canExecute
+                  ? "w-full rounded border border-[#2d2d2d] bg-black px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-amber-500/60 hover:text-amber-200"
+                  : "w-full cursor-not-allowed rounded border border-[#141414] bg-black/50 px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#3a3a3a]",
+              })}
             >
               EXECUTE
             </button>

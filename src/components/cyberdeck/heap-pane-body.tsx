@@ -1,5 +1,6 @@
 'use client';
 
+import { CyberdeckActionButton } from "@/components/cyberdeck/action-button";
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderSubtitle, CyberdeckPaneHeaderTitle, CyberdeckPaneHeaderValue } from "@/components/cyberdeck/pane-header";
 
 type HeapEntry = {
@@ -54,20 +55,12 @@ export function CyberdeckHeapPaneBody({
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">NEW HEAP ENTRY</div>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void onPasteClipboard()}
-                  className="rounded border border-emerald-700/70 bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-emerald-300 transition hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-200"
-                >
+                <CyberdeckActionButton variant="accent" onClick={() => void onPasteClipboard()}>
                   PASTE CLIPBOARD
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void onSaveDraft()}
-                  className="rounded border border-emerald-700/70 bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-emerald-300 transition hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-200"
-                >
+                </CyberdeckActionButton>
+                <CyberdeckActionButton variant="accent" onClick={() => void onSaveDraft()}>
                   SAVE
-                </button>
+                </CyberdeckActionButton>
               </div>
             </div>
 
@@ -113,27 +106,15 @@ export function CyberdeckHeapPaneBody({
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void onCopyEntry(entry)}
-                        className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                      >
+                      <CyberdeckActionButton variant="neutral" onClick={() => void onCopyEntry(entry)}>
                         COPY
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onOpenEntry(entry)}
-                        className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
-                      >
+                      </CyberdeckActionButton>
+                      <CyberdeckActionButton variant="neutral" onClick={() => onOpenEntry(entry)}>
                         OPEN
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteEntry(entry.id)}
-                        className="rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-red-500/60 hover:text-red-200"
-                      >
+                      </CyberdeckActionButton>
+                      <CyberdeckActionButton variant="danger" onClick={() => onDeleteEntry(entry.id)}>
                         DEL
-                      </button>
+                      </CyberdeckActionButton>
                     </div>
                   </div>
                   <pre className="mt-3 flex-1 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-snug text-green-200">
