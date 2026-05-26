@@ -176,6 +176,12 @@ import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-type
 import { ENABLE_AUTOMATION, ENABLE_MODEL_PROBE } from "@/lib/cyberdeck/automation-config";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import {
+  getMuthurHelpText,
+  getMuthurHelpUnknownTopicText,
+  parseMuthurClearChatIntent,
+  parseMuthurHelpIntent,
+} from "@/lib/muthur-help-text";
+import {
   PROVIDER_CLICK_ESCALATION_MS,
   PROVIDER_LINK_REFRESH_COOLDOWN_MS,
   loadProviderModelsCache,
@@ -3872,7 +3878,32 @@ export default function CyberdeckApp() {
 
   const handleSend = async (messageText?: string) => {
     const userMessage = (messageText ?? messageInputRef.current?.getValue() ?? "").trim();
-    if (!userMessage || isStreaming) return;
+    if (!userMessage) return;
+
+    if (parseMuthurClearChatIntent(userMessage)) {
+      abortMotherSpeech();
+      if (chatAbortRef.current) {
+        chatAbortRef.current.abort();
+        chatAbortRef.current = null;
+      }
+      setIsStreaming(false);
+      setStreamText("");
+      setStreamToolTrace("");
+      setMessages([]);
+      setChatKeyboardHighlightIndex(null);
+      setGeneratedUI(null);
+      screenshotRef.current = null;
+      messageInputRef.current?.clear();
+      try {
+        window.localStorage.removeItem(CHAT_STORAGE_KEY);
+        window.localStorage.removeItem(CHAT_STREAM_STORAGE_KEY);
+      } catch {
+        // ignore storage errors
+      }
+      return;
+    }
+
+    if (isStreaming) return;
     const providerCooldownUntil = providerRateLimitUntilRef.current[activeProvider] || 0;
     if (providerCooldownUntil && Date.now() < providerCooldownUntil) {
       setMessages((prev) => [
@@ -3993,6 +4024,17 @@ export default function CyberdeckApp() {
         ...prev,
         { role: "system", text: "SETTINGS_SURFACE // CONFIG_PLANE" },
       ]);
+      setIsStreaming(false);
+      return;
+    }
+
+    const helpIntent = parseMuthurHelpIntent(userMessage);
+    if (helpIntent) {
+      const helpText =
+        helpIntent.kind === "unknown"
+          ? getMuthurHelpUnknownTopicText(helpIntent.topic)
+          : getMuthurHelpText(helpIntent.topic);
+      setMessages((prev) => [...prev, { role: "assistant", text: helpText }]);
       setIsStreaming(false);
       return;
     }

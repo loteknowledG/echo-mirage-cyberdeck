@@ -127,20 +127,23 @@ export function CyberdeckRollingPicker({
     duration: 20,
   });
 
-  const emitSelection = useCallback((index: number) => {
-    if (isProgrammaticScrollRef.current) return;
+  const commitSelection = useCallback((embla: EmblaCarouselType) => {
     const list = itemsRef.current;
+    if (list.length === 0) return;
+    const index = findClosestSnapIndex(embla);
     const entry = list[normalizeIndex(index, list.length)];
     if (!entry || entry.value === valueRef.current) return;
     onChangeRef.current(entry.value);
   }, []);
 
-  const ensureSnappedToCenter = useCallback((embla: EmblaCarouselType) => {
+  const ensureSnappedToCenter = useCallback((embla: EmblaCarouselType): boolean => {
     const closest = findClosestSnapIndex(embla);
     if (snapOffsetPx(embla, closest) > SNAP_ALIGN_THRESHOLD_PX) {
       isProgrammaticScrollRef.current = true;
       embla.scrollTo(closest);
+      return true;
     }
+    return false;
   }, []);
 
   const showSnapTooltip = useCallback((embla: EmblaCarouselType) => {
@@ -171,7 +174,10 @@ export function CyberdeckRollingPicker({
     if (!emblaApi) return;
 
     const onSelect = () => {
-      emitSelection(emblaApi.selectedScrollSnap());
+      if (isProgrammaticScrollRef.current) return;
+      const engine = emblaApi.internalEngine();
+      if (!engine.scrollBody.settled()) return;
+      commitSelection(emblaApi);
     };
 
     const onPointerDown = () => {
@@ -198,7 +204,11 @@ export function CyberdeckRollingPicker({
 
     const onSettle = () => {
       isProgrammaticScrollRef.current = false;
-      ensureSnappedToCenter(emblaApi);
+      const stillCentering = ensureSnappedToCenter(emblaApi);
+      if (stillCentering) return;
+
+      commitSelection(emblaApi);
+
       if (showTextWhileScrolling) setScrollingLabels(false);
       const dragged = userDraggedRef.current;
       userDraggedRef.current = false;
@@ -208,9 +218,8 @@ export function CyberdeckRollingPicker({
         if (entry) {
           onUserSelectRef.current?.(entry.value);
         }
+        showSnapTooltip(emblaApi);
       }
-      if (!dragged) return;
-      showSnapTooltip(emblaApi);
     };
 
     const onScroll = () => {
@@ -236,7 +245,7 @@ export function CyberdeckRollingPicker({
       emblaApi.off("scroll", onScroll);
       emblaApi.rootNode().removeEventListener("wheel", onWheel);
     };
-  }, [emblaApi, emitSelection, ensureSnappedToCenter, setScrollingLabels, showSnapTooltip, showTextWhileScrolling]);
+  }, [emblaApi, commitSelection, ensureSnappedToCenter, setScrollingLabels, showSnapTooltip, showTextWhileScrolling]);
 
   useEffect(() => {
     if (!emblaApi) return;
