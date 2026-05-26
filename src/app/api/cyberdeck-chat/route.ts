@@ -7,9 +7,19 @@ import {
 } from "@/lib/fetch-with-timeout";
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { EMPTY_TOOL_REGISTRY } from "@/lib/muthur-core/empty-tool-registry";
-import { muthurChatWithModelTools } from "@/lib/muthur-core/muthur-provider-chat";
-import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
 import type { ToolRegistry } from "@/lib/muthur-core/types";
+
+async function chatWithModelTools(
+  ...args: Parameters<(typeof import("@/lib/muthur-core/muthur-provider-chat"))["muthurChatWithModelTools"]>
+) {
+  const { muthurChatWithModelTools } = await import("@/lib/muthur-core/muthur-provider-chat");
+  return muthurChatWithModelTools(...args);
+}
+
+async function streamProviderResponse(response: Response) {
+  const { streamOpenAiCompatibleResponse } = await import("@/lib/muthur-core/stream-openai-response");
+  return streamOpenAiCompatibleResponse(response);
+}
 
 interface MemoryCacheEntry {
   context: string;
@@ -149,6 +159,14 @@ function defaultModelForProvider(provider: string): string {
   return "trinity-large-preview-free";
 }
 
+/** Dev-only compile warm — avoids first chat waiting on route bundling. */
+export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  return NextResponse.json({ ok: true, route: "cyberdeck-chat" });
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -166,6 +184,8 @@ export async function POST(request: Request) {
     const chatHistory = normalizeChatHistory(history);
     const clientHasMemory =
       typeof memoryContext === "string" && memoryContext.trim().length > 0;
+    /** Cyberdeck always ships client memory — skip boot_muthur on the hot path. */
+    const clientSentMemoryField = typeof memoryContext === "string";
     const browserPrompt =
       typeof browserContext === "string" && browserContext.trim()
         ? `\n\nLive browser pane snapshot:\n${browserContext.trim()}`
@@ -300,7 +320,8 @@ export async function POST(request: Request) {
         const model =
           (typeof modelFromBody === "string" && modelFromBody.trim()) || defaultModelForProvider(provider);
 
-        const serverMemoryCtx = clientHasMemory ? "" : await getMuthurMemoryContext(message);
+        const serverMemoryCtx =
+          clientSentMemoryField || clientHasMemory ? "" : await getMuthurMemoryContext(message);
         const memoryPrompt = buildMemoryPrompt(memoryContext, serverMemoryCtx);
 
         const systemContent =
@@ -315,7 +336,7 @@ export async function POST(request: Request) {
           { role: "user", content: message },
         ];
 
-        return await muthurChatWithModelTools({
+        return await chatWithModelTools({
           endpoint,
           apiKey: resolvedApiKey,
           model,
@@ -372,9 +393,10 @@ export async function POST(request: Request) {
     const envModel = process.env.OPENCODE_MODEL || "trinity-large-preview-free";
     const endpoint = "https://opencode.ai/zen/v1/chat/completions";
 
-    const fallbackMemoryCtx = clientHasMemory
-      ? ""
-      : await getMuthurMemoryContext(typeof message === "string" ? message : "");
+    const fallbackMemoryCtx =
+      clientSentMemoryField || clientHasMemory
+        ? ""
+        : await getMuthurMemoryContext(typeof message === "string" ? message : "");
     const fallbackMemoryPrompt = buildMemoryPrompt(memoryContext, fallbackMemoryCtx);
 
     const systemContent =
@@ -390,7 +412,7 @@ export async function POST(request: Request) {
     ];
 
     if (envApiKey.trim()) {
-      return await muthurChatWithModelTools({
+      return await chatWithModelTools({
         endpoint,
         apiKey: envApiKey.trim(),
         model: envModel,
@@ -426,7 +448,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return new Response(await streamOpenAiCompatibleResponse(providerResponse), {
+    return new Response(await streamProviderResponse(providerResponse), {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",

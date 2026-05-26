@@ -4750,6 +4750,18 @@ const resolved = resolveUiTarget(userMessage);
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let fullText = "";
+      let streamDisplayText = "";
+      let streamFlushRaf = 0;
+
+      const flushStreamDisplay = () => {
+        streamFlushRaf = 0;
+        setStreamText(streamDisplayText);
+      };
+
+      const scheduleStreamFlush = () => {
+        if (streamFlushRaf !== 0) return;
+        streamFlushRaf = window.requestAnimationFrame(flushStreamDisplay);
+      };
 
       if (reader) {
         while (true) {
@@ -4757,11 +4769,16 @@ const resolved = resolveUiTarget(userMessage);
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           fullText += chunk;
-          // Clean up streamText for display but keep fullText intact
-          const displayText = chunk.replace(/^=+\s*$/gm, "").replace(/^=+$\n?/g, "");
-          setStreamText(fullText.replace(/^=+\s*$/gm, "").replace(/^=+$\n?/g, ""));
+          streamDisplayText = fullText.replace(/^=+\s*$/gm, "").replace(/^=+$\n?/g, "");
+          scheduleStreamFlush();
         }
       }
+
+      if (streamFlushRaf !== 0) {
+        window.cancelAnimationFrame(streamFlushRaf);
+        streamFlushRaf = 0;
+      }
+      setStreamText(streamDisplayText);
 
       const allowBrowserDirective =
         ENABLE_AUTOMATION &&

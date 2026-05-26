@@ -2,6 +2,12 @@ const fs = require('fs/promises');
 const path = require('path');
 const { app, BrowserWindow, Menu, shell, ipcMain, clipboard, dialog } = require('electron');
 
+if (!app.isPackaged && process.platform === 'win32') {
+  // Dev-only: reduce GPU/network subprocess crashes while hot-reloading a heavy page.
+  app.commandLine.appendSwitch('disable-gpu-sandbox');
+  app.disableHardwareAcceleration();
+}
+
 function getEchoMirageProjectRoot() {
   if (process.env.ECHO_MIRAGE_PROJECT_ROOT) {
     return path.resolve(process.env.ECHO_MIRAGE_PROJECT_ROOT);

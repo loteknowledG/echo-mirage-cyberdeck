@@ -35,22 +35,10 @@ const nextConfig = {
 	webpack: (config, { dev }) => {
 		if (dev) {
 			config.parallelism = 1;
-			config.cache = false;
-			config.optimization = {
-				...(config.optimization ?? {}),
-				splitChunks: {
-					...(config.optimization?.splitChunks ?? {}),
-					chunks: "all",
-					maxSize: 244_000,
-				},
-			};
-			config.experiments = {
-				...config.experiments,
-				lazyCompilation: {
-					entries: false,
-					imports: true,
-				},
-			};
+			// LazyCompilationBackend ECONNRESET on Windows when warm + Electron race the dev server.
+			if (config.experiments?.lazyCompilation) {
+				config.experiments.lazyCompilation = false;
+			}
 			config.watchOptions = {
 				...(config.watchOptions ?? {}),
 				ignored: [

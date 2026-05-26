@@ -7,6 +7,8 @@ const ROUTE = `${ORIGIN}/cyberdeck`;
 const DEADLINE_MS = 300_000;
 const FETCH_MS = 120_000;
 const RETRY_MS = 2_000;
+/** Let webpack finish writing before Electron opens a second browser session. */
+const SETTLE_MS = 4_000;
 
 /** @param {string} url */
 async function fetchWithDeadline(url) {
@@ -58,7 +60,23 @@ async function warmCyberdeck() {
         await chunkRes.arrayBuffer();
       }
 
-      process.stdout.write('[warm] /cyberdeck ready — opening Electron\n');
+      process.stdout.write('[warm] /cyberdeck ready — compiling chat API\n');
+
+      try {
+        const chatWarm = await fetchWithDeadline(`${ORIGIN}/api/cyberdeck-chat`);
+        if (chatWarm.ok) {
+          process.stdout.write('[warm] chat API ready — opening Electron\n');
+        } else {
+          process.stdout.write(`[warm] chat API HTTP ${chatWarm.status} (continuing)\n`);
+        }
+      } catch {
+        process.stdout.write('[warm] chat API warm skipped (continuing)\n');
+      }
+
+      if (SETTLE_MS > 0) {
+        process.stdout.write(`[warm] settling ${SETTLE_MS / 1000}s before Electron…\n`);
+        await new Promise((r) => setTimeout(r, SETTLE_MS));
+      }
       return;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

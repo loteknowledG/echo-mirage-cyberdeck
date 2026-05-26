@@ -27,6 +27,8 @@ let nextReady = false;
 const useTurbopack =
   process.env.CYBERDECK_DEV_TURBOPACK === '1' ||
   process.argv.includes('--turbopack');
+const useWebpack = process.argv.includes('--webpack');
+const bundler = useWebpack ? 'webpack' : useTurbopack ? 'turbopack' : 'webpack';
 
 const readyServer = http.createServer((req, res) => {
   const url = req.url?.split('?')[0] ?? '/';
@@ -51,8 +53,13 @@ readyServer.on('error', (err) => {
 });
 
 readyServer.listen(READY_PORT, '127.0.0.1', () => {
+  if (bundler === 'turbopack') {
+    process.stdout.write(
+      '[dev] turbopack mode — if PostCSS panics on Windows, use: pnpm dev (webpack)\n',
+    );
+  }
   process.stdout.write(
-    `[dev] sidecar :${READY_PORT}/health | node heap ${HEAP_MB}MB | bundler ${useTurbopack ? 'turbopack' : 'webpack'}\n`,
+    `[dev] sidecar :${READY_PORT}/health | node heap ${HEAP_MB}MB | bundler ${bundler}\n`,
   );
 });
 
@@ -91,7 +98,7 @@ const nextArgs = [
   'dev',
   '-p',
   '3050',
-  ...(useTurbopack ? [] : ['--webpack']),
+  ...(bundler === 'turbopack' ? [] : ['--webpack']),
 ];
 
 const child = spawn(process.execPath, nextArgs, {

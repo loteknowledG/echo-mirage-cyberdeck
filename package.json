@@ -13,7 +13,7 @@
     "preview": "next build && next start -p 3050",
     "voice:restore": "node scripts/restore-muthur-voice.mjs",
     "voice:save": "tsx scripts/save-muthur-voice.ts",
-    "electron:dev": "concurrently -k \"node scripts/next-dev.mjs --turbopack\" \"wait-on -t 300000 -i 2000 -d 15000 http-get://127.0.0.1:3051/health && node scripts/warm-cyberdeck.mjs && electron .\"",
+    "electron:dev": "concurrently -k \"node scripts/next-dev.mjs --webpack\" \"wait-on -t 300000 -i 2000 -d 15000 http-get://127.0.0.1:3051/health && node scripts/warm-cyberdeck.mjs && electron .\"",
     "electron:prod": "next build && concurrently \"next start -p 3050\" \"electron .\"",
     "lint": "eslint .",
     "lint:fix": "eslint --ext .js,.jsx,.ts,.tsx . --fix",
