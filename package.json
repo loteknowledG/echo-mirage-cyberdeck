@@ -114,5 +114,11 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "wait-on": "^7.2.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@google/genai",
+      "@mongodb-js/zstd"
+    ]
   }
 }
