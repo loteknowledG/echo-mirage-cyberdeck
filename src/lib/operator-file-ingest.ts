@@ -34,6 +34,11 @@ const EDITABLE_TEXT_EXTENSIONS = [
   ".csv",
   ".tsv",
   ".log",
+  ".env",
+  ".env.local",
+  ".env.development",
+  ".env.production",
+  ".env.example",
 ];
 
 export type OperatorIngestFileKind =
@@ -61,6 +66,7 @@ export function isEditableOperatorFile(file: File) {
     lowerType === "application/javascript" ||
     lowerType === "application/typescript" ||
     lowerType === "application/x-yaml" ||
+    lowerName.startsWith(".env") ||
     EDITABLE_TEXT_EXTENSIONS.some((ext) => lowerName.endsWith(ext))
   );
 }

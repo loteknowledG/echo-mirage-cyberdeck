@@ -32,7 +32,9 @@ export function CyberdeckRailTabTooltip({ label, children }: CyberdeckRailTabToo
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="relative h-[52px] w-12 shrink-0 max-md:mr-2 max-md:snap-start">{children}</div>
+        <div className="relative shrink-0 max-md:me-2 md:mb-2" data-rail-tab-cell>
+          {children}
+        </div>
       </TooltipTrigger>
       <TooltipContent
         side="right"

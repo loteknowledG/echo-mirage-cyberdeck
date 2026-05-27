@@ -1,0 +1,93 @@
+{
+  "timestamp": "2026-05-26T08:47:46.959Z",
+  "task_id": "e71112a2-f69f-467f-be97-6d05690197b5",
+  "action_id": "e71112a2-f69f-467f-be97-6d05690197b5",
+  "action_type": "open_url",
+  "task_label": "l12-v3-bad",
+  "url": "http://127.0.0.1:3050/this-route-does-not-exist-404",
+  "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_this_route_does_not_exist_404-1779785266436.png",
+  "execution_success": true,
+  "verification_passed": false,
+  "console_error_count": 1,
+  "execution_result": {
+    "success": true,
+    "duration_ms": 645,
+    "stdout": "404\nThis page could not be found.",
+    "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_this_route_does_not_exist_404-1779785266436.png",
+    "metadata": {
+      "url": "http://127.0.0.1:3050/this-route-does-not-exist-404",
+      "title": "Echo Mirage Cyberdeck",
+      "status": 404,
+      "console_error_count": 1,
+      "console_entries": [
+        {
+          "message": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "source": "http://127.0.0.1:3050/this-route-does-not-exist-404",
+          "severity": "error",
+          "timestamp": "2026-05-26T08:47:46.420Z"
+        },
+        {
+          "message": "./node_modules/.pnpm/@mariozechner+pi-ai@0.72.1_ws@8.20.0_zod@3.25.76/node_modules/@mariozechner/pi-ai/dist/providers/openai-codex-responses.js\nCritical dependency: the request of a dependency is an expression",
+          "source": "webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@16.1.5_@babel+core@7.2_4d46ebafa92e6245c8b6d4dc601588c7/node_modules/next/dist/next-devtools/shared/forward-logs-shared.js",
+          "severity": "warning",
+          "timestamp": "2026-05-26T08:47:46.916Z"
+        }
+      ],
+      "screenshot": {
+        "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_this_route_does_not_exist_404-1779785266436.png",
+        "width": 1280,
+        "height": 720,
+        "captured_at": "2026-05-26T08:47:46.950Z"
+      }
+    },
+    "verification_notes": "Navigated to http://127.0.0.1:3050/this-route-does-not-exist-404 (404)."
+  },
+  "verification": {
+    "passed": false,
+    "checks": [
+      {
+        "check": "route_loads",
+        "passed": false,
+        "message": "Route failed status=404 url=http://127.0.0.1:3050/this-route-does-not-exist-404",
+        "evidence_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_this_route_does_not_exist_404-1779785266436.png",
+        "metadata": {
+          "url": "http://127.0.0.1:3050/this-route-does-not-exist-404",
+          "title": "Echo Mirage Cyberdeck",
+          "status": 404
+        }
+      },
+      {
+        "check": "no_console_errors",
+        "passed": false,
+        "message": "Console errors 1 > 0: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "metadata": {
+          "count": 1,
+          "errors": [
+            {
+              "message": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+              "source": "http://127.0.0.1:3050/this-route-does-not-exist-404",
+              "severity": "error",
+              "timestamp": "2026-05-26T08:47:46.420Z"
+            }
+          ]
+        }
+      },
+      {
+        "check": "screenshot_captured",
+        "passed": true,
+        "message": "Screenshot saved: F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_this_route_does_not_exist_404-1779785266436.png",
+        "evidence_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_this_route_does_not_exist_404-1779785266436.png",
+        "metadata": {
+          "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_this_route_does_not_exist_404-1779785266436.png"
+        }
+      }
+    ],
+    "evidence_paths": [
+      "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_this_route_does_not_exist_404-1779785266436.png"
+    ]
+  },
+  "evidence_paths": [
+    "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_this_route_does_not_exist_404-1779785266436.png"
+  ],
+  "receipt_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\receipts\\verification\\2026-05-26T08-47-46-959Z_e71112a2.json"
+}

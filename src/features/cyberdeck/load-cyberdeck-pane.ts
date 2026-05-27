@@ -37,6 +37,10 @@ function loadPaneByKind(kind: CyberdeckPaneKind): Promise<CyberdeckPaneModule> {
       return import("@/features/cyberdeck/pane-loaders/voice-lab");
     case "flight-log":
       return import("@/features/cyberdeck/pane-loaders/flight-log");
+    case "drop-bay":
+      return import("@/features/cyberdeck/pane-loaders/drop-bay");
+    case "muthur-execution":
+      return import("@/features/cyberdeck/pane-loaders/muthur-execution");
     case "glyph-channel":
       return import("@/features/cyberdeck/pane-loaders/glyph-channel");
     case "rola-dex":

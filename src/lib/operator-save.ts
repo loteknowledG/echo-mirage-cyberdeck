@@ -1,5 +1,11 @@
 import { resolveCadreSaveTarget } from "@/lib/cadre-constitutional-routing";
 import { deriveOperatorSaveFilename } from "@/lib/operator-markdown-title";
+import {
+  canSaveOperatorFileInPlace,
+  isOperatorFolderPaneFilePath,
+  writeFileToFolderRoot,
+  type OperatorDocFolderRoot,
+} from "@/lib/operator-folder-nav";
 
 export type OperatorSaveIntent = {
   text: string;
@@ -14,27 +20,51 @@ export type OperatorSaveIntent = {
   }>;
 };
 
+export const OPERATOR_SAVE_FILE_TYPES: OperatorSaveIntent["fileTypes"] = [
+  {
+    description: "All files",
+    accept: { "*/*": [".*"] },
+  },
+  {
+    description: "Markdown",
+    accept: {
+      "text/markdown": [".md", ".markdown"],
+    },
+  },
+  {
+    description: "Text",
+    accept: {
+      "text/plain": [".txt", ".md", ".markdown", ".env", ".env.local", ".json", ".yaml", ".yml"],
+    },
+  },
+];
+
 export function buildOperatorSaveIntent(options: {
   text: string;
   kind: string | undefined;
   mimeType: string;
   currentName?: string;
   headerName?: string;
+  /** Logical path when opened from the folder pane (e.g. repo/.env.local). */
+  sourceFilePath?: string | null;
   /** @deprecated Use currentName */
   fallbackName?: string;
 }): OperatorSaveIntent {
-  const { text, kind, mimeType, currentName, headerName, fallbackName } = options;
+  const { text, kind, mimeType, currentName, headerName, sourceFilePath, fallbackName } = options;
   const cadreTarget =
     kind === "markdown" ? resolveCadreSaveTarget(text, { kind: "markdown" }) : null;
+  const sourceFileName = sourceFilePath?.split("/").pop()?.trim();
   const suggestedFilename = deriveOperatorSaveFilename({
     kind,
     text,
-    currentName: currentName ?? fallbackName,
+    currentName: currentName ?? sourceFileName ?? fallbackName,
     headerName,
   });
   const suggestedSavePath = cadreTarget?.constitutionalPrefix
     ? `${cadreTarget.relativeDirectory}${suggestedFilename}`.replace(/\/{2,}/g, "/")
-    : suggestedFilename;
+    : isOperatorFolderPaneFilePath(sourceFilePath)
+      ? sourceFilePath
+      : suggestedFilename;
 
   return {
     text,
@@ -43,16 +73,24 @@ export function buildOperatorSaveIntent(options: {
     suggestedFilename,
     suggestedSavePath,
     cadreTarget,
-    fileTypes: [
-      {
-        description: "Markdown",
-        accept: {
-          "text/markdown": [".md", ".markdown"],
-          "text/plain": [".txt", ".md", ".markdown"],
-        },
-      },
-    ],
+    fileTypes: OPERATOR_SAVE_FILE_TYPES,
   };
+}
+
+export async function saveOperatorFileInPlace(
+  filePath: string,
+  text: string,
+  roots: OperatorDocFolderRoot[],
+): Promise<{ ok: boolean; filePath?: string; error?: string }> {
+  if (!canSaveOperatorFileInPlace(filePath, roots)) {
+    return { ok: false, error: "No saved file path to overwrite." };
+  }
+  const rootName = filePath.split("/")[0];
+  const root = roots.find((entry) => entry.name === rootName);
+  if (!root) {
+    return { ok: false, error: "Folder root is no longer available." };
+  }
+  return writeFileToFolderRoot(root, filePath, text);
 }
 
 export async function saveViaCadreApi(
@@ -104,3 +142,5 @@ export function isPickerAbortError(err: unknown): boolean {
     err instanceof DOMException && (err.name === "AbortError" || err.code === 20)
   );
 }
+
+export { canSaveOperatorFileInPlace };

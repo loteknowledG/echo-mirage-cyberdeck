@@ -28,4 +28,11 @@ contextBridge.exposeInMainWorld('echoMirageSave', {
 
 contextBridge.exposeInMainWorld('echoMirageOpen', {
   pickConvertDocument: () => ipcRenderer.invoke('echo-mirage-open:pick-convert-document'),
+  pickOperatorFolder: () => ipcRenderer.invoke('echo-mirage-open:pick-operator-folder'),
+  listOperatorFolder: (rootPath, relativePath, pathPrefix) =>
+    ipcRenderer.invoke('echo-mirage-open:list-operator-folder', { rootPath, relativePath, pathPrefix }),
+  readOperatorFile: (rootPath, logicalPath) =>
+    ipcRenderer.invoke('echo-mirage-open:read-operator-file', { rootPath, logicalPath }),
+  writeOperatorFile: (rootPath, logicalPath, content) =>
+    ipcRenderer.invoke('echo-mirage-open:write-operator-file', { rootPath, logicalPath, content }),
 });

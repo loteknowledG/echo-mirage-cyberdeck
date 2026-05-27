@@ -11,7 +11,9 @@ export const CYBERDECK_PANE_KINDS = [
   "memory-atlas",
   "voice-lab",
   "flight-log",
+  "drop-bay",
   "glyph-channel",
+  "muthur-execution",
   "rola-dex",
   "sound-profile",
 ] as const;
@@ -44,6 +46,14 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   "memory-atlas": { label: "MEMORY ATLAS" },
   "voice-lab": { label: "VOICE LAB", fetchHints: ["PRESET", "AUDIO CHAIN"] },
   "flight-log": { label: "FLIGHT LOG" },
+  "drop-bay": {
+    label: "DROP BAY",
+    fetchHints: ["INTAKE", "JSONL STORE", "SSE FEED"],
+  },
+  "muthur-execution": {
+    label: "MUTHUR EXECUTION",
+    fetchHints: ["RUNTIME", "QUEUE", "ACTION RUNNER", "AUDIT"],
+  },
   "glyph-channel": { label: "GLYPH CHANNEL", fetchHints: ["GLYPH BUS", "RENDER"] },
   "rola-dex": { label: "ROLA-DEX", fetchHints: ["DEX", "CAROUSEL"] },
   "sound-profile": { label: "SOUND PROFILE", fetchHints: ["PROFILE", "SFX"] },
@@ -52,6 +62,7 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
 const TAB_KIND_ALIASES: Record<string, CyberdeckPaneKind> = {
   catelog: "catalog",
   diagnostic: "diagnostics",
+  dropbay: "drop-bay",
 };
 
 export function normalizeCyberdeckPaneKind(kind: string): CyberdeckPaneKind | null {

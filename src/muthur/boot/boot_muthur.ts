@@ -80,7 +80,9 @@ export async function ensureMuthurDirs(workspaceRoot: string): Promise<void> {
   const dirs = [
     path.join(workspaceRoot, ".muthur", "memory", "daily"),
     path.join(workspaceRoot, ".muthur", "receipts"),
+    path.join(workspaceRoot, ".muthur", "screenshots"),
     path.join(workspaceRoot, ".muthur", "atlas"),
+    path.join(workspaceRoot, ".muthur", "logs"),
   ];
   for (const d of dirs) {
     try {

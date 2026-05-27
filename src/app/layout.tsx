@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { Mrs_Saint_Delafield, Satisfy } from 'next/font/google';
 
@@ -27,6 +27,12 @@ export const metadata: Metadata = {
     template: "%s · Echo Mirage Cyberdeck",
   },
   description: "A floating, voice-locked cyberdeck for operators, agents, and live AI control.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({

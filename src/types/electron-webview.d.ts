@@ -52,6 +52,47 @@ declare global {
 
   interface EchoMirageOpenBridge {
     pickConvertDocument(): Promise<{ canceled: boolean; filePath?: string; error?: string }>;
+    pickOperatorFolder(): Promise<{
+      canceled: boolean;
+      folderPath?: string;
+      name?: string;
+      error?: string;
+    }>;
+    listOperatorFolder(
+      rootPath: string,
+      relativePath: string,
+      pathPrefix: string,
+    ): Promise<{
+      ok: boolean;
+      nodes?: Array<{
+        name: string;
+        path: string;
+        kind: "file" | "folder";
+        ignored?: boolean;
+        truncated?: boolean;
+      }>;
+      error?: string;
+    }>;
+    readOperatorFile(
+      rootPath: string,
+      logicalPath: string,
+    ): Promise<{
+      ok: boolean;
+      name?: string;
+      mimeType?: string;
+      text?: string;
+      size?: number;
+      error?: string;
+    }>;
+    writeOperatorFile(
+      rootPath: string,
+      logicalPath: string,
+      content: string,
+    ): Promise<{
+      ok: boolean;
+      filePath?: string;
+      error?: string;
+    }>;
   }
 
   interface Window {

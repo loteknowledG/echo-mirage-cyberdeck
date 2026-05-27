@@ -1,7 +1,7 @@
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
-import { executeRegistryToolForOpenAi } from "@/lib/muthur-core/execute-openai-tool";
+import { executeOpenAiToolViaExecutionLoop } from "@/lib/muthur/execution/execute-openai-tool-via-loop.server";
 import { MUTHUR_OPENAI_TOOLS } from "@/lib/muthur-core/openai-tool-definitions";
 import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
 import type { ToolRegistry } from "@/lib/muthur-core/types";
@@ -177,7 +177,7 @@ export async function muthurChatWithModelTools(options: {
         toolCalls.map(async (tc) => {
           const name = tc.function?.name ?? "";
           const rawArgs = tc.function?.arguments ?? "{}";
-          const content = await executeRegistryToolForOpenAi(registry, name, rawArgs);
+          const content = await executeOpenAiToolViaExecutionLoop(registry, name, rawArgs);
           return { id: tc.id, content };
         }),
       );

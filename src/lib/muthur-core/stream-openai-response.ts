@@ -39,6 +39,13 @@ export async function streamOpenAiCompatibleResponse(response: Response): Promis
       const reader = body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let closed = false;
+
+      const closeOnce = () => {
+        if (closed) return;
+        closed = true;
+        controller.close();
+      };
 
       const emit = (text: string) => {
         if (!text) return;
@@ -60,7 +67,7 @@ export async function streamOpenAiCompatibleResponse(response: Response): Promis
 
             const data = line.slice(5).trim();
             if (data === "[DONE]") {
-              controller.close();
+              closeOnce();
               return;
             }
 
@@ -74,7 +81,7 @@ export async function streamOpenAiCompatibleResponse(response: Response): Promis
           }
         }
       } finally {
-        controller.close();
+        closeOnce();
       }
     },
   });
