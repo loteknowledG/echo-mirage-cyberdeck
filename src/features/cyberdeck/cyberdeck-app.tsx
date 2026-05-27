@@ -6547,7 +6547,7 @@ const resolved = resolveUiTarget(userMessage);
             <div
               ref={messageScrollRef}
               tabIndex={-1}
-              className="cyberdeck-chat-content custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
+              className="cyberdeck-chat-content custom-scrollbar flex min-h-0 flex-1 basis-0 flex-col overflow-y-auto p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
             >
               {isMobileLayout ? (
                 <div className="mb-2">
