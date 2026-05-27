@@ -29,7 +29,7 @@ async function postExecution(body: Record<string, unknown>) {
   return data as { state?: MuthurRuntimeState; ok?: boolean; results?: unknown[] };
 }
 
-export function useMuthurExecutionRuntime(pollMs = 800) {
+export function useMuthurExecutionRuntime(pollMs = 800, pollEnabled = true) {
   const [state, setState] = useState<MuthurRuntimeState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,10 +42,12 @@ export function useMuthurExecutionRuntime(pollMs = 800) {
   }, []);
 
   useEffect(() => {
+    if (!pollEnabled) return;
+
     void refresh();
     const timer = window.setInterval(() => void refresh(), pollMs);
     return () => window.clearInterval(timer);
-  }, [pollMs, refresh]);
+  }, [pollEnabled, pollMs, refresh]);
 
   const control = useCallback(async (body: Record<string, unknown>) => {
     const data = await postExecution(body);

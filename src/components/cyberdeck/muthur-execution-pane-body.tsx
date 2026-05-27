@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderTitle } from "@/components/cyberdeck/pane-header";
 import { useMuthurExecutionRuntime } from "@/lib/muthur/execution/use-muthur-execution-runtime";
 import type { MuthurAction, MuthurExecutionMode } from "@/lib/muthur/execution/execution-types";
@@ -225,7 +225,21 @@ function ActionRow({
 
 export function CyberdeckMuthurExecutionPaneBody() {
   const deckMode = useDeckMode();
-  const { state, stop, pause, resume, clearQueue, approve, deny, setMode } = useMuthurExecutionRuntime();
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  const [paneVisible, setPaneVisible] = useState(true);
+  const { state, stop, pause, resume, clearQueue, approve, deny, setMode } = useMuthurExecutionRuntime(800, paneVisible);
+
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      setPaneVisible(Boolean(entry?.isIntersecting && entry.intersectionRect.height > 0 && entry.intersectionRect.width > 0));
+    });
+
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, []);
 
   const loopStatus = state?.loop_status ?? "idle";
   const mode = state?.execution_mode ?? "observe";
@@ -235,6 +249,7 @@ export function CyberdeckMuthurExecutionPaneBody() {
 
   return (
     <div
+      ref={paneRef}
       className={cn(
         "custom-scrollbar flex h-full min-h-0 flex-1 flex-col overflow-y-auto p-3",
         deckMode === "realmorphism" ? "bg-[color:var(--realmorphism-host)]" : "bg-black text-green-200",

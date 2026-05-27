@@ -35,6 +35,14 @@ const nextConfig = {
 		"@mongodb-js/zstd",
 	],
 	webpack: (config, { dev }) => {
+		config.ignoreWarnings = [
+			...(config.ignoreWarnings ?? []),
+			{
+				module: /@mariozechner[\\/]pi-ai[\\/]dist[\\/]providers[\\/]openai-codex-responses\.js/,
+				message: /Critical dependency: the request of a dependency is an expression/,
+			},
+		];
+
 		if (dev) {
 			config.parallelism = 1;
 			// LazyCompilationBackend ECONNRESET on Windows when warm + Electron race the dev server.

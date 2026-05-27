@@ -28,8 +28,19 @@ function resolveProviderApiKey(provider: string, suppliedApiKey: unknown): {
 }
 
 export async function POST(request: Request) {
+  let body: { provider?: unknown; apiKey?: unknown };
   try {
-    const { provider, apiKey } = await request.json();
+    const parsed = (await request.json()) as unknown;
+    if (!parsed || typeof parsed !== "object") {
+      return NextResponse.json({ error: "JSON body required" }, { status: 400 });
+    }
+    body = parsed as { provider?: unknown; apiKey?: unknown };
+  } catch {
+    return NextResponse.json({ error: "JSON body required" }, { status: 400 });
+  }
+
+  try {
+    const { provider, apiKey } = body;
     const url = MODEL_LIST_URL[provider as string];
     if (!url) {
       return NextResponse.json({ error: "provider required" }, { status: 400 });
