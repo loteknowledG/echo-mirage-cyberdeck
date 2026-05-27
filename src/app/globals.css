@@ -317,7 +317,29 @@ body,
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
 }
 
+body:has(.property-manager-shell),
+body:has(.send-shell) {
+  overflow-y: auto !important;
+}
+
 @media (max-width: 768px) {
+  html:has(.cyberdeck-shell),
+  html:has(.property-manager-shell),
+  html:has(.send-shell),
+  body:has(.cyberdeck-shell),
+  body:has(.property-manager-shell),
+  body:has(.send-shell) {
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  body:has(.property-manager-shell) .app-min-width-wrapper,
+  body:has(.send-shell) .app-min-width-wrapper {
+    min-width: 0 !important;
+    width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
   html,
   body:has(.cyberdeck-shell) {
     height: 100%;

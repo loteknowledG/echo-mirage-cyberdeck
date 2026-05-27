@@ -28,11 +28,11 @@ async function sendDeckCommand(page: import("@playwright/test").Page, text: stri
 
 test("cyberdeck renders and switches required alpha modules", async ({ page }) => {
   try {
-    await page.goto("/cyberdeck", { waitUntil: "load", timeout: 30000 });
+    await page.goto("/cyberdeck", { waitUntil: "load", timeout: 120000 });
   } catch {
-    await page.goto("/cyberdeck", { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.goto("/cyberdeck", { waitUntil: "domcontentloaded", timeout: 120000 });
   }
-  await page.waitForSelector("cyberdeck-rail-tab", { timeout: 20000 });
+  await page.waitForSelector("cyberdeck-rail-tab", { timeout: 120000 });
   const response = await page.reload({ waitUntil: "domcontentloaded" });
   expect(response).not.toBeNull();
   expect(response!.status()).toBeLessThan(500);

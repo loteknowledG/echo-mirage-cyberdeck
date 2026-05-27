@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   LuChevronDown,
@@ -12,7 +12,7 @@ import {
   LuX,
 } from "react-icons/lu";
 import { useDeckMode } from "@/lib/deck-mode";
-import { realmorphismActionClass } from "@/lib/cyberdeck/realmorphism-control";
+import { realmorphismActionClass, realmorphismMenuItemClass } from "@/lib/cyberdeck/realmorphism-control";
 import { cn } from "@/lib/utils";
 import {
   listDirectoryChildrenForRoot,
@@ -25,6 +25,13 @@ import {
 type OperatorDocFolderPaneProps = {
   onOpenFile: (path: string, file: File) => void | Promise<void>;
   onRootsChange?: (roots: OperatorDocFolderRoot[]) => void;
+};
+
+type FolderContextMenu = {
+  x: number;
+  y: number;
+  copyPath: string;
+  kind: "file" | "folder";
 };
 
 function uniqueRootLabel(base: string, existing: string[]): string {
@@ -50,6 +57,15 @@ function createRootFromHandle(handle: FileSystemDirectoryHandle, label: string):
   };
 }
 
+function copiedTreePath(root: OperatorDocFolderRoot, logicalPath: string): string {
+  if (!root.diskPath) return logicalPath;
+  const relativePath =
+    logicalPath === root.name ? "" : logicalPath.startsWith(`${root.name}/`) ? logicalPath.slice(root.name.length + 1) : logicalPath;
+  if (!relativePath) return root.diskPath;
+  const separator = root.diskPath.includes("\\") ? "\\" : "/";
+  return `${root.diskPath.replace(/[\\/]+$/, "")}${separator}${relativePath.replaceAll("/", separator)}`;
+}
+
 export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDocFolderPaneProps) {
   const deckMode = useDeckMode();
   const [roots, setRoots] = useState<OperatorDocFolderRoot[]>([]);
@@ -60,6 +76,7 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
   const [isPicking, setIsPicking] = useState(false);
   const [replacingRootId, setReplacingRootId] = useState<string | null>(null);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<FolderContextMenu | null>(null);
   const isPickingRef = useRef(false);
 
   const setPathLoading = useCallback((path: string, loading: boolean) => {
@@ -97,6 +114,53 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
   useEffect(() => {
     onRootsChange?.(roots);
   }, [onRootsChange, roots]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("blur", close);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("blur", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [contextMenu]);
+
+  const openContextMenu = useCallback(
+    (event: MouseEvent<HTMLElement>, root: OperatorDocFolderRoot, path: string, kind: "file" | "folder") => {
+      event.preventDefault();
+      event.stopPropagation();
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        copyPath: copiedTreePath(root, path),
+        kind,
+      });
+    },
+    [],
+  );
+
+  const copyContextMenuPath = useCallback(async () => {
+    if (!contextMenu) return;
+    const path = contextMenu.copyPath;
+    setContextMenu(null);
+    const bridge = (window as Window & { echoMirageClipboard?: { writeText(text: string): void } }).echoMirageClipboard;
+    try {
+      if (bridge?.writeText) {
+        bridge.writeText(path);
+      } else {
+        await navigator.clipboard.writeText(path);
+      }
+      toast.success(`Copied ${contextMenu.kind} path.`);
+    } catch {
+      toast.error("Could not copy path.");
+    }
+  }, [contextMenu]);
 
   const pickDirectoryRoot = useCallback(async (): Promise<OperatorDocFolderRoot | null> => {
     const bridge = window.echoMirageOpen;
@@ -292,6 +356,10 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
                   ? void handleToggleFolder(rootName, node.path, node)
                   : void handleSelectFile(rootName, node.path)
               }
+              onContextMenu={(event) => {
+                const root = roots.find((entry) => entry.name === rootName);
+                if (root) openContextMenu(event, root, node.path, node.kind);
+              }}
             >
               {node.kind === "folder" ? (
                 isLoading ? (
@@ -320,11 +388,17 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
           </div>
         );
       }),
-    [expanded, handleSelectFile, handleToggleFolder, loadingPaths, openingPath, selectedPath],
+    [expanded, handleSelectFile, handleToggleFolder, loadingPaths, openContextMenu, openingPath, roots, selectedPath],
   );
 
   return (
-    <aside className="flex w-44 shrink-0 flex-col border-l border-[#1c1c1c] bg-black">
+    <aside
+      className="flex w-44 shrink-0 flex-col border-l border-[#1c1c1c] bg-black"
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+    >
       <div className="border-b border-[#1c1c1c] p-2">
         <button
           type="button"
@@ -356,6 +430,7 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
                     type="button"
                     className="flex min-w-0 flex-1 items-center gap-1 text-left"
                     onClick={() => void handleToggleFolder(root.name, root.name)}
+                    onContextMenu={(event) => openContextMenu(event, root, root.name, "folder")}
                   >
                     {rootLoading || isReplacing ? (
                       <span className="w-2.5 shrink-0 animate-pulse text-[#555]">…</span>
@@ -402,6 +477,28 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
           })
         )}
       </div>
+      {contextMenu ? (
+        <div
+          role="menu"
+          aria-label="Folder tree actions"
+          className="fixed z-50 min-w-40 rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void copyContextMenuPath()}
+            className={realmorphismMenuItemClass(deckMode)}
+          >
+            {contextMenu.kind === "file" ? "COPY FILE PATH" : "COPY FOLDER PATH"}
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }

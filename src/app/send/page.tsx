@@ -132,7 +132,7 @@ export default function SendPage() {
   };
 
   return (
-    <main className="min-h-screen bg-black px-4 py-6 text-[#d8d8d8]">
+    <main className="send-shell min-h-screen w-full max-w-full overflow-x-hidden bg-black px-4 py-6 text-[#d8d8d8]">
       <div className="mx-auto flex w-full max-w-lg flex-col gap-4">
         <header>
           <h1 className="font-mono text-lg tracking-[0.12em] text-emerald-300">ECHO MIRAGE // SEND</h1>

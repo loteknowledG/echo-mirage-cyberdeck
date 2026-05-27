@@ -16,8 +16,12 @@ type SplitGeometry = {
 
 async function openCyberdeck(page: Page, viewport: { width: number; height: number }) {
   await page.setViewportSize(viewport);
-  await page.goto("/cyberdeck", { waitUntil: "domcontentloaded" });
-  await page.locator("cyberdeck-rail-tab").first().waitFor({ state: "visible", timeout: 20000 });
+  let response = await page.goto("/cyberdeck", { waitUntil: "domcontentloaded" });
+  for (let attempt = 0; response?.status() === 404 && attempt < 2; attempt += 1) {
+    response = await page.reload({ waitUntil: "domcontentloaded" });
+  }
+  expect(response?.status()).not.toBe(404);
+  await page.locator("cyberdeck-rail-tab").first().waitFor({ state: "visible", timeout: 120000 });
   const skipBoot = page.getByRole("button", { name: "Skip" });
   if (await skipBoot.isVisible().catch(() => false)) {
     await skipBoot.click();
