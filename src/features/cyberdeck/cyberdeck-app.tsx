@@ -1299,8 +1299,6 @@ export default function CyberdeckApp() {
       : isConnected
         ? "connected"
         : "offline";
-  const mobilePanelMinSize = 2;
-
   const inactiveTextColor = "#7a7a7a";
   const inactiveSubtleTextColor = "#6a6a6a";
   const activeTextGlow = "0 0 8px rgba(0, 255, 0, 0.22)";
@@ -6232,7 +6230,7 @@ const resolved = resolveUiTarget(userMessage);
     <div
       ref={cyberdeckRootRef}
       data-deck-mode={deckMode}
-      className="terminal-window box-border flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:h-[100dvh] max-md:flex-col max-md:overflow-hidden md:overflow-hidden"
+      className="terminal-window box-border flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:flex-col max-md:overflow-hidden md:overflow-hidden"
     >
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence
@@ -6529,7 +6527,7 @@ const resolved = resolveUiTarget(userMessage);
           className="min-h-0 min-w-0 flex-1"
         >
           {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
-          <ResizablePanel defaultSize={isMobileLayout ? 98 : 55} minSize={isMobileLayout ? mobilePanelMinSize : 0}>
+          <ResizablePanel defaultSize={isMobileLayout ? 100 : 55} minSize={isMobileLayout ? 100 : 0}>
           <div
             ref={chatColumnRef}
             onContextMenu={handleMiragePaneContextMenu}
@@ -6878,10 +6876,12 @@ const resolved = resolveUiTarget(userMessage);
           </div>
         </ResizablePanel>
 
-        <ResizableHandle withHandle stacked={isMobileLayout} className="flex" />
+        {!isMobileLayout ? (
+          <>
+        <ResizableHandle withHandle stacked={false} className="flex" />
 
         {/* COL 3 (flipped): gateway nav — Weyland col2 */}
-          <ResizablePanel defaultSize={isMobileLayout ? 2 : 45} minSize={isMobileLayout ? mobilePanelMinSize : 0.01}>
+          <ResizablePanel defaultSize={45} minSize={0.01}>
           <div
             ref={gatewayColumnRef}
             tabIndex={-1}
@@ -7202,6 +7202,8 @@ const resolved = resolveUiTarget(userMessage);
             </div>
           </div>
         </ResizablePanel>
+          </>
+        ) : null}
       </ResizablePanelGroup>
         </div>
     </div>

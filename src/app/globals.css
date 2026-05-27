@@ -310,6 +310,12 @@ body,
 }
 
 @media (max-width: 768px) {
+  .terminal-window {
+    height: 100svh;
+    max-height: 100svh;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   .cyberdeck-server-rail {
     max-width: 100vw;
     min-width: 0;

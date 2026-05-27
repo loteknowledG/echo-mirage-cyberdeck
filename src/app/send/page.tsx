@@ -1,16 +1,55 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 type SubmitState = "idle" | "submitting" | "success" | "error";
+
+function fileFromClipboardItem(blob: File, index: number): File {
+  const ext = blob.type.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
+  return new File([blob], `pasted-${Date.now()}-${index}.${ext}`, { type: blob.type });
+}
 
 export default function SendPage() {
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
   const [source, setSource] = useState("android");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [state, setState] = useState<SubmitState>("idle");
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreviewUrl(null);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [imageFile]);
+
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        if (!item.type.startsWith("image/")) continue;
+        const blob = item.getAsFile();
+        if (!blob) continue;
+
+        event.preventDefault();
+        setImageFile(fileFromClipboardItem(blob, index));
+        setState("idle");
+        setMessage("Image pasted — ready to send.");
+        return;
+      }
+    };
+
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -98,21 +137,49 @@ export default function SendPage() {
             />
           </label>
 
-          <label className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1">
             <span className="font-mono text-[10px] tracking-[0.08em] text-[#888]">IMAGE (OPTIONAL)</span>
             <input
               type="file"
               accept="image/*"
-              capture="environment"
-              onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                setImageFile(event.target.files?.[0] ?? null);
+                setState("idle");
+                setMessage("");
+              }}
               className="rounded-sm border border-[#222] bg-black px-3 py-2 font-mono text-[12px] text-[#bbb] file:mr-3 file:rounded-sm file:border-0 file:bg-emerald-950/40 file:px-3 file:py-1 file:font-mono file:text-[10px] file:tracking-[0.08em] file:text-emerald-200"
             />
+            <span className="font-mono text-[9px] tracking-[0.06em] text-[#555]">
+              Pick from gallery/files, or paste an image anywhere on this page (Ctrl+V / long-press paste).
+            </span>
             {imageFile ? (
-              <span className="font-mono text-[9px] tracking-[0.06em] text-[#666]">
-                {imageFile.name} ({Math.round(imageFile.size / 1024)} KB)
-              </span>
+              <div className="mt-1 flex items-start gap-3">
+                {imagePreviewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={imagePreviewUrl}
+                    alt="Selected drop"
+                    className="max-h-32 max-w-[40%] rounded-sm border border-[#222] object-contain"
+                  />
+                ) : null}
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="truncate font-mono text-[9px] tracking-[0.06em] text-[#666]">
+                    {imageFile.name} ({Math.round(imageFile.size / 1024)} KB)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageFile(null);
+                      setMessage("");
+                    }}
+                    className="self-start font-mono text-[9px] tracking-[0.08em] text-[#888] underline underline-offset-2"
+                  >
+                    Remove image
+                  </button>
+                </div>
+              </div>
             ) : null}
-          </label>
+          </div>
 
           <label className="flex flex-col gap-1">
             <span className="font-mono text-[10px] tracking-[0.08em] text-[#888]">SOURCE</span>
