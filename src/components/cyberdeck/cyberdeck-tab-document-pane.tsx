@@ -31,11 +31,13 @@ import {
 import { cleanOperatorPasteText } from "@/lib/operator-paste-cleaner";
 import {
   buildOperatorSaveIntent,
+  canSaveOperatorFileInPlace,
   downloadOperatorDoc,
   isPickerAbortError,
+  saveOperatorFileInPlace,
   saveViaCadreApi,
 } from "@/lib/operator-save";
-import { readFileFromFolderPath } from "@/lib/operator-folder-nav";
+import { readFileFromFolderRoot } from "@/lib/operator-folder-nav";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { useCyberdeckTabStore } from "@/lib/cyberdeck-tab-store";
 
@@ -85,6 +87,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
   const browserRef = useRef<HTMLWebViewElement | null>(null);
   const kindManualRef = useRef(false);
   const folderRootsRef = useRef<OperatorDocFolderRoot[]>([]);
+  const [folderRootsCount, setFolderRootsCount] = useState(0);
   const fileHistoryRef = useRef<string[]>([]);
   const fileHistoryIndexRef = useRef(-1);
   const historyLoadersRef = useRef<Map<string, () => Promise<void>>>(new Map());
@@ -246,7 +249,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
         const rootName = filePath.split("/")[0];
         const root = folderRootsRef.current.find((entry) => entry.name === rootName);
         if (root) {
-          const fresh = await readFileFromFolderPath(root.handle, filePath);
+          const fresh = await readFileFromFolderRoot(root, filePath);
           await loadAssetFromFile(fresh || file);
           return;
         }
@@ -354,7 +357,44 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
     }
   }, [asset?.name, setTextAsset]);
 
-  const saveDoc = useCallback(async () => {
+  const clearDocument = useCallback(() => {
+    kindManualRef.current = false;
+    setActiveFilePath(null);
+    fileHistoryRef.current = [];
+    fileHistoryIndexRef.current = -1;
+    historyLoadersRef.current.clear();
+    setFileHistory([]);
+    setFileHistoryIndex(-1);
+    setTextAsset({
+      kind: "text",
+      name: "",
+      mimeType: "text/plain",
+      size: 0,
+      text: "",
+    });
+    setNameDraft("");
+    setDocMode("view");
+  }, [setTextAsset]);
+
+  const saveDocInPlace = useCallback(async () => {
+    const text = asset?.text || "";
+    if (!text.trim()) {
+      toast.error("Document has no text.");
+      return;
+    }
+    if (!activeFilePath) {
+      toast.error("No open file to save.");
+      return;
+    }
+    const result = await saveOperatorFileInPlace(activeFilePath, text, folderRootsRef.current);
+    if (!result.ok) {
+      toast.error(result.error || "Could not save file.");
+      return;
+    }
+    toast.success(`Saved "${activeFilePath.split("/").pop()}".`);
+  }, [activeFilePath, asset?.text]);
+
+  const saveDocAs = useCallback(async () => {
     const text = asset?.text || "";
     if (!text.trim()) {
       toast.error("Document has no text.");
@@ -366,8 +406,22 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
       mimeType: asset?.mimeType || "text/plain",
       currentName: asset?.name,
       headerName: nameDraft,
+      sourceFilePath: activeFilePath,
     });
     try {
+      const electronSave = window.echoMirageSave;
+      if (electronSave) {
+        const result = await electronSave.showDialog({
+          defaultRelativePath: intent.suggestedSavePath,
+          content: intent.text,
+        });
+        if (!result.canceled && result.filePath) {
+          toast.success(`Saved "${result.filePath}".`);
+          return;
+        }
+        if (result.canceled && !result.error) return;
+        if (result.error) toast.error(result.error);
+      }
       if (await saveViaCadreApi(intent, false)) {
         toast.success(`Saved to ${intent.suggestedSavePath}`);
         return;
@@ -379,7 +433,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
         toast.error(err instanceof Error ? err.message : "Save failed.");
       }
     }
-  }, [asset, nameDraft]);
+  }, [activeFilePath, asset, nameDraft]);
 
   const exportMarkdown = useCallback(
     async (format: OperatorExportFormat) => {
@@ -478,14 +532,21 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
       onOperatorBrowserNavigate={() => {}}
       onOperatorBrowserUrlChange={() => {}}
       onPasteClipboardToOperator={pasteFromClipboard}
-      onSaveOperatorDocAsFile={saveDoc}
+      onSaveOperatorDocInPlace={saveDocInPlace}
+      onSaveOperatorDocAsFile={saveDocAs}
+      operatorCanSaveInPlace={
+        folderRootsCount >= 0 &&
+        canSaveOperatorFileInPlace(activeFilePath, folderRootsRef.current)
+      }
       onCopyOperatorDocToClipboard={copyToClipboard}
       onOperatorDocumentTextChange={handleTextChange}
+      onClearOperatorDocument={clearDocument}
       operatorDocumentKind={normalizeOperatorDocumentKind(asset?.kind)}
       onOperatorDocumentKindChange={handleKindChange}
       onOpenOperatorFolderFile={handleFolderFile}
       onOperatorFolderRootsChange={(roots) => {
         folderRootsRef.current = roots;
+        setFolderRootsCount(roots.length);
       }}
       operatorCanNavigateFileBack={operatorFileHistoryBackIndex(fileHistoryIndex) !== null}
       operatorCanNavigateFileForward={

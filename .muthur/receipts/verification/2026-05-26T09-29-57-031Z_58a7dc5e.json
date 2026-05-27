@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-05-26T09:29:57.031Z",
+  "task_id": "58a7dc5e-8f91-42f0-ab4a-3ada37f3846d",
+  "action_id": "58a7dc5e-8f91-42f0-ab4a-3ada37f3846d",
+  "action_type": "open_url",
+  "task_label": "probe-b6-root",
+  "url": "http://127.0.0.1:3050/cyberdeck",
+  "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_-1779787796398.png",
+  "execution_success": true,
+  "verification_passed": false,
+  "console_error_count": 0,
+  "execution_result": {
+    "success": true,
+    "duration_ms": 5446,
+    "stdout": "CYBERDECK // LOADING",
+    "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_-1779787796136.png",
+    "metadata": {
+      "url": "http://127.0.0.1:3050/cyberdeck",
+      "title": "Echo Mirage Cyberdeck",
+      "status": 200,
+      "console_error_count": 0,
+      "console_entries": [
+        {
+          "message": "./node_modules/.pnpm/@mariozechner+pi-ai@0.72.1_ws@8.20.0_zod@3.25.76/node_modules/@mariozechner/pi-ai/dist/providers/openai-codex-responses.js\nCritical dependency: the request of a dependency is an expression",
+          "source": "webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@16.1.5_@babel+core@7.2_4d46ebafa92e6245c8b6d4dc601588c7/node_modules/next/dist/next-devtools/shared/forward-logs-shared.js",
+          "severity": "warning",
+          "timestamp": "2026-05-26T09:29:56.132Z"
+        }
+      ],
+      "screenshot": {
+        "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_-1779787796136.png",
+        "width": 1280,
+        "height": 720,
+        "captured_at": "2026-05-26T09:29:56.252Z"
+      }
+    },
+    "verification_notes": "Navigated to http://127.0.0.1:3050/cyberdeck (200)."
+  },
+  "verification": {
+    "passed": false,
+    "checks": [
+      {
+        "check": "route_loads",
+        "passed": false,
+        "message": "Route failed status=200 url=http://127.0.0.1:3050/cyberdeck expected=/",
+        "evidence_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_-1779787796398.png",
+        "metadata": {
+          "url": "http://127.0.0.1:3050/cyberdeck",
+          "title": "Echo Mirage Cyberdeck",
+          "status": 200,
+          "route": "/"
+        }
+      },
+      {
+        "check": "no_console_errors",
+        "passed": true,
+        "message": "Console errors 0 <= 0",
+        "metadata": {
+          "count": 0,
+          "errors": []
+        }
+      },
+      {
+        "check": "screenshot_captured",
+        "passed": true,
+        "message": "Screenshot saved: F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_-1779787796398.png",
+        "evidence_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_-1779787796398.png",
+        "metadata": {
+          "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_-1779787796398.png"
+        }
+      }
+    ],
+    "evidence_paths": [
+      "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_-1779787796398.png"
+    ]
+  },
+  "evidence_paths": [
+    "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_-1779787796398.png"
+  ],
+  "receipt_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\receipts\\verification\\2026-05-26T09-29-57-031Z_58a7dc5e.json"
+}

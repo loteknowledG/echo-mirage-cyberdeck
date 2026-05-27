@@ -55,20 +55,22 @@ export function CyberdeckServerRail({
     window.requestAnimationFrame(() => {
       const rail = railRef.current;
       const tabEl = rail?.querySelector<HTMLElement>(`[data-server-tab="${selectedRailTabId}"]`);
-      if (!tabEl || !rail) return;
+      const scrollTarget =
+        tabEl?.closest<HTMLElement>("[data-rail-tab-cell]") ?? tabEl?.parentElement ?? tabEl;
+      if (!scrollTarget || !rail) return;
 
       const railRect = rail.getBoundingClientRect();
-      const tabRect = tabEl.getBoundingClientRect();
-      const vertical = railRect.height >= railRect.width;
-      const inView = vertical
-        ? tabRect.top >= railRect.top - 1 && tabRect.bottom <= railRect.bottom + 1
-        : tabRect.left >= railRect.left - 1 && tabRect.right <= railRect.right + 1;
+      const tabRect = scrollTarget.getBoundingClientRect();
+      const horizontal = railRect.width >= railRect.height;
+      const inView = horizontal
+        ? tabRect.left >= railRect.left - 1 && tabRect.right <= railRect.right + 1
+        : tabRect.top >= railRect.top - 1 && tabRect.bottom <= railRect.bottom + 1;
 
       if (!inView) {
-        tabEl.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });
+        scrollTarget.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
       }
     });
-  }, [railRef, selectedRailTabId]);
+  }, [railRef, selectedRailTabId, customTabs.length, fixedServers.length]);
 
   return (
     <CyberdeckRailTooltipProvider>
@@ -77,7 +79,7 @@ export function CyberdeckServerRail({
       data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
       tabIndex={-1}
       aria-label="Server rail"
-      className="cyberdeck-server-rail z-40 flex w-12 flex-shrink-0 flex-col items-center border-r border-gray-800 bg-black py-4 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 md:min-h-0 md:overflow-y-auto md:overscroll-y-contain max-md:sticky max-md:top-[max(0px,env(safe-area-inset-top))] max-md:self-start max-md:bg-black/95 max-md:backdrop-blur-sm max-md:h-auto max-md:w-full max-md:flex-row max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory max-md:border-b max-md:border-r-0 max-md:px-2 max-md:py-2 max-md:touch-pan-x"
+      className="cyberdeck-server-rail z-40 flex w-12 flex-shrink-0 flex-col items-center border-r border-gray-800 bg-black py-4 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 md:min-h-0 md:overflow-y-auto md:overscroll-y-contain max-md:w-full max-md:max-w-[100vw] max-md:min-w-0 max-md:shrink-0 max-md:flex-row max-md:flex-nowrap max-md:items-center max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:border-b max-md:border-r-0 max-md:bg-black max-md:px-2 max-md:py-2 max-md:[-webkit-overflow-scrolling:touch] max-md:[scroll-padding-inline:8px] max-md:touch-pan-x"
     >
       {fixedServers.map((btn) => (
         <CyberdeckRailTabTooltip
@@ -85,7 +87,6 @@ export function CyberdeckServerRail({
           label={railPaneLabelForFixedServer(btn.id, btn.label)}
         >
         <cyberdeck-rail-tab
-          className="absolute inset-0"
           data-server-tab={btn.id}
           onContextMenu={(event) => onRailContextMenu(btn.id, event)}
           {...createRailTabLongPressHandlers(btn.id)}
@@ -102,10 +103,10 @@ export function CyberdeckServerRail({
               onTabClick(btn.id);
             }}
             style={{
-              position: "absolute",
-              inset: 0,
               margin: 0,
               cursor: "pointer",
+              width: "100%",
+              height: "100%",
             }}
           >
             {selectedRailTabId === btn.id
@@ -118,7 +119,6 @@ export function CyberdeckServerRail({
       {customTabs.map((tab) => (
         <CyberdeckRailTabTooltip key={tab.id} label={railPaneLabelForCustomTab(tab)}>
         <cyberdeck-rail-tab
-          className="absolute inset-0"
           data-server-tab={tab.id}
           onContextMenu={(event) => onRailContextMenu(tab.id, event)}
           {...createRailTabLongPressHandlers(tab.id)}
@@ -135,10 +135,10 @@ export function CyberdeckServerRail({
               onTabClick(tab.id);
             }}
             style={{
-              position: "absolute",
-              inset: 0,
               margin: 0,
               cursor: "pointer",
+              width: "100%",
+              height: "100%",
             }}
           >
             {selectedRailTabId === tab.id
@@ -148,7 +148,7 @@ export function CyberdeckServerRail({
         </cyberdeck-rail-tab>
         </CyberdeckRailTabTooltip>
       ))}
-      <div className="flex w-12 shrink-0 flex-col gap-2 px-2 max-md:mt-0 max-md:snap-start md:mt-2">
+      <div className="flex w-12 shrink-0 flex-col gap-2 px-2 max-md:flex-row max-md:items-center max-md:mt-0 md:mt-2">
         <CyberdeckRailTabTooltip label="NEW TAB">
         <button
           type="button"

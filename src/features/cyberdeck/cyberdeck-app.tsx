@@ -112,13 +112,15 @@ import {
   pushOperatorFileHistory,
 } from "@/lib/operator-file-history";
 import {
-  readFileFromFolderPath,
+  readFileFromFolderRoot,
   type OperatorDocFolderRoot,
 } from "@/lib/operator-folder-nav";
 import {
   buildOperatorSaveIntent,
+  canSaveOperatorFileInPlace,
   downloadOperatorDoc,
   isPickerAbortError,
+  saveOperatorFileInPlace,
   saveViaCadreApi,
   type OperatorSaveIntent,
 } from "@/lib/operator-save";
@@ -178,6 +180,11 @@ import type { Identity } from "@/lib/identity/identity-types";
 import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration";
 import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
 import { ENABLE_AUTOMATION, ENABLE_MODEL_PROBE } from "@/lib/cyberdeck/automation-config";
+import {
+  formatActionResultForChat,
+  parseLegacyToolJson,
+} from "@/lib/muthur/execution/parse-legacy-tool-json";
+import { enqueueMuthurActions } from "@/lib/muthur/execution/use-muthur-execution-runtime";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import {
   getMuthurHelpText,
@@ -322,7 +329,9 @@ const CUSTOM_TAB_KINDS = [
   "memory-atlas",
   "voice-lab",
   "flight-log",
+  "drop-bay",
   "glyph-channel",
+  "muthur-execution",
   "rola-dex",
   "sound-profile",
   "catelog",
@@ -414,6 +423,8 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Memory Atlas", kind: "memory-atlas", action: "convert" },
   { label: "Voice Lab", kind: "voice-lab", action: "convert" },
   { label: "Flight Log", kind: "flight-log", action: "convert" },
+  { label: "Drop Bay", kind: "drop-bay", action: "convert" },
+  { label: "MUTHUR Execution", kind: "muthur-execution", action: "convert" },
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Rola Dex", kind: "rola-dex", action: "convert" },
   { label: "Sound Profile", kind: "sound-profile", action: "convert" },
@@ -727,6 +738,17 @@ function normalizeCustomTabKind(kind: string) {
   if (nextKind === "flightlog" || nextKind === "flight_log") {
     return "flight-log" as CustomTabKind;
   }
+  if (nextKind === "dropbay" || nextKind === "drop_bay") {
+    return "drop-bay" as CustomTabKind;
+  }
+  if (
+    nextKind === "muthur-execution" ||
+    nextKind === "muthur_execution" ||
+    nextKind === "execution" ||
+    nextKind === "execution-pane"
+  ) {
+    return "muthur-execution" as CustomTabKind;
+  }
   if (
     nextKind === "glyph" ||
     nextKind === "glyph-channel" ||
@@ -777,6 +799,8 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "memory-atlas") return "M";
   if (kind === "voice-lab") return "V";
   if (kind === "flight-log") return "F";
+  if (kind === "drop-bay") return "⬇";
+  if (kind === "muthur-execution") return "⚙";
   if (kind === "glyph-channel") return "⟁";
   if (kind === "rola-dex") return "▧";
   if (kind === "sound-profile") return "♪";
@@ -788,6 +812,8 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "memory-atlas") return "MEMORY ATLAS";
   if (kind === "voice-lab") return "VOICE LAB";
   if (kind === "flight-log") return "FLIGHT LOG";
+  if (kind === "drop-bay") return "DROP BAY";
+  if (kind === "muthur-execution") return "MUTHUR EXECUTION";
   if (kind === "glyph-channel") return "⟁ GLYPH";
   if (kind === "rola-dex") return "Rola Dex";
   if (kind === "sound-profile") return "Sound Profile";
@@ -833,7 +859,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|muthur-execution|execution|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -886,6 +912,7 @@ export default function CyberdeckApp() {
   const operatorFileHistoryRef = useRef<string[]>([]);
   const operatorFileHistoryIndexRef = useRef(-1);
   const operatorFolderRootsRef = useRef<OperatorDocFolderRoot[]>([]);
+  const [operatorFolderRootsCount, setOperatorFolderRootsCount] = useState(0);
   const operatorFileHistoryLoadersRef = useRef<Map<string, () => Promise<void>>>(new Map());
   const [operatorBrowserUrl, setOperatorBrowserUrl] = useState(OPERATOR_BROWSER_HOME_URL);
   const [operatorBrowserSnapshot, setOperatorBrowserSnapshot] = useState("");
@@ -2229,6 +2256,25 @@ export default function CyberdeckApp() {
     setOperatorDocNameDraft(nextName);
   }, [operatorDocNameDraft, operatorDroppedAsset]);
 
+  const clearOperatorDocument = useCallback(() => {
+    operatorKindManualRef.current = false;
+    setOperatorActiveFilePath(null);
+    operatorFileHistoryRef.current = [];
+    operatorFileHistoryIndexRef.current = -1;
+    operatorFileHistoryLoadersRef.current.clear();
+    setOperatorFileHistory([]);
+    setOperatorFileHistoryIndex(-1);
+    setOperatorTextAsset({
+      kind: "text",
+      name: "",
+      mimeType: "text/plain",
+      size: 0,
+      text: "",
+    });
+    setOperatorDocNameDraft("");
+    setOperatorDocMode("view");
+  }, [setOperatorTextAsset]);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -2419,6 +2465,7 @@ export default function CyberdeckApp() {
       mimeType: operatorDroppedAsset?.mimeType || "text/plain",
       currentName: operatorDroppedAsset?.name,
       headerName: operatorDocNameDraft,
+      sourceFilePath: operatorActiveFilePath,
     });
 
     const electronSave = (window as Window & { echoMirageSave?: EchoMirageSaveApi }).echoMirageSave;
@@ -2447,6 +2494,7 @@ export default function CyberdeckApp() {
     });
   }, [
     completeOperatorSave,
+    operatorActiveFilePath,
     operatorDocNameDraft,
     operatorDroppedAsset?.kind,
     operatorDroppedAsset?.mimeType,
@@ -2454,6 +2502,43 @@ export default function CyberdeckApp() {
     operatorDroppedAsset?.text,
     operatorSurfaceIsDocument,
   ]);
+
+  const saveOperatorDocInPlace = useCallback(async () => {
+    const text = operatorDroppedAsset?.text || "";
+    if (!operatorSurfaceIsDocument || !text.trim()) {
+      toast.error("Operator document has no text.");
+      return;
+    }
+    if (!operatorActiveFilePath) {
+      toast.error("No open file to save.");
+      return;
+    }
+
+    const result = await saveOperatorFileInPlace(
+      operatorActiveFilePath,
+      text,
+      operatorFolderRootsRef.current,
+    );
+    if (!result.ok) {
+      toast.error(result.error || "Could not save file.");
+      return;
+    }
+    toast.success(`Saved "${operatorActiveFilePath.split("/").pop()}".`);
+  }, [
+    operatorActiveFilePath,
+    operatorDroppedAsset?.text,
+    operatorSurfaceIsDocument,
+  ]);
+
+  const saveOperatorDocument = useCallback(() => {
+    if (
+      canSaveOperatorFileInPlace(operatorActiveFilePath, operatorFolderRootsRef.current)
+    ) {
+      void saveOperatorDocInPlace();
+      return;
+    }
+    saveOperatorDocAsFile();
+  }, [operatorActiveFilePath, saveOperatorDocAsFile, saveOperatorDocInPlace]);
 
   const exportOperatorMarkdown = useCallback(async (format: OperatorExportFormat) => {
     const text = operatorDroppedAsset?.text || "";
@@ -2658,7 +2743,7 @@ export default function CyberdeckApp() {
       const rootName = filePath.split("/")[0];
       const root = operatorFolderRootsRef.current.find((entry) => entry.name === rootName);
       if (!root) return;
-      const file = await readFileFromFolderPath(root.handle, filePath);
+      const file = await readFileFromFolderRoot(root, filePath);
       if (!file) return;
       await loadOperatorAssetFromFile(file);
     },
@@ -2671,7 +2756,7 @@ export default function CyberdeckApp() {
         const rootName = filePath.split("/")[0];
         const root = operatorFolderRootsRef.current.find((entry) => entry.name === rootName);
         if (root) {
-          const fresh = await readFileFromFolderPath(root.handle, filePath);
+          const fresh = await readFileFromFolderRoot(root, filePath);
           await loadOperatorAssetFromFile(fresh || file);
           return;
         }
@@ -2683,6 +2768,7 @@ export default function CyberdeckApp() {
 
   const handleOperatorFolderRootsChange = useCallback((roots: OperatorDocFolderRoot[]) => {
     operatorFolderRootsRef.current = roots;
+    setOperatorFolderRootsCount(roots.length);
   }, []);
 
   const copyHeapEntry = useCallback(async (entry: HeapEntry) => {
@@ -2724,7 +2810,7 @@ export default function CyberdeckApp() {
     const onContextAction = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail;
       if (detail === "save-operator") {
-        void saveOperatorDocAsFile();
+        saveOperatorDocument();
         return;
       }
       if (detail === "paste-operator") {
@@ -2738,7 +2824,7 @@ export default function CyberdeckApp() {
 
     window.addEventListener("echo-mirage-context-action", onContextAction);
     return () => window.removeEventListener("echo-mirage-context-action", onContextAction);
-  }, [copyOperatorDocToClipboard, pasteClipboardToOperator, saveOperatorDocAsFile]);
+  }, [copyOperatorDocToClipboard, pasteClipboardToOperator, saveOperatorDocument]);
 
   const selectProvider = useCallback((id: string) => {
     setActiveProvider(id);
@@ -4962,100 +5048,73 @@ const resolved = resolveUiTarget(userMessage);
         .replace(/^=+$\n?/g, "")
         .trim();
 
-      // Check if response is a tool invocation JSON - don't show raw JSON to user
-      // Quick check first - only if text starts with { or [
-      let toolInvocationMatch = null;
-      let altToolMatch = null;
-      if (cleanedText.trim().startsWith("{") || cleanedText.trim().startsWith("[")) {
-        toolInvocationMatch = cleanedText.match(/^\s*\{[\s\S]*"tool"\s*:\s*"(\w+)"[\s\S]*"command"\s*:\s*"([^"]+)"[\s\S]*\}\s*$/);
-        if (!toolInvocationMatch) {
-          altToolMatch = cleanedText.match(/^\s*\[[\s\S]*"type"\s*:\s*"tool"[\s\S]*"name"\s*:\s*"(\w+)"[\s\S]*"arguments"\s*:\s*\{[\s\S]*"command"\s*:\s*"([^"]+)"[\s\S]*\}[^\]]*\]\s*$/);
-        }
-      }
-      
-      if (altToolMatch && !cleanedText.includes("[EXEC:")) {
-        const toolName = altToolMatch[1];
-        const toolCommand = altToolMatch[2];
-      } else if (toolInvocationMatch && !cleanedText.includes("[EXEC:")) {
-        const toolName = toolInvocationMatch[1];
-        const toolCommand = toolInvocationMatch[2];
-        
-        // Whitelist of allowed commands
-        const allowedCommands = [
-          "pnpm exec tsc --noEmit",
-          "pnpm build", 
-          "pnpm e2e",
-          "git diff",
-          "git status --short",
-          "git log --oneline -10"
-        ];
-        
-        if (!allowedCommands.includes(toolCommand)) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", text: `TOOL EXECUTION BLOCKED: command not allowlisted\n\nRequested: ${toolCommand}` },
-          ]);
-          setStreamText("");
-          setIsStreaming(false);
-          return;
-        }
-
-        // Execute the tool
+      const legacyAction = parseLegacyToolJson(cleanedText);
+      if (legacyAction && !cleanedText.includes("[EXEC:")) {
         setMessages((prev) => [
           ...prev,
-          { role: "system", text: `⚡ TOOL // ${toolName.toUpperCase()} // EXECUTING // ${toolCommand}` },
+          {
+            role: "system",
+            text: `⚡ EXECUTION // ${legacyAction.type.toUpperCase()} // QUEUED`,
+          },
         ]);
         setIsStreaming(true);
-        setStreamText(`⚡ Executing ${toolName}...`);
+        setStreamText("⚡ Running execution loop…");
 
         try {
-          const startTime = Date.now();
-          
-          const execRes = await fetch("/api/execute-command", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ command: toolCommand }),
+          const execData = await enqueueMuthurActions([legacyAction], {
+            wait: true,
+            mode: "execute",
+            taskLabel: "legacy-json-tool",
           });
-          
-          const execResult = await execRes.json();
-          
-          if (!execRes.ok) {
+          const results = Array.isArray(execData.results) ? execData.results : [];
+          const first = results[0] as
+            | {
+                status?: string;
+                type?: string;
+                payload?: Record<string, unknown>;
+                result?: {
+                  success: boolean;
+                  stdout?: string;
+                  stderr?: string;
+                  exit_code?: number;
+                  duration_ms: number;
+                };
+                error?: string;
+              }
+            | undefined;
+
+          if (!first) {
             setMessages((prev) => [
               ...prev,
-              { role: "assistant", text: `TOOL EXECUTION BLOCKED: ${execResult.error}\n\nRequested: ${toolCommand}` },
+              {
+                role: "assistant",
+                text: "EXECUTION BLOCKED // Action requires approval in MUTHUR Execution pane.",
+              },
             ]);
             setStreamText("");
             setIsStreaming(false);
             return;
           }
-          
-          const { exitCode, stdout, stderr, durationMs } = execResult;
-          const resultStatus = exitCode === 0 ? "PASS" : "FAIL";
-          
-          // Send result back to Muthur for final summary
-          const toolResultMessage = `TOOL RESULT:
-tool: ${toolName}
-command: ${toolCommand}
-exit_code: ${exitCode}
-status: ${resultStatus}
-stdout: ${stdout.slice(0, 2000)}
-stderr: ${stderr.slice(0, 1000)}
-duration_ms: ${durationMs}`;
-          
+
+          const toolResultMessage = formatActionResultForChat({
+            type: first.type ?? legacyAction.type,
+            payload: first.payload ?? legacyAction.payload,
+            status: first.status ?? "unknown",
+            result: first.result,
+            error: first.error,
+          });
+
           if (!ENABLE_AUTOMATION) {
             setMessages((prev) => [
               ...prev,
-              {
-                role: "assistant",
-                text: `TOOL ${resultStatus}\nCommand: ${toolCommand}\nDuration: ${durationMs}ms\n\nstdout:\n${stdout.slice(0, 2000)}${stderr ? `\n\nstderr:\n${stderr.slice(0, 1000)}` : ""}`,
-              },
+              { role: "assistant", text: toolResultMessage },
             ]);
           } else {
             const reviewRes = await fetch("/api/cyberdeck-chat", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                message: `A tool was executed. Give a brief summary of the result.\n\n${toolResultMessage}`,
+                message: `A tool was executed via the MUTHUR execution loop. Give a brief summary.\n\n${toolResultMessage}`,
                 provider: activeProvider,
                 apiKey: providerKeys[activeProvider] || "",
                 model: modelID,
@@ -5084,17 +5143,17 @@ duration_ms: ${durationMs}`;
             } else {
               setMessages((prev) => [
                 ...prev,
-                { role: "assistant", text: `TOOL ${resultStatus}\nCommand: ${toolCommand}\nDuration: ${durationMs}ms` },
+                { role: "assistant", text: toolResultMessage },
               ]);
             }
           }
         } catch (e) {
           setMessages((prev) => [
             ...prev,
-            { role: "assistant", text: `TOOL EXECUTION FAILED: ${(e as Error).message}` },
+            { role: "assistant", text: `EXECUTION FAILED: ${(e as Error).message}` },
           ]);
         }
-        
+
         setStreamText("");
         setIsStreaming(false);
         return;
@@ -6098,6 +6157,14 @@ duration_ms: ${durationMs}`;
         return shell(<ActivatedCyberdeckPane kind="flight-log" />);
       }
 
+      if (tab.kind === "drop-bay") {
+        return shell(<ActivatedCyberdeckPane kind="drop-bay" />);
+      }
+
+      if (tab.kind === "muthur-execution") {
+        return shell(<ActivatedCyberdeckPane kind="muthur-execution" />);
+      }
+
       if (tab.kind === "glyph-channel") {
         return (
           <div
@@ -6165,7 +6232,7 @@ duration_ms: ${durationMs}`;
     <div
       ref={cyberdeckRootRef}
       data-deck-mode={deckMode}
-      className="terminal-window flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:flex-col max-md:overflow-y-auto md:overflow-hidden"
+      className="terminal-window box-border flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:h-[100dvh] max-md:flex-col max-md:overflow-hidden md:overflow-hidden"
     >
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence
@@ -7089,11 +7156,20 @@ duration_ms: ${durationMs}`;
                   onOperatorBrowserNavigate={openOperatorBrowser}
                   onOperatorBrowserUrlChange={setOperatorBrowserUrl}
                   onPasteClipboardToOperator={pasteClipboardToOperator}
+                  onSaveOperatorDocInPlace={saveOperatorDocInPlace}
                   onSaveOperatorDocAsFile={saveOperatorDocAsFile}
+                  operatorCanSaveInPlace={
+                    operatorFolderRootsCount >= 0 &&
+                    canSaveOperatorFileInPlace(
+                      operatorActiveFilePath,
+                      operatorFolderRootsRef.current,
+                    )
+                  }
                   onConvertDocumentToMarkdown={openConvertedMarkdownInOperator}
                   onExportOperatorMarkdown={exportOperatorMarkdown}
                   onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
                   onOperatorDocumentTextChange={handleOperatorDocumentTextChange}
+                  onClearOperatorDocument={clearOperatorDocument}
                   onOperatorDocumentKindChange={handleOperatorDocumentKindChange}
                   operatorDocumentKind={normalizeOperatorDocumentKind(operatorDroppedAsset?.kind)}
                   onOpenOperatorFolderFile={openOperatorFolderFile}

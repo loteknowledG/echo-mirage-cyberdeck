@@ -18,6 +18,83 @@ function getEchoMirageProjectRoot() {
   return app.getPath('documents');
 }
 
+const OPERATOR_FOLDER_IGNORED_NAMES = new Set([
+  'node_modules',
+  '.git',
+  '.next',
+  '.turbo',
+  'dist',
+  'build',
+  'coverage',
+  '.pnpm-store',
+  '.cache',
+  '.muthur',
+]);
+
+const OPERATOR_FOLDER_LIST_MAX_ENTRIES = 400;
+
+function isPathInsideRoot(rootPath, targetPath) {
+  const root = path.resolve(rootPath);
+  const target = path.resolve(targetPath);
+  const relative = path.relative(root, target);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function resolveOperatorFolderPath(rootPath, relativePath = '') {
+  const root = path.resolve(rootPath);
+  const parts = String(relativePath || '')
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter(Boolean);
+  const target = path.resolve(root, ...parts);
+  if (!isPathInsideRoot(root, target)) {
+    throw new Error('Path escapes folder root.');
+  }
+  return target;
+}
+
+async function listOperatorFolderEntries(rootPath, relativePath, pathPrefix) {
+  const dirPath = resolveOperatorFolderPath(rootPath, relativePath);
+  const entries = await fs.readdir(dirPath, { withFileTypes: true });
+  const nodes = [];
+
+  for (const entry of entries) {
+    const entryPath = `${pathPrefix}/${entry.name}`;
+    if (entry.isDirectory()) {
+      if (OPERATOR_FOLDER_IGNORED_NAMES.has(entry.name)) {
+        nodes.push({ name: entry.name, path: entryPath, kind: 'folder', ignored: true });
+      } else {
+        nodes.push({ name: entry.name, path: entryPath, kind: 'folder' });
+      }
+    } else if (entry.isFile()) {
+      nodes.push({ name: entry.name, path: entryPath, kind: 'file' });
+    }
+
+    if (nodes.length > OPERATOR_FOLDER_LIST_MAX_ENTRIES) {
+      break;
+    }
+  }
+
+  nodes.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === 'folder' ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  if (entries.length <= OPERATOR_FOLDER_LIST_MAX_ENTRIES) {
+    return nodes;
+  }
+
+  const kept = nodes.slice(0, OPERATOR_FOLDER_LIST_MAX_ENTRIES);
+  kept.push({
+    name: '… more entries',
+    path: `${pathPrefix}/__truncated__`,
+    kind: 'folder',
+    truncated: true,
+    ignored: true,
+  });
+  return kept;
+}
+
 let playrightBrowserState = null;
 
 async function ensurePlaywrightBrowserState() {
@@ -367,6 +444,115 @@ ipcMain.handle('echo-mirage-open:pick-convert-document', async () => {
   }
 });
 
+ipcMain.handle('echo-mirage-open:pick-operator-folder', async () => {
+  try {
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory'],
+      defaultPath: getEchoMirageProjectRoot(),
+    });
+    if (result.canceled || !result.filePaths?.[0]) {
+      return { canceled: true };
+    }
+    const folderPath = path.resolve(result.filePaths[0]);
+    return {
+      canceled: false,
+      folderPath,
+      name: path.basename(folderPath) || 'folder',
+    };
+  } catch (error) {
+    return {
+      canceled: true,
+      error: error instanceof Error ? error.message : 'Open folder dialog failed',
+    };
+  }
+});
+
+ipcMain.handle('echo-mirage-open:list-operator-folder', async (_event, payload) => {
+  try {
+    const rootPath = String(payload?.rootPath || '');
+    const relativePath = String(payload?.relativePath || '');
+    const pathPrefix = String(payload?.pathPrefix || '');
+    if (!rootPath || !pathPrefix) {
+      return { ok: false, error: 'Missing folder path.' };
+    }
+    const nodes = await listOperatorFolderEntries(rootPath, relativePath, pathPrefix);
+    return { ok: true, nodes };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not list folder.',
+    };
+  }
+});
+
+ipcMain.handle('echo-mirage-open:read-operator-file', async (_event, payload) => {
+  try {
+    const rootPath = String(payload?.rootPath || '');
+    const logicalPath = String(payload?.logicalPath || '');
+    if (!rootPath || !logicalPath) {
+      return { ok: false, error: 'Missing file path.' };
+    }
+    const parts = logicalPath.replace(/\\/g, '/').split('/').filter(Boolean).slice(1);
+    if (parts.length === 0) {
+      return { ok: false, error: 'Invalid file path.' };
+    }
+    for (const part of parts.slice(0, -1)) {
+      if (OPERATOR_FOLDER_IGNORED_NAMES.has(part)) {
+        return { ok: false, error: 'Folder is not browsable.' };
+      }
+    }
+    const filePath = resolveOperatorFolderPath(rootPath, parts.join('/'));
+    const stat = await fs.stat(filePath);
+    if (!stat.isFile()) {
+      return { ok: false, error: 'Not a file.' };
+    }
+    const name = path.basename(filePath);
+    const text = await fs.readFile(filePath, 'utf8');
+    return {
+      ok: true,
+      name,
+      mimeType: 'text/plain',
+      text,
+      size: stat.size,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not read file.',
+    };
+  }
+});
+
+ipcMain.handle('echo-mirage-open:write-operator-file', async (_event, payload) => {
+  try {
+    const rootPath = String(payload?.rootPath || '');
+    const logicalPath = String(payload?.logicalPath || '');
+    const content = String(payload?.content ?? '');
+    if (!rootPath || !logicalPath) {
+      return { ok: false, error: 'Missing file path.' };
+    }
+    const parts = logicalPath.replace(/\\/g, '/').split('/').filter(Boolean).slice(1);
+    if (parts.length === 0) {
+      return { ok: false, error: 'Invalid file path.' };
+    }
+    for (const part of parts.slice(0, -1)) {
+      if (OPERATOR_FOLDER_IGNORED_NAMES.has(part)) {
+        return { ok: false, error: 'Folder is not browsable.' };
+      }
+    }
+    const filePath = resolveOperatorFolderPath(rootPath, parts.join('/'));
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, content, 'utf8');
+    return { ok: true, filePath };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not save file.',
+    };
+  }
+});
+
 ipcMain.handle('echo-mirage-save:show-dialog', async (_event, options) => {
   try {
     const relative = String(options?.defaultRelativePath || 'docs/cadre/operator-doc.md').replace(/\\/g, '/');
@@ -378,8 +564,10 @@ ipcMain.handle('echo-mirage-save:show-dialog', async (_event, options) => {
     const result = await dialog.showSaveDialog(win, {
       defaultPath,
       filters: [
+        { name: 'All files', extensions: ['*'] },
         { name: 'Markdown', extensions: ['md', 'markdown'] },
         { name: 'Text', extensions: ['txt'] },
+        { name: 'Environment', extensions: ['local', 'env'] },
       ],
     });
     if (result.canceled || !result.filePath) {

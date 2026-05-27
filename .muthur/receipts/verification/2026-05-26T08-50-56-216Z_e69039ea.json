@@ -1,0 +1,98 @@
+{
+  "timestamp": "2026-05-26T08:50:56.216Z",
+  "task_id": "e69039ea-5f71-4455-ad23-ceb37404fecf",
+  "action_id": "e69039ea-5f71-4455-ad23-ceb37404fecf",
+  "action_type": "open_url",
+  "task_label": "b6-root-20260526-045038",
+  "url": "http://127.0.0.1:3050/cyberdeck",
+  "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_-1779785455155.png",
+  "execution_success": true,
+  "verification_passed": true,
+  "console_error_count": 0,
+  "execution_result": {
+    "success": true,
+    "duration_ms": 16165,
+    "stdout": "CYBERDECK // LOADING",
+    "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_-1779785455155.png",
+    "metadata": {
+      "url": "http://127.0.0.1:3050/cyberdeck",
+      "title": "Echo Mirage Cyberdeck",
+      "status": 200,
+      "console_error_count": 0,
+      "console_entries": [
+        {
+          "message": "./node_modules/.pnpm/@mariozechner+pi-ai@0.72.1_ws@8.20.0_zod@3.25.76/node_modules/@mariozechner/pi-ai/dist/providers/openai-codex-responses.js\nCritical dependency: the request of a dependency is an expression\n\nImport trace for requested module:\n./node_modules/.pnpm/@mariozechner+pi-ai@0.72.1_ws@8.20.0_zod@3.25.76/node_modules/@mariozechner/pi-ai/dist/providers/openai-codex-responses.js\n./node_modules/.pnpm/@mariozechner+pi-ai@0.72.1_ws@8.20.0_zod@3.25.76/node_modules/@mariozechner/pi-ai/dist/index.js\n./src/components/cyberdeck/pi-chat-pane-body.tsx\n./src/features/cyberdeck/pane-loaders/pi-chat.tsx\n./src/features/cyberdeck/load-cyberdeck-pane.ts\n./src/features/cyberdeck/activated-cyberdeck-pane.tsx\n./src/features/cyberdeck/cyberdeck-app.tsx\n./src/app/cyberdeck/cyberdeck-page-client.tsx",
+          "source": "webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@16.1.5_@babel+core@7.2_4d46ebafa92e6245c8b6d4dc601588c7/node_modules/next/dist/next-devtools/shared/forward-logs-shared.js",
+          "severity": "warning",
+          "timestamp": "2026-05-26T08:50:52.825Z"
+        },
+        {
+          "message": "./node_modules/.pnpm/@mariozechner+pi-ai@0.72.1_ws@8.20.0_zod@3.25.76/node_modules/@mariozechner/pi-ai/dist/providers/openai-codex-responses.js\nCritical dependency: the request of a dependency is an expression\n\nImport trace for requested module:\n./node_modules/.pnpm/@mariozechner+pi-ai@0.72.1_ws@8.20.0_zod@3.25.76/node_modules/@mariozechner/pi-ai/dist/providers/openai-codex-responses.js\n./node_modules/.pnpm/@mariozechner+pi-ai@0.72.1_ws@8.20.0_zod@3.25.76/node_modules/@mariozechner/pi-ai/dist/index.js\n./src/components/cyberdeck/pi-chat-pane-body.tsx\n./src/features/cyberdeck/pane-loaders/pi-chat.tsx\n./src/features/cyberdeck/load-cyberdeck-pane.ts\n./src/features/cyberdeck/activated-cyberdeck-pane.tsx\n./src/features/cyberdeck/cyberdeck-app.tsx\n./src/app/cyberdeck/cyberdeck-page-client.tsx",
+          "source": "webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@16.1.5_@babel+core@7.2_4d46ebafa92e6245c8b6d4dc601588c7/node_modules/next/dist/next-devtools/shared/forward-logs-shared.js",
+          "severity": "warning",
+          "timestamp": "2026-05-26T08:50:54.712Z"
+        },
+        {
+          "message": "./node_modules/.pnpm/@mariozechner+pi-ai@0.72.1_ws@8.20.0_zod@3.25.76/node_modules/@mariozechner/pi-ai/dist/providers/openai-codex-responses.js\nCritical dependency: the request of a dependency is an expression",
+          "source": "webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@16.1.5_@babel+core@7.2_4d46ebafa92e6245c8b6d4dc601588c7/node_modules/next/dist/next-devtools/shared/forward-logs-shared.js",
+          "severity": "warning",
+          "timestamp": "2026-05-26T08:50:56.067Z"
+        },
+        {
+          "message": "./node_modules/.pnpm/@mariozechner+pi-ai@0.72.1_ws@8.20.0_zod@3.25.76/node_modules/@mariozechner/pi-ai/dist/providers/openai-codex-responses.js\nCritical dependency: the request of a dependency is an expression",
+          "source": "webpack-internal:///(app-pages-browser)/./node_modules/.pnpm/next@16.1.5_@babel+core@7.2_4d46ebafa92e6245c8b6d4dc601588c7/node_modules/next/dist/next-devtools/shared/forward-logs-shared.js",
+          "severity": "warning",
+          "timestamp": "2026-05-26T08:50:56.068Z"
+        }
+      ],
+      "screenshot": {
+        "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_-1779785455155.png",
+        "width": 1280,
+        "height": 720,
+        "captured_at": "2026-05-26T08:50:56.158Z"
+      }
+    },
+    "verification_notes": "Navigated to http://127.0.0.1:3050/cyberdeck (200)."
+  },
+  "verification": {
+    "passed": true,
+    "checks": [
+      {
+        "check": "route_loads",
+        "passed": true,
+        "message": "Route loaded (200) http://127.0.0.1:3050/cyberdeck",
+        "evidence_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_-1779785455155.png",
+        "metadata": {
+          "url": "http://127.0.0.1:3050/cyberdeck",
+          "title": "Echo Mirage Cyberdeck",
+          "status": 200
+        }
+      },
+      {
+        "check": "no_console_errors",
+        "passed": true,
+        "message": "Console errors 0 <= 0",
+        "metadata": {
+          "count": 0,
+          "errors": []
+        }
+      },
+      {
+        "check": "screenshot_captured",
+        "passed": true,
+        "message": "Screenshot saved: F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_-1779785455155.png",
+        "evidence_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_-1779785455155.png",
+        "metadata": {
+          "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_-1779785455155.png"
+        }
+      }
+    ],
+    "evidence_paths": [
+      "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_-1779785455155.png"
+    ]
+  },
+  "evidence_paths": [
+    "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\verify-_-1779785455155.png"
+  ],
+  "receipt_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\receipts\\verification\\2026-05-26T08-50-56-216Z_e69039ea.json"
+}

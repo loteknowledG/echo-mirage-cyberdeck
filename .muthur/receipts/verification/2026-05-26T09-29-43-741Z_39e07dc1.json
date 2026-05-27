@@ -1,0 +1,82 @@
+{
+  "timestamp": "2026-05-26T09:29:43.742Z",
+  "task_id": "39e07dc1-ad3e-4f99-9e1b-55f71b71cb18",
+  "action_id": "39e07dc1-ad3e-4f99-9e1b-55f71b71cb18",
+  "action_type": "verify_route_loaded",
+  "task_label": null,
+  "url": "http://127.0.0.1:3050/cyberdeck",
+  "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png",
+  "execution_success": true,
+  "verification_passed": true,
+  "console_error_count": 0,
+  "execution_result": {
+    "success": true,
+    "duration_ms": 833,
+    "metadata": {
+      "verification": {
+        "passed": true,
+        "checks": [
+          {
+            "check": "route_loads",
+            "passed": true,
+            "message": "Route loaded (200) http://127.0.0.1:3050/cyberdeck",
+            "evidence_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png",
+            "metadata": {
+              "url": "http://127.0.0.1:3050/cyberdeck",
+              "title": "Echo Mirage Cyberdeck",
+              "status": 200,
+              "route": "/cyberdeck"
+            }
+          },
+          {
+            "check": "screenshot_captured",
+            "passed": true,
+            "message": "Screenshot saved: F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png",
+            "evidence_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png",
+            "metadata": {
+              "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png"
+            }
+          }
+        ],
+        "evidence_paths": [
+          "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png"
+        ]
+      }
+    },
+    "verification_notes": "PASS route_loads: Route loaded (200) http://127.0.0.1:3050/cyberdeck\nPASS screenshot_captured: Screenshot saved: F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png",
+    "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png"
+  },
+  "verification": {
+    "passed": true,
+    "checks": [
+      {
+        "check": "route_loads",
+        "passed": true,
+        "message": "Route loaded (200) http://127.0.0.1:3050/cyberdeck",
+        "evidence_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png",
+        "metadata": {
+          "url": "http://127.0.0.1:3050/cyberdeck",
+          "title": "Echo Mirage Cyberdeck",
+          "status": 200,
+          "route": "/cyberdeck"
+        }
+      },
+      {
+        "check": "screenshot_captured",
+        "passed": true,
+        "message": "Screenshot saved: F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png",
+        "evidence_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png",
+        "metadata": {
+          "screenshot_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png"
+        }
+      }
+    ],
+    "evidence_paths": [
+      "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png"
+    ]
+  },
+  "evidence_paths": [
+    "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\screenshots\\route-_cyberdeck-1779787783235.png"
+  ],
+  "receipt_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\receipts\\verification\\2026-05-26T09-29-43-741Z_39e07dc1.json"
+}

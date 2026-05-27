@@ -6,7 +6,7 @@ import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { BsMarkdown } from "react-icons/bs";
 import { FaRegPaste } from "react-icons/fa6";
 import { GrFormEdit, GrFormView } from "react-icons/gr";
-import { LuArrowLeft, LuArrowRight, LuPanelRightClose, LuPanelRightOpen, LuRedo2, LuTrash2, LuUndo2 } from "react-icons/lu";
+import { LuArrowLeft, LuArrowRight, LuPanelRightClose, LuPanelRightOpen, LuRedo2, LuSave, LuTrash2, LuUndo2 } from "react-icons/lu";
 import { isConvertibleDocumentPath } from "@/lib/muthur-document-conversion-intent";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -70,9 +70,12 @@ type OperatorPaneBodyProps = {
   onOperatorBrowserNavigate: (nextUrl: string) => void;
   onOperatorBrowserUrlChange: (nextUrl: string) => void;
   onPasteClipboardToOperator: () => void | Promise<void>;
+  onSaveOperatorDocInPlace?: () => void | Promise<void>;
   onSaveOperatorDocAsFile: () => void | Promise<void>;
+  operatorCanSaveInPlace?: boolean;
   onCopyOperatorDocToClipboard: () => void | Promise<void>;
   onOperatorDocumentTextChange: (nextText: string) => void;
+  onClearOperatorDocument?: () => void;
   operatorDocumentKind: OperatorDocumentPickerKind;
   onOperatorDocumentKindChange: (kind: OperatorDocumentPickerKind) => void;
   onOpenOperatorFolderFile: (path: string, file: File) => void | Promise<void>;
@@ -346,7 +349,9 @@ function OperatorDocumentToolStrip({
   onOperatorDocumentKindChange,
   onCopyOperatorDocToClipboard,
   onPasteClipboardToOperator,
+  onSaveOperatorDocInPlace,
   onSaveOperatorDocAsFile,
+  operatorCanSaveInPlace = false,
   onConvertDocumentToMarkdown,
   onExportOperatorMarkdown,
 }: {
@@ -360,7 +365,9 @@ function OperatorDocumentToolStrip({
   onOperatorDocumentKindChange: (kind: OperatorDocumentPickerKind) => void;
   onCopyOperatorDocToClipboard: () => void | Promise<void>;
   onPasteClipboardToOperator: () => void | Promise<void>;
+  onSaveOperatorDocInPlace?: () => void | Promise<void>;
   onSaveOperatorDocAsFile: () => void | Promise<void>;
+  operatorCanSaveInPlace?: boolean;
   onConvertDocumentToMarkdown: (filePath: string) => void | Promise<void>;
   onExportOperatorMarkdown: (format: OperatorExportFormat) => void | Promise<void>;
 }) {
@@ -476,6 +483,13 @@ function OperatorDocumentToolStrip({
       </OperatorToolbarIconButton>
       <OperatorToolbarIconButton
         label="Save"
+        onClick={() => void (onSaveOperatorDocInPlace ?? onSaveOperatorDocAsFile)()}
+        disabled={!operatorCanSaveInPlace}
+      >
+        <LuSave className="h-3.5 w-3.5" />
+      </OperatorToolbarIconButton>
+      <OperatorToolbarIconButton
+        label="Save as"
         onClick={() => void onSaveOperatorDocAsFile()}
       >
         <DownloadIcon className="h-3.5 w-3.5" />
@@ -505,8 +519,11 @@ export function CyberdeckOperatorPaneBody({
   onOperatorBrowserNavigate,
   onOperatorBrowserUrlChange,
   onPasteClipboardToOperator,
+  onSaveOperatorDocInPlace,
   onSaveOperatorDocAsFile,
+  operatorCanSaveInPlace = false,
   onCopyOperatorDocToClipboard,
+  onClearOperatorDocument,
   onOperatorDocumentTextChange,
   operatorDocumentKind,
   onOperatorDocumentKindChange,
@@ -608,9 +625,13 @@ export function CyberdeckOperatorPaneBody({
   }, [onOperatorDocumentTextChange, redoOperatorDoc]);
 
   const handleOperatorClear = useCallback(() => {
+    if (onClearOperatorDocument) {
+      onClearOperatorDocument();
+      return;
+    }
     if (!operatorDocText.trim()) return;
     applyOperatorDocText("", "immediate");
-  }, [applyOperatorDocText, operatorDocText]);
+  }, [applyOperatorDocText, onClearOperatorDocument, operatorDocText]);
 
   useEffect(() => {
     if (operatorSurfaceMode !== "browser") return;
@@ -767,14 +788,20 @@ export function CyberdeckOperatorPaneBody({
             operatorDocumentKind={operatorDocumentKind}
             canUndo={operatorCanUndo}
             canRedo={operatorCanRedo}
-            canClear={Boolean(operatorDocText.trim())}
+            canClear={Boolean(
+              operatorDocText.trim() ||
+                operatorDocNameDraft.trim() ||
+                operatorDroppedAsset?.name?.trim(),
+            )}
             onUndo={handleOperatorUndo}
             onRedo={handleOperatorRedo}
             onClear={handleOperatorClear}
             onOperatorDocumentKindChange={onOperatorDocumentKindChange}
             onCopyOperatorDocToClipboard={onCopyOperatorDocToClipboard}
             onPasteClipboardToOperator={onPasteClipboardToOperator}
+            onSaveOperatorDocInPlace={onSaveOperatorDocInPlace}
             onSaveOperatorDocAsFile={onSaveOperatorDocAsFile}
+            operatorCanSaveInPlace={operatorCanSaveInPlace}
             onConvertDocumentToMarkdown={onConvertDocumentToMarkdown}
             onExportOperatorMarkdown={onExportOperatorMarkdown}
           />
@@ -961,6 +988,15 @@ export function CyberdeckOperatorPaneBody({
                   onKeyDown={(event) => {
                     if (!event.ctrlKey && !event.metaKey) return;
                     const key = event.key.toLowerCase();
+                    if (key === "s") {
+                      event.preventDefault();
+                      if (operatorCanSaveInPlace && onSaveOperatorDocInPlace) {
+                        void onSaveOperatorDocInPlace();
+                      } else {
+                        void onSaveOperatorDocAsFile();
+                      }
+                      return;
+                    }
                     if (key === "z" && !event.shiftKey) {
                       event.preventDefault();
                       handleOperatorUndo();
@@ -999,11 +1035,13 @@ export function CyberdeckOperatorPaneBody({
               </div>
             )}
             </div>
-            {operatorSurfaceIsDocument && folderPaneOpen ? (
-              <OperatorDocFolderPane
-                onOpenFile={onOpenOperatorFolderFile}
-                onRootsChange={onOperatorFolderRootsChange}
-              />
+            {operatorSurfaceIsDocument ? (
+              <div className={folderPaneOpen ? "contents" : "hidden"}>
+                <OperatorDocFolderPane
+                  onOpenFile={onOpenOperatorFolderFile}
+                  onRootsChange={onOperatorFolderRootsChange}
+                />
+              </div>
             ) : null}
           </div>
         ) : (
