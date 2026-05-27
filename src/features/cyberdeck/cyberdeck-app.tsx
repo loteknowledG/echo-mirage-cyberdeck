@@ -936,8 +936,6 @@ export default function CyberdeckApp() {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(max-width: 768px)").matches;
   });
-  /** Mobile: full-screen chat (1) or gateway/rail pane (2) — not a side-by-side desktop split. */
-  const [mobileDeckPane, setMobileDeckPane] = useState<"chat" | "gateway">("chat");
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
@@ -2889,9 +2887,6 @@ export default function CyberdeckApp() {
         closeGatewayPaneContextMenu();
         setNavRailContext("gateway");
         setServerKeyboardHighlightId(null);
-        if (window.matchMedia("(max-width: 768px)").matches) {
-          setMobileDeckPane("gateway");
-        }
       });
     },
     [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu],
@@ -6529,52 +6524,16 @@ const resolved = resolveUiTarget(userMessage);
         }}
       />
 
-      {isMobileLayout ? (
-        <div
-          className="cyberdeck-mobile-pane-switch z-30 flex shrink-0 border-b border-gray-800 bg-black/95"
-          role="tablist"
-          aria-label="Deck pane"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileDeckPane === "chat"}
-            onClick={() => setMobileDeckPane("chat")}
-            className={`flex-1 px-3 py-2 font-mono text-[11px] tracking-wider transition-colors ${
-              mobileDeckPane === "chat"
-                ? "bg-green-950/40 text-green-400"
-                : "text-gray-500 hover:text-gray-300"
-            }`}
-          >
-            1 · CHAT
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileDeckPane === "gateway"}
-            onClick={() => setMobileDeckPane("gateway")}
-            className={`flex-1 px-3 py-2 font-mono text-[11px] tracking-wider transition-colors ${
-              mobileDeckPane === "gateway"
-                ? "bg-green-950/40 text-green-400"
-                : "text-gray-500 hover:text-gray-300"
-            }`}
-          >
-            2 · PANE
-          </button>
-        </div>
-      ) : null}
-
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-morphism={MORPHISM_ZONE_REALMORPHISM}>
         <ResizablePanelGroup
-          key={isMobileLayout ? `mobile-${mobileDeckPane}` : "desktop"}
-          orientation="horizontal"
+          key={isMobileLayout ? "mobile-vertical" : "desktop-horizontal"}
+          orientation={isMobileLayout ? "vertical" : "horizontal"}
           className="h-full min-h-0 min-w-0 flex-1"
         >
           {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
-          {(!isMobileLayout || mobileDeckPane === "chat") ? (
           <ResizablePanel
-            defaultSize={isMobileLayout ? 100 : 55}
-            minSize={isMobileLayout ? 100 : 0}
+            defaultSize={isMobileLayout ? 72 : 55}
+            minSize={isMobileLayout ? 32 : 0}
             className="h-full min-h-0"
           >
           <div
@@ -6924,15 +6883,13 @@ const resolved = resolveUiTarget(userMessage);
             </footer>
           </div>
         </ResizablePanel>
-          ) : null}
 
-        {!isMobileLayout ? <ResizableHandle withHandle /> : null}
+        <ResizableHandle withHandle stacked={isMobileLayout} />
 
         {/* COL 3 (flipped): gateway nav — Weyland col2 */}
-        {(!isMobileLayout || mobileDeckPane === "gateway") ? (
         <ResizablePanel
-          defaultSize={isMobileLayout ? 100 : 45}
-          minSize={isMobileLayout ? 100 : 0.01}
+          defaultSize={isMobileLayout ? 28 : 45}
+          minSize={isMobileLayout ? 14 : 0.01}
           className="h-full min-h-0"
         >
           <div
@@ -7255,7 +7212,6 @@ const resolved = resolveUiTarget(userMessage);
             </div>
           </div>
         </ResizablePanel>
-        ) : null}
       </ResizablePanelGroup>
         </div>
     </div>
