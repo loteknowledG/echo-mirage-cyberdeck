@@ -6525,13 +6525,17 @@ const resolved = resolveUiTarget(userMessage);
       />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-morphism={MORPHISM_ZONE_REALMORPHISM}>
-        <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0 flex-1">
+        <ResizablePanelGroup orientation="horizontal" className="h-full min-h-0 min-w-0 flex-1">
           {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
-          <ResizablePanel defaultSize={isMobileLayout ? 100 : 55} minSize={isMobileLayout ? 100 : 0}>
+          <ResizablePanel
+            defaultSize={isMobileLayout ? 100 : 55}
+            minSize={isMobileLayout ? 100 : 0}
+            className="h-full min-h-0"
+          >
           <div
             ref={chatColumnRef}
             onContextMenu={handleMiragePaneContextMenu}
-            className={`cyberdeck-net-pane cyberdeck-chat-app left flex min-h-0 flex-col overflow-hidden border-b border-gray-800 bg-black max-md:flex-1 md:h-full md:min-w-0 md:border-b-0 ${
+            className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full max-h-full min-h-0 flex-col overflow-hidden border-b border-gray-800 bg-black max-md:flex-1 max-md:min-h-0 md:min-w-0 md:border-b-0 ${
               networkActivityActive ? "is-net-active" : ""
             }`}
           >
@@ -6550,7 +6554,7 @@ const resolved = resolveUiTarget(userMessage);
                   <EchoHeader />
                 </div>
               ) : null}
-              <div className="message-log flex-1 space-y-3">
+              <div className="message-log space-y-3">
                 {messages.map((m, i) => {
                   const isModelConnectedLine =
                     m.role === "system" && typeof m.text === "string" && m.text.includes("MODEL_CONNECTED");
@@ -6877,7 +6881,7 @@ const resolved = resolveUiTarget(userMessage);
         </ResizablePanel>
 
         {!isMobileLayout ? (
-        <ResizableHandle withHandle className="flex" />
+        <ResizableHandle withHandle />
         ) : null}
 
         {/* COL 3 (flipped): gateway nav — Weyland col2 (desktop only) */}

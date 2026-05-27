@@ -8,6 +8,20 @@ type Orientation = 'horizontal' | 'vertical';
 
 type SizeValue = string | number | undefined;
 
+type ResizableRole = 'panel' | 'handle';
+
+type ResizableComponentType = {
+  resizableRole?: ResizableRole;
+};
+
+function getResizableRole(child: React.ReactElement): ResizableRole | undefined {
+  const type = child.type as ResizableComponentType;
+  if (type?.resizableRole) return type.resizableRole;
+  if (type === ResizablePanel) return 'panel';
+  if (type === ResizableHandle) return 'handle';
+  return undefined;
+}
+
 export type ResizablePanelGroupProps = {
   orientation?: Orientation;
   className?: string;
@@ -46,8 +60,8 @@ export function ResizablePanelGroup({
   const childrenArray = React.Children.toArray(children).filter(
     (child): child is React.ReactElement => React.isValidElement(child),
   );
-  const panels = childrenArray.filter((child) => child.type === ResizablePanel);
-  const handles = childrenArray.filter((child) => child.type === ResizableHandle);
+  const panels = childrenArray.filter((child) => getResizableRole(child) === 'panel');
+  const handles = childrenArray.filter((child) => getResizableRole(child) === 'handle');
   const panelCount = panels.length;
 
   // Track container size so we can calculate fractions for dragging.
@@ -196,7 +210,7 @@ export function ResizablePanelGroup({
       }}
     >
       {childrenArray.map((child) => {
-        if (child.type === ResizablePanel) {
+        if (getResizableRole(child) === 'panel') {
           const panelIndex = panels.indexOf(child);
           const panel = child as React.ReactElement<ResizablePanelProps>;
           const size = getPanelFraction(panelIndex) * 100;
@@ -222,7 +236,7 @@ export function ResizablePanelGroup({
           });
         }
 
-        if (child.type !== ResizableHandle) {
+        if (getResizableRole(child) !== 'handle') {
           return child;
         }
 
@@ -272,11 +286,12 @@ export function ResizablePanel({
   // defaultSize/minSize/maxSize are only used by the ResizablePanelGroup logic.
   // They should not be forwarded to the DOM element.
   return (
-    <div className={cn('relative min-w-0 min-h-0', className)} {...props}>
+    <div className={cn('relative min-h-0 min-w-0', className)} {...props}>
       {children}
     </div>
   );
 }
+ResizablePanel.resizableRole = 'panel' as const;
 
 export type ResizableHandleProps = {
   withHandle?: boolean;
@@ -292,7 +307,7 @@ export function ResizableHandle({ withHandle = false, stacked = false, className
         stacked
           ? 'relative z-20 flex-none self-stretch h-1 min-h-[6px] w-full flex items-center justify-center border-y border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-row-resize touch-none'
           : 'relative z-20 flex-none self-stretch w-px min-w-[6px] flex items-center justify-center border-x border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none',
-        className
+        className,
       )}
       {...props}
     >
@@ -308,3 +323,4 @@ export function ResizableHandle({ withHandle = false, stacked = false, className
     </div>
   );
 }
+ResizableHandle.resizableRole = 'handle' as const;
