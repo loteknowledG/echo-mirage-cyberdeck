@@ -31,6 +31,40 @@ export type ResizablePanelGroupProps = {
 
 const rememberedPanelSizes = new Map<string, number[]>();
 
+const readRememberedPanelSizes = (key: string, panelCount: number) => {
+  const inMemory = rememberedPanelSizes.get(key);
+  if (inMemory) return [...inMemory];
+
+  try {
+    const serialized = window.localStorage.getItem(key);
+    if (!serialized) return undefined;
+
+    const stored = JSON.parse(serialized);
+    if (
+      !Array.isArray(stored) ||
+      stored.length !== panelCount ||
+      stored.some((size) => typeof size !== 'number' || !Number.isFinite(size) || size < 0)
+    ) {
+      return undefined;
+    }
+
+    rememberedPanelSizes.set(key, stored);
+    return [...stored];
+  } catch {
+    return undefined;
+  }
+};
+
+const storeRememberedPanelSizes = (key: string, sizes: number[]) => {
+  rememberedPanelSizes.set(key, [...sizes]);
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(sizes));
+  } catch {
+    // Resize still works if browser storage is unavailable.
+  }
+};
+
 const parseFraction = (value?: SizeValue) => {
   if (value === undefined) return undefined;
   if (typeof value === 'number') return value > 1 ? value / 100 : value;
@@ -90,7 +124,7 @@ export function ResizablePanelGroup({
     if (sizes.length === panelCount && layoutKeyRef.current === layoutKey) return;
 
     const rememberedKey = memoryKey ? `${memoryKey}:${layoutKey}` : undefined;
-    const rememberedSizes = rememberedKey ? rememberedPanelSizes.get(rememberedKey) : undefined;
+    const rememberedSizes = rememberedKey ? readRememberedPanelSizes(rememberedKey, panelCount) : undefined;
     const initialSizes = rememberedSizes ? [...rememberedSizes] : Array(panelCount).fill(1 / panelCount);
 
     if (!rememberedSizes) {
@@ -110,7 +144,7 @@ export function ResizablePanelGroup({
 
   React.useEffect(() => {
     if (!memoryKey || sizes.length !== panelCount || panelCount === 0) return;
-    rememberedPanelSizes.set(`${memoryKey}:${orientation}:${panelCount}`, [...sizes]);
+    storeRememberedPanelSizes(`${memoryKey}:${orientation}:${panelCount}`, sizes);
   }, [memoryKey, orientation, panelCount, sizes]);
 
   const dragState = React.useRef<{

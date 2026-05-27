@@ -68,6 +68,18 @@ async function dragDividerTo(page: Page, y: number) {
   await page.mouse.up();
 }
 
+async function openExecutionSurface(page: Page) {
+  const input = page.locator('input[placeholder*="GATEWAY"], input[placeholder*="command"], input[placeholder*="COMMAND"]').first();
+  await input.fill("new tab named execution glyph E");
+  await input.press("Enter");
+  await expect(page.getByText("TAB_CREATED // execution // GLYPH E")).toBeVisible({ timeout: 10000 });
+
+  const executionTab = page.locator("cyberdeck-rail-tab").nth(3);
+  await executionTab.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "MUTHUR Execution" }).click();
+  await expect(page.getByText("MUTHUR EXECUTION", { exact: true }).last()).toBeVisible({ timeout: 10000 });
+}
+
 function expectComposerAttachedToDivider(geometry: SplitGeometry) {
   expect(Math.abs(geometry.dividerTop - geometry.composerBottom)).toBeLessThanOrEqual(2);
 }
@@ -128,5 +140,43 @@ test.describe("Cyberdeck responsive split layout", () => {
     const returned = await readSplitGeometry(page);
     expect(Math.abs(returned.dividerTop - placed.dividerTop)).toBeLessThanOrEqual(2);
     expectComposerAttachedToDivider(returned);
+  });
+
+  test("mobile divider position survives a page reload", async ({ page }) => {
+    await openCyberdeck(page, MOBILE_VIEWPORT);
+
+    const initial = await readSplitGeometry(page);
+    await dragDividerTo(page, initial.groupTop + 360);
+    const placed = await readSplitGeometry(page);
+    expectComposerAttachedToDivider(placed);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator(COMPOSER)).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(DIVIDER)).toBeVisible({ timeout: 10000 });
+
+    const returned = await readSplitGeometry(page);
+    expect(Math.abs(returned.dividerTop - placed.dividerTop)).toBeLessThanOrEqual(2);
+    expectComposerAttachedToDivider(returned);
+  });
+
+  test("collapsed mobile MUTHUR execution pane stops polling until visible", async ({ page }) => {
+    await openCyberdeck(page, MOBILE_VIEWPORT);
+
+    let executionPolls = 0;
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/muthur/execution" && request.method() === "GET") {
+        executionPolls += 1;
+      }
+    });
+
+    await openExecutionSurface(page);
+    await expect.poll(() => executionPolls, { timeout: 3000 }).toBeGreaterThan(0);
+
+    const initial = await readSplitGeometry(page);
+    await dragDividerTo(page, initial.groupBottom);
+    await page.waitForTimeout(250);
+    executionPolls = 0;
+    await page.waitForTimeout(1200);
+    expect(executionPolls).toBe(0);
   });
 });
