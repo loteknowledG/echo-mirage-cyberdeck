@@ -31,6 +31,8 @@ const nextConfig = {
 		"google-photos-album-image-url-fetch",
 		"md-to-pdf",
 		"puppeteer",
+		"just-bash",
+		"@mongodb-js/zstd",
 	],
 	webpack: (config, { dev }) => {
 		if (dev) {
