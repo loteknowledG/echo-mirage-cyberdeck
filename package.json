@@ -23,8 +23,10 @@
     "fonts:sync": "node scripts/sync-figlet-fonts.mjs",
     "probe:memory-cards": "tsx scripts/probe-memory-card-registry.ts && tsx scripts/probe-memory-card-parser-regression.ts",
     "e2e": "playwright test",
+    "e2e:layout": "playwright test e2e/cyberdeck.layout.spec.ts",
     "e2e:headed": "playwright test --headed",
     "e2e:report": "playwright show-report",
+    "test:predeploy:layout": "pnpm exec tsc --noEmit && pnpm build && playwright test e2e/cyberdeck.layout.spec.ts",
     "voice:cursor:read-last-response": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CURSOR_HOOK_MECHANICUS_EXTRACT='full'; $j = Join-Path (Get-Location) '.cursor/hooks/sample-after-agent.json'; if (-not (Test-Path $j)) { Write-Error 'Missing .cursor/hooks/sample-after-agent.json'; exit 1 }; Get-Content -Raw $j | python -u (Join-Path (Get-Location) '.cursor/hooks/speak_last_sentence_mechanicus.py')\"",
     "voice:cursor:read-last-response:dry": "python .cursor/hooks/speak_last_sentence_mechanicus.py --dry-run"
   },
