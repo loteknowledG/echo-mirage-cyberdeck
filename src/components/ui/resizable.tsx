@@ -43,8 +43,12 @@ export function ResizablePanelGroup({
   const initialSizesRef = React.useRef<number[] | null>(null);
   const layoutKeyRef = React.useRef<string>("");
 
-  const childrenArray = React.Children.toArray(children) as React.ReactElement[];
-  const panelCount = Math.ceil(childrenArray.length / 2);
+  const childrenArray = React.Children.toArray(children).filter(
+    (child): child is React.ReactElement => React.isValidElement(child),
+  );
+  const panels = childrenArray.filter((child) => child.type === ResizablePanel);
+  const handles = childrenArray.filter((child) => child.type === ResizableHandle);
+  const panelCount = panels.length;
 
   // Track container size so we can calculate fractions for dragging.
   React.useLayoutEffect(() => {
@@ -70,7 +74,7 @@ export function ResizablePanelGroup({
     const initialSizes = Array(panelCount).fill(1 / panelCount);
 
     for (let i = 0; i < panelCount; i += 1) {
-      const panel = childrenArray[i * 2] as React.ReactElement<{ defaultSize?: SizeValue }>;
+      const panel = panels[i] as React.ReactElement<{ defaultSize?: SizeValue }>;
       const fraction = parseFraction(panel?.props?.defaultSize);
       if (typeof fraction === 'number' && fraction > 0) {
         initialSizes[i] = fraction;
@@ -80,7 +84,7 @@ export function ResizablePanelGroup({
     initialSizesRef.current = initialSizes;
     layoutKeyRef.current = layoutKey;
     setSizes(initialSizes);
-  }, [orientation, panelCount, childrenArray, sizes.length]);
+  }, [orientation, panelCount, panels, sizes.length]);
 
   const dragState = React.useRef<{
     index: number;
@@ -157,7 +161,7 @@ export function ResizablePanelGroup({
     const maxSizes = Array(panelCount).fill(1);
 
     for (let i = 0; i < panelCount; i += 1) {
-      const panel = childrenArray[i * 2] as React.ReactElement<{
+      const panel = panels[i] as React.ReactElement<{
         minSize?: SizeValue;
         maxSize?: SizeValue;
       }>;
@@ -191,10 +195,9 @@ export function ResizablePanelGroup({
         width: '100%',
       }}
     >
-      {childrenArray.map((child, idx) => {
-        const isPanel = idx % 2 === 0;
-        if (isPanel) {
-          const panelIndex = idx / 2;
+      {childrenArray.map((child) => {
+        if (child.type === ResizablePanel) {
+          const panelIndex = panels.indexOf(child);
           const panel = child as React.ReactElement<ResizablePanelProps>;
           const size = getPanelFraction(panelIndex) * 100;
 
@@ -219,7 +222,11 @@ export function ResizablePanelGroup({
           });
         }
 
-        const handleIndex = (idx - 1) / 2;
+        if (child.type !== ResizableHandle) {
+          return child;
+        }
+
+        const handleIndex = handles.indexOf(child);
         const handle = child as React.ReactElement<ResizableHandleProps>;
 
         return React.cloneElement(handle, {

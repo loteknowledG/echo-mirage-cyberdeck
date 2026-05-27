@@ -905,7 +905,10 @@ export default function CyberdeckApp() {
   const [gatewayPaneContextMenu, setGatewayPaneContextMenu] = useState<{ x: number; y: number } | null>(
     null,
   );
-  const [isMobileLayout, setIsMobileLayout] = useState(false);
+  const [isMobileLayout, setIsMobileLayout] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 768px)").matches;
+  });
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
@@ -1272,7 +1275,6 @@ export default function CyberdeckApp() {
       : isConnected
         ? "connected"
         : "offline";
-  const mobilePanelMinSize = 2;
 
   const inactiveTextColor = "#7a7a7a";
   const inactiveSubtleTextColor = "#6a6a6a";
@@ -6165,7 +6167,7 @@ duration_ms: ${durationMs}`;
     <div
       ref={cyberdeckRootRef}
       data-deck-mode={deckMode}
-      className="terminal-window flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:flex-col max-md:overflow-y-auto md:overflow-hidden"
+      className="terminal-window box-border flex h-full min-h-0 w-full overflow-x-hidden bg-background font-mono text-green-500 max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:flex-col max-md:overflow-hidden md:h-screen md:overflow-hidden"
     >
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence
@@ -6456,17 +6458,14 @@ duration_ms: ${durationMs}`;
         }}
       />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-morphism={MORPHISM_ZONE_REALMORPHISM}>
-        <ResizablePanelGroup
-          orientation={isMobileLayout ? "vertical" : "horizontal"}
-          className="min-h-0 min-w-0 flex-1"
-        >
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-morphism={MORPHISM_ZONE_REALMORPHISM}>
+        <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0 flex-1">
           {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
-          <ResizablePanel defaultSize={isMobileLayout ? 98 : 55} minSize={isMobileLayout ? mobilePanelMinSize : 0}>
+          <ResizablePanel defaultSize={isMobileLayout ? 100 : 55} minSize={isMobileLayout ? 100 : 0}>
           <div
             ref={chatColumnRef}
             onContextMenu={handleMiragePaneContextMenu}
-            className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full min-w-0 flex-col overflow-hidden border-b border-gray-800 bg-black md:border-b-0 ${
+            className={`cyberdeck-net-pane cyberdeck-chat-app left flex min-h-0 flex-col overflow-hidden border-b border-gray-800 bg-black max-md:flex-1 md:h-full md:min-w-0 md:border-b-0 ${
               networkActivityActive ? "is-net-active" : ""
             }`}
           >
@@ -6811,10 +6810,13 @@ duration_ms: ${durationMs}`;
           </div>
         </ResizablePanel>
 
-        <ResizableHandle withHandle stacked={isMobileLayout} className="flex" />
+        {!isMobileLayout ? (
+        <ResizableHandle withHandle className="flex" />
+        ) : null}
 
-        {/* COL 3 (flipped): gateway nav — Weyland col2 */}
-          <ResizablePanel defaultSize={isMobileLayout ? 2 : 45} minSize={isMobileLayout ? mobilePanelMinSize : 0.01}>
+        {/* COL 3 (flipped): gateway nav — Weyland col2 (desktop only) */}
+        {!isMobileLayout ? (
+          <ResizablePanel defaultSize={45} minSize={0.01}>
           <div
             ref={gatewayColumnRef}
             tabIndex={-1}
@@ -7126,6 +7128,7 @@ duration_ms: ${durationMs}`;
             </div>
           </div>
         </ResizablePanel>
+        ) : null}
       </ResizablePanelGroup>
         </div>
     </div>
