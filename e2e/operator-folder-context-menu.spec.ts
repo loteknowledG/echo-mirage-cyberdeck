@@ -52,6 +52,7 @@ test("operator folder tree replaces generic context actions with copy file path"
 
   const file = page.getByText("readme.md", { exact: true });
   await expect(file).toBeVisible();
+  await expect(file.locator("xpath=ancestor::button[1]").locator('img[data-vscode-icon="file_type_markdown.svg"]')).toBeVisible();
   await file.click({ button: "right" });
 
   await expect(page.getByRole("menu", { name: "Folder tree actions" })).toBeVisible();

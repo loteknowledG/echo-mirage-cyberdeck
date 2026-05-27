@@ -5,14 +5,13 @@ import { toast } from "sonner";
 import {
   LuChevronDown,
   LuChevronRight,
-  LuFile,
-  LuFolder,
   LuFolderPlus,
   LuRefreshCw,
   LuX,
 } from "react-icons/lu";
 import { useDeckMode } from "@/lib/deck-mode";
 import { realmorphismActionClass, realmorphismMenuItemClass } from "@/lib/cyberdeck/realmorphism-control";
+import { operatorFileIcon, operatorFolderIcon, operatorIconSrc } from "@/lib/operator-file-icon";
 import { cn } from "@/lib/utils";
 import {
   listDirectoryChildrenForRoot,
@@ -64,6 +63,33 @@ function copiedTreePath(root: OperatorDocFolderRoot, logicalPath: string): strin
   if (!relativePath) return root.diskPath;
   const separator = root.diskPath.includes("\\") ? "\\" : "/";
   return `${root.diskPath.replace(/[\\/]+$/, "")}${separator}${relativePath.replaceAll("/", separator)}`;
+}
+
+function OperatorTreeIcon({
+  name,
+  kind,
+  expanded = false,
+  root = false,
+  muted = false,
+}: {
+  name: string;
+  kind: "file" | "folder";
+  expanded?: boolean;
+  root?: boolean;
+  muted?: boolean;
+}) {
+  const icon = kind === "file" ? operatorFileIcon(name) : operatorFolderIcon(name, expanded, root);
+
+  return (
+    <img
+      src={operatorIconSrc(icon)}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      data-vscode-icon={icon}
+      className={cn("h-3 w-3 shrink-0 object-contain", muted && "opacity-45 grayscale")}
+    />
+  );
 }
 
 export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDocFolderPaneProps) {
@@ -373,9 +399,9 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
                 <span className="w-2.5" />
               )}
               {node.kind === "folder" ? (
-                <LuFolder size={10} className={cn("shrink-0", node.ignored ? "text-[#555]" : "text-yellow-600")} />
+                <OperatorTreeIcon name={node.name} kind="folder" expanded={isExpanded} muted={node.ignored} />
               ) : (
-                <LuFile size={10} className="shrink-0 text-blue-400" />
+                <OperatorTreeIcon name={node.name} kind="file" />
               )}
               <span className="truncate font-mono text-[10px]">
                 {node.name}
@@ -439,7 +465,7 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
                     ) : (
                       <LuChevronRight size={10} className="shrink-0 text-[#555]" />
                     )}
-                    <LuFolder size={10} className="shrink-0 text-yellow-600" />
+                    <OperatorTreeIcon name={root.name} kind="folder" expanded={rootExpanded} root />
                     <span className="truncate font-mono text-[10px] text-[#999]" title={root.name}>
                       {root.name}
                     </span>
