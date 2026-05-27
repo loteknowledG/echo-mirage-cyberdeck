@@ -215,20 +215,22 @@ export function ResizablePanelGroup({
           const panel = child as React.ReactElement<ResizablePanelProps>;
           const size = getPanelFraction(panelIndex) * 100;
 
+          const minFraction = parseFraction(panel.props.minSize) ?? 0;
+          const maxFraction = parseFraction(panel.props.maxSize) ?? 1;
           const style: React.CSSProperties = isHorizontal
             ? {
-                flexGrow: 0,
-                flexShrink: 0,
-                flexBasis: `${size}%`,
-                minWidth: `${(parseFraction(panel.props.minSize) ?? 0) * 100}%`,
-                maxWidth: `${(parseFraction(panel.props.maxSize) ?? 1) * 100}%`,
+                flex: `${size} 1 0`,
+                minWidth: 0,
+                minHeight: 0,
+                ...(minFraction > 0 ? { minWidth: `${minFraction * 100}%` } : {}),
+                maxWidth: `${maxFraction * 100}%`,
               }
             : {
-                flexGrow: 0,
-                flexShrink: 0,
-                flexBasis: `${size}%`,
-                minHeight: `${(parseFraction(panel.props.minSize) ?? 0) * 100}%`,
-                maxHeight: `${(parseFraction(panel.props.maxSize) ?? 1) * 100}%`,
+                flex: `${size} 1 0`,
+                minWidth: 0,
+                minHeight: 0,
+                ...(minFraction > 0 ? { minHeight: `${minFraction * 100}%` } : {}),
+                maxHeight: `${maxFraction * 100}%`,
               };
 
           return React.cloneElement(panel, {

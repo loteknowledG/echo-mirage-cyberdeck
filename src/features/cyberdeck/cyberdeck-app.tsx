@@ -6233,7 +6233,7 @@ const resolved = resolveUiTarget(userMessage);
     <div
       ref={cyberdeckRootRef}
       data-deck-mode={deckMode}
-      className="terminal-window box-border flex h-full min-h-0 w-full overflow-x-hidden bg-background font-mono text-green-500 max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:flex-col max-md:overflow-hidden md:h-screen md:overflow-hidden"
+      className="terminal-window box-border flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-background font-mono text-green-500 max-md:min-h-0 md:h-screen"
     >
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence
