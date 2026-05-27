@@ -6528,8 +6528,8 @@ const resolved = resolveUiTarget(userMessage);
         <ResizablePanelGroup orientation="horizontal" className="h-full min-h-0 min-w-0 flex-1">
           {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
           <ResizablePanel
-            defaultSize={isMobileLayout ? 100 : 55}
-            minSize={isMobileLayout ? 100 : 0}
+            defaultSize={isMobileLayout ? 62 : 55}
+            minSize={isMobileLayout ? 28 : 0}
             className="h-full min-h-0"
           >
           <div
@@ -6880,13 +6880,17 @@ const resolved = resolveUiTarget(userMessage);
           </div>
         </ResizablePanel>
 
-        {!isMobileLayout ? (
-        <ResizableHandle withHandle />
-        ) : null}
+        <ResizableHandle
+          withHandle
+          className={isMobileLayout ? "min-w-3 w-3 touch-pan-x" : undefined}
+        />
 
-        {/* COL 3 (flipped): gateway nav — Weyland col2 (desktop only) */}
-        {!isMobileLayout ? (
-          <ResizablePanel defaultSize={45} minSize={0.01}>
+        {/* COL 3 (flipped): gateway nav — Weyland col2 */}
+        <ResizablePanel
+          defaultSize={isMobileLayout ? 38 : 45}
+          minSize={isMobileLayout ? 18 : 0.01}
+          className="h-full min-h-0"
+        >
           <div
             ref={gatewayColumnRef}
             tabIndex={-1}
@@ -7207,7 +7211,6 @@ const resolved = resolveUiTarget(userMessage);
             </div>
           </div>
         </ResizablePanel>
-        ) : null}
       </ResizablePanelGroup>
         </div>
     </div>
