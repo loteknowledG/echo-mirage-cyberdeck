@@ -1,11 +1,13 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-// playwright is an optional runtime dependency — not required in CI/Vercel.
+
+import { DEFAULT_BROWSER_BASE_URL, validateBrowserUrl } from "./browser-policy";
+
+// Playwright is optional at runtime (see src/types/playwright-optional.d.ts).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Browser = any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Page = any;
-import { DEFAULT_BROWSER_BASE_URL, validateBrowserUrl } from "./browser-policy";
 
 export type BrowserConsoleEntry = {
   message: string;
@@ -94,7 +96,7 @@ async function ensurePage(): Promise<Page> {
   const page = await context.newPage();
   pageInstance = page;
   sessionConsoleEntries = [];
-  page.on("console", (msg) => {
+  page.on("console", (msg: { type(): string; text(): string; location(): { url?: string } }) => {
     const type = msg.type();
     const severity: BrowserConsoleEntry["severity"] =
       type === "error" ? "error" : type === "warning" ? "warning" : "info";
@@ -102,7 +104,7 @@ async function ensurePage(): Promise<Page> {
       pushConsoleEntry(msg.text(), severity, msg.location().url || "console");
     }
   });
-  page.on("pageerror", (error) => {
+  page.on("pageerror", (error: { message: string }) => {
     pushConsoleEntry(error.message, "error", "pageerror");
   });
   return page;
