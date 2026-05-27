@@ -6233,7 +6233,7 @@ const resolved = resolveUiTarget(userMessage);
     <div
       ref={cyberdeckRootRef}
       data-deck-mode={deckMode}
-      className="terminal-window box-border flex h-full min-h-0 w-full overflow-x-hidden bg-background font-mono text-green-500 max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:flex-col max-md:overflow-hidden md:h-screen md:overflow-hidden"
+      className="terminal-window box-border flex h-full min-h-0 w-full flex-1 overflow-hidden bg-background font-mono text-green-500 max-md:min-h-0 max-md:flex-col md:h-screen"
     >
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence
@@ -6525,12 +6525,17 @@ const resolved = resolveUiTarget(userMessage);
       />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-morphism={MORPHISM_ZONE_REALMORPHISM}>
-        <ResizablePanelGroup orientation="horizontal" className="h-full min-h-0 min-w-0 flex-1">
+        <ResizablePanelGroup
+          key={isMobileLayout ? "mobile-vertical" : "desktop-horizontal"}
+          orientation={isMobileLayout ? "vertical" : "horizontal"}
+          memoryKey="cyberdeck-content-split"
+          className="h-full min-h-0 min-w-0 flex-1"
+        >
           {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
           <ResizablePanel
-            defaultSize={isMobileLayout ? 100 : 55}
-            minSize={isMobileLayout ? 100 : 0}
-            className="h-full min-h-0"
+            defaultSize={isMobileLayout ? 72 : 55}
+            minSize={0}
+            className="h-full min-h-0 overflow-hidden"
           >
           <div
             ref={chatColumnRef}
@@ -6880,13 +6885,14 @@ const resolved = resolveUiTarget(userMessage);
           </div>
         </ResizablePanel>
 
-        {!isMobileLayout ? (
-        <ResizableHandle withHandle />
-        ) : null}
+        <ResizableHandle withHandle stacked={isMobileLayout} />
 
-        {/* COL 3 (flipped): gateway nav — Weyland col2 (desktop only) */}
-        {!isMobileLayout ? (
-          <ResizablePanel defaultSize={45} minSize={0.01}>
+        {/* COL 3 (flipped): gateway nav — Weyland col2 */}
+        <ResizablePanel
+          defaultSize={isMobileLayout ? 28 : 45}
+          minSize={isMobileLayout ? 0 : 0.01}
+          className="h-full min-h-0"
+        >
           <div
             ref={gatewayColumnRef}
             tabIndex={-1}
@@ -7207,7 +7213,6 @@ const resolved = resolveUiTarget(userMessage);
             </div>
           </div>
         </ResizablePanel>
-        ) : null}
       </ResizablePanelGroup>
         </div>
     </div>

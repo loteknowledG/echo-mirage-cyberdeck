@@ -25,8 +25,11 @@ function getResizableRole(child: React.ReactElement): ResizableRole | undefined 
 export type ResizablePanelGroupProps = {
   orientation?: Orientation;
   className?: string;
+  memoryKey?: string;
   children: React.ReactNode;
 };
+
+const rememberedPanelSizes = new Map<string, number[]>();
 
 const parseFraction = (value?: SizeValue) => {
   if (value === undefined) return undefined;
@@ -49,6 +52,7 @@ const clamp = (value: number, min?: number, max?: number) => {
 export function ResizablePanelGroup({
   orientation = 'horizontal',
   className,
+  memoryKey,
   children,
 }: ResizablePanelGroupProps) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -85,20 +89,29 @@ export function ResizablePanelGroup({
     const layoutKey = `${orientation}:${panelCount}`;
     if (sizes.length === panelCount && layoutKeyRef.current === layoutKey) return;
 
-    const initialSizes = Array(panelCount).fill(1 / panelCount);
+    const rememberedKey = memoryKey ? `${memoryKey}:${layoutKey}` : undefined;
+    const rememberedSizes = rememberedKey ? rememberedPanelSizes.get(rememberedKey) : undefined;
+    const initialSizes = rememberedSizes ? [...rememberedSizes] : Array(panelCount).fill(1 / panelCount);
 
-    for (let i = 0; i < panelCount; i += 1) {
-      const panel = panels[i] as React.ReactElement<{ defaultSize?: SizeValue }>;
-      const fraction = parseFraction(panel?.props?.defaultSize);
-      if (typeof fraction === 'number' && fraction > 0) {
-        initialSizes[i] = fraction;
+    if (!rememberedSizes) {
+      for (let i = 0; i < panelCount; i += 1) {
+        const panel = panels[i] as React.ReactElement<{ defaultSize?: SizeValue }>;
+        const fraction = parseFraction(panel?.props?.defaultSize);
+        if (typeof fraction === 'number' && fraction > 0) {
+          initialSizes[i] = fraction;
+        }
       }
     }
 
     initialSizesRef.current = initialSizes;
     layoutKeyRef.current = layoutKey;
     setSizes(initialSizes);
-  }, [orientation, panelCount, panels, sizes.length]);
+  }, [memoryKey, orientation, panelCount, panels, sizes.length]);
+
+  React.useEffect(() => {
+    if (!memoryKey || sizes.length !== panelCount || panelCount === 0) return;
+    rememberedPanelSizes.set(`${memoryKey}:${orientation}:${panelCount}`, [...sizes]);
+  }, [memoryKey, orientation, panelCount, sizes]);
 
   const dragState = React.useRef<{
     index: number;
