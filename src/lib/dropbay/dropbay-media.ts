@@ -38,6 +38,7 @@ export async function saveDropImage(
   dropId: string,
   bytes: Buffer,
   mimeType: string,
+  index = 0,
 ): Promise<{ filename: string; imageUrl: string }> {
   const normalizedMime = mimeType.toLowerCase();
   if (!isAllowedDropImageType(normalizedMime)) {
@@ -48,7 +49,7 @@ export async function saveDropImage(
   }
 
   const ext = EXT_BY_MIME[normalizedMime] ?? ".bin";
-  const filename = `${dropId}${ext}`;
+  const filename = index === 0 ? `${dropId}${ext}` : `${dropId}_${index}${ext}`;
   const filePath = path.join(mediaDirPath(), filename);
   await fs.mkdir(mediaDirPath(), { recursive: true });
   await fs.writeFile(filePath, bytes);

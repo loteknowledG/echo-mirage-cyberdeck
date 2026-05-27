@@ -2,7 +2,8 @@ import { nanoid } from "nanoid";
 import { validateCreateDropInput } from "@/lib/dropbay/dropbay-jsonl-store";
 import { getDropStore } from "@/lib/dropbay/dropbay-store";
 import { saveDropImage } from "@/lib/dropbay/dropbay-media";
-import type { CreateDropInput, Drop } from "@/lib/dropbay/dropbay-types";
+import type { CreateDropInput, Drop, DropImage } from "@/lib/dropbay/dropbay-types";
+import { DROP_BAY_MAX_IMAGES } from "@/lib/dropbay/dropbay-types";
 
 export function parseDropQueryParams(searchParams: URLSearchParams): CreateDropInput {
   return {
@@ -21,24 +22,43 @@ function readFormField(form: FormData, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function readImageFiles(form: FormData): File[] {
+  const fromImages = form
+    .getAll("images")
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+  if (fromImages.length > 0) return fromImages;
+
+  const legacy = form.get("image");
+  if (legacy instanceof File && legacy.size > 0) return [legacy];
+  return [];
+}
+
 export async function intakeDropFromFormData(form: FormData): Promise<Drop> {
   const text = readFormField(form, "text");
   const url = readFormField(form, "url");
   const source = readFormField(form, "source") || "android";
-  const imageEntry = form.get("image");
+  const imageFiles = readImageFiles(form);
 
-  let imageUrl: string | undefined;
-  let mimeType: string | undefined;
-  const dropId = `drop_${nanoid()}`;
-
-  if (imageEntry instanceof File && imageEntry.size > 0) {
-    const bytes = Buffer.from(await imageEntry.arrayBuffer());
-    const saved = await saveDropImage(dropId, bytes, imageEntry.type || "application/octet-stream");
-    imageUrl = saved.imageUrl;
-    mimeType = imageEntry.type || undefined;
+  if (imageFiles.length > DROP_BAY_MAX_IMAGES) {
+    throw new Error(`Too many images (max ${DROP_BAY_MAX_IMAGES}).`);
   }
 
-  const input: CreateDropInput = { text, url, source, imageUrl, mimeType };
+  const dropId = `drop_${nanoid()}`;
+  const images: DropImage[] = [];
+
+  for (let index = 0; index < imageFiles.length; index += 1) {
+    const file = imageFiles[index];
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const saved = await saveDropImage(
+      dropId,
+      bytes,
+      file.type || "application/octet-stream",
+      index,
+    );
+    images.push({ url: saved.imageUrl, mimeType: file.type || undefined });
+  }
+
+  const input: CreateDropInput = { text, url, source, images };
   const validationError = validateCreateDropInput(input);
   if (validationError) throw new Error(validationError);
 
@@ -48,8 +68,9 @@ export async function intakeDropFromFormData(form: FormData): Promise<Drop> {
     source: source.slice(0, 64) || "unknown",
     text: text.slice(0, 10_000),
     url: url.slice(0, 2_048),
-    imageUrl,
-    mimeType,
+    images: images.length > 0 ? images : undefined,
+    imageUrl: images[0]?.url,
+    mimeType: images[0]?.mimeType,
     status: "pending",
   };
 

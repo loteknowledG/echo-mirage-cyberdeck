@@ -932,7 +932,10 @@ export default function CyberdeckApp() {
   const [gatewayPaneContextMenu, setGatewayPaneContextMenu] = useState<{ x: number; y: number } | null>(
     null,
   );
-  const [isMobileLayout, setIsMobileLayout] = useState(false);
+  const [isMobileLayout, setIsMobileLayout] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 768px)").matches;
+  });
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
@@ -6230,7 +6233,7 @@ const resolved = resolveUiTarget(userMessage);
     <div
       ref={cyberdeckRootRef}
       data-deck-mode={deckMode}
-      className="terminal-window box-border flex h-screen min-h-0 overflow-x-hidden bg-background font-mono text-green-500 max-md:flex-col max-md:overflow-hidden md:overflow-hidden"
+      className="terminal-window box-border flex h-full min-h-0 w-full overflow-x-hidden bg-background font-mono text-green-500 max-md:flex-col max-md:overflow-hidden md:h-screen md:overflow-hidden"
     >
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence
@@ -6877,10 +6880,11 @@ const resolved = resolveUiTarget(userMessage);
         </ResizablePanel>
 
         {!isMobileLayout ? (
-          <>
         <ResizableHandle withHandle stacked={false} className="flex" />
+        ) : null}
 
         {/* COL 3 (flipped): gateway nav — Weyland col2 */}
+        {!isMobileLayout ? (
           <ResizablePanel defaultSize={45} minSize={0.01}>
           <div
             ref={gatewayColumnRef}
@@ -7202,7 +7206,6 @@ const resolved = resolveUiTarget(userMessage);
             </div>
           </div>
         </ResizablePanel>
-          </>
         ) : null}
       </ResizablePanelGroup>
         </div>

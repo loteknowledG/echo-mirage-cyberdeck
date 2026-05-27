@@ -1,50 +1,79 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { DROP_BAY_MAX_IMAGES } from "@/lib/dropbay/dropbay-types";
 
 type SubmitState = "idle" | "submitting" | "success" | "error";
+
+type ImagePreview = {
+  id: string;
+  file: File;
+  url: string;
+};
 
 function fileFromClipboardItem(blob: File, index: number): File {
   const ext = blob.type.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
   return new File([blob], `pasted-${Date.now()}-${index}.${ext}`, { type: blob.type });
 }
 
+function mergeImageFiles(existing: File[], incoming: File[]): File[] {
+  const merged = [...existing];
+  for (const file of incoming) {
+    if (merged.length >= DROP_BAY_MAX_IMAGES) break;
+    merged.push(file);
+  }
+  return merged;
+}
+
 export default function SendPage() {
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
   const [source, setSource] = useState("android");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [state, setState] = useState<SubmitState>("idle");
   const [message, setMessage] = useState("");
 
+  const imagePreviews = useMemo<ImagePreview[]>(
+    () =>
+      imageFiles.map((file, index) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
+        file,
+        url: URL.createObjectURL(file),
+      })),
+    [imageFiles],
+  );
+
   useEffect(() => {
-    if (!imageFile) {
-      setImagePreviewUrl(null);
-      return;
-    }
-    const previewUrl = URL.createObjectURL(imageFile);
-    setImagePreviewUrl(previewUrl);
-    return () => URL.revokeObjectURL(previewUrl);
-  }, [imageFile]);
+    return () => {
+      for (const preview of imagePreviews) {
+        URL.revokeObjectURL(preview.url);
+      }
+    };
+  }, [imagePreviews]);
 
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       const items = event.clipboardData?.items;
       if (!items) return;
 
+      const pasted: File[] = [];
       for (let index = 0; index < items.length; index += 1) {
         const item = items[index];
         if (!item.type.startsWith("image/")) continue;
         const blob = item.getAsFile();
         if (!blob) continue;
-
-        event.preventDefault();
-        setImageFile(fileFromClipboardItem(blob, index));
-        setState("idle");
-        setMessage("Image pasted — ready to send.");
-        return;
+        pasted.push(fileFromClipboardItem(blob, index));
       }
+      if (pasted.length === 0) return;
+
+      event.preventDefault();
+      setImageFiles((current) => mergeImageFiles(current, pasted));
+      setState("idle");
+      setMessage(
+        pasted.length === 1
+          ? "Image pasted — ready to send."
+          : `${pasted.length} images pasted — ready to send.`,
+      );
     };
 
     window.addEventListener("paste", onPaste);
@@ -58,7 +87,7 @@ export default function SendPage() {
 
     const trimmedText = text.trim();
     const trimmedUrl = url.trim();
-    if (!trimmedText && !trimmedUrl && !imageFile) {
+    if (!trimmedText && !trimmedUrl && imageFiles.length === 0) {
       setState("error");
       setMessage("Add a note, URL, or image.");
       return;
@@ -66,12 +95,14 @@ export default function SendPage() {
 
     try {
       let res: Response;
-      if (imageFile) {
+      if (imageFiles.length > 0) {
         const form = new FormData();
         if (trimmedText) form.append("text", trimmedText);
         if (trimmedUrl) form.append("url", trimmedUrl);
         form.append("source", source.trim() || "android");
-        form.append("image", imageFile);
+        for (const file of imageFiles) {
+          form.append("images", file);
+        }
         res = await fetch("/api/drop", { method: "POST", body: form });
       } else {
         res = await fetch("/api/drop", {
@@ -91,7 +122,7 @@ export default function SendPage() {
       }
       setText("");
       setUrl("");
-      setImageFile(null);
+      setImageFiles([]);
       setState("success");
       setMessage(`Drop relayed // ${payload.drop?.id ?? "ok"}`);
     } catch (error) {
@@ -138,43 +169,63 @@ export default function SendPage() {
           </label>
 
           <div className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] tracking-[0.08em] text-[#888]">IMAGE (OPTIONAL)</span>
+            <span className="font-mono text-[10px] tracking-[0.08em] text-[#888]">
+              IMAGES (OPTIONAL, UP TO {DROP_BAY_MAX_IMAGES})
+            </span>
             <input
               type="file"
               accept="image/*"
+              multiple
               onChange={(event) => {
-                setImageFile(event.target.files?.[0] ?? null);
+                const selected = Array.from(event.target.files ?? []);
+                setImageFiles((current) => mergeImageFiles(current, selected));
+                event.target.value = "";
                 setState("idle");
                 setMessage("");
               }}
               className="rounded-sm border border-[#222] bg-black px-3 py-2 font-mono text-[12px] text-[#bbb] file:mr-3 file:rounded-sm file:border-0 file:bg-emerald-950/40 file:px-3 file:py-1 file:font-mono file:text-[10px] file:tracking-[0.08em] file:text-emerald-200"
             />
             <span className="font-mono text-[9px] tracking-[0.06em] text-[#555]">
-              Pick from gallery/files, or paste an image anywhere on this page (Ctrl+V / long-press paste).
+              Pick multiple from gallery/files, or paste images anywhere on this page.
             </span>
-            {imageFile ? (
-              <div className="mt-1 flex items-start gap-3">
-                {imagePreviewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={imagePreviewUrl}
-                    alt="Selected drop"
-                    className="max-h-32 max-w-[40%] rounded-sm border border-[#222] object-contain"
-                  />
-                ) : null}
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="truncate font-mono text-[9px] tracking-[0.06em] text-[#666]">
-                    {imageFile.name} ({Math.round(imageFile.size / 1024)} KB)
+            {imagePreviews.length > 0 ? (
+              <div className="mt-1 flex flex-col gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {imagePreviews.map((preview, index) => (
+                    <div key={preview.id} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={preview.url}
+                        alt={`Selected drop ${index + 1}`}
+                        className="h-24 w-24 rounded-sm border border-[#222] object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
+                          setMessage("");
+                        }}
+                        className="absolute right-1 top-1 rounded-sm bg-black/80 px-1 font-mono text-[8px] text-[#ccc]"
+                        aria-label={`Remove image ${index + 1}`}
+                      >
+                        x
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-[9px] tracking-[0.06em] text-[#666]">
+                    {imagePreviews.length} image{imagePreviews.length === 1 ? "" : "s"} selected
                   </span>
                   <button
                     type="button"
                     onClick={() => {
-                      setImageFile(null);
+                      setImageFiles([]);
                       setMessage("");
                     }}
-                    className="self-start font-mono text-[9px] tracking-[0.08em] text-[#888] underline underline-offset-2"
+                    className="font-mono text-[9px] tracking-[0.08em] text-[#888] underline underline-offset-2"
                   >
-                    Remove image
+                    Clear all
                   </button>
                 </div>
               </div>

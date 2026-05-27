@@ -11,6 +11,7 @@ import {
   DROP_BAY_MAX_URL_LENGTH,
   type CreateDropInput,
   type Drop,
+  type DropImage,
   type ListDropsOptions,
 } from "@/lib/dropbay/dropbay-types";
 
@@ -26,22 +27,37 @@ function normalizeInput(input: CreateDropInput): {
   text: string;
   url: string;
   source: string;
-  imageUrl: string;
-  mimeType: string;
+  images: DropImage[];
 } {
   const text = String(input.text ?? "").trim().slice(0, DROP_BAY_MAX_TEXT_LENGTH);
   const url = String(input.url ?? "").trim().slice(0, DROP_BAY_MAX_URL_LENGTH);
   const source = String(input.source ?? "unknown")
     .trim()
     .slice(0, DROP_BAY_MAX_SOURCE_LENGTH) || "unknown";
-  const imageUrl = String(input.imageUrl ?? "").trim().slice(0, DROP_BAY_MAX_URL_LENGTH);
-  const mimeType = String(input.mimeType ?? "").trim().slice(0, 64);
-  return { text, url, source, imageUrl, mimeType };
+
+  const images: DropImage[] = [];
+  if (input.images?.length) {
+    for (const image of input.images) {
+      const imageUrl = String(image.url ?? "").trim().slice(0, DROP_BAY_MAX_URL_LENGTH);
+      if (!imageUrl) continue;
+      images.push({
+        url: imageUrl,
+        mimeType: image.mimeType ? String(image.mimeType).trim().slice(0, 64) : undefined,
+      });
+    }
+  } else if (input.imageUrl) {
+    images.push({
+      url: String(input.imageUrl).trim().slice(0, DROP_BAY_MAX_URL_LENGTH),
+      mimeType: input.mimeType ? String(input.mimeType).trim().slice(0, 64) : undefined,
+    });
+  }
+
+  return { text, url, source, images };
 }
 
 export function validateCreateDropInput(input: CreateDropInput): string | null {
-  const { text, url, imageUrl } = normalizeInput(input);
-  if (!text && !url && !imageUrl) return "Provide text, url, or image.";
+  const { text, url, images } = normalizeInput(input);
+  if (!text && !url && images.length === 0) return "Provide text, url, or image.";
   return null;
 }
 
@@ -51,7 +67,21 @@ function parseDropLine(line: string): Drop | null {
   try {
     const parsed = JSON.parse(trimmed) as Partial<Drop>;
     if (!parsed.id || !parsed.timestamp) return null;
-    return {
+    const images = Array.isArray(parsed.images)
+      ? parsed.images.reduce<DropImage[]>((acc, image) => {
+          if (!image || typeof image !== "object") return acc;
+          const url = "url" in image ? String(image.url ?? "").trim() : "";
+          if (!url) return acc;
+          acc.push({
+            url,
+            mimeType:
+              "mimeType" in image && image.mimeType ? String(image.mimeType) : undefined,
+          });
+          return acc;
+        }, [])
+      : undefined;
+
+    const drop: Drop = {
       id: String(parsed.id),
       timestamp: String(parsed.timestamp),
       source: String(parsed.source ?? "unknown"),
@@ -59,8 +89,13 @@ function parseDropLine(line: string): Drop | null {
       url: String(parsed.url ?? ""),
       imageUrl: parsed.imageUrl ? String(parsed.imageUrl) : undefined,
       mimeType: parsed.mimeType ? String(parsed.mimeType) : undefined,
+      images: images && images.length > 0 ? images : undefined,
       status: parsed.status === "processed" || parsed.status === "failed" ? parsed.status : "pending",
     };
+    if (!drop.images?.length && drop.imageUrl) {
+      drop.images = [{ url: drop.imageUrl, mimeType: drop.mimeType }];
+    }
+    return drop;
   } catch {
     return null;
   }
@@ -86,15 +121,16 @@ export class JsonlDropStore implements DropStore {
     const error = validateCreateDropInput(input);
     if (error) throw new Error(error);
 
-    const { text, url, source, imageUrl, mimeType } = normalizeInput(input);
+    const { text, url, source, images } = normalizeInput(input);
     const drop: Drop = {
       id: `drop_${nanoid()}`,
       timestamp: new Date().toISOString(),
       source,
       text,
       url,
-      imageUrl: imageUrl || undefined,
-      mimeType: mimeType || undefined,
+      images: images.length > 0 ? images : undefined,
+      imageUrl: images[0]?.url,
+      mimeType: images[0]?.mimeType,
       status: "pending",
     };
 

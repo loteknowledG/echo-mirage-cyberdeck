@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderTitle } from "@/components/cyberdeck/pane-header";
 import { useDropBayFeed } from "@/lib/dropbay/use-drop-bay-feed";
-import type { Drop } from "@/lib/dropbay/dropbay-types";
+import { dropImages, type Drop } from "@/lib/dropbay/dropbay-types";
 
 function formatTimestamp(timestamp: string): string {
   try {
@@ -14,6 +13,8 @@ function formatTimestamp(timestamp: string): string {
 }
 
 function DropRow({ drop }: { drop: Drop }) {
+  const images = dropImages(drop);
+
   return (
     <article className="rounded-sm border border-[#1c1c1c] bg-black/80 px-3 py-2">
       <div className="mb-1 flex flex-wrap items-center gap-2 font-mono text-[9px] tracking-[0.08em] text-[#666]">
@@ -36,15 +37,19 @@ function DropRow({ drop }: { drop: Drop }) {
           {drop.url}
         </a>
       ) : null}
-      {drop.imageUrl ? (
-        <a href={drop.imageUrl} target="_blank" rel="noreferrer" className="mt-2 block">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={drop.imageUrl}
-            alt="Drop image"
-            className="max-h-56 w-auto max-w-full rounded-sm border border-[#222] object-contain"
-          />
-        </a>
+      {images.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {images.map((image, index) => (
+            <a key={`${drop.id}-${image.url}-${index}`} href={image.url} target="_blank" rel="noreferrer">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image.url}
+                alt={`Drop image ${index + 1}`}
+                className="max-h-40 w-auto max-w-full rounded-sm border border-[#222] object-contain"
+              />
+            </a>
+          ))}
+        </div>
       ) : null}
       <div className="mt-1 font-mono text-[8px] tracking-[0.06em] text-[#444]">{drop.id}</div>
     </article>

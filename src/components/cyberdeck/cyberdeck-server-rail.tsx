@@ -79,7 +79,7 @@ export function CyberdeckServerRail({
       data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
       tabIndex={-1}
       aria-label="Server rail"
-      className="cyberdeck-server-rail z-40 flex w-12 flex-shrink-0 flex-col items-center border-r border-gray-800 bg-black py-4 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 md:min-h-0 md:overflow-y-auto md:overscroll-y-contain max-md:w-full max-md:max-w-[100vw] max-md:min-w-0 max-md:shrink-0 max-md:flex-row max-md:flex-nowrap max-md:items-center max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:border-b max-md:border-r-0 max-md:bg-black max-md:px-2 max-md:py-2 max-md:[-webkit-overflow-scrolling:touch] max-md:[scroll-padding-inline:8px] max-md:touch-pan-x"
+      className="cyberdeck-server-rail z-50 flex w-12 flex-shrink-0 flex-col items-center border-r border-gray-800 bg-black py-4 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 md:min-h-0 md:overflow-y-auto md:overscroll-y-contain max-md:sticky max-md:top-0 max-md:w-full max-md:max-w-[100vw] max-md:shrink-0 max-md:flex-row max-md:flex-nowrap max-md:items-center max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:border-b max-md:border-r-0 max-md:bg-black max-md:px-2 max-md:pb-2 max-md:pt-[max(0.5rem,env(safe-area-inset-top))] max-md:[-webkit-overflow-scrolling:touch] max-md:[scroll-padding-inline:8px] max-md:touch-pan-x"
     >
       {fixedServers.map((btn) => (
         <CyberdeckRailTabTooltip
