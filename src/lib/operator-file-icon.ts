@@ -28,14 +28,28 @@ const FILE_EXTENSION_ICONS: Record<string, string> = {
   pdf: "file_type_pdf.svg",
   png: "file_type_image.svg",
   ps1: "file_type_powershell.svg",
+  py: "file_type_python.svg",
   sh: "file_type_shell.svg",
   svg: "file_type_svg.svg",
+  txt: "file_type_text.svg",
   ts: "file_type_typescript.svg",
   tsx: "file_type_reactts.svg",
   webp: "file_type_image.svg",
   yaml: "file_type_yaml.svg",
   yml: "file_type_yaml.svg",
   zsh: "file_type_shell.svg",
+};
+
+const DOCUMENT_KIND_SAMPLE_FILES: Record<string, string> = {
+  css: "operator.css",
+  html: "operator.html",
+  javascript: "operator.js",
+  json: "operator.json",
+  markdown: "operator.md",
+  pdf: "operator.pdf",
+  python: "operator.py",
+  text: "operator.txt",
+  typescript: "operator.ts",
 };
 
 const FOLDER_ICONS: Record<string, string> = {
@@ -55,6 +69,10 @@ export function operatorFileIcon(name: string): string {
 
   const extension = normalizedName.slice(normalizedName.lastIndexOf(".") + 1);
   return FILE_EXTENSION_ICONS[extension] ?? "default_file.svg";
+}
+
+export function operatorDocumentKindIcon(kind: string): string {
+  return operatorFileIcon(DOCUMENT_KIND_SAMPLE_FILES[kind] ?? "operator.txt");
 }
 
 export function operatorFolderIcon(name: string, expanded: boolean, root = false): string {

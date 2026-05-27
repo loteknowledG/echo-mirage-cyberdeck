@@ -9,10 +9,11 @@ async function openCyberdeck(page: Page) {
 
 test("operator folder tree replaces generic context actions with copy file path", async ({ page }) => {
   await page.addInitScript(() => {
-    (window as Window & { copiedOperatorPath?: string; echoMirageClipboard?: { writeText(text: string): void } })
+    (window as Window & { copiedOperatorPath?: string; echoMirageClipboard?: { writeText(text: string): Promise<{ ok: boolean }> } })
       .echoMirageClipboard = {
-      writeText(text: string) {
+      async writeText(text: string) {
         (window as Window & { copiedOperatorPath?: string }).copiedOperatorPath = text;
+        return { ok: true };
       },
     };
     (window as Window & { echoMirageOpen?: unknown }).echoMirageOpen = {
@@ -46,6 +47,7 @@ test("operator folder tree replaces generic context actions with copy file path"
   const filesTab = page.locator("cyberdeck-rail-tab").nth(3);
   await filesTab.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Document", exact: true }).click();
+  await expect(page.locator('[aria-label="Document type"] img[data-vscode-icon="file_type_markdown.svg"]')).toBeVisible();
   await page.getByRole("button", { name: "Open folders" }).click();
   await page.getByRole("button", { name: "ADD FOLDER" }).click();
   await page.getByText("docs", { exact: true }).click();
@@ -62,4 +64,5 @@ test("operator folder tree replaces generic context actions with copy file path"
   await expect.poll(() => page.evaluate(() => (window as Window & { copiedOperatorPath?: string }).copiedOperatorPath)).toBe(
     "C:\\workspace\\docs\\readme.md",
   );
+  await expect(page.getByText("Copied file path: C:\\workspace\\docs\\readme.md")).toBeVisible();
 });

@@ -50,6 +50,11 @@ declare global {
     }): Promise<{ canceled: boolean; filePath?: string; error?: string }>;
   }
 
+  interface EchoMirageClipboardBridge {
+    readText(): Promise<string>;
+    writeText(text: string): Promise<{ ok: boolean }>;
+  }
+
   interface EchoMirageOpenBridge {
     pickConvertDocument(): Promise<{ canceled: boolean; filePath?: string; error?: string }>;
     pickOperatorFolder(): Promise<{
@@ -96,6 +101,7 @@ declare global {
   }
 
   interface Window {
+    echoMirageClipboard?: EchoMirageClipboardBridge;
     echoMirageBrowser?: EchoMirageBrowserBridge;
     echoMirageSave?: EchoMirageSaveBridge;
     echoMirageOpen?: EchoMirageOpenBridge;

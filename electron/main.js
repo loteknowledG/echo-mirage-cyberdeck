@@ -421,6 +421,13 @@ ipcMain.handle('echo-mirage-browser:forward', async () => {
   }
 });
 
+ipcMain.handle('echo-mirage-clipboard:read-text', async () => clipboard.readText());
+
+ipcMain.handle('echo-mirage-clipboard:write-text', async (_event, text) => {
+  clipboard.writeText(String(text || ''));
+  return { ok: true };
+});
+
 ipcMain.handle('echo-mirage-open:pick-convert-document', async () => {
   try {
     const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];

@@ -7,6 +7,7 @@ import {
   operatorDocTypeIndex,
   type OperatorDocumentPickerKind,
 } from "@/lib/operator-document-types";
+import { operatorDocumentKindIcon, operatorIconSrc } from "@/lib/operator-file-icon";
 
 type OperatorDocTypePickerProps = {
   value: OperatorDocumentPickerKind;
@@ -18,11 +19,20 @@ export function OperatorDocTypePicker({ value, onChange }: OperatorDocTypePicker
   const items = useMemo(
     () =>
       OPERATOR_DOC_TYPE_ENTRIES.map((entry) => {
-        const Icon = entry.Icon;
+        const icon = operatorDocumentKindIcon(entry.value);
         return {
           value: entry.value,
           label: entry.label,
-          slide: <Icon className="h-3.5 w-3.5" aria-hidden />,
+          slide: (
+            <img
+              src={operatorIconSrc(icon)}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              data-vscode-icon={icon}
+              className="h-3.5 w-3.5 object-contain"
+            />
+          ),
         };
       }),
     [],

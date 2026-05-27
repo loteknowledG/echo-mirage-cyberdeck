@@ -65,6 +65,31 @@ function copiedTreePath(root: OperatorDocFolderRoot, logicalPath: string): strin
   return `${root.diskPath.replace(/[\\/]+$/, "")}${separator}${relativePath.replaceAll("/", separator)}`;
 }
 
+async function writeTreePathToClipboard(path: string): Promise<void> {
+  if (window.echoMirageClipboard?.writeText) {
+    await window.echoMirageClipboard.writeText(path);
+    return;
+  }
+
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(path);
+    return;
+  }
+
+  const fallback = document.createElement("textarea");
+  fallback.value = path;
+  fallback.setAttribute("readonly", "");
+  fallback.style.position = "fixed";
+  fallback.style.left = "-9999px";
+  document.body.appendChild(fallback);
+  fallback.select();
+  try {
+    if (!document.execCommand("copy")) throw new Error("Clipboard copy was not accepted.");
+  } finally {
+    fallback.remove();
+  }
+}
+
 function OperatorTreeIcon({
   name,
   kind,
@@ -174,15 +199,11 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
   const copyContextMenuPath = useCallback(async () => {
     if (!contextMenu) return;
     const path = contextMenu.copyPath;
+    const kind = contextMenu.kind;
     setContextMenu(null);
-    const bridge = (window as Window & { echoMirageClipboard?: { writeText(text: string): void } }).echoMirageClipboard;
     try {
-      if (bridge?.writeText) {
-        bridge.writeText(path);
-      } else {
-        await navigator.clipboard.writeText(path);
-      }
-      toast.success(`Copied ${contextMenu.kind} path.`);
+      await writeTreePathToClipboard(path);
+      toast.success(`Copied ${kind} path: ${path}`);
     } catch {
       toast.error("Could not copy path.");
     }

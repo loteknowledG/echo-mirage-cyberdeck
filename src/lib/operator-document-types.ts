@@ -1,10 +1,3 @@
-import type { IconType } from "react-icons";
-import { AiOutlineFilePdf, AiOutlinePython } from "react-icons/ai";
-import { BsMarkdown } from "react-icons/bs";
-import { GrCss3 } from "react-icons/gr";
-import { RiJavascriptLine } from "react-icons/ri";
-import { TbBrandHtml5, TbBrandTypescript, TbFileTypeTxt } from "react-icons/tb";
-import { VscJson } from "react-icons/vsc";
 import { isMarkdownH1Document, parseMarkdownH1Title } from "@/lib/operator-markdown-title";
 import {
   buildCadreFilename,
@@ -49,18 +42,17 @@ export function normalizeOperatorDocumentKind(
 export const OPERATOR_DOC_TYPE_ENTRIES: Array<{
   value: OperatorDocumentPickerKind;
   label: string;
-  Icon: IconType;
   mimeType: string;
 }> = [
-  { value: "css", label: "CSS", Icon: GrCss3, mimeType: "text/css" },
-  { value: "html", label: "HTML", Icon: TbBrandHtml5, mimeType: "text/html" },
-  { value: "javascript", label: "JavaScript", Icon: RiJavascriptLine, mimeType: "text/javascript" },
-  { value: "json", label: "JSON", Icon: VscJson, mimeType: "application/json" },
-  { value: "markdown", label: "Markdown", Icon: BsMarkdown, mimeType: "text/markdown" },
-  { value: "pdf", label: "PDF", Icon: AiOutlineFilePdf, mimeType: "application/pdf" },
-  { value: "python", label: "Python", Icon: AiOutlinePython, mimeType: "text/x-python" },
-  { value: "text", label: "Text", Icon: TbFileTypeTxt, mimeType: "text/plain" },
-  { value: "typescript", label: "TypeScript", Icon: TbBrandTypescript, mimeType: "text/typescript" },
+  { value: "css", label: "CSS", mimeType: "text/css" },
+  { value: "html", label: "HTML", mimeType: "text/html" },
+  { value: "javascript", label: "JavaScript", mimeType: "text/javascript" },
+  { value: "json", label: "JSON", mimeType: "application/json" },
+  { value: "markdown", label: "Markdown", mimeType: "text/markdown" },
+  { value: "pdf", label: "PDF", mimeType: "application/pdf" },
+  { value: "python", label: "Python", mimeType: "text/x-python" },
+  { value: "text", label: "Text", mimeType: "text/plain" },
+  { value: "typescript", label: "TypeScript", mimeType: "text/typescript" },
 ];
 
 export function operatorDocTypeIndex(kind: OperatorDocumentPickerKind): number {

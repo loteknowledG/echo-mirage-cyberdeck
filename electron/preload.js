@@ -1,8 +1,8 @@
-const { contextBridge, clipboard, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('echoMirageClipboard', {
-  readText: () => clipboard.readText(),
-  writeText: (text) => clipboard.writeText(String(text || '')),
+  readText: () => ipcRenderer.invoke('echo-mirage-clipboard:read-text'),
+  writeText: (text) => ipcRenderer.invoke('echo-mirage-clipboard:write-text', String(text || '')),
 });
 
 contextBridge.exposeInMainWorld('echoMirageBrowser', {
