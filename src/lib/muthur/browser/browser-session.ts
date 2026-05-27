@@ -1,6 +1,10 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { Browser, Page } from "playwright";
+// playwright is an optional runtime dependency — not required in CI/Vercel.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Browser = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Page = any;
 import { DEFAULT_BROWSER_BASE_URL, validateBrowserUrl } from "./browser-policy";
 
 export type BrowserConsoleEntry = {
