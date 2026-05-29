@@ -3,16 +3,17 @@
 import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  LuChevronDown,
-  LuChevronRight,
-  LuFolderPlus,
-  LuRefreshCw,
-  LuX,
-} from "react-icons/lu";
+  cdxIconAdd,
+  cdxIconClose,
+  cdxIconCollapse,
+  cdxIconExpand,
+  cdxIconReload,
+} from "@wikimedia/codex-icons";
 import { useDeckMode } from "@/lib/deck-mode";
 import { realmorphismActionClass, realmorphismMenuItemClass } from "@/lib/cyberdeck/realmorphism-control";
 import { operatorFileIcon, operatorFolderIcon, operatorIconSrc } from "@/lib/operator-file-icon";
 import { cn } from "@/lib/utils";
+import { CodexIcon } from "@/components/codex-icon";
 import {
   listDirectoryChildrenForRoot,
   mergeFolderTreeNodes,
@@ -24,13 +25,30 @@ import {
 type OperatorDocFolderPaneProps = {
   onOpenFile: (path: string, file: File) => void | Promise<void>;
   onRootsChange?: (roots: OperatorDocFolderRoot[]) => void;
+  className?: string;
 };
 
 type FolderContextMenu = {
   x: number;
   y: number;
   copyPath: string;
+  refreshPath: string;
+  rootName: string;
   kind: "file" | "folder";
+};
+
+const OPERATOR_FOLDER_STATE_STORAGE_KEY = "echo-mirage-operator-folder-pane-state-v1";
+
+type PersistedFolderRoot = {
+  id: string;
+  name: string;
+  diskPath: string;
+};
+
+type PersistedFolderState = {
+  roots?: PersistedFolderRoot[];
+  expanded?: string[];
+  selectedPath?: string | null;
 };
 
 function uniqueRootLabel(base: string, existing: string[]): string {
@@ -65,6 +83,11 @@ function copiedTreePath(root: OperatorDocFolderRoot, logicalPath: string): strin
   return `${root.diskPath.replace(/[\\/]+$/, "")}${separator}${relativePath.replaceAll("/", separator)}`;
 }
 
+function parentLogicalPath(path: string): string {
+  const index = path.lastIndexOf("/");
+  return index > -1 ? path.slice(0, index) : path;
+}
+
 async function writeTreePathToClipboard(path: string): Promise<void> {
   if (window.echoMirageClipboard?.writeText) {
     await window.echoMirageClipboard.writeText(path);
@@ -90,6 +113,28 @@ async function writeTreePathToClipboard(path: string): Promise<void> {
   }
 }
 
+function readPersistedFolderState(): PersistedFolderState | null {
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(OPERATOR_FOLDER_STATE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedFolderState | null;
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function persistFolderState(state: PersistedFolderState): void {
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
+  try {
+    window.localStorage.setItem(OPERATOR_FOLDER_STATE_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
 function OperatorTreeIcon({
   name,
   kind,
@@ -109,15 +154,16 @@ function OperatorTreeIcon({
     <img
       src={operatorIconSrc(icon)}
       alt=""
-      aria-hidden="true"
-      draggable={false}
       data-vscode-icon={icon}
-      className={cn("h-3 w-3 shrink-0 object-contain", muted && "opacity-45 grayscale")}
+      className={cn(
+        "h-3 w-3 shrink-0",
+        muted && "opacity-45",
+      )}
     />
   );
 }
 
-export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDocFolderPaneProps) {
+export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: OperatorDocFolderPaneProps) {
   const deckMode = useDeckMode();
   const [roots, setRoots] = useState<OperatorDocFolderRoot[]>([]);
   const [tree, setTree] = useState<Record<string, OperatorFolderTreeNode[]>>({});
@@ -128,7 +174,10 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
   const [replacingRootId, setReplacingRootId] = useState<string | null>(null);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<FolderContextMenu | null>(null);
+  const [folderStateHydrated, setFolderStateHydrated] = useState(false);
+  const treeScrollRef = useRef<HTMLDivElement | null>(null);
   const isPickingRef = useRef(false);
+  const didRestoreExpandedTreeRef = useRef(false);
 
   const setPathLoading = useCallback((path: string, loading: boolean) => {
     setLoadingPaths((prev) => {
@@ -163,6 +212,78 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
   }, []);
 
   useEffect(() => {
+    const persisted = readPersistedFolderState();
+    if (!persisted) {
+      setFolderStateHydrated(true);
+      return;
+    }
+
+    const restoredRoots = Array.isArray(persisted.roots)
+      ? persisted.roots.flatMap((root) => {
+          if (!root || typeof root !== "object") return [];
+          if (!root.name?.trim() || !root.diskPath?.trim()) return [];
+          return [{ id: root.id || crypto.randomUUID(), name: root.name, diskPath: root.diskPath }];
+        })
+      : [];
+
+    if (restoredRoots.length > 0) setRoots(restoredRoots);
+    if (Array.isArray(persisted.expanded)) {
+      setExpanded(new Set(persisted.expanded.filter((path) => typeof path === "string" && path.trim())));
+    }
+    if (typeof persisted.selectedPath === "string" && persisted.selectedPath.trim()) {
+      setSelectedPath(persisted.selectedPath);
+    }
+    setFolderStateHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!folderStateHydrated) return;
+    persistFolderState({
+      roots: roots.flatMap((root) =>
+        root.diskPath ? [{ id: root.id, name: root.name, diskPath: root.diskPath }] : [],
+      ),
+      expanded: [...expanded],
+      selectedPath,
+    });
+  }, [expanded, folderStateHydrated, roots, selectedPath]);
+
+  useEffect(() => {
+    if (!folderStateHydrated || didRestoreExpandedTreeRef.current) return;
+    if (roots.length === 0 || expanded.size === 0) return;
+
+    didRestoreExpandedTreeRef.current = true;
+    let cancelled = false;
+
+    void (async () => {
+      const paths = [...expanded].sort((a, b) => a.split("/").length - b.split("/").length);
+      for (const path of paths) {
+        if (cancelled) return;
+        const rootName = path.split("/")[0];
+        const root = roots.find((entry) => entry.name === rootName);
+        if (!root?.diskPath) continue;
+        setPathLoading(path, true);
+        try {
+          const nodes = await listDirectoryChildrenForRoot(root, path);
+          if (cancelled) return;
+          setTree((prev) => ({
+            ...prev,
+            [rootName]:
+              path === rootName ? nodes : mergeFolderTreeNodes(prev[rootName] || [], path, nodes),
+          }));
+        } catch {
+          /* Ignore stale persisted paths; operator can refresh or re-open. */
+        } finally {
+          if (!cancelled) setPathLoading(path, false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, folderStateHydrated, roots, setPathLoading]);
+
+  useEffect(() => {
     onRootsChange?.(roots);
   }, [onRootsChange, roots]);
 
@@ -190,6 +311,8 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
         x: event.clientX,
         y: event.clientY,
         copyPath: copiedTreePath(root, path),
+        refreshPath: kind === "folder" ? path : parentLogicalPath(path),
+        rootName: root.name,
         kind,
       });
     },
@@ -208,6 +331,35 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
       toast.error("Could not copy path.");
     }
   }, [contextMenu]);
+
+  const refreshContextMenuFolder = useCallback(async () => {
+    if (!contextMenu) return;
+    const { refreshPath, rootName } = contextMenu;
+    const root = roots.find((entry) => entry.name === rootName);
+    setContextMenu(null);
+    if (!root) return;
+
+    const scrollTop = treeScrollRef.current?.scrollTop ?? 0;
+    setPathLoading(refreshPath, true);
+    try {
+      const nodes = await listDirectoryChildrenForRoot(root, refreshPath);
+      setTree((prev) => ({
+        ...prev,
+        [rootName]:
+          refreshPath === rootName
+            ? nodes
+            : mergeFolderTreeNodes(prev[rootName] || [], refreshPath, nodes),
+      }));
+      window.requestAnimationFrame(() => {
+        if (treeScrollRef.current) treeScrollRef.current.scrollTop = scrollTop;
+      });
+      toast.success(`Refreshed ${refreshPath}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `Could not refresh ${refreshPath}.`);
+    } finally {
+      setPathLoading(refreshPath, false);
+    }
+  }, [contextMenu, roots, setPathLoading]);
 
   const pickDirectoryRoot = useCallback(async (): Promise<OperatorDocFolderRoot | null> => {
     const bridge = window.echoMirageOpen;
@@ -412,9 +564,9 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
                 isLoading ? (
                   <span className="w-2.5 animate-pulse text-[#555]">…</span>
                 ) : isExpanded ? (
-                  <LuChevronDown size={10} />
+                  <CodexIcon icon={cdxIconCollapse} className="h-2.5 w-2.5" />
                 ) : (
-                  <LuChevronRight size={10} />
+                  <CodexIcon icon={cdxIconExpand} className="h-2.5 w-2.5" />
                 )
               ) : (
                 <span className="w-2.5" />
@@ -440,7 +592,7 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
 
   return (
     <aside
-      className="flex w-44 shrink-0 flex-col border-l border-[#1c1c1c] bg-black"
+      className={cn("flex h-full min-w-0 flex-col bg-black", className)}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -454,12 +606,12 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
           className={cn(realmorphismActionClass(deckMode, "neutral"), "w-full py-1.5")}
         >
           <span className="flex w-full items-center gap-1.5">
-            <LuFolderPlus size={11} />
+            <CodexIcon icon={cdxIconAdd} className="h-3 w-3" />
             {isPicking && !replacingRootId ? "PICKING…" : "ADD FOLDER"}
           </span>
         </button>
       </div>
-      <div className="custom-scrollbar flex-1 overflow-y-auto py-1">
+      <div ref={treeScrollRef} className="custom-scrollbar flex-1 overflow-y-auto py-1">
         {roots.length === 0 ? (
           <div className="px-3 py-4 text-center font-mono text-[9px] tracking-[0.06em] text-[#5a5a5a]">
             ADD FOLDER TO BROWSE DOCS
@@ -482,9 +634,9 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
                     {rootLoading || isReplacing ? (
                       <span className="w-2.5 shrink-0 animate-pulse text-[#555]">…</span>
                     ) : rootExpanded ? (
-                      <LuChevronDown size={10} className="shrink-0 text-[#555]" />
+                      <CodexIcon icon={cdxIconCollapse} className="h-2.5 w-2.5 shrink-0 text-[#555]" />
                     ) : (
-                      <LuChevronRight size={10} className="shrink-0 text-[#555]" />
+                      <CodexIcon icon={cdxIconExpand} className="h-2.5 w-2.5 shrink-0 text-[#555]" />
                     )}
                     <OperatorTreeIcon name={root.name} kind="folder" expanded={rootExpanded} root />
                     <span className="truncate font-mono text-[10px] text-[#999]" title={root.name}>
@@ -499,7 +651,7 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
                     aria-label={`Replace folder ${root.name}`}
                     title="Replace folder"
                   >
-                    <LuRefreshCw size={10} />
+                    <CodexIcon icon={cdxIconReload} className="h-2.5 w-2.5" />
                   </button>
                   <button
                     type="button"
@@ -507,7 +659,7 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
                     className="shrink-0 text-[#444] transition hover:text-red-400"
                     aria-label={`Remove folder ${root.name}`}
                   >
-                    <LuX size={10} />
+                    <CodexIcon icon={cdxIconClose} className="h-2.5 w-2.5" />
                   </button>
                 </div>
                 {rootExpanded ? (
@@ -543,6 +695,14 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange }: OperatorDoc
             className={realmorphismMenuItemClass(deckMode)}
           >
             {contextMenu.kind === "file" ? "COPY FILE PATH" : "COPY FOLDER PATH"}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void refreshContextMenuFolder()}
+            className={realmorphismMenuItemClass(deckMode)}
+          >
+            REFRESH
           </button>
         </div>
       ) : null}

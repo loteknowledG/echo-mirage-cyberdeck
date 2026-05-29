@@ -72,16 +72,14 @@ async function dragDividerTo(page: Page, y: number) {
   await page.mouse.up();
 }
 
-async function openExecutionSurface(page: Page) {
+async function openCustomTabContextMenu(page: Page) {
   const input = page.locator('input[placeholder*="GATEWAY"], input[placeholder*="command"], input[placeholder*="COMMAND"]').first();
-  await input.fill("new tab named execution glyph E");
+  await input.fill("new tab named retired-check glyph R");
   await input.press("Enter");
-  await expect(page.getByText("TAB_CREATED // execution // GLYPH E")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("TAB_CREATED // retired-check // GLYPH R")).toBeVisible({ timeout: 10000 });
 
-  const executionTab = page.locator("cyberdeck-rail-tab").nth(3);
-  await executionTab.click({ button: "right" });
-  await page.getByRole("menuitem", { name: "MUTHUR Execution" }).click();
-  await expect(page.getByText("MUTHUR EXECUTION", { exact: true }).last()).toBeVisible({ timeout: 10000 });
+  const customTab = page.locator("cyberdeck-rail-tab").nth(3);
+  await customTab.click({ button: "right" });
 }
 
 function expectComposerAttachedToDivider(geometry: SplitGeometry) {
@@ -163,7 +161,7 @@ test.describe("Cyberdeck responsive split layout", () => {
     expectComposerAttachedToDivider(returned);
   });
 
-  test("collapsed mobile MUTHUR execution pane stops polling until visible", async ({ page }) => {
+  test("custom tab menu omits retired MUTHUR execution surface", async ({ page }) => {
     await openCyberdeck(page, MOBILE_VIEWPORT);
 
     let executionPolls = 0;
@@ -173,14 +171,8 @@ test.describe("Cyberdeck responsive split layout", () => {
       }
     });
 
-    await openExecutionSurface(page);
-    await expect.poll(() => executionPolls, { timeout: 3000 }).toBeGreaterThan(0);
-
-    const initial = await readSplitGeometry(page);
-    await dragDividerTo(page, initial.groupBottom);
-    await page.waitForTimeout(250);
-    executionPolls = 0;
-    await page.waitForTimeout(1200);
+    await openCustomTabContextMenu(page);
+    await expect(page.getByRole("menuitem", { name: "MUTHUR Execution" })).toHaveCount(0);
     expect(executionPolls).toBe(0);
   });
 });

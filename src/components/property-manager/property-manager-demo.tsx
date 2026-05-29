@@ -8,6 +8,8 @@ import {
   type PropertyIssueClass,
   type PropertyTicketDraft,
 } from "@/lib/property-manager/demo-workflow";
+import { publishMuthurObservation } from "@/lib/muthur/observation/publish-observation";
+import { ObservePresenceGlyph, OBSERVE_TRANSCRIPT_PREFIX } from "@/components/muthur/observe-presence-glyph";
 import { speakDryFallback } from "@/voice/speakMuthur";
 
 type ListeningState = "idle" | "listening" | "processing" | "speaking" | "unsupported";
@@ -134,6 +136,25 @@ export function PropertyManagerDemo() {
       setTicket(result.ticket);
       setEscalation(result.escalation);
       setMicMessage("TRANSCRIPT CAPTURED // TICKET UPDATED");
+      void publishMuthurObservation({
+        route: "/property-manager",
+        surface: "property-manager",
+        observing: true,
+        observingPanelId: "property-manager-live-intake",
+        observingSubsystem: "property-manager",
+        activeTab: "property-manager",
+        activePane: "live-intake",
+        visibleDocument: null,
+        documentExcerpt: null,
+        selectedProperty: null,
+        selectedUnit: result.ticket?.unit || null,
+        visibleLogs: completedTurns.slice(-6).map((turn) => `${turn.role.toUpperCase()} // ${turn.text}`),
+        activeTickets: result.ticket ? [{ ...result.ticket }] : [],
+        operationalMode: "OBSERVE",
+        transcriptState: `PROCESSING // ${result.classification}`,
+        operationalWarnings: result.classification === "EMERGENCY" ? ["EMERGENCY ESCALATION"] : [],
+        continuityIndicators: [result.escalation, "NO DISPATCH REQUESTED"],
+      });
       void speakReply(result.reply);
       setDraft("");
     },
@@ -143,6 +164,33 @@ export function PropertyManagerDemo() {
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ block: "nearest" });
   }, [turns, interim]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const warnings = [
+      ...(classification === "EMERGENCY" ? ["EMERGENCY ESCALATION"] : []),
+      ...(micMessage.startsWith("AUTH_REQUIRED") ? [micMessage] : []),
+    ];
+    void publishMuthurObservation({
+      route: "/property-manager",
+      surface: "property-manager",
+      observing: true,
+      observingPanelId: "property-manager-live-intake",
+      observingSubsystem: "property-manager",
+      activeTab: "property-manager",
+      activePane: "live-intake",
+      visibleDocument: null,
+      documentExcerpt: null,
+      selectedProperty: null,
+      selectedUnit: ticket?.unit || null,
+      visibleLogs: turns.slice(-6).map((turn) => `${turn.role.toUpperCase()} // ${turn.text}`),
+      activeTickets: ticket ? [{ ...ticket }] : [],
+      operationalMode: "OBSERVE",
+      transcriptState: `${state.toUpperCase()} // ${classification}`,
+      operationalWarnings: warnings,
+      continuityIndicators: [escalation, dispatchStatus],
+    });
+  }, [classification, dispatchStatus, escalation, hydrated, micMessage, state, ticket, turns]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -264,6 +312,10 @@ export function PropertyManagerDemo() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 font-mono text-[10px]">
+              <ObservePresenceGlyph active subsystemLabel="muthur in" scopeLabel="observation" />
+              <span data-testid="observation-authority" className="border border-cyan-900 px-2 py-1 text-cyan-300">
+                OBSERVE // READ ONLY
+              </span>
               <span data-testid="voice-state" className="border border-emerald-900 px-2 py-1 text-emerald-300">{state.toUpperCase()}</span>
               <span data-testid="classification" className={`border px-2 py-1 ${classificationClass(classification)}`}>{classification}</span>
             </div>
@@ -290,7 +342,9 @@ export function PropertyManagerDemo() {
             <div data-testid="transcript" aria-live="polite" className="flex min-h-[14rem] flex-1 flex-col gap-3 overflow-y-auto p-3 font-mono text-[12px] leading-relaxed">
               {turns.map((turn, index) => (
                 <div key={`${turn.role}-${index}`} className={turn.role === "muthur" ? "text-emerald-300" : "text-[#d0d6d2]"}>
-                  <span className="mr-2 text-[10px] text-[#67746e]">{turn.role === "muthur" ? "MUTHUR" : "CALLER"} //</span>
+                  <span className="mr-2 text-[10px] text-[#67746e]">
+                    {turn.role === "muthur" ? OBSERVE_TRANSCRIPT_PREFIX : "CALLER //"}
+                  </span>
                   {turn.text}
                 </div>
               ))}

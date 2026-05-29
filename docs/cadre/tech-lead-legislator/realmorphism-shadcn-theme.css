@@ -1,0 +1,109 @@
+/*
+ * Realmorphism shadcn/ui theme export.
+ *
+ * The token block is upload/share friendly for shadcn/tweakcn-style themes.
+ * The motion block is the Realmorphism doctrine layer: hard-offset wall shadow,
+ * blocky face radius, hover lift, active press, and latched state.
+ */
+
+.theme-realmorphism {
+  --background: 0 0% 3%;
+  --foreground: 150 18% 92%;
+  --card: 195 10% 6%;
+  --card-foreground: 150 18% 92%;
+  --popover: 195 10% 6%;
+  --popover-foreground: 150 18% 92%;
+  --primary: 161 44% 29%;
+  --primary-foreground: 150 18% 92%;
+  --secondary: 150 10% 10%;
+  --secondary-foreground: 150 18% 92%;
+  --muted: 150 10% 10%;
+  --muted-foreground: 150 9% 65%;
+  --accent: 161 43% 40%;
+  --accent-foreground: 150 18% 92%;
+  --destructive: 0 49% 32%;
+  --destructive-foreground: 0 100% 98%;
+  --border: 150 12% 19%;
+  --input: 150 10% 10%;
+  --ring: 161 43% 40%;
+  --chart-1: 161 44% 29%;
+  --chart-2: 36 49% 36%;
+  --chart-3: 147 100% 75%;
+  --chart-4: 150 9% 65%;
+  --chart-5: 45 97% 65%;
+  --sidebar: 0 0% 3%;
+  --sidebar-foreground: 150 18% 92%;
+  --sidebar-primary: 161 44% 29%;
+  --sidebar-primary-foreground: 150 18% 92%;
+  --sidebar-accent: 150 10% 10%;
+  --sidebar-accent-foreground: 150 18% 92%;
+  --sidebar-border: 150 12% 19%;
+  --sidebar-ring: 161 43% 40%;
+  --radius: 0.5rem;
+
+  --realmorphism-host: #060708;
+  --realmorphism-host-raised: #0e1011;
+  --realmorphism-wall: #2a6b56;
+  --realmorphism-wall-hover: #3a9174;
+  --realmorphism-wall-amber: #8a6530;
+  --realmorphism-wall-amber-hover: #b8873f;
+  --realmorphism-face: #171c19;
+  --realmorphism-face-border: #2a3530;
+  --realmorphism-face-active: #12241c;
+  --realmorphism-face-active-border: #2f6b52;
+  --realmorphism-ink-on-face: #e8efeb;
+  --realmorphism-ink-on-face-active: #d6ffec;
+  --realmorphism-glyph-hover: #a8b8ff;
+  --realmorphism-shadow-rest: 2px 2px 0 1px var(--realmorphism-wall);
+  --realmorphism-shadow-hover: 4px 4px 0 1px var(--realmorphism-wall-hover);
+  --realmorphism-shadow-inset-active: inset 1px 1px 0 0 rgba(16, 185, 129, 0.22);
+}
+
+.theme-realmorphism .realmorphism-action {
+  position: relative;
+  border: 1px solid var(--realmorphism-face-border);
+  border-radius: var(--radius);
+  background: var(--realmorphism-face);
+  color: var(--realmorphism-ink-on-face);
+  box-shadow: var(--realmorphism-shadow-rest);
+  transform: translate(0, 0);
+  transition:
+    transform 150ms ease-out,
+    box-shadow 150ms ease-out,
+    color 150ms ease-out,
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+.theme-realmorphism .realmorphism-action::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: inherit;
+  background: transparent;
+}
+
+.theme-realmorphism .realmorphism-action:hover:not(:disabled) {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--realmorphism-shadow-hover);
+  color: var(--realmorphism-glyph-hover);
+}
+
+.theme-realmorphism .realmorphism-action:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: none;
+}
+
+.theme-realmorphism .realmorphism-action[aria-pressed="true"],
+.theme-realmorphism .realmorphism-action[data-state="checked"] {
+  border-color: var(--realmorphism-face-active-border);
+  background: var(--realmorphism-face-active);
+  color: var(--realmorphism-ink-on-face-active);
+  box-shadow: var(--realmorphism-shadow-rest), var(--realmorphism-shadow-inset-active);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-realmorphism .realmorphism-action {
+    transition: none;
+  }
+}

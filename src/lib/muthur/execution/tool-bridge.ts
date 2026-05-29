@@ -4,6 +4,18 @@ export function openAiToolCallToAction(
   functionName: string,
   args: Record<string, unknown>,
 ): CreateMuthurActionInput | null {
+  if (functionName === "observe_operator_pane") {
+    return {
+      type: "observe_operator_pane",
+      source: "muthur",
+      payload: {
+        tool: functionName,
+        authority: "READ_ONLY_OBSERVATION",
+        surface: typeof args.surface === "string" ? args.surface : undefined,
+      },
+    };
+  }
+
   if (functionName === "justbash") {
     const command = typeof args.command === "string" ? args.command.trim() : "";
     if (!command) return null;
@@ -70,6 +82,9 @@ export function formatExecutionResultsForOpenAiTool(
   }
   if (functionName === "localfs") {
     return `[TOOL OK] localfs\n\n${result.stdout ?? JSON.stringify(result.metadata ?? {}, null, 2)}`;
+  }
+  if (functionName === "observe_operator_pane") {
+    return `[TOOL OK] observe_operator_pane // READ_ONLY\n\n${result.stdout ?? "{}"}`;
   }
   const stdout = result.stdout ?? "";
   const stderr = result.stderr ?? "";

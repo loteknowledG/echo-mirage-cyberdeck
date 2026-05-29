@@ -1,12 +1,21 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { Dispatch, DragEvent, RefObject, SetStateAction } from "react";
-import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
-import { BsMarkdown } from "react-icons/bs";
-import { FaRegPaste } from "react-icons/fa6";
-import { GrFormEdit, GrFormView } from "react-icons/gr";
-import { LuArrowLeft, LuArrowRight, LuPanelRightClose, LuPanelRightOpen, LuRedo2, LuSave, LuTrash2, LuUndo2 } from "react-icons/lu";
+import {
+  cdxIconArrowNext,
+  cdxIconArrowPrevious,
+  cdxIconCopy,
+  cdxIconDownload,
+  cdxIconEdit,
+  cdxIconEye,
+  cdxIconPaste,
+  cdxIconRedo,
+  cdxIconTrash,
+  cdxIconUndo,
+  cdxIconUpload,
+} from "@wikimedia/codex-icons";
+import { LuPanelRightClose, LuPanelRightOpen, LuSave } from "react-icons/lu";
 import { isConvertibleDocumentPath } from "@/lib/muthur-document-conversion-intent";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -39,6 +48,7 @@ import {
 } from "@/lib/cyberdeck/realmorphism-control";
 import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
+import { CodexIcon } from "@/components/codex-icon";
 
 type DroppedOperatorAsset = {
   kind: string;
@@ -98,6 +108,34 @@ const OPERATOR_MARKDOWN_VIEW_CLASS =
   "max-w-none font-mono text-[12px] leading-snug text-green-200 [&_h1]:my-2 [&_h1]:font-mono [&_h1]:text-[12px] [&_h1]:font-normal [&_h2]:my-2 [&_h2]:font-mono [&_h2]:text-[12px] [&_h3]:font-mono [&_h3]:text-[12px] [&_p]:my-1 [&_li]:my-0 [&_pre]:my-2 [&_pre]:bg-black [&_pre]:text-green-300";
 
 const OPERATOR_HEADER_ICON_BTN = LEGACY_TOOLBAR_ICON;
+const OPERATOR_FOLDER_PANE_OPEN_KEY = "echo-mirage-operator-folder-pane-open-v1";
+const OPERATOR_FOLDER_PANE_WIDTH_KEY = "echo-mirage-operator-folder-pane-width-v1";
+const OPERATOR_FOLDER_PANE_DEFAULT_WIDTH = 176;
+const OPERATOR_FOLDER_PANE_MIN_WIDTH = 148;
+const OPERATOR_FOLDER_PANE_MAX_WIDTH = 360;
+
+function clampFolderPaneWidth(width: number): number {
+  return Math.min(OPERATOR_FOLDER_PANE_MAX_WIDTH, Math.max(OPERATOR_FOLDER_PANE_MIN_WIDTH, Math.round(width)));
+}
+
+function readPersistedFolderPaneOpen(): boolean {
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return false;
+  try {
+    return window.localStorage.getItem(OPERATOR_FOLDER_PANE_OPEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function readPersistedFolderPaneWidth(): number {
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return OPERATOR_FOLDER_PANE_DEFAULT_WIDTH;
+  try {
+    const parsed = Number(window.localStorage.getItem(OPERATOR_FOLDER_PANE_WIDTH_KEY));
+    return Number.isFinite(parsed) ? clampFolderPaneWidth(parsed) : OPERATOR_FOLDER_PANE_DEFAULT_WIDTH;
+  } catch {
+    return OPERATOR_FOLDER_PANE_DEFAULT_WIDTH;
+  }
+}
 
 function OperatorToolbarIconButton({
   label,
@@ -157,10 +195,10 @@ function OperatorFileHistoryNav({
   return (
     <div className="flex shrink-0 items-center gap-0.5">
       <OperatorToolbarIconButton label="Previous file" onClick={onBack} disabled={!canBack}>
-        <LuArrowLeft className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconArrowPrevious} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
       <OperatorToolbarIconButton label="Next file" onClick={onForward} disabled={!canForward}>
-        <LuArrowRight className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconArrowNext} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
     </div>
   );
@@ -187,7 +225,7 @@ function OperatorViewEditControls({
           onSetOperatorDocMode("view");
         }}
       >
-        <GrFormView className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconEye} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
       <CyberdeckPaneTooltip label={operatorDocMode === "edit" ? "Switch to view" : "Switch to edit"}>
         <span className="inline-flex">
@@ -211,7 +249,7 @@ function OperatorViewEditControls({
         latched={operatorDocMode === "edit"}
         onClick={() => onSetOperatorDocMode("edit")}
       >
-        <GrFormEdit className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconEdit} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
     </div>
   );
@@ -438,13 +476,13 @@ function OperatorDocumentToolStrip({
         onChange={(event) => void handleConvertFileInput(event)}
       />
       <OperatorToolbarIconButton label="Undo" onClick={onUndo} disabled={!canUndo}>
-        <LuUndo2 className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconUndo} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
       <OperatorToolbarIconButton label="Redo" onClick={onRedo} disabled={!canRedo}>
-        <LuRedo2 className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconRedo} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
       <OperatorToolbarIconButton label="Clear document" onClick={onClear} disabled={!canClear}>
-        <LuTrash2 className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconTrash} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
       <span className="mx-0.5 h-4 w-px shrink-0 bg-[#2d2d2d]" aria-hidden />
       <OperatorDocTypePicker
@@ -456,7 +494,7 @@ function OperatorDocumentToolStrip({
         onClick={() => void handlePickConvertDocument()}
         disabled={converting}
       >
-        <BsMarkdown className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconUpload} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
       <OperatorExportPicker
         disabled={exporting || normalizeOperatorDocumentKind(operatorDocumentKind) !== "markdown"}
@@ -473,13 +511,13 @@ function OperatorDocumentToolStrip({
         label="Copy"
         onClick={() => void onCopyOperatorDocToClipboard()}
       >
-        <CopyIcon className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconCopy} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
       <OperatorToolbarIconButton
         label="Paste"
         onClick={() => void onPasteClipboardToOperator()}
       >
-        <FaRegPaste className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconPaste} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
       <OperatorToolbarIconButton
         label="Save"
@@ -492,7 +530,7 @@ function OperatorDocumentToolStrip({
         label="Save as"
         onClick={() => void onSaveOperatorDocAsFile()}
       >
-        <DownloadIcon className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconDownload} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
     </div>
   );
@@ -538,12 +576,14 @@ export function CyberdeckOperatorPaneBody({
 }: OperatorPaneBodyProps) {
   const deckMode = useDeckMode();
   const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
-  const [folderPaneOpen, setFolderPaneOpen] = useState(false);
+  const [folderPaneOpen, setFolderPaneOpen] = useState(readPersistedFolderPaneOpen);
+  const [folderPaneWidth, setFolderPaneWidth] = useState(readPersistedFolderPaneWidth);
   const [imageZoom, setImageZoom] = useState<number>(1);
   const imageZoomIndexRef = useRef(3);
   const operatorAssetKeyRef = useRef("");
   const operatorApplyRef = useRef(false);
   const operatorDocHistoryTextRef = useRef("");
+  const folderPaneResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const {
     canUndo: operatorCanUndo,
     canRedo: operatorCanRedo,
@@ -562,6 +602,53 @@ export function CyberdeckOperatorPaneBody({
   useEffect(() => {
     setBrowserDraft(operatorBrowserUrl);
   }, [operatorBrowserUrl]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
+    try {
+      window.localStorage.setItem(OPERATOR_FOLDER_PANE_OPEN_KEY, folderPaneOpen ? "1" : "0");
+    } catch {
+      /* ignore storage failures */
+    }
+  }, [folderPaneOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
+    try {
+      window.localStorage.setItem(OPERATOR_FOLDER_PANE_WIDTH_KEY, String(folderPaneWidth));
+    } catch {
+      /* ignore storage failures */
+    }
+  }, [folderPaneWidth]);
+
+  const beginFolderPaneResize = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      folderPaneResizeRef.current = { startX: event.clientX, startWidth: folderPaneWidth };
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        const resizeStart = folderPaneResizeRef.current;
+        if (!resizeStart) return;
+        setFolderPaneWidth(clampFolderPaneWidth(resizeStart.startWidth - (moveEvent.clientX - resizeStart.startX)));
+      };
+
+      const stopResize = () => {
+        folderPaneResizeRef.current = null;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        window.removeEventListener("pointermove", handlePointerMove);
+        window.removeEventListener("pointerup", stopResize);
+        window.removeEventListener("pointercancel", stopResize);
+      };
+
+      window.addEventListener("pointermove", handlePointerMove);
+      window.addEventListener("pointerup", stopResize);
+      window.addEventListener("pointercancel", stopResize);
+    },
+    [folderPaneWidth],
+  );
 
   useEffect(() => {
     imageZoomIndexRef.current = 3;
@@ -701,6 +788,7 @@ export function CyberdeckOperatorPaneBody({
         className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-sm border border-[#141414] bg-black transition-colors ${
           isOperatorDragOver ? "border-amber-500/60 ring-2 ring-amber-500/35 ring-inset" : ""
         }`}
+        data-observing="true"
       >
         <CyberdeckPaneHeader
           className="z-20 shrink-0 bg-black py-2"
@@ -764,10 +852,12 @@ export function CyberdeckOperatorPaneBody({
                 onToggleFolderPane={() => setFolderPaneOpen((open) => !open)}
               />
             ) : operatorDroppedAsset && !operatorSurfaceIsDocument ? (
-              <div className="font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                {operatorDroppedAsset.kind.toUpperCase()}
+              <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+                <span>{operatorDroppedAsset.kind.toUpperCase()}</span>
               </div>
-            ) : null
+            ) : (
+              null
+            )
           }
         />
         {operatorSurfaceMode === "browser" ? (
@@ -779,7 +869,7 @@ export function CyberdeckOperatorPaneBody({
               label="Paste"
               onClick={() => void onPasteClipboardToOperator()}
             >
-              <FaRegPaste className="h-3.5 w-3.5" />
+              <CodexIcon icon={cdxIconPaste} className="h-3.5 w-3.5" />
             </OperatorToolbarIconButton>
           </div>
         ) : null}
@@ -1036,12 +1126,32 @@ export function CyberdeckOperatorPaneBody({
             )}
             </div>
             {operatorSurfaceIsDocument ? (
-              <div className={folderPaneOpen ? "contents" : "hidden"}>
-                <OperatorDocFolderPane
-                  onOpenFile={onOpenOperatorFolderFile}
-                  onRootsChange={onOperatorFolderRootsChange}
-                />
-              </div>
+              folderPaneOpen ? (
+                <>
+                  <button
+                    type="button"
+                    role="separator"
+                    aria-label="Resize folder pane"
+                    aria-orientation="vertical"
+                    title="Resize folder pane"
+                    onPointerDown={beginFolderPaneResize}
+                    onDoubleClick={() => setFolderPaneWidth(OPERATOR_FOLDER_PANE_DEFAULT_WIDTH)}
+                    className="group relative z-10 w-2 shrink-0 cursor-col-resize border-l border-[#141414] bg-black transition hover:border-emerald-500/50 focus:outline-none focus-visible:border-emerald-400/80"
+                  >
+                    <span className="absolute left-1/2 top-1/2 h-10 w-px -translate-x-1/2 -translate-y-1/2 bg-[#2d2d2d] transition group-hover:bg-emerald-400/70" />
+                  </button>
+                  <div
+                    className="min-w-0 shrink-0 border-l border-[#1c1c1c]"
+                    style={{ width: `${folderPaneWidth}px` }}
+                  >
+                    <OperatorDocFolderPane
+                      className="w-full"
+                      onOpenFile={onOpenOperatorFolderFile}
+                      onRootsChange={onOperatorFolderRootsChange}
+                    />
+                  </div>
+                </>
+              ) : null
             ) : null}
           </div>
         ) : (

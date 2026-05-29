@@ -17,6 +17,24 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   {
     type: "function",
     function: {
+      name: "observe_operator_pane",
+      description:
+        "Read the latest visible operational state from the Echo Mirage operator surface. This is observation only: it cannot click, edit, dispatch, deploy, or execute actions.",
+      parameters: {
+        type: "object",
+        properties: {
+          surface: {
+            type: "string",
+            enum: ["cyberdeck", "property-manager"],
+            description: "Optional visible surface to observe. Omit for the most recently visible surface.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "justbash",
       description:
         "Runs a shell command in a copy-on-write workspace mirror of the Echo Mirage project (reads real files; writes are ephemeral). Use for rg/git/ls/cat inside the repo, quick inspection.",

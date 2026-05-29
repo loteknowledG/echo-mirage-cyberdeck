@@ -116,6 +116,61 @@
   color: var(--realmorphism-glyph-latched);
 }
 
+/* Observe presence relay — localized panel morphology for L-18. */
+
+.observe-presence-glyph {
+  position: relative;
+  display: inline-grid;
+  min-width: 4.35rem;
+  height: 1.5rem;
+  place-items: center;
+  overflow: visible;
+  border: 1px solid transparent;
+  background: rgba(0, 0, 0, 0.74);
+  color: #67e8f9;
+  font-family: var(--font-geist-mono), "Hack", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  line-height: 1;
+  text-shadow: 0 0 8px rgba(103, 232, 249, 0.32);
+  transition:
+    border-color 140ms ease-out,
+    color 140ms ease-out;
+}
+
+.observe-presence-glyph:focus-visible {
+  outline: 1px solid rgba(103, 232, 249, 0.75);
+  outline-offset: 2px;
+}
+
+.observe-presence-glyph__compact {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+}
+
+.observe-presence-glyph--mirage-ledge {
+  position: absolute;
+  right: 1rem;
+  bottom: -0.66rem;
+  z-index: 3;
+  min-width: 4.35rem;
+  height: 1rem;
+  border: 0;
+  background: transparent;
+}
+
+.observe-presence-glyph:hover,
+.observe-presence-glyph:focus-visible,
+.observe-presence-glyph:focus-within {
+  border-color: transparent;
+  color: #a5f3fc;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .observe-presence-glyph {
+    transition: none;
+  }
+}
+
 /* ── Host bench (pane footers, recessed areas) ─────────────────────────── */
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-host-surface.cyberdeck-message-box {

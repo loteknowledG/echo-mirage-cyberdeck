@@ -7,7 +7,7 @@ import { auditExecutionSession, auditSafetyEvent, auditToolAction } from "./audi
 import type { CreateMuthurActionInput, MuthurAction, MuthurExecutionMode } from "./execution-types";
 import { isVerificationActionType } from "./execution-types";
 import { getMuthurExecutionStore, MuthurExecutionStore } from "./execution-store";
-import { requiresConfirmationForAction } from "./safety-policy";
+import { isReadOnlyObservationAction, requiresConfirmationForAction } from "./safety-policy";
 import { writeVerificationReceipt } from "./verification-receipts.server";
 import { runVerifyConditions } from "./verification-runner.server";
 import type { VerificationOutcome } from "./verification-types";
@@ -46,7 +46,9 @@ export class MuthurExecutionLoop {
     const mode = this.store.getSnapshot().execution_mode;
     const normalized = inputs.map((input) => {
       const requires_confirmation =
-        mode === "observe" || mode === "suggest" ? true : requiresConfirmationForAction(input);
+        (mode === "observe" || mode === "suggest") && !isReadOnlyObservationAction(input.type)
+          ? true
+          : requiresConfirmationForAction(input);
       return { ...input, requires_confirmation };
     });
     this.currentTaskLabel = options.taskLabel ?? this.currentTaskLabel;

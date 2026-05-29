@@ -13,6 +13,7 @@ export const MUTHUR_ACTION_TYPES = [
   "verify_route_loaded",
   "verify_console_clean",
   "get_console_errors",
+  "observe_operator_pane",
 ] as const;
 
 export const VERIFICATION_ACTION_TYPES = [

@@ -3,7 +3,13 @@ const ICON_BASE_PATH = "/vendor/vscode-icons";
 const FILE_NAME_ICONS: Record<string, string> = {
   ".env": "file_type_dotenv.svg",
   ".env.local": "file_type_dotenv.svg",
+  ".gitattributes": "file_type_git.svg",
+  ".gitignore": "file_type_git.svg",
+  ".gitmodules": "file_type_git.svg",
   "dockerfile": "file_type_docker.svg",
+  "eslint.config.js": "file_type_eslint.svg",
+  "eslint.config.mjs": "file_type_eslint.svg",
+  "eslint.config.ts": "file_type_eslint.svg",
   "next.config.js": "file_type_next.svg",
   "next.config.mjs": "file_type_next.svg",
   "next.config.ts": "file_type_next.svg",
@@ -11,10 +17,22 @@ const FILE_NAME_ICONS: Record<string, string> = {
   "package.json": "file_type_npm.svg",
   "pnpm-lock.yaml": "file_type_pnpm.svg",
   "pnpm-workspace.yaml": "file_type_pnpm.svg",
+  "postcss.config.js": "file_type_postcss.svg",
+  "postcss.config.mjs": "file_type_postcss.svg",
+  "postcss.config.ts": "file_type_postcss.svg",
+  "prettier.config.js": "file_type_prettier.svg",
+  "prettier.config.mjs": "file_type_prettier.svg",
+  "tailwind.config.js": "file_type_tailwind.svg",
+  "tailwind.config.mjs": "file_type_tailwind.svg",
+  "tailwind.config.ts": "file_type_tailwind.svg",
+  "tsconfig.json": "file_type_tsconfig.svg",
+  "tsconfig.tsbuildinfo": "file_type_tsconfig.svg",
 };
 
 const FILE_EXTENSION_ICONS: Record<string, string> = {
   css: "file_type_css.svg",
+  db: "file_type_light_db.svg",
+  flf: "file_type_font.svg",
   gif: "file_type_image.svg",
   htm: "file_type_html.svg",
   html: "file_type_html.svg",
@@ -23,6 +41,7 @@ const FILE_EXTENSION_ICONS: Record<string, string> = {
   js: "file_type_js.svg",
   jsx: "file_type_reactjs.svg",
   json: "file_type_json.svg",
+  log: "file_type_log.svg",
   md: "file_type_markdown.svg",
   mdx: "file_type_markdown.svg",
   pdf: "file_type_pdf.svg",
@@ -53,19 +72,28 @@ const DOCUMENT_KIND_SAMPLE_FILES: Record<string, string> = {
 };
 
 const FOLDER_ICONS: Record<string, string> = {
+  __pycache__: "python",
   doc: "docs",
   docs: "docs",
   e2e: "test",
+  node_modules: "node",
   public: "public",
   src: "src",
   test: "test",
   tests: "test",
+  tool: "tools",
+  tooling: "tools",
+  tools: "tools",
 };
 
 export function operatorFileIcon(name: string): string {
   const normalizedName = name.toLowerCase();
   const namedIcon = FILE_NAME_ICONS[normalizedName];
   if (namedIcon) return namedIcon;
+
+  if (normalizedName.endsWith(".d.ts")) return "file_type_typescriptdef.svg";
+  if (normalizedName.endsWith(".db-shm") || normalizedName.endsWith(".db-wal")) return "file_type_light_db.svg";
+  if (normalizedName.endsWith(".config.json")) return "file_type_config.svg";
 
   const extension = normalizedName.slice(normalizedName.lastIndexOf(".") + 1);
   return FILE_EXTENSION_ICONS[extension] ?? "default_file.svg";

@@ -13,7 +13,6 @@ export const CYBERDECK_PANE_KINDS = [
   "flight-log",
   "drop-bay",
   "glyph-channel",
-  "muthur-execution",
   "rola-dex",
   "sound-profile",
 ] as const;
@@ -49,10 +48,6 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   "drop-bay": {
     label: "DROP BAY",
     fetchHints: ["INTAKE", "JSONL STORE", "SSE FEED"],
-  },
-  "muthur-execution": {
-    label: "MUTHUR EXECUTION",
-    fetchHints: ["RUNTIME", "QUEUE", "ACTION RUNNER", "AUDIT"],
   },
   "glyph-channel": { label: "GLYPH CHANNEL", fetchHints: ["GLYPH BUS", "RENDER"] },
   "rola-dex": { label: "ROLA-DEX", fetchHints: ["DEX", "CAROUSEL"] },

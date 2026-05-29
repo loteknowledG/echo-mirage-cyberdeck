@@ -22,6 +22,7 @@ const RUNNABLE_ACTIONS: MuthurActionType[] = [
   "verify_route_loaded",
   "verify_console_clean",
   "get_console_errors",
+  "observe_operator_pane",
 ];
 
 const ALWAYS_REQUIRES_CONFIRMATION: MuthurActionType[] = ["write_file"];
@@ -38,6 +39,10 @@ export function isPathInsideWorkspace(targetPath: string): boolean {
 
 export function isRunnableAction(type: MuthurActionType): boolean {
   return RUNNABLE_ACTIONS.includes(type);
+}
+
+export function isReadOnlyObservationAction(type: MuthurActionType): boolean {
+  return type === "observe_operator_pane";
 }
 
 /** @deprecated use isRunnableAction */

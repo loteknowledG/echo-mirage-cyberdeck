@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { validateBrowserUrl } from "@/lib/muthur/browser/browser-policy";
+import { getLatestMuthurObservation } from "@/lib/muthur/observation/observation-store.server";
 import {
   captureScreenshot,
   getSessionConsoleEntries,
@@ -297,6 +298,25 @@ export async function runMuthurAction(
           entries,
           errors,
         },
+      };
+    }
+
+    case "observe_operator_pane": {
+      const requestedSurface =
+        action.payload.surface === "property-manager" || action.payload.surface === "cyberdeck"
+          ? action.payload.surface
+          : undefined;
+      const observation = getLatestMuthurObservation(requestedSurface);
+      return {
+        success: true,
+        duration_ms: Date.now() - startedAt,
+        stdout: JSON.stringify(observation ?? { status: "NO_VISIBLE_OBSERVATION" }, null, 2),
+        metadata: {
+          authority: "READ_ONLY_OBSERVATION",
+          read_only: true,
+          observation,
+        },
+        verification_notes: "Read-only operator observation retrieved; no action authority granted.",
       };
     }
 

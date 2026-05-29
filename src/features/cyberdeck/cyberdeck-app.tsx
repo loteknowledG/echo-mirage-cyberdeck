@@ -186,6 +186,8 @@ import {
 } from "@/lib/muthur/execution/parse-legacy-tool-json";
 import { enqueueMuthurActions } from "@/lib/muthur/execution/use-muthur-execution-runtime";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
+import { publishMuthurObservation } from "@/lib/muthur/observation/publish-observation";
+import { OBSERVE_TRANSCRIPT_PREFIX } from "@/components/muthur/observe-presence-glyph";
 import {
   getMuthurHelpText,
   getMuthurHelpUnknownTopicText,
@@ -331,7 +333,6 @@ const CUSTOM_TAB_KINDS = [
   "flight-log",
   "drop-bay",
   "glyph-channel",
-  "muthur-execution",
   "rola-dex",
   "sound-profile",
   "catelog",
@@ -424,7 +425,6 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Voice Lab", kind: "voice-lab", action: "convert" },
   { label: "Flight Log", kind: "flight-log", action: "convert" },
   { label: "Drop Bay", kind: "drop-bay", action: "convert" },
-  { label: "MUTHUR Execution", kind: "muthur-execution", action: "convert" },
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Rola Dex", kind: "rola-dex", action: "convert" },
   { label: "Sound Profile", kind: "sound-profile", action: "convert" },
@@ -445,11 +445,23 @@ function isCustomTabKind(kind: unknown): kind is CustomTabKind {
   return typeof kind === "string" && normalizeCustomTabKind(kind) !== null;
 }
 
+function isRetiredCustomTabKind(kind: unknown): boolean {
+  if (typeof kind !== "string") return false;
+  const normalized = kind.trim().toLowerCase();
+  return (
+    normalized === "muthur-execution" ||
+    normalized === "muthur_execution" ||
+    normalized === "execution" ||
+    normalized === "execution-pane"
+  );
+}
+
 function sanitizeCustomTabs(value: unknown): CustomTab[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const tab = item as Partial<CustomTab>;
+    if (isRetiredCustomTabKind(tab.kind)) return [];
     const id = typeof tab.id === "string" && tab.id.trim() ? tab.id.trim() : "";
     const label = typeof tab.label === "string" && tab.label.trim() ? tab.label.trim() : "TAB";
     const glyph = typeof tab.glyph === "string" && tab.glyph.trim() ? tab.glyph.trim() : "□";
@@ -742,14 +754,6 @@ function normalizeCustomTabKind(kind: string) {
     return "drop-bay" as CustomTabKind;
   }
   if (
-    nextKind === "muthur-execution" ||
-    nextKind === "muthur_execution" ||
-    nextKind === "execution" ||
-    nextKind === "execution-pane"
-  ) {
-    return "muthur-execution" as CustomTabKind;
-  }
-  if (
     nextKind === "glyph" ||
     nextKind === "glyph-channel" ||
     nextKind === "glyph_channel" ||
@@ -800,7 +804,6 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "voice-lab") return "V";
   if (kind === "flight-log") return "F";
   if (kind === "drop-bay") return "⬇";
-  if (kind === "muthur-execution") return "⚙";
   if (kind === "glyph-channel") return "⟁";
   if (kind === "rola-dex") return "▧";
   if (kind === "sound-profile") return "♪";
@@ -813,7 +816,6 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "voice-lab") return "VOICE LAB";
   if (kind === "flight-log") return "FLIGHT LOG";
   if (kind === "drop-bay") return "DROP BAY";
-  if (kind === "muthur-execution") return "MUTHUR EXECUTION";
   if (kind === "glyph-channel") return "⟁ GLYPH";
   if (kind === "rola-dex") return "Rola Dex";
   if (kind === "sound-profile") return "Sound Profile";
@@ -859,7 +861,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|muthur-execution|execution|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -2043,6 +2045,51 @@ export default function CyberdeckApp() {
     setServer: (next) => useCyberdeckTabStore.getState().setServer(next),
     setOperatorBrowserSnapshot,
   });
+
+  const publishOperatorObservation = useCallback(() => {
+    if (!deckUiHydrated) return;
+    const { server, customTabs, activeCustomTabId } = useCyberdeckTabStore.getState();
+    const activeCustomTab = customTabs.find((tab) => tab.id === activeCustomTabId) ?? null;
+    const visibleAsset = activeCustomTab?.asset ?? (operatorSurfaceMode === "workspace" ? operatorDroppedAsset : null);
+    void publishMuthurObservation({
+      route: "/cyberdeck",
+      surface: "cyberdeck",
+      observing: true,
+      observingPanelId: activeCustomTab?.id ?? server,
+      observingSubsystem: activeCustomTab?.kind ?? server,
+      activeTab: activeCustomTab?.label ?? server,
+      activePane: activeCustomTab?.kind ?? server,
+      visibleDocument: visibleAsset?.name ?? null,
+      documentExcerpt: typeof visibleAsset?.text === "string" ? visibleAsset.text.slice(0, 800) : null,
+      selectedProperty: null,
+      selectedUnit: null,
+      visibleLogs: messages.slice(-6).map((message) => `${message.role.toUpperCase()} // ${message.text.slice(0, 300)}`),
+      activeTickets: [],
+      operationalMode: "OBSERVE",
+      transcriptState: isStreaming ? "STREAMING" : "STANDBY",
+      operationalWarnings: [],
+      continuityIndicators: [
+        `SURFACE // ${operatorSurfaceMode.toUpperCase()}`,
+        `DOCUMENT // ${operatorDocMode.toUpperCase()}`,
+        ...(operatorActiveFilePath ? [`PATH // ${operatorActiveFilePath}`] : []),
+        ...(operatorSurfaceMode === "browser" ? [`URL // ${operatorBrowserUrl}`] : []),
+      ],
+    });
+  }, [
+    deckUiHydrated,
+    isStreaming,
+    messages,
+    operatorActiveFilePath,
+    operatorBrowserUrl,
+    operatorDocMode,
+    operatorDroppedAsset,
+    operatorSurfaceMode,
+  ]);
+
+  useEffect(() => {
+    publishOperatorObservation();
+    return useCyberdeckTabStore.subscribe(() => publishOperatorObservation());
+  }, [publishOperatorObservation]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -5089,7 +5136,7 @@ const resolved = resolveUiTarget(userMessage);
               ...prev,
               {
                 role: "assistant",
-                text: "EXECUTION BLOCKED // Action requires approval in MUTHUR Execution pane.",
+                text: "EXECUTION BLOCKED // Action requires operator approval.",
               },
             ]);
             setStreamText("");
@@ -6162,10 +6209,6 @@ const resolved = resolveUiTarget(userMessage);
         return shell(<ActivatedCyberdeckPane kind="drop-bay" />);
       }
 
-      if (tab.kind === "muthur-execution") {
-        return shell(<ActivatedCyberdeckPane kind="muthur-execution" />);
-      }
-
       if (tab.kind === "glyph-channel") {
         return (
           <div
@@ -6569,6 +6612,10 @@ const resolved = resolveUiTarget(userMessage);
                     /(failure|failuer|failed|invalid_key|auth_rejected|uplink_error|api\s*error|http_[45]\d{2}|empty_response|rate_limit)/i.test(
                       m.text,
                     );
+                  const isObserveResponse =
+                    m.role === "assistant" &&
+                    (m.toolTrace?.includes("observe_operator_pane") ||
+                      /observe_operator_pane|READ_ONLY_OBSERVATION|Operator panel observed/i.test(m.text));
                   return (
                     <div
                       key={i}
@@ -6632,6 +6679,11 @@ const resolved = resolveUiTarget(userMessage);
                                 .join(" · ")}
                             </span>
                           ) : null}
+                          {isObserveResponse ? (
+                            <span className="mb-0.5 block font-mono text-[10px] leading-snug text-cyan-300">
+                              {OBSERVE_TRANSCRIPT_PREFIX}
+                            </span>
+                          ) : null}
                           <span className="whitespace-pre-wrap">{m.text}</span>
                         </>
                       )}
@@ -6656,6 +6708,11 @@ const resolved = resolveUiTarget(userMessage);
                             .map((t) => t.trim())
                             .filter(Boolean)
                             .join(" · ")}
+                        </span>
+                      ) : null}
+                      {streamToolTrace?.includes("observe_operator_pane") ? (
+                        <span className="mb-0.5 block font-mono text-[10px] leading-snug text-cyan-300">
+                          {OBSERVE_TRANSCRIPT_PREFIX}
                         </span>
                       ) : null}
                       <span className="text-green-300">{streamText}</span>

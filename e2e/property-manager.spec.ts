@@ -36,6 +36,36 @@ test("property manager desktop intake classifies emergency and prepares mocked e
   await expect(page.getByTestId("ticket-draft")).toContainText('"unit": "4B"');
   await expect(page.getByTestId("escalation")).toHaveText("EMERGENCY ESCALATION");
   await expect(page.getByTestId("voice-state")).toHaveText("IDLE");
+  await expect(page.getByTestId("observation-authority")).toHaveText("OBSERVE // READ ONLY");
+  await expect(page.getByTestId("observe-presence-glyph")).toContainText("(𓁹 𓁹)");
+  const glyphIdleBox = await page.getByTestId("observe-presence-glyph").boundingBox();
+  await page.getByTestId("observe-presence-glyph").hover();
+  const glyphExpandedBox = await page.getByTestId("observe-presence-glyph").boundingBox();
+  expect(Math.round(glyphExpandedBox?.width ?? 0)).toBe(Math.round(glyphIdleBox?.width ?? 0));
+  expect(Math.round(glyphExpandedBox?.height ?? 0)).toBe(Math.round(glyphIdleBox?.height ?? 0));
+  await expect(page.locator(".observe-presence-glyph__frame")).toBeVisible();
+  await expect(page.getByTestId("transcript")).toContainText("(𓁹 𓁹) [OBSERVE]");
+  await expect.poll(async () => {
+    const response = await page.request.get("/api/muthur/observation?surface=property-manager");
+    const body = (await response.json()) as {
+      observation?: {
+        route?: string;
+        selectedUnit?: string;
+        operationalWarnings?: string[];
+        authority?: string;
+        observing?: boolean;
+        observingPanelId?: string;
+      };
+    };
+    return body.observation;
+  }).toMatchObject({
+    route: "/property-manager",
+    observing: true,
+    observingPanelId: "property-manager-live-intake",
+    selectedUnit: "4B",
+    operationalWarnings: ["EMERGENCY ESCALATION"],
+    authority: "READ_ONLY_OBSERVATION",
+  });
 
   await page.getByRole("button", { name: "MOCK VENDOR DISPATCH" }).click();
   await expect(page.getByTestId("dispatch-status")).toHaveText("MOCK ESCALATION QUEUED // ON-CALL MANAGER + MAINTENANCE");

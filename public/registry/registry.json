@@ -1,0 +1,25 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "echo-mirage",
+  "homepage": "http://localhost:3050",
+  "items": [
+    {
+      "name": "realmorphism",
+      "type": "registry:theme",
+      "title": "Realmorphism",
+      "description": "A blocky tactile shadcn/ui theme for operational interfaces, with hard-offset shadows and motion states that communicate action affordance."
+    },
+    {
+      "name": "realmorphism-base",
+      "type": "registry:block",
+      "title": "Realmorphism Base",
+      "description": "Turnkey Realmorphism wrappers for shadcn/ui controls."
+    },
+    {
+      "name": "shadcn-sidebar",
+      "type": "registry:block",
+      "title": "Shadcn Sidebar",
+      "description": "Local sidebar block registry item."
+    }
+  ]
+}

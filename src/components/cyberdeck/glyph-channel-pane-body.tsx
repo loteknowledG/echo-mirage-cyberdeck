@@ -1,10 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { CopyIcon } from "@radix-ui/react-icons";
-import { FaRegPaste } from "react-icons/fa6";
-import { GrFormEdit, GrFormView } from "react-icons/gr";
-import { LuRedo2, LuScanLine, LuTrash2, LuUndo2 } from "react-icons/lu";
+import {
+  cdxIconCopy,
+  cdxIconEdit,
+  cdxIconEye,
+  cdxIconPaste,
+  cdxIconRedo,
+  cdxIconTrash,
+  cdxIconUndo,
+} from "@wikimedia/codex-icons";
+import { LuScanLine } from "react-icons/lu";
 import {
   CyberdeckPaneHeader,
   CyberdeckPaneHeaderTitle,
@@ -43,6 +49,7 @@ import {
   subscribeGlyphChannelContent,
   writeGlyphModeActive,
 } from "@/lib/glyph-channel";
+import { CodexIcon } from "@/components/codex-icon";
 import { isFigletAllFonts } from "@/lib/figlet-fonts";
 import { resolveGlyphCommand } from "@/lib/muthur-glyph-intent";
 import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
@@ -510,7 +517,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                   }`,
                 })}
               >
-                <GrFormView className="h-3.5 w-3.5" />
+                <CodexIcon icon={cdxIconEye} className="h-3.5 w-3.5" />
               </button>
             </CyberdeckControlTooltip>
             <Switch
@@ -537,7 +544,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                   }`,
                 })}
               >
-                <GrFormEdit className="h-3.5 w-3.5" />
+                <CodexIcon icon={cdxIconEdit} className="h-3.5 w-3.5" />
               </button>
             </CyberdeckControlTooltip>
           </div>
@@ -560,7 +567,7 @@ export function CyberdeckGlyphChannelPaneBody() {
               legacyClassName: toolbarIconBtn(!canUndo || rendering),
             })}
           >
-            <LuUndo2 className="h-3.5 w-3.5" />
+            <CodexIcon icon={cdxIconUndo} className="h-3.5 w-3.5" />
           </button>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Redo">
@@ -575,7 +582,7 @@ export function CyberdeckGlyphChannelPaneBody() {
               legacyClassName: toolbarIconBtn(!canRedo || rendering),
             })}
           >
-            <LuRedo2 className="h-3.5 w-3.5" />
+            <CodexIcon icon={cdxIconRedo} className="h-3.5 w-3.5" />
           </button>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Copy ASCII">
@@ -589,7 +596,7 @@ export function CyberdeckGlyphChannelPaneBody() {
               legacyClassName: HEADER_ICON_BTN,
             })}
           >
-            <CopyIcon className="h-3.5 w-3.5" />
+            <CodexIcon icon={cdxIconCopy} className="h-3.5 w-3.5" />
           </button>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Clear ASCII channel">
@@ -604,7 +611,7 @@ export function CyberdeckGlyphChannelPaneBody() {
               legacyClassName: toolbarIconBtn(!text.trim() || rendering),
             })}
           >
-            <LuTrash2 className="h-3.5 w-3.5" />
+            <CodexIcon icon={cdxIconTrash} className="h-3.5 w-3.5" />
           </button>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Paste into ASCII">
@@ -618,7 +625,7 @@ export function CyberdeckGlyphChannelPaneBody() {
               legacyClassName: HEADER_ICON_BTN,
             })}
           >
-            <FaRegPaste className="h-3.5 w-3.5" />
+            <CodexIcon icon={cdxIconPaste} className="h-3.5 w-3.5" />
           </button>
         </CyberdeckControlTooltip>
       </div>

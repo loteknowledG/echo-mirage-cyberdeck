@@ -27,7 +27,11 @@ export async function executeOpenAiToolViaExecutionLoop(
 
   const loop = getMuthurExecutionLoop();
   const snapshotBefore = loop.getState();
-  const useExecuteMode = snapshotBefore.execution_mode === "observe" ? "execute" : snapshotBefore.execution_mode;
+  const readOnlyObservation = mapped.type === "observe_operator_pane";
+  const useExecuteMode =
+    snapshotBefore.execution_mode === "observe" && !readOnlyObservation
+      ? "execute"
+      : snapshotBefore.execution_mode;
   if (useExecuteMode !== snapshotBefore.execution_mode) {
     loop.setMode(useExecuteMode);
   }

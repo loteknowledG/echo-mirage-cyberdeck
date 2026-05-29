@@ -12,3 +12,5 @@ export { closeBrowserSession, getLastBrowserSnapshot, getSessionConsoleErrors, o
 export * from "../browser/index.server";
 export * from "./verification-runner.server";
 export * from "./verification-receipts.server";
+export * from "../observation/observation-store.server";
+export * from "../observation/observation-types";

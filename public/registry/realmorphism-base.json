@@ -1,0 +1,28 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "realmorphism-base",
+  "type": "registry:block",
+  "title": "Realmorphism Base",
+  "description": "Turnkey Realmorphism wrappers for shadcn/ui controls. Installs the theme dependency plus tactile primitives for buttons, cards, inputs, switches, toolbars, and tabs.",
+  "author": "LT Lo TeknowledG",
+  "registryDependencies": [
+    "http://localhost:3050/registry/realmorphism.json",
+    "button",
+    "card",
+    "input",
+    "switch",
+    "tabs"
+  ],
+  "files": [
+    {
+      "type": "registry:component",
+      "path": "components/realmorphism/realmorphism-primitives.tsx",
+      "target": "components/realmorphism/realmorphism-primitives.tsx",
+      "content": "\"use client\";\n\nimport * as React from \"react\";\n\nimport { Button, type ButtonProps } from \"@/components/ui/button\";\nimport { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from \"@/components/ui/card\";\nimport { Input } from \"@/components/ui/input\";\nimport { Switch } from \"@/components/ui/switch\";\nimport { Tabs, TabsContent, TabsList, TabsTrigger } from \"@/components/ui/tabs\";\nimport { cn } from \"@/lib/utils\";\n\nexport function RealmorphismShell({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {\n  return <div className={cn(\"theme-realmorphism bg-background text-foreground\", className)} {...props} />;\n}\n\nexport function RealmorphismButton({ className, ...props }: ButtonProps) {\n  return <Button className={cn(\"realmorphism-action rounded-[var(--radius)]\", className)} {...props} />;\n}\n\nexport function RealmorphismIconButton({ className, ...props }: ButtonProps) {\n  return <RealmorphismButton size=\"icon\" className={cn(\"size-10\", className)} {...props} />;\n}\n\nexport function RealmorphismCard({ className, ...props }: React.ComponentProps<typeof Card>) {\n  return (\n    <Card\n      className={cn(\n        \"rounded-[var(--radius)] border border-[var(--realmorphism-face-border)] bg-[var(--realmorphism-host-raised)] shadow-[var(--realmorphism-shadow-rest)]\",\n        className\n      )}\n      {...props}\n    />\n  );\n}\n\nexport function RealmorphismInput({ className, ...props }: React.ComponentProps<typeof Input>) {\n  return (\n    <Input\n      className={cn(\n        \"rounded-[var(--radius)] border-[var(--realmorphism-face-border)] bg-[var(--realmorphism-face)] text-[var(--realmorphism-ink-on-face)] shadow-[var(--realmorphism-shadow-rest)] focus-visible:-translate-x-0.5 focus-visible:-translate-y-0.5 focus-visible:shadow-[var(--realmorphism-shadow-hover)]\",\n        className\n      )}\n      {...props}\n    />\n  );\n}\n\nexport function RealmorphismSwitch({ className, ...props }: React.ComponentProps<typeof Switch>) {\n  return <Switch className={cn(\"realmorphism-action\", className)} {...props} />;\n}\n\nexport function RealmorphismToolbar({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {\n  return (\n    <div\n      className={cn(\n        \"flex items-center gap-2 rounded-[var(--radius)] border border-[var(--realmorphism-face-border)] bg-[var(--realmorphism-host)] p-2\",\n        className\n      )}\n      {...props}\n    />\n  );\n}\n\nexport function RealmorphismTabs({ className, ...props }: React.ComponentProps<typeof Tabs>) {\n  return <Tabs className={cn(\"theme-realmorphism\", className)} {...props} />;\n}\n\nexport function RealmorphismTabsList({ className, ...props }: React.ComponentProps<typeof TabsList>) {\n  return (\n    <TabsList\n      className={cn(\n        \"gap-2 rounded-[var(--radius)] border border-[var(--realmorphism-face-border)] bg-[var(--realmorphism-host)] p-1\",\n        className\n      )}\n      {...props}\n    />\n  );\n}\n\nexport function RealmorphismTabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsTrigger>) {\n  return <TabsTrigger className={cn(\"realmorphism-action\", className)} {...props} />;\n}\n\nexport { CardContent, CardDescription, CardFooter, CardHeader, CardTitle, TabsContent };\n"
+    }
+  ],
+  "meta": {
+    "doctrine": "Use RealmorphismShell once near the root. Use realmorphism-action on controls where motion should communicate action availability.",
+    "installNote": "Install with `npx shadcn@latest add http://localhost:3050/registry/realmorphism-base.json` while Echo Mirage is serving locally."
+  }
+}
