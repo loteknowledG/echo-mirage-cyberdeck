@@ -64,6 +64,13 @@
   --realmorphism-ink-critical: #fca5a5;
   --realmorphism-ink-disabled: #56605c;
 
+  /* Ink glow — press + latched selected */
+  --realmorphism-ink-glow-press: 0 0 8px rgba(168, 184, 255, 0.55), 0 0 16px rgba(168, 184, 255, 0.28);
+  --realmorphism-ink-glow-selected: 0 0 10px rgba(143, 255, 200, 0.7),
+    0 0 22px rgba(125, 255, 180, 0.38);
+  --realmorphism-ink-glow-caution-press: 0 0 8px rgba(252, 211, 77, 0.6), 0 0 16px rgba(252, 211, 77, 0.3);
+  --realmorphism-ink-glow-critical-press: 0 0 8px rgba(252, 165, 165, 0.65), 0 0 16px rgba(252, 165, 165, 0.32);
+
   --realmorphism-inset: rgba(0, 0, 0, 0.52);
   --realmorphism-inset-active: rgba(16, 185, 129, 0.22);
 
@@ -237,18 +244,28 @@
     box-shadow 150ms ease-out,
     color 150ms ease-out,
     background-color 150ms ease-out,
-    border-color 150ms ease-out;
+    border-color 150ms ease-out,
+    text-shadow 150ms ease-out;
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control:hover:not(:disabled) {
   transform: translate(-2px, -2px);
   box-shadow: var(--realmorphism-shadow-hover);
-  color: var(--realmorphism-glyph-hover);
+}
+
+/* Default face — brighten in-family (like amber → caution, critical → critical ink). */
+[data-deck-mode="realmorphism"]
+  [data-morphism="realmorphism"]
+  .realmorphism-control:not(.is-amber):not(.is-critical):hover:not(:disabled):not([aria-pressed="true"]):not(
+    [data-state="on"]
+  ):not([data-state="checked"]) {
+  color: var(--realmorphism-ink-signal);
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control:active:not(:disabled) {
   transform: translate(4px, 4px);
   box-shadow: none;
+  text-shadow: var(--realmorphism-ink-glow-press);
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control:disabled {
@@ -267,27 +284,41 @@
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-amber {
+  --realmorphism-shadow-rest: var(--realmorphism-shadow-amber-rest);
+  --realmorphism-shadow-hover: var(--realmorphism-shadow-amber-hover);
   border-color: var(--realmorphism-face-amber-border);
   background-color: var(--realmorphism-face-amber);
   color: var(--realmorphism-ink-on-face-amber);
-  box-shadow: var(--realmorphism-shadow-amber-rest);
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-amber:hover:not(:disabled) {
-  box-shadow: var(--realmorphism-shadow-amber-hover);
+  transform: translate(-2px, -2px);
   color: var(--realmorphism-ink-caution);
 }
 
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-amber:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: none;
+  text-shadow: var(--realmorphism-ink-glow-caution-press);
+}
+
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-critical {
+  --realmorphism-shadow-rest: var(--realmorphism-shadow-critical-rest);
+  --realmorphism-shadow-hover: var(--realmorphism-shadow-critical-hover);
   border-color: var(--realmorphism-face-critical-border);
   background-color: var(--realmorphism-face-critical);
   color: var(--realmorphism-ink-on-face-critical);
-  box-shadow: var(--realmorphism-shadow-critical-rest);
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-critical:hover:not(:disabled) {
-  box-shadow: var(--realmorphism-shadow-critical-hover);
+  transform: translate(-2px, -2px);
   color: var(--realmorphism-ink-critical);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-critical:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: none;
+  text-shadow: var(--realmorphism-ink-glow-critical-press);
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[aria-pressed="true"],
@@ -298,6 +329,7 @@
   color: var(--realmorphism-ink-on-face-active);
   box-shadow: var(--realmorphism-shadow-inset-active);
   transform: translate(2px, 2px);
+  text-shadow: var(--realmorphism-ink-glow-selected);
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[aria-pressed="true"]:hover:not(:disabled),
@@ -305,7 +337,8 @@
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[data-state="checked"]:hover:not(:disabled) {
   transform: translate(2px, 2px);
   box-shadow: var(--realmorphism-shadow-inset-active);
-  color: var(--realmorphism-ink-on-face-active);
+  color: var(--realmorphism-ink-signal);
+  text-shadow: var(--realmorphism-ink-glow-selected);
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[aria-pressed="true"]:active:not(:disabled),
@@ -313,6 +346,7 @@
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[data-state="checked"]:active:not(:disabled) {
   transform: translate(4px, 4px);
   box-shadow: none;
+  text-shadow: var(--realmorphism-ink-glow-press);
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-danger {
@@ -401,7 +435,23 @@
 [data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu):hover:not(:disabled) {
   transform: translate(-2px, -2px);
   box-shadow: var(--realmorphism-shadow-hover);
-  color: var(--realmorphism-glyph-hover);
+}
+
+[data-deck-mode="realmorphism"]
+  .realmorphism-control:not(.is-menu):not(.is-amber):not(.is-critical):hover:not(:disabled):not(
+    [aria-pressed="true"]
+  ):not([data-state="on"]):not([data-state="checked"]) {
+  color: var(--realmorphism-ink-signal);
+}
+
+[data-deck-mode="realmorphism"]
+  .realmorphism-control:not(.is-menu)[aria-pressed="true"]:hover:not(:disabled),
+[data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu)[data-state="on"]:hover:not(:disabled),
+[data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu)[data-state="checked"]:hover:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: var(--realmorphism-shadow-inset-active);
+  color: var(--realmorphism-ink-signal);
+  text-shadow: var(--realmorphism-ink-glow-selected);
 }
 
 [data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu):active:not(:disabled) {

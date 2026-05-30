@@ -328,6 +328,14 @@ body:has(.send-shell) {
   overflow-y: auto !important;
 }
 
+/* Registry showroom (incl. Realmorphism Kit webview): no 401px floor. */
+html:has([data-registry-showroom]),
+body:has([data-registry-showroom]),
+body:has([data-registry-showroom]) #__next,
+body:has([data-registry-showroom]) .app-min-width-wrapper {
+  min-width: 0 !important;
+}
+
 @media (max-width: 768px) {
   html:has(.cyberdeck-shell),
   html:has(.property-manager-shell),

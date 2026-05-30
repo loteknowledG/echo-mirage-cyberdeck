@@ -42,7 +42,6 @@ export function GlyphEnginePicker({ value, onChange }: GlyphEnginePickerProps) {
       viewportClassName="h-7 min-w-[3rem] w-auto max-w-[4.75rem]"
       alwaysShowLabel
       showTextWhileScrolling
-      showTooltipOnSnap
     />
   );
 }

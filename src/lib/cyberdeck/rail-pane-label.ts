@@ -29,6 +29,7 @@ export function railPaneLabelForCustomTab(tab: { kind: string; label?: string })
     return tab.label?.trim().toUpperCase() || "BLANK TAB";
   }
 
+  if (tab.kind === "realmorphism-kit") return "REALMORPHISM KIT";
   if (tab.kind === "web") return "WEB BROWSER";
   if (tab.kind === "connection") return "CONNECTION";
 

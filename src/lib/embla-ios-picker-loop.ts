@@ -5,6 +5,8 @@ export const IOS_PICKER_ITEM_SIZE_PX = 22;
 export type IosPickerStyleOptions = {
   /** Gentler opacity falloff for long lists (e.g. figlet fonts). */
   compact?: boolean;
+  /** Stronger dimming off-center (showroom pinned wheel). */
+  centerEmphasis?: boolean;
   /** Cylindrical rolodex: rotateX + translateZ on inner slide nodes. */
   rolodex?: boolean;
   /** Slide row height in px — used for translateZ radius. */
@@ -38,13 +40,14 @@ export function applyIosPickerSlideStyles(
   if (!snapCount) return;
 
   const compact = options?.compact ?? false;
+  const centerEmphasis = options?.centerEmphasis ?? false;
   const rolodex = options?.rolodex ?? false;
   const maxNeighborSteps = options?.maxNeighborSteps;
   const itemSize = options?.itemSizePx ?? IOS_PICKER_ITEM_SIZE_PX;
   const snapSpacing = snapCount > 1 ? 1 / (snapCount - 1) : 1;
-  const minOpacity = compact ? 0.35 : 0.2;
+  const minOpacity = centerEmphasis ? 0.2 : compact ? 0.35 : 0.2;
   const maxRotate = compact ? 22 : 48;
-  const opacityFalloff = compact ? 0.22 : 0.14;
+  const opacityFalloff = centerEmphasis ? 0.4 : compact ? 0.22 : 0.14;
   const wheelRadius = (itemSize * Math.max(snapCount, 3)) / (2 * Math.PI);
 
   snapList.forEach((snap, snapIndex) => {

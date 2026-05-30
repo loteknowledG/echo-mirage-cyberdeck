@@ -104,8 +104,6 @@ export function OnelineArtPicker({ value, onChange, onWheelSettled }: OnelineArt
       slideHeightPx={28}
       wheelScrollStep={1}
       showTextWhileScrolling
-      showTooltipOnSnap={false}
-      tooltipSide="top"
     />
   );
 }

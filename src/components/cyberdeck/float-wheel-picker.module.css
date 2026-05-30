@@ -88,3 +88,43 @@
   touch-action: pan-y;
   cursor: default;
 }
+
+/* Registry / showroom — compact square wheel (center + one neighbor each side). */
+.showroomPinned {
+  --showroom-wheel-band: calc(var(--float-wheel-row-px) * var(--float-wheel-visible-rows, 3));
+  height: var(--showroom-wheel-band);
+  width: max(var(--showroom-wheel-band), 9.75rem);
+  max-width: 10.5rem;
+  overflow: visible;
+}
+
+.showroomPinned .wheelStage {
+  position: relative;
+  top: auto;
+  transform: none;
+  height: 100%;
+}
+
+.showroomPinned .wheelStage::before {
+  background: linear-gradient(
+    to bottom,
+    rgba(6, 7, 8, 0.92) 0%,
+    rgba(6, 7, 8, 0.05) 36%,
+    rgba(6, 7, 8, 0.05) 64%,
+    rgba(6, 7, 8, 0.92) 100%
+  );
+}
+
+.showroomPinned::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - var(--float-wheel-row-px) / 2);
+  height: var(--float-wheel-row-px);
+  z-index: 4;
+  border-top: 1px solid rgba(255, 255, 255, 0.28);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.28);
+  background: transparent;
+}

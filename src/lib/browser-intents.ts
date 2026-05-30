@@ -51,7 +51,9 @@ export function normalizeOperatorBrowserUrl(raw: string) {
   const value = raw.trim();
   if (!value) return OPERATOR_BROWSER_HOME_URL;
   if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(value)) return rewriteSearchEngineUrl(value);
-  if (/^(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/.*)?$/i.test(value)) return `https://${value}`;
+  if (/^(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/.*)?$/i.test(value)) {
+    return `http://${value.replace(/^https?:\/\//i, "")}`;
+  }
   if (/^[^\s]+\.[^\s/]+(?:\/.*)?$/i.test(value)) return rewriteSearchEngineUrl(`https://${value}`);
   if (/\bdot\b/i.test(value)) {
     const dotWordCandidate = value

@@ -12,6 +12,19 @@ declare global {
   }
 }
 
+const PI_WEB_UI_STYLES_ID = "echo-mirage-pi-web-ui-css";
+
+function ensurePiWebUiStyles() {
+  if (typeof document === "undefined") return;
+  if (document.getElementById(PI_WEB_UI_STYLES_ID)) return;
+
+  const link = document.createElement("link");
+  link.id = PI_WEB_UI_STYLES_ID;
+  link.rel = "stylesheet";
+  link.href = "/vendor/pi-web-ui.css";
+  document.head.appendChild(link);
+}
+
 async function ensurePiStorage(ui: typeof import("@mariozechner/pi-web-ui")) {
   if (typeof window === "undefined") return;
   if (window.__echoMiragePiStorageReady) return;
@@ -95,6 +108,7 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
 
     const mountPi = async () => {
       try {
+        ensurePiWebUiStyles();
         const [{ Agent }, { createAssistantMessageEventStream, getModel }, ui] = await Promise.all([
           import("@mariozechner/pi-agent-core"),
           import("@mariozechner/pi-ai"),

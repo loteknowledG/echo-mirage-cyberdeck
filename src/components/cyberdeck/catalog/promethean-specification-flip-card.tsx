@@ -27,10 +27,11 @@ export function PrometheanSpecificationFlipCard({
   return (
     <div className={cn("relative h-full min-h-0 w-full", className)} style={{ perspective: "1600px" }}>
       <div
-        className="relative h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        className="relative h-full w-full transition-transform duration-700"
         style={{
           transformStyle: "preserve-3d",
           transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
         }}
       >
         {/* Front — full image (letterboxed, uncropped) */}

@@ -49,7 +49,6 @@ export function OperatorDocTypePicker({ value, onChange }: OperatorDocTypePicker
       ariaLabel="Document type"
       viewportClassName="h-7 w-7"
       showTextWhileScrolling
-      showTooltipOnSnap
     />
   );
 }

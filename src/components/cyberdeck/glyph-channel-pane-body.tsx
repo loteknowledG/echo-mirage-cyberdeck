@@ -65,9 +65,6 @@ const HEADER_ICON_BTN =
 const STATUS_BTN =
   "rounded border border-[#2d2d2d] bg-black px-1.5 py-0.5 font-mono text-[9px] tracking-[0.06em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200";
 
-/** Block cursor nudge (px) — same idea as MUTHUR `top-[calc(50%+9px)]` in page.tsx. */
-const GLYPH_CURSOR_OFFSET = { top: 8, left: 0 } as const;
-
 type EchoMirageClipboardApi = { readText?: () => Promise<string> };
 
 async function readEchoMirageClipboardText(): Promise<string> {
@@ -110,33 +107,45 @@ export function CyberdeckGlyphChannelPaneBody() {
   const [inputFocused, setInputFocused] = useState(false);
   const [cursorBlinkOn, setCursorBlinkOn] = useState(true);
   const [cursorLeft, setCursorLeft] = useState(0);
+  const [cursorTop, setCursorTop] = useState(0);
+  const [cursorHeight, setCursorHeight] = useState(20);
   const [caretIndex, setCaretIndex] = useState(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const caretMeasureRef = useRef<HTMLSpanElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const signalScrollRef = useRef<HTMLDivElement>(null);
   const scrollFigletAfterTextRef = useRef(false);
 
   const syncComposerCaret = useCallback(() => {
     const el = inputRef.current;
-    if (!el) return;
+    const band = el?.parentElement;
+    const measure = caretMeasureRef.current;
+    if (!el || !band || !measure) return;
+
     const idx = el.selectionStart ?? 0;
-    const displayIndex =
-      composer.length === 0 ? 0 : Math.max(0, Math.min(composer.length - 1, idx));
-    setCaretIndex(displayIndex);
+    setCaretIndex(idx);
 
     const computed = window.getComputedStyle(el);
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.font = computed.font;
-    const before = composer.slice(0, displayIndex);
-    const padLeft = Number.parseFloat(computed.paddingLeft || "0") || 0;
-    const charWidth = composer[displayIndex]
-      ? ctx.measureText(composer[displayIndex]).width
-      : 0;
-    const x = padLeft + ctx.measureText(before).width + charWidth - el.scrollLeft;
-    setCursorLeft(Math.max(padLeft, x));
+    measure.style.font = computed.font;
+    measure.style.letterSpacing = computed.letterSpacing;
+    measure.textContent = composer.slice(0, idx);
+
+    const padLeft = Number.parseFloat(computed.paddingLeft) || 0;
+    const textWidth = measure.offsetWidth;
+    const left = el.offsetLeft + padLeft + textWidth - el.scrollLeft;
+
+    const bandRect = band.getBoundingClientRect();
+    const inputRect = el.getBoundingClientRect();
+    const parsedLineHeight = Number.parseFloat(computed.lineHeight);
+    const parsedFontSize = Number.parseFloat(computed.fontSize) || 14;
+    const lineHeight = Number.isFinite(parsedLineHeight) ? parsedLineHeight : parsedFontSize * 1.25;
+    const top =
+      inputRect.top - bandRect.top + (inputRect.height - lineHeight) / 2;
+
+    setCursorLeft(left);
+    setCursorTop(top);
+    setCursorHeight(lineHeight);
   }, [composer]);
 
   const focusComposer = useCallback(() => {
@@ -697,6 +706,11 @@ export function CyberdeckGlyphChannelPaneBody() {
               <span className="pointer-events-none absolute left-3 z-10 text-lg font-bold text-green-500">
                 $
               </span>
+              <span
+                ref={caretMeasureRef}
+                aria-hidden
+                className="pointer-events-none invisible absolute left-0 top-0 whitespace-pre font-mono text-sm"
+              />
               <input
                 ref={inputRef}
                 value={composer}
@@ -712,6 +726,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                 onKeyUp={syncComposerCaret}
                 onClick={syncComposerCaret}
                 onSelect={syncComposerCaret}
+                onScroll={syncComposerCaret}
                 onFocus={() => {
                   setInputFocused(true);
                   syncComposerCaret();
@@ -735,13 +750,15 @@ export function CyberdeckGlyphChannelPaneBody() {
               {inputFocused && !rendering && cursorBlinkOn ? (
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute -translate-y-1/2 bg-green-400 px-[1px] font-mono text-sm leading-5 text-black"
+                  className="pointer-events-none absolute inline-flex min-w-[1ch] items-center justify-center bg-green-400 font-mono text-sm text-black"
                   style={{
-                    left: `calc(${cursorLeft}px + ${GLYPH_CURSOR_OFFSET.left}px)`,
-                    top: `calc(50% + ${GLYPH_CURSOR_OFFSET.top}px)`,
+                    left: cursorLeft,
+                    top: cursorTop,
+                    height: cursorHeight,
+                    lineHeight: `${cursorHeight}px`,
                   }}
                 >
-                  {composer[caretIndex] ? composer[caretIndex] : "\u00A0"}
+                  {caretIndex < composer.length ? composer[caretIndex] : "\u00A0"}
                 </span>
               ) : null}
             </div>
@@ -757,13 +774,15 @@ export function CyberdeckGlyphChannelPaneBody() {
                     }}
                   />
                   {settings.engine === "figlet" ? (
-                    <FigletFontPicker
-                      value={settings.figletFont}
-                      onChange={(figletFont) =>
-                        setSettings((prev) => ({ ...prev, figletFont }))
-                      }
-                      onWheelSettled={focusComposer}
-                    />
+                    <div className="relative z-10 shrink-0 overflow-visible">
+                      <FigletFontPicker
+                        value={settings.figletFont}
+                        onChange={(figletFont) =>
+                          setSettings((prev) => ({ ...prev, figletFont }))
+                        }
+                        onWheelSettled={focusComposer}
+                      />
+                    </div>
                   ) : null}
                   {settings.engine === "oneline" ? (
                     <OnelineArtPicker

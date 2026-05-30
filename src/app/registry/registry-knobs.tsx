@@ -22,7 +22,7 @@ export function RegistryKnobs() {
         </div>
         <span className="font-mono text-xs text-[#7dffb4]">wheel-first tuning</span>
       </div>
-      <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid justify-items-center gap-8 sm:grid-cols-2 xl:grid-cols-4">
         <Knob
           label="Power"
           value={power}

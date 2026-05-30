@@ -363,15 +363,16 @@ export function Knob({
     <fieldset
       ref={hostRef}
       className={cn(
-        "group relative inline-flex flex-col items-center gap-2 border-0 p-0 text-center font-mono text-sm",
+        "group relative inline-flex flex-col items-center justify-self-center gap-2 border-0 p-0 text-center font-mono text-sm",
         knobSizeClass(size),
         className,
       )}
     >
       <div
         ref={knobRef}
+        data-knob-dial
         className={cn(
-          "relative mx-auto aspect-square w-full select-none rounded-full touch-none overflow-hidden transition-transform duration-150",
+          "knob-dial-face relative mx-auto aspect-square w-full select-none rounded-full touch-none overflow-hidden transition-transform duration-150",
           isPressed
             ? "translate-y-[4px] scale-[0.95]"
             : isHovered
@@ -432,10 +433,23 @@ export function Knob({
               : "bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.08),transparent_42%)]",
           )}
         />
+        <div
+          className={cn(
+            "absolute inset-[14%] rounded-full",
+            isLight ? "bg-[#e8e1d7]" : "bg-[#2c2d2f]",
+          )}
+        />
+        <div
+          className={cn(
+            "absolute inset-[22%] rounded-full opacity-10",
+            isLight ? "bg-[#ffffff]" : "bg-[#e4e8ea]",
+          )}
+        />
 
         <svg
-          className="absolute left-1/2 top-0 h-full w-full -translate-x-1/2"
+          className="pointer-events-none absolute inset-0 z-[5] h-full w-full"
           viewBox="0 0 100 100"
+          preserveAspectRatio="xMidYMid meet"
           aria-hidden="true"
         >
           <g opacity={isLight ? 0.32 : 0.55}>
@@ -522,20 +536,8 @@ export function Knob({
         />
         <div
           className={cn(
-            "absolute inset-0 rounded-full border",
+            "pointer-events-none absolute inset-0 z-[15] rounded-full border",
             isLight ? "border-[#8f8c87]" : "border-[#181b1c]",
-          )}
-        />
-        <div
-          className={cn(
-            "absolute inset-[14%] rounded-full",
-            isLight ? "bg-[#e8e1d7]" : "bg-[#2c2d2f]",
-          )}
-        />
-        <div
-          className={cn(
-            "absolute inset-[22%] rounded-full opacity-10",
-            isLight ? "bg-[#ffffff]" : "bg-[#e4e8ea]",
           )}
         />
       </div>

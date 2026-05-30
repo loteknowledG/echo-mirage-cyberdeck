@@ -43,6 +43,8 @@ import {
 } from "@/lib/browser-intents";
 import { useBrowserController } from "@/lib/use-browser-controller";
 import { CyberdeckCustomTabBrowserSync } from "@/components/cyberdeck/cyberdeck-custom-tab-browser-sync";
+import { CyberdeckWebTabFrame } from "@/components/cyberdeck/cyberdeck-web-tab-frame";
+import { RegistryShowroom } from "@/app/registry/registry-showroom";
 import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
 import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import type { CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
@@ -2966,8 +2968,6 @@ export default function CyberdeckApp() {
       closeMirageContextMenu();
       closeGatewayPaneContextMenu();
 
-      const registryUrl =
-        typeof window !== "undefined" ? `${window.location.origin}/registry` : "/registry";
       const targetTabId = tabId || `tab-${crypto.randomUUID()}`;
 
       flushSync(() => {
@@ -2982,8 +2982,8 @@ export default function CyberdeckApp() {
                     ...tab,
                     label: "REALMORPHISM KIT",
                     glyph: "K",
-                    kind: "web",
-                    browserUrl: registryUrl,
+                    kind: "realmorphism-kit",
+                    browserUrl: undefined,
                     asset: null,
                   }
                 : tab,
@@ -2996,8 +2996,7 @@ export default function CyberdeckApp() {
               id: targetTabId,
               label: "REALMORPHISM KIT",
               glyph: "K",
-              kind: "web",
-              browserUrl: registryUrl,
+              kind: "realmorphism-kit",
               asset: null,
             },
           ]);
@@ -6119,7 +6118,16 @@ const resolved = resolveUiTarget(userMessage);
         </div>
       );
 
+      if (tab.kind === "realmorphism-kit" || (tab.kind === "web" && tab.label === "REALMORPHISM KIT")) {
+        return shell(
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <RegistryShowroom variant="embedded" />
+          </div>,
+        );
+      }
+
       if (tab.kind === "web") {
+        const webUrl = tab.browserUrl || OPERATOR_BROWSER_HOME_URL;
         return shell(
           <div
             className="flex min-h-0 flex-1 flex-col gap-3 p-3"
@@ -6131,7 +6139,7 @@ const resolved = resolveUiTarget(userMessage);
           >
             <div className="flex items-center gap-2 rounded-sm border border-[#1c1c1c] bg-black/80 p-2">
               <input
-                value={tab.browserUrl || OPERATOR_BROWSER_HOME_URL}
+                value={webUrl}
                 onChange={(event) => customTabBrowserNavigate(tab.id, event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key !== "Enter") return;
@@ -6144,20 +6152,12 @@ const resolved = resolveUiTarget(userMessage);
                 autoCorrect="off"
                 className="min-w-0 flex-1 border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#cfcfcf] outline-none"
               />
-              <button
-                type="button"
-                onClick={() => customTabBrowserNavigate(tab.id, tab.browserUrl || OPERATOR_BROWSER_HOME_URL)}
-                className={realmorphismActionClass(deckMode, "neutral")}
-              >
-                OPEN
-              </button>
             </div>
             <div className="min-h-0 flex-1 overflow-hidden rounded-sm border border-[#1c1c1c] bg-black">
-              <webview
-                ref={operatorBrowserRef}
-                src={tab.browserUrl || OPERATOR_BROWSER_HOME_URL}
-                partition="persist:custom-tab-browser"
-                className="h-full w-full"
+              <CyberdeckWebTabFrame
+                key={webUrl}
+                url={webUrl}
+                webviewRef={operatorBrowserRef}
               />
             </div>
           </div>,

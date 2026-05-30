@@ -1,0 +1,139 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: Echo Mirage Registry
+        - generic [ref=e8]:
+          - heading "Realmorphism" [level=1] [ref=e9]
+          - paragraph [ref=e10]: A blocky tactile shadcn theme for operational interfaces. The colors define the planes; the motion tells the operator an action is alive.
+      - generic [ref=e11]:
+        - generic [ref=e12]: Install
+        - generic [ref=e13]:
+          - generic [ref=e14]: Theme
+          - generic [ref=e15]: npx shadcn@latest add http://localhost:3050/registry/realmorphism.json
+        - generic [ref=e16]:
+          - generic [ref=e17]: Base Kit
+          - generic [ref=e18]: npx shadcn@latest add http://localhost:3050/registry/realmorphism-base.json
+        - generic [ref=e19]:
+          - generic [ref=e20]: Showroom Site
+          - generic [ref=e21]: npx shadcn@latest add http://localhost:3050/registry/realmorphism-site.json
+    - generic [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e25]: Host
+        - generic [ref=e26]: "#060708"
+      - generic [ref=e27]:
+        - generic [ref=e29]: Raised
+        - generic [ref=e30]: "#0e1011"
+      - generic [ref=e31]:
+        - generic [ref=e33]: Face
+        - generic [ref=e34]: "#171c19"
+      - generic [ref=e35]:
+        - generic [ref=e37]: Wall
+        - generic [ref=e38]: "#2a6b56"
+      - generic [ref=e39]:
+        - generic [ref=e41]: Hover
+        - generic [ref=e42]: "#3a9174"
+      - generic [ref=e43]:
+        - generic [ref=e45]: Amber
+        - generic [ref=e46]: "#8a6530"
+      - generic [ref=e47]:
+        - generic [ref=e49]: Signal
+        - generic [ref=e50]: "#7dffb4"
+      - generic [ref=e51]:
+        - generic [ref=e53]: Ink
+        - generic [ref=e54]: "#e8efeb"
+    - generic [ref=e55]:
+      - generic [ref=e56]:
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - heading "Action Surface" [level=2] [ref=e59]
+            - paragraph [ref=e60]: Hover and press the controls.
+          - generic [ref=e61]: motion = affordance
+        - generic [ref=e62]:
+          - button "Commit" [ref=e63] [cursor=pointer]
+          - button "Selected" [pressed] [ref=e64] [cursor=pointer]
+          - button "Caution" [ref=e65] [cursor=pointer]
+          - button "Danger" [ref=e66] [cursor=pointer]
+          - button "Disabled" [disabled]
+      - generic [ref=e67]:
+        - article [ref=e68]:
+          - generic [ref=e69]:
+            - generic [ref=e70]: realmorphism
+            - generic [ref=e71]: registry:theme
+          - paragraph [ref=e72]: Tokens, color planes, radius, hard wall shadow, and motion CSS.
+        - article [ref=e73]:
+          - generic [ref=e74]:
+            - generic [ref=e75]: realmorphism-base
+            - generic [ref=e76]: registry:block
+          - paragraph [ref=e77]: Turnkey shadcn wrappers for tactile controls and layout primitives.
+        - article [ref=e78]:
+          - generic [ref=e79]:
+            - generic [ref=e80]: realmorphism-site
+            - generic [ref=e81]: registry:block
+          - paragraph [ref=e82]: A portable showroom page for presenting the registry itself.
+    - generic [ref=e83]:
+      - generic [ref=e84]:
+        - generic [ref=e85]:
+          - heading "Rotary Surface" [level=2] [ref=e86]
+          - paragraph [ref=e87]: Wheel for precise increments, drag for a quick sweep, press the dial face to toggle power, double-click to snap back to default.
+        - generic [ref=e88]: wheel-first tuning
+      - generic [ref=e89]:
+        - group [ref=e90]:
+          - button "Power power on" [pressed] [ref=e91] [cursor=pointer]:
+            - img
+          - generic [ref=e97]:
+            - generic [ref=e98]: "42"
+            - generic [ref=e99]: level
+          - spinbutton "Power" [ref=e100]: "42"
+          - generic [ref=e102]: Power
+        - group [ref=e103]:
+          - button "Tone power on" [pressed] [ref=e104] [cursor=pointer]:
+            - img
+          - generic [ref=e110]:
+            - generic [ref=e111]: "24"
+            - generic [ref=e112]: level
+          - spinbutton "Tone" [ref=e113]: "24"
+          - generic [ref=e115]: Tone
+        - group [ref=e116]:
+          - generic [ref=e117]:
+            - img
+          - generic [ref=e123]:
+            - generic [ref=e124]: "0"
+            - generic [ref=e125]: center
+          - spinbutton "Balance" [ref=e126]: "0"
+          - generic [ref=e128]: Balance
+        - group [ref=e129]:
+          - button "Trim power on" [pressed] [ref=e130] [cursor=pointer]:
+            - img
+          - generic [ref=e136]:
+            - generic [ref=e137]: "7"
+            - generic [ref=e138]: level
+          - spinbutton "Trim" [ref=e139]: "7"
+          - generic [ref=e141]: Trim
+    - generic [ref=e142]:
+      - generic [ref=e143]:
+        - generic [ref=e144]:
+          - heading "Rolling Selector" [level=2] [ref=e145]
+          - paragraph [ref=e146]: Y-axis rotary picker from the operator pane. Drag or scroll to cycle document types; the label expands while scrolling and snaps back to the icon when settled.
+        - generic [ref=e147]: operator doc type
+      - generic [ref=e148]:
+        - generic [ref=e149]:
+          - generic [ref=e150]: Operator toolbar
+          - generic "Document type" [ref=e152]:
+            - generic [ref=e154]:
+              - img [ref=e157]
+              - img [ref=e160]
+              - img [ref=e163]
+              - img [ref=e166]
+              - img [ref=e169]
+              - img [ref=e172]
+              - img [ref=e175]
+              - img [ref=e178]
+              - img [ref=e181]
+        - generic [ref=e182]:
+          - generic [ref=e183]: Selected
+          - generic [ref=e184]: Markdown
+          - generic [ref=e185]: markdown
+    - generic [ref=e186]:
+      - heading "Community Upload Notes" [level=2] [ref=e187]
+      - paragraph [ref=e188]: "Tweakcn can carry the Realmorphism colors and tokens. The shadcn registry carries the installable part: theme JSON, wrappers, and this showroom page. Publish the colors on tweakcn, then point builders to this registry when they need the full motion layer."
