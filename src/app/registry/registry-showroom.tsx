@@ -81,7 +81,7 @@ export function RegistryShowroom({ variant = 'page' }: RegistryShowroomProps) {
               </h1>
               <p className="max-w-2xl text-base leading-7 text-[#9eada7]">
                 A blocky tactile shadcn theme for operational interfaces. The colors define the
-                planes; the motion tells the operator an action is alive.
+                planes; the motion tells the operator an action is available.
               </p>
             </div>
           </div>

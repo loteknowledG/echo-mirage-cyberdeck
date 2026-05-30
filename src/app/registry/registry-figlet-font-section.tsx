@@ -22,21 +22,22 @@ export function RegistryFigletFontSection() {
     <section className="rounded-[var(--realmorphism-radius)] border border-[#2a3530] bg-[#0e1011] p-5 shadow-[var(--realmorphism-shadow-rest)]">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Figlet Font Selector</h2>
+          <h2 className="text-xl font-semibold">Rolling Picker</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-[#9eada7]">
-            Rolling picker from the glyph channel. Scroll or drag the wheel to browse fonts; the
-            row above and below stay visible while you spin. The panel renders a live figlet preview
-            of the settled font.
+            Showroom variant for long lists: a square wheel with a mirrored band, momentum scroll, and
+            a selection row that can show rich preview plus label. Off-band rows stay text-only so
+            the layout does not jump when you stop. Below, figlet fonts are only the demo data—the
+            same control type can drive any keyed list with an optional detail panel.
           </p>
         </div>
-        <span className="font-mono text-xs text-[#7dffb4]">glyph / figlet</span>
+        <span className="font-mono text-xs text-[#7dffb4]">control · showroom</span>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start">
         <div className="flex flex-col items-center gap-3">
           <div className="flex w-fit flex-col items-center gap-2 rounded border border-[#2a3530] bg-[#060708] px-3 py-2.5">
             <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6f7a75]">
-              Font wheel
+              Wheel
             </span>
             <FigletFontPicker variant="showroom" value={font} onChange={setFont} />
           </div>
@@ -54,7 +55,12 @@ export function RegistryFigletFontSection() {
           </div>
         </div>
 
-        <FigletFontPreviewPanel font={resolved} text="ECHO" />
+        <div className="space-y-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6f7a75]">
+            Detail panel (example: figlet)
+          </span>
+          <FigletFontPreviewPanel font={resolved} text="ECHO" />
+        </div>
       </div>
     </section>
   );

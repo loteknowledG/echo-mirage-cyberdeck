@@ -2,31 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { FIGLET_FONT_ALL, isFigletAllFonts } from '@/lib/figlet-fonts';
+import {
+  fetchFigletPreviewText,
+  getCachedFigletPreview,
+} from '@/lib/figlet-preview-fetch';
 import { cn } from '@/lib/utils';
 
 const PREVIEW_TEXT = 'EM';
-const previewCache = new Map<string, string>();
-
-async function fetchFigletPreview(font: string): Promise<string> {
-  if (isFigletAllFonts(font)) return 'ALL FONTS';
-  const cached = previewCache.get(font);
-  if (cached) return cached;
-
-  const res = await fetch('/api/glyph/render', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      engine: 'figlet',
-      text: PREVIEW_TEXT,
-      font,
-      decorate: false,
-    }),
-  });
-  const payload = (await res.json()) as { ok?: boolean; output?: string };
-  const output = payload.ok && payload.output ? payload.output.trimEnd() : font;
-  previewCache.set(font, output);
-  return output;
-}
+/** Wait for wheel to pause on a row before hitting /api/glyph/render. */
+const WHEEL_PREVIEW_DEBOUNCE_MS = 160;
 
 type FigletFontPreviewSlideProps = {
   font: string;
@@ -43,23 +27,34 @@ export function FigletFontPreviewSlide({
   size = 'wheel',
 }: FigletFontPreviewSlideProps) {
   const [preview, setPreview] = useState<string | null>(() =>
-    previewCache.get(font) ?? null,
+    getCachedFigletPreview(font, PREVIEW_TEXT) ?? null,
   );
 
   useEffect(() => {
-    if (!loadPreview) return;
+    if (!loadPreview || !active) return;
     if (isFigletAllFonts(font)) {
       setPreview('ALL FONTS');
       return;
     }
+
+    const cached = getCachedFigletPreview(font, PREVIEW_TEXT);
+    if (cached) {
+      setPreview(cached);
+      return;
+    }
+
     let cancelled = false;
-    void fetchFigletPreview(font).then((text) => {
-      if (!cancelled) setPreview(text);
-    });
+    const timer = window.setTimeout(() => {
+      void fetchFigletPreviewText(font, PREVIEW_TEXT).then((text) => {
+        if (!cancelled) setPreview(text);
+      });
+    }, WHEEL_PREVIEW_DEBOUNCE_MS);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [font, loadPreview]);
+  }, [font, loadPreview, active]);
 
   const label = isFigletAllFonts(font) ? FIGLET_FONT_ALL : font;
   const lineLimit = size === 'lg' ? 12 : 3;

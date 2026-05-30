@@ -17,13 +17,13 @@ export function RegistryRollingPicker() {
     <section className="rounded-[var(--realmorphism-radius)] border border-[#2a3530] bg-[#0e1011] p-5 shadow-[var(--realmorphism-shadow-rest)]">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Rolling Selector</h2>
+          <h2 className="text-xl font-semibold">Rolling Picker</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-[#9eada7]">
-            Y-axis rotary picker from the operator pane. Drag or scroll to cycle document types; the
-            label expands while scrolling and snaps back to the icon when settled.
+            Compact toolbar variant of the same control: one visible row in the bar, neighbors on
+            while you spin, icon when settled. Document types below are demo data only.
           </p>
         </div>
-        <span className="font-mono text-xs text-[#7dffb4]">operator doc type</span>
+        <span className="font-mono text-xs text-[#7dffb4]">control · compact</span>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,16rem)] lg:items-center">

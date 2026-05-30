@@ -337,6 +337,7 @@ const CUSTOM_TAB_KINDS = [
   "glyph-channel",
   "rola-dex",
   "sound-profile",
+  "realmorphism-kit",
   "catelog",
 ] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -778,6 +779,14 @@ function normalizeCustomTabKind(kind: string) {
     nextKind === "soundprofile"
   ) {
     return "sound-profile" as CustomTabKind;
+  }
+  if (
+    nextKind === "realmorphism-kit" ||
+    nextKind === "realmorphism_kit" ||
+    nextKind === "realmorphismkit" ||
+    nextKind === "realmorphism"
+  ) {
+    return "realmorphism-kit" as CustomTabKind;
   }
   if (CUSTOM_TAB_KINDS.includes(nextKind as CustomTabKind)) {
     return nextKind as CustomTabKind;

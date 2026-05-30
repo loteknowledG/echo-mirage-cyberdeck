@@ -2,30 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { isFigletAllFonts } from '@/lib/figlet-fonts';
+import {
+  fetchFigletPreviewText,
+  getCachedFigletPreview,
+} from '@/lib/figlet-preview-fetch';
 import { cn } from '@/lib/utils';
-
-const panelCache = new Map<string, string>();
-
-async function fetchFigletPanel(font: string, text: string): Promise<string> {
-  const key = `${font}\0${text}`;
-  const cached = panelCache.get(key);
-  if (cached) return cached;
-
-  const res = await fetch('/api/glyph/render', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      engine: 'figlet',
-      text,
-      font,
-      decorate: false,
-    }),
-  });
-  const payload = (await res.json()) as { ok?: boolean; output?: string };
-  const output = payload.ok && payload.output ? payload.output.trimEnd() : text;
-  panelCache.set(key, output);
-  return output;
-}
 
 type FigletFontPreviewPanelProps = {
   font: string;
@@ -38,7 +19,9 @@ export function FigletFontPreviewPanel({
   text = 'ECHO',
   className,
 }: FigletFontPreviewPanelProps) {
-  const [output, setOutput] = useState<string | null>(() => panelCache.get(`${font}\0${text}`) ?? null);
+  const [output, setOutput] = useState<string | null>(() =>
+    getCachedFigletPreview(font, text) ?? null,
+  );
   const [loading, setLoading] = useState(!output);
 
   useEffect(() => {
@@ -48,9 +31,16 @@ export function FigletFontPreviewPanel({
       return;
     }
 
+    const cached = getCachedFigletPreview(font, text);
+    if (cached) {
+      setOutput(cached);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
-    void fetchFigletPanel(font, text).then((rendered) => {
+    void fetchFigletPreviewText(font, text).then((rendered) => {
       if (!cancelled) {
         setOutput(rendered);
         setLoading(false);

@@ -145,7 +145,7 @@ export function PreviewMatrix() {
               {PREVIEW_DECKS.map((deck, deckIndex) => (
                 <section
                   key={deck.name}
-                  className="deckSlide"
+                  className={`deckSlide${deckIndex === activeDeckIndex ? " is-selected" : ""}`}
                   data-deck-index={deckIndex}
                 >
                   <header className="deckHeader">

@@ -19,6 +19,58 @@ export function numberWithinRange(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), max);
 }
 
+export function indexDistanceFromSnapCenter(
+  index: number,
+  centerIndex: number,
+  count: number,
+): number {
+  if (count <= 1) return 0;
+  const raw = Math.abs(index - centerIndex);
+  return Math.min(raw, count - raw);
+}
+
+/**
+ * Showroom pinned wheel — opacity from snap index, not scrollProgress (breaks on long lists).
+ */
+export function applyPinnedShowroomSlideStyles(
+  emblaApi: EmblaCarouselType,
+  centerIndex: number,
+  options?: Pick<IosPickerStyleOptions, "maxNeighborSteps" | "centerEmphasis">,
+): void {
+  const snapCount = emblaApi.scrollSnapList().length;
+  if (!snapCount) return;
+
+  const maxNeighborSteps = options?.maxNeighborSteps ?? 1;
+  const centerEmphasis = options?.centerEmphasis ?? false;
+  const minOpacity = centerEmphasis ? 0.28 : 0.35;
+  const opacityFalloff = centerEmphasis ? 0.4 : 0.22;
+
+  emblaApi.slideNodes().forEach((_node, index) => {
+    const node = pickerInnerNode(emblaApi, index);
+    if (!node) return;
+
+    const stepsFromCenter = indexDistanceFromSnapCenter(index, centerIndex, snapCount);
+    if (stepsFromCenter > maxNeighborSteps + 0.01) {
+      node.style.opacity = "0";
+      node.style.transform = "scale(0.82)";
+      node.style.pointerEvents = "none";
+      return;
+    }
+
+    const isCentered = stepsFromCenter < 0.55;
+    const opacity = isCentered
+      ? 1
+      : numberWithinRange(1 - stepsFromCenter * opacityFalloff, minOpacity, 1);
+    const scale = isCentered
+      ? 1
+      : numberWithinRange(1 - stepsFromCenter * 0.08, 0.82, 1);
+
+    node.style.pointerEvents = isCentered ? "" : "none";
+    node.style.opacity = `${opacity}`;
+    node.style.transform = isCentered ? "" : `scale(${scale})`;
+  });
+}
+
 function pickerInnerNode(emblaApi: EmblaCarouselType, slideIndex: number): HTMLElement | null {
   const slide = emblaApi.slideNodes()[slideIndex];
   if (!slide) return null;

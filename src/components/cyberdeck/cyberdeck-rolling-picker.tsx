@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { EmblaCarouselType } from "embla-carousel";
 import useEmblaCarousel from "embla-carousel-react";
 import { cn } from "@/lib/utils";
-import { applyIosPickerSlideStyles, findClosestSnapIndex } from "@/lib/embla-ios-picker-loop";
+import {
+  applyIosPickerSlideStyles,
+  applyPinnedShowroomSlideStyles,
+  findClosestSnapIndex,
+} from "@/lib/embla-ios-picker-loop";
 import floatWheelStyles from "@/components/cyberdeck/float-wheel-picker.module.css";
 
 const SNAP_ALIGN_THRESHOLD_PX = 0.5;
@@ -175,18 +179,24 @@ export function CyberdeckRollingPicker({
     (embla: EmblaCarouselType, eventName?: string) => {
       neighborsVisibleRef.current = true;
       setWheelSettled(false);
+      const center = findClosestSnapIndex(embla);
+      setCenterIndex(center);
+      if (wheelPinnedOpen) {
+        applyPinnedShowroomSlideStyles(embla, center, iosPickerStyleOptions);
+        return;
+      }
       applyIosPickerSlideStyles(embla, eventName, iosPickerStyleOptions);
-      setCenterIndex(findClosestSnapIndex(embla));
     },
-    [iosPickerStyleOptions],
+    [iosPickerStyleOptions, wheelPinnedOpen],
   );
 
   const applyPinnedWheelAtRest = useCallback(
-    (embla: EmblaCarouselType, eventName?: string) => {
+    (embla: EmblaCarouselType) => {
       neighborsVisibleRef.current = true;
       setWheelSettled(true);
-      applyIosPickerSlideStyles(embla, eventName, iosPickerStyleOptions);
-      setCenterIndex(findClosestSnapIndex(embla));
+      const center = findClosestSnapIndex(embla);
+      setCenterIndex(center);
+      applyPinnedShowroomSlideStyles(embla, center, iosPickerStyleOptions);
     },
     [iosPickerStyleOptions],
   );
@@ -194,7 +204,7 @@ export function CyberdeckRollingPicker({
   const settleWheelNeighbors = useCallback(
     (embla: EmblaCarouselType, eventName?: string) => {
       if (wheelPinnedOpen) {
-        applyPinnedWheelAtRest(embla, eventName);
+        applyPinnedWheelAtRest(embla);
       } else {
         hideNeighborPreviews(embla);
       }
@@ -244,9 +254,9 @@ export function CyberdeckRollingPicker({
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
     axis: "y",
-    loop: items.length > 1,
+    loop: items.length > 1 && items.length < 120,
     align: "center",
-    containScroll: false,
+    containScroll: false as const,
     dragFree: true,
     duration: wheelExpandOnScroll ? 14 : 20,
   });
@@ -272,8 +282,11 @@ export function CyberdeckRollingPicker({
 
   useEffect(() => {
     if (!emblaApi || !wheelExpandOnScroll || items.length === 0) return;
-    if (!wheelInitDoneRef.current) {
-      wheelInitDoneRef.current = true;
+
+    const initWheel = () => {
+      const root = emblaApi.rootNode();
+      if (!root || root.clientHeight < 4) return false;
+      emblaApi.reInit();
       const index = indexForValue(itemsRef.current, valueRef.current);
       isProgrammaticScrollRef.current = true;
       emblaApi.scrollTo(index, true);
@@ -281,9 +294,28 @@ export function CyberdeckRollingPicker({
         endProgrammaticScroll(emblaApi);
         settleWheelNeighbors(emblaApi, "reInit");
       });
-      return;
+      return true;
+    };
+
+    if (!wheelInitDoneRef.current) {
+      if (initWheel()) wheelInitDoneRef.current = true;
+    } else {
+      settleWheelNeighbors(emblaApi, "reInit");
     }
-    settleWheelNeighbors(emblaApi, "reInit");
+
+    const root = emblaApi.rootNode();
+    if (!root) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        if (!initWheel()) return;
+        wheelInitDoneRef.current = true;
+      },
+      { threshold: 0.01 },
+    );
+    observer.observe(root);
+    return () => observer.disconnect();
   }, [
     emblaApi,
     wheelExpandOnScroll,
