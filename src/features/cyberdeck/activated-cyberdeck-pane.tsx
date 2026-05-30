@@ -2,24 +2,25 @@
 
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { PanelLoader, type PanelLoadStage } from "@/features/cyberdeck/panel-loader";
+import { importCyberdeckPane } from "@/features/cyberdeck/pane-chunks";
 import { paneFetchHintsForKind, paneLabelForKind } from "@/features/cyberdeck/pane-registry";
 
 type ActivatedCyberdeckPaneProps = Record<string, unknown> & {
   kind: string;
 };
 
-type LoadPhase = "bootstrap" | "fetch" | "mount";
+type LoadPhase = "fetch" | "mount";
 
 const FETCH_HINT_INTERVAL_MS = 2200;
 
 /**
- * Mounts a pane body only after activation. The registry stays metadata-only;
- * chunk fetch happens here via loadCyberdeckPane().
+ * Mounts a pane body only after activation. Each pane is a direct dynamic import
+ * (no loader-router intermediary chunk).
  */
 export function ActivatedCyberdeckPane({ kind, ...props }: ActivatedCyberdeckPaneProps) {
   const [Pane, setPane] = useState<ComponentType<any> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [phase, setPhase] = useState<LoadPhase>("bootstrap");
+  const [phase, setPhase] = useState<LoadPhase>("fetch");
   const [hintIndex, setHintIndex] = useState(0);
 
   const paneLabel = paneLabelForKind(kind);
@@ -29,17 +30,12 @@ export function ActivatedCyberdeckPane({ kind, ...props }: ActivatedCyberdeckPan
     let cancelled = false;
     setPane(null);
     setLoadError(null);
-    setPhase("bootstrap");
+    setPhase("fetch");
     setHintIndex(0);
 
-    void import("@/features/cyberdeck/load-cyberdeck-pane")
+    void importCyberdeckPane(kind)
       .then((mod) => {
-        if (cancelled) return null;
-        setPhase("fetch");
-        return mod.loadCyberdeckPane(kind);
-      })
-      .then((mod) => {
-        if (!mod || cancelled) return;
+        if (cancelled) return;
         setPhase("mount");
         setPane(() => mod.default);
       })
@@ -65,20 +61,14 @@ export function ActivatedCyberdeckPane({ kind, ...props }: ActivatedCyberdeckPan
   }, [phase, fetchHints.length]);
 
   const stages = useMemo((): PanelLoadStage[] => {
-    const bootstrapDone = phase !== "bootstrap";
     const fetchDone = phase === "mount";
     const mountDone = Boolean(Pane);
 
     return [
       {
-        id: "bootstrap",
-        label: "LOADER ROUTER",
-        status: bootstrapDone ? "done" : "active",
-      },
-      {
         id: "fetch",
         label: `${paneLabel} MODULE`,
-        status: fetchDone ? "done" : bootstrapDone ? "active" : "pending",
+        status: fetchDone ? "done" : "active",
       },
       {
         id: "mount",

@@ -64,7 +64,13 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.goto("/cyberdeck", { waitUntil: "domcontentloaded", timeout: 120000 });
     await skipBootIfPresent(page);
     await page.waitForSelector("cyberdeck-rail-tab", { timeout: 120000 });
-    await sendDeckCommand(page, "tab: rola-dex");
+    await sendDeckCommand(page, "new tab named rola audit glyph R");
+    await expect(page.getByText(/TAB_CREATED.*rola audit/i)).toBeVisible({ timeout: 15000 });
+
+    const auditTab = page.locator("cyberdeck-rail-tab").filter({ hasText: "R" }).last();
+    await auditTab.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Rola Dex" }).click();
+
     await expect(page.locator(".cyberdeck-rola-dex-pane")).toBeVisible({ timeout: 30000 });
     await expect(page.getByText("POWERFIST MATRIX")).toBeVisible({ timeout: 15000 });
     await expectFocusedCardVisibleInMatrix(page);
@@ -74,54 +80,66 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
     await expect(page.getByText("POWERFIST MATRIX")).toBeVisible();
 
-    await page.getByRole("button", { name: "Deck ↓" }).click();
+    await page.getByRole("button", { name: "Next deck" }).click();
     await expect(page.getByText(/POWERFIST MATRIX.*Diagnostics Deck/i)).toBeVisible({
       timeout: 5000,
     });
     await expectFocusedCardVisibleInMatrix(page);
 
-    await page.getByRole("button", { name: "Card →" }).click();
+    await page.getByRole("button", { name: "Next card" }).click();
     await expectFocusedCardVisibleInMatrix(page);
   });
 
-  test("diagonal drag from matrix moves deck and card together", async ({ page }) => {
+  test("neighbor decks peek above and below the focused deck", async ({ page }) => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
     await expect(page.getByText("POWERFIST MATRIX")).toBeVisible();
 
-    const before = await page.evaluate(() => ({
-      deck: document.querySelector(".powerfist-preview-root .status strong")?.textContent?.trim(),
-      card: document
-        .querySelectorAll(".powerfist-preview-root .status strong")[1]
-        ?.textContent?.trim(),
-    }));
+    const peek = await page.evaluate(() => {
+      const matrix = document.querySelector(".powerfist-preview-root .matrix");
+      if (!matrix) return { ok: false, reason: "no matrix" };
+      const m = matrix.getBoundingClientRect();
+      const slides = [...document.querySelectorAll(".powerfist-preview-root .deckSlide")];
+      let neighborBands = 0;
 
-    const matrix = page.locator(".powerfist-preview-root .matrix");
-    const box = await matrix.boundingBox();
+      for (const slide of slides) {
+        if (slide.classList.contains("is-selected")) continue;
+        const r = slide.getBoundingClientRect();
+        const visible = r.height > 24 && r.bottom > m.top + 4 && r.top < m.bottom - 4;
+        if (visible) neighborBands += 1;
+      }
+
+      return { ok: neighborBands >= 1, neighborBands, matrixH: Math.round(m.height) };
+    });
+
+    expect(peek.ok, `expected >=1 neighbor deck band, got ${peek.neighborBands}`).toBe(true);
+    await expectFocusedCardVisibleInMatrix(page);
+  });
+
+  test("horizontal drag on hand scrolls cards", async ({ page }) => {
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    await expect(page.getByText("POWERFIST MATRIX")).toBeVisible();
+
+    const hand = page.locator(".powerfist-preview-root .handViewport").first();
+    const box = await hand.boundingBox();
     expect(box).not.toBeNull();
 
-    const startX = box!.x + box!.width * 0.5;
-    const startY = box!.y + box!.height * 0.55;
-    await page.mouse.move(startX, startY);
+    const y = box!.y + box!.height * 0.5;
+    await page.mouse.move(box!.x + box!.width * 0.8, y);
     await page.mouse.down();
-    await page.mouse.move(startX + 80, startY + 80, { steps: 12 });
+    await page.mouse.move(box!.x + box!.width * 0.2, y, { steps: 16 });
     await page.mouse.up();
 
-    await expect
-      .poll(async () => {
-        const after = await page.evaluate(() => ({
-          deck: document
-            .querySelector(".powerfist-preview-root .status strong")
-            ?.textContent?.trim(),
-          card: document
-            .querySelectorAll(".powerfist-preview-root .status strong")[1]
-            ?.textContent?.trim(),
-        }));
-        const deckMoved = after.deck !== before.deck;
-        const cardMoved = after.card !== before.card;
-        return deckMoved && cardMoved;
-      })
-      .toBe(true);
+    await page.waitForTimeout(400);
 
+    const moved = await page.evaluate(() => {
+      const handEmblaRoot = document.querySelector(
+        ".powerfist-preview-root .handViewport .handContainer",
+      ) as HTMLElement | null;
+      if (!handEmblaRoot) return false;
+      const transform = getComputedStyle(handEmblaRoot).transform;
+      return transform !== "none" && transform !== "matrix(1, 0, 0, 1, 0, 0)";
+    });
+    expect(moved).toBe(true);
     await expectFocusedCardVisibleInMatrix(page);
   });
 });

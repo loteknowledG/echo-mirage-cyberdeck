@@ -1,84 +1,65 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { CyberdeckRollingPicker } from '@/components/cyberdeck/cyberdeck-rolling-picker';
+import { cn } from '@/lib/utils';
+import type { OnelineArtCatalogEntry } from '@/lib/oneline-art';
 import {
-  fetchOnelineArtCatalog,
-  onelineArtPickerLabel,
-  type OnelineArtCatalogEntry,
-} from '@/lib/oneline-art';
+  resolveOnelinePickerValue,
+  useOnelineArtCatalog,
+} from '@/lib/use-oneline-art-catalog';
+
+/** Match figlet toolbar roller row height. */
+const ROW_PX = 28;
+
+const TITLE_SLIDE_CLASS =
+  'flex w-full min-w-0 items-center justify-center overflow-hidden whitespace-nowrap px-1 font-mono text-[8px] leading-none tracking-[0.02em]';
 
 type OnelineArtPickerProps = {
   value: string;
-  onChange: (art: string) => void;
-  onWheelSettled?: () => void;
+  onChange: (artId: string) => void;
+  /** Fires when the user spins and the wheel snap settles. */
+  onWheelSettled?: (entry: OnelineArtCatalogEntry) => void;
 };
 
-function asciiSlide(content: string) {
+function titleSlide(title: string) {
   return (
     <span
-      className="block max-w-full truncate px-0.5 font-mono text-[8px] leading-none tracking-[0.02em] text-emerald-200/95"
-      title={content}
+      data-oneline-title
+      className={cn(TITLE_SLIDE_CLASS, 'text-emerald-200/95')}
+      title={title}
     >
-      {onelineArtPickerLabel(content, 18)}
+      {title}
     </span>
   );
 }
 
-/** Rotary: ww9 + asky.lol + 1lineart.kulaone.com — title while spinning, ascii when snapped. */
+/** Kula One 1-line rolodex — title in picker; ascii goes to composer on settle. */
 export function OnelineArtPicker({ value, onChange, onWheelSettled }: OnelineArtPickerProps) {
-  const [catalog, setCatalog] = useState<OnelineArtCatalogEntry[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const entries = await fetchOnelineArtCatalog();
-        if (!mounted) return;
-        setCatalog(entries);
-        setLoadError(null);
-      } catch (err) {
-        if (!mounted) return;
-        setCatalog([]);
-        setLoadError(err instanceof Error ? err.message : 'Failed to load one-line art');
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const { catalog, byId, loadError } = useOnelineArtCatalog();
 
   const items = useMemo(
     () =>
       catalog.map((entry) => ({
         value: entry.id,
         label: entry.title,
-        slide: asciiSlide(entry.content),
-        labelSlide: (
-          <span
-            className="block max-w-full truncate px-0.5 font-mono text-[8px] leading-none tracking-[0.02em] text-[#b8c4be]"
-            title={entry.title}
-          >
-            {onelineArtPickerLabel(entry.title, 20)}
-          </span>
-        ),
+        slide: titleSlide(entry.title),
+        labelSlide: titleSlide(entry.title),
       })),
     [catalog],
   );
 
-  const resolvedEntry = catalog.find((entry) => entry.content === value);
-  const resolvedValue = resolvedEntry?.id ?? catalog[0]?.id ?? '';
+  const resolvedValue = resolveOnelinePickerValue(value, catalog);
 
-  const pickById = (id: string) => {
-    const entry = catalog.find((item) => item.id === id);
-    if (entry) onChange(entry.content);
-  };
+  useEffect(() => {
+    if (resolvedValue === value) return;
+    onChange(resolvedValue);
+  }, [resolvedValue, value, onChange]);
 
   if (catalog.length === 0) {
     return (
       <div
-        className="flex h-7 min-w-[5.25rem] shrink-0 items-center justify-center rounded border border-[#2d2d2d] bg-black px-1 font-mono text-[8px] text-[#6a6a6a]"
+        className="flex h-7 w-full min-w-0 flex-1 items-center justify-center rounded border border-[#2d2d2d] bg-black px-1 font-mono text-[8px] text-[#6a6a6a]"
         title={loadError ?? 'Loading one-line art'}
       >
         …
@@ -90,20 +71,17 @@ export function OnelineArtPicker({ value, onChange, onWheelSettled }: OnelineArt
     <CyberdeckRollingPicker
       items={items}
       value={resolvedValue}
-      onChange={pickById}
-      onUserSelect={(id) => {
-        pickById(id);
-        onWheelSettled?.();
+      onChange={onChange}
+      onUserSelect={(artId) => {
+        const entry = byId.get(artId);
+        if (entry) onWheelSettled?.(entry);
       }}
       ariaLabel="One-line ASCII art"
-      viewportClassName="h-7 min-w-[5.25rem] w-auto max-w-[10rem]"
-      wheelExpandOnScroll
-      wheelTransparent
-      wheelSettledShowsSlide
-      wheelNeighborCount={3}
-      slideHeightPx={28}
+      viewportClassName="h-7 min-w-0 w-full max-w-none overflow-hidden rounded border border-[#2d2d2d] bg-black [scrollbar-width:none]"
+      slideHeightPx={ROW_PX}
       wheelScrollStep={1}
-      showTextWhileScrolling
+      showTextWhileScrolling={false}
+      loop
     />
   );
 }

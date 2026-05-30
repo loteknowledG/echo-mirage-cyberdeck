@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       engine,
       text,
       font: typeof body.font === "string" ? body.font : undefined,
-      decorate: body.decorate !== false,
+      decorate: body.decorate === true,
     });
 
     return NextResponse.json({ ok: true, output, engine });

@@ -26,11 +26,13 @@ const nextConfig = {
 	experimental: {
 		webpackMemoryOptimizations: true,
 	},
-	// Treat as external in the Node.js server runtime
+	// Treat as external in the Node.js server runtime (native / optional / E2E-only).
 	serverExternalPackages: [
 		"google-photos-album-image-url-fetch",
 		"md-to-pdf",
 		"puppeteer",
+		"playwright",
+		"playwright-core",
 		"just-bash",
 		"@mongodb-js/zstd",
 	],

@@ -1,12 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import EmblaCarousel, { type EmblaCarouselType } from "embla-carousel";
+import { LuPlay } from "react-icons/lu";
 import { PREVIEW_DECKS } from "./preview-data";
-import { resolveMatrixDrag, scrollMatrixTo, wrapIndex } from "./preview-matrix-nav";
+import { scrollMatrixTo, wrapIndex } from "./preview-matrix-nav";
 import "./preview-matrix.css";
-
-const DRAG_THRESHOLD_PX = 36;
 
 export function PreviewMatrix() {
   const [activeDeckIndex, setActiveDeckIndex] = useState(0);
@@ -18,15 +23,6 @@ export function PreviewMatrix() {
   const handViewportRefs = useRef<(HTMLDivElement | null)[]>([]);
   const deckEmblaRef = useRef<EmblaCarouselType | null>(null);
   const handEmblaRefs = useRef<(EmblaCarouselType | null)[]>([]);
-
-  const dragRef = useRef({
-    active: false,
-    pointerId: -1,
-    startX: 0,
-    startY: 0,
-    startDeck: 0,
-    startCard: 0,
-  });
 
   const activeDeck = PREVIEW_DECKS[activeDeckIndex];
   const activeCard = activeDeck?.cards[activeCardIndex];
@@ -76,14 +72,18 @@ export function PreviewMatrix() {
         axis: "x",
         loop: true,
         align: "center",
-        dragFree: true,
+        dragFree: false,
         containScroll: false,
-        watchDrag: false,
       });
 
       handEmblaRefs.current[deckIndex] = handEmbla;
 
       handEmbla.on("select", () => {
+        if (deckEmblaRef.current?.selectedScrollSnap() !== deckIndex) return;
+        setActiveCardIndex(handEmbla.selectedScrollSnap());
+      });
+
+      handEmbla.on("settle", () => {
         if (deckEmblaRef.current?.selectedScrollSnap() !== deckIndex) return;
         setActiveCardIndex(handEmbla.selectedScrollSnap());
       });
@@ -95,13 +95,17 @@ export function PreviewMatrix() {
       align: "center",
       dragFree: false,
       containScroll: false,
-      watchDrag: false,
     });
 
     deckEmblaRef.current = deckEmbla;
     deckEmbla.on("select", syncFromEmbla);
     deckEmbla.scrollTo(0, true);
     syncFromEmbla();
+    requestAnimationFrame(() => {
+      deckEmbla.reInit();
+      deckEmbla.scrollTo(deckEmbla.selectedScrollSnap(), true);
+      syncFromEmbla();
+    });
 
     return true;
   }, [syncFromEmbla]);
@@ -159,70 +163,6 @@ export function PreviewMatrix() {
     return () => observer.disconnect();
   }, [mountCarousels, syncFromEmbla]);
 
-  useEffect(() => {
-    const matrix = matrixRef.current;
-    if (!matrix) return;
-
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.button !== 0) return;
-      const target = event.target as HTMLElement;
-      if (target.closest(".play")) return;
-
-      const deckEmbla = deckEmblaRef.current;
-      const deckIdx = deckEmbla?.selectedScrollSnap() ?? activeDeckIndex;
-      const handEmbla = handEmblaRefs.current[deckIdx];
-      dragRef.current = {
-        active: true,
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        startDeck: deckIdx,
-        startCard: handEmbla?.selectedScrollSnap() ?? activeCardIndex,
-      };
-      matrix.setPointerCapture(event.pointerId);
-    };
-
-    const onPointerMove = (event: PointerEvent) => {
-      if (!dragRef.current.active || event.pointerId !== dragRef.current.pointerId) return;
-      event.preventDefault();
-    };
-
-    const onPointerUp = (event: PointerEvent) => {
-      if (!dragRef.current.active || event.pointerId !== dragRef.current.pointerId) return;
-
-      const { startX, startY, startDeck, startCard } = dragRef.current;
-      dragRef.current.active = false;
-      matrix.releasePointerCapture(event.pointerId);
-
-      const dx = event.clientX - startX;
-      const dy = event.clientY - startY;
-      if (Math.abs(dx) < DRAG_THRESHOLD_PX && Math.abs(dy) < DRAG_THRESHOLD_PX) return;
-
-      const deckCount = PREVIEW_DECKS.length;
-      const cardCount = PREVIEW_DECKS[startDeck]?.cards.length ?? 0;
-      const next = resolveMatrixDrag(startDeck, startCard, { dx, dy }, deckCount, cardCount, DRAG_THRESHOLD_PX);
-      applyFocus(next.deckIndex, next.cardIndex);
-    };
-
-    const onPointerCancel = (event: PointerEvent) => {
-      if (event.pointerId === dragRef.current.pointerId) {
-        dragRef.current.active = false;
-      }
-    };
-
-    matrix.addEventListener("pointerdown", onPointerDown, { capture: true });
-    matrix.addEventListener("pointermove", onPointerMove, { capture: true });
-    matrix.addEventListener("pointerup", onPointerUp, { capture: true });
-    matrix.addEventListener("pointercancel", onPointerCancel, { capture: true });
-
-    return () => {
-      matrix.removeEventListener("pointerdown", onPointerDown, { capture: true });
-      matrix.removeEventListener("pointermove", onPointerMove, { capture: true });
-      matrix.removeEventListener("pointerup", onPointerUp, { capture: true });
-      matrix.removeEventListener("pointercancel", onPointerCancel, { capture: true });
-    };
-  }, [activeDeckIndex, activeCardIndex, applyFocus]);
-
   const playFocusedCard = useCallback(() => {
     const deck = PREVIEW_DECKS[activeDeckIndex];
     const card = deck?.cards[activeCardIndex];
@@ -261,13 +201,6 @@ export function PreviewMatrix() {
     [applyFocus],
   );
 
-  const handlePeekCardClick = useCallback(
-    (deckIndex: number, cardIndex: number) => {
-      applyFocus(deckIndex, cardIndex);
-    },
-    [applyFocus],
-  );
-
   return (
     <div className="powerfist-preview-root">
       <main className="shell">
@@ -277,8 +210,8 @@ export function PreviewMatrix() {
             <strong>{activeCard?.title ?? "—"}</strong>
           </div>
           <div className="hint">
-            Drag on the matrix (including corner peek cards) to move diagonal. Arrow keys and
-            buttons still work. Enter plays the focused card.
+            Drag cards left/right, decks up/down — neighbor decks peek above/below. Arrow keys
+            and buttons still work.
           </div>
         </section>
 
@@ -286,7 +219,11 @@ export function PreviewMatrix() {
           <div className="deckViewport" ref={deckViewportRef}>
             <div className="deckContainer">
               {PREVIEW_DECKS.map((deck, deckIndex) => (
-                <section key={deck.name} className="deckSlide" data-deck-index={deckIndex}>
+                <section
+                  key={deck.name}
+                  className={`deckSlide${deckIndex === activeDeckIndex ? " is-selected" : ""}`}
+                  data-deck-index={deckIndex}
+                >
                   <header className="deckHeader">
                     <div className="deckTitle">{deck.name}</div>
                     <div className="deckBadge">{deck.badge}</div>
@@ -308,9 +245,6 @@ export function PreviewMatrix() {
                             className={`cardSlide${isSelected ? " is-selected" : ""}`}
                             data-card-index={cardIndex}
                             data-testid={`card-slide-${deckIndex}-${cardIndex}`}
-                            onClick={() => {
-                              if (!isSelected) handlePeekCardClick(deckIndex, cardIndex);
-                            }}
                           >
                             <div className="card">
                               <div className="cardTop">
@@ -344,27 +278,48 @@ export function PreviewMatrix() {
         </section>
 
         <section className="controls">
-          <button type="button" onClick={() => deckEmblaRef.current?.scrollPrev()}>
-            Deck ↑
-          </button>
-          <button type="button" onClick={() => deckEmblaRef.current?.scrollNext()}>
-            Deck ↓
-          </button>
-          <button
-            type="button"
-            onClick={() => handEmblaRefs.current[activeDeckIndex]?.scrollPrev()}
-          >
-            Card ←
-          </button>
-          <button
-            type="button"
-            onClick={() => handEmblaRefs.current[activeDeckIndex]?.scrollNext()}
-          >
-            Card →
-          </button>
-          <button type="button" onClick={playFocusedCard}>
-            Play Focused Card
-          </button>
+          <div className="dpad" aria-label="Matrix navigation">
+            <button
+              type="button"
+              className="dpadBtn dpadUp"
+              aria-label="Previous deck"
+              onClick={() => deckEmblaRef.current?.scrollPrev()}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="dpadBtn dpadLeft"
+              aria-label="Previous card"
+              onClick={() => handEmblaRefs.current[activeDeckIndex]?.scrollPrev()}
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              className="dpadBtn dpadPlay"
+              aria-label="Play focused card"
+              onClick={playFocusedCard}
+            >
+              <LuPlay aria-hidden className="dpadPlayIcon" />
+            </button>
+            <button
+              type="button"
+              className="dpadBtn dpadRight"
+              aria-label="Next card"
+              onClick={() => handEmblaRefs.current[activeDeckIndex]?.scrollNext()}
+            >
+              →
+            </button>
+            <button
+              type="button"
+              className="dpadBtn dpadDown"
+              aria-label="Next deck"
+              onClick={() => deckEmblaRef.current?.scrollNext()}
+            >
+              ↓
+            </button>
+          </div>
         </section>
 
         <section

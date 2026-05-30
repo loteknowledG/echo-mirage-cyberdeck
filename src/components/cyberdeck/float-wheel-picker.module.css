@@ -17,6 +17,21 @@
   box-shadow: none;
 }
 
+.inlineFullWidth {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 0%;
+  height: 100%;
+  min-height: var(--float-wheel-row-px);
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.inlineFullWidth::after {
+  left: 0;
+  right: 0;
+}
+
 .spinningHost {
   z-index: 50;
 }

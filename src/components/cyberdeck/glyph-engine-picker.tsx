@@ -7,7 +7,7 @@ import type { GlyphPaneEngine } from "@/lib/glyph-channel";
 const GLYPH_ENGINE_ENTRIES: Array<{ value: GlyphPaneEngine; label: string; glyph: string }> = [
   { value: "ascii", label: "TEXT", glyph: "T" },
   { value: "figlet", label: "FIGLET", glyph: "F" },
-  { value: "oneline", label: "1 LINE ASCII", glyph: "1" },
+  { value: "oneline", label: "1 LINE", glyph: "1" },
 ];
 
 type GlyphEnginePickerProps = {

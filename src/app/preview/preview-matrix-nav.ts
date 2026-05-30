@@ -20,34 +20,3 @@ export function scrollMatrixTo(
   hand?.scrollTo(card, true);
   return { deckIndex: deck, cardIndex: card };
 }
-
-export type MatrixDragDelta = {
-  dx: number;
-  dy: number;
-};
-
-/** Map drag release to deck/card index changes (supports diagonal). */
-export function resolveMatrixDrag(
-  startDeck: number,
-  startCard: number,
-  delta: MatrixDragDelta,
-  deckCount: number,
-  cardCount: number,
-  thresholdPx = 36,
-): { deckIndex: number; cardIndex: number } {
-  let deck = startDeck;
-  let card = startCard;
-  const { dx, dy } = delta;
-
-  if (Math.abs(dy) >= thresholdPx) {
-    deck += dy > 0 ? 1 : -1;
-  }
-  if (Math.abs(dx) >= thresholdPx) {
-    card += dx > 0 ? 1 : -1;
-  }
-
-  return {
-    deckIndex: wrapIndex(deck, deckCount),
-    cardIndex: wrapIndex(card, cardCount),
-  };
-}

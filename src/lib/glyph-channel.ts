@@ -13,7 +13,9 @@ export type GlyphMergeMode = "append" | "replace";
 
 export type GlyphPaneEngine = "ascii" | "figlet" | "oneline";
 
-export function glyphEngineUsesFigletFont(engine: GlyphPaneEngine): boolean {
+export type GlyphRenderEngine = GlyphPaneEngine;
+
+export function glyphEngineUsesFigletFont(engine: GlyphRenderEngine): boolean {
   return engine === "figlet";
 }
 
@@ -33,26 +35,28 @@ export function glyphEnginePickerLabel(engine: GlyphPaneEngine): string {
   }
 }
 
-export function glyphEngineStatusLabel(engine: GlyphPaneEngine): string {
+export function glyphEngineStatusLabel(engine: GlyphRenderEngine): string {
   switch (engine) {
     case "ascii":
       return "TEXT";
     case "figlet":
       return "FIGLET";
     case "oneline":
-      return "1 LINE ASCII";
+      return "1 LINE";
   }
 }
 
 export type GlyphPaneSettings = {
   engine: GlyphPaneEngine;
   figletFont: string;
+  onelineArtId: string;
   zoomPercent: number;
 };
 
 const DEFAULT_GLYPH_SETTINGS: GlyphPaneSettings = {
   engine: "figlet",
   figletFont: DEFAULT_FIGLET_FONT,
+  onelineArtId: "1",
   zoomPercent: 100,
 };
 
@@ -86,6 +90,11 @@ export function appendGlyphChannelText(existing: string, addition: string): stri
   if (!base) return next;
   if (!next) return base;
   return `${base}\n\n${next}`;
+}
+
+/** Format a catalog one-line ASCII art block for the glyph channel. */
+export function formatOnelineCatalogArt(content: string): string {
+  return content.trim();
 }
 
 /** Insert rendered output at a cursor range in the channel text. */
@@ -124,19 +133,23 @@ export function readGlyphPaneSettings(): GlyphPaneSettings {
         ? parsed.figletFont.trim()
         : DEFAULT_GLYPH_SETTINGS.figletFont;
     const engineRaw = parsed.engine;
-    const engine =
+    const engine: GlyphPaneEngine =
       engineRaw === "ascii" || engineRaw === "figlet" || engineRaw === "oneline"
         ? engineRaw
-        : engineRaw === "glyph" || engineRaw === "toilet"
-          ? engineRaw === "glyph"
-            ? "ascii"
-            : "figlet"
-          : DEFAULT_GLYPH_SETTINGS.engine;
+        : engineRaw === "glyph"
+          ? "ascii"
+          : engineRaw === "toilet"
+            ? "figlet"
+            : DEFAULT_GLYPH_SETTINGS.engine;
+    const onelineArtId =
+      typeof parsed.onelineArtId === "string" && parsed.onelineArtId.trim()
+        ? parsed.onelineArtId.trim()
+        : DEFAULT_GLYPH_SETTINGS.onelineArtId;
     const zoomPercent =
       typeof parsed.zoomPercent === "number" && parsed.zoomPercent >= 50 && parsed.zoomPercent <= 200
         ? Math.round(parsed.zoomPercent)
         : DEFAULT_GLYPH_SETTINGS.zoomPercent;
-    return { engine, figletFont, zoomPercent };
+    return { engine, figletFont, onelineArtId, zoomPercent };
   } catch {
     return DEFAULT_GLYPH_SETTINGS;
   }
@@ -161,6 +174,7 @@ export async function buildGlyphContextSnapshot(): Promise<string> {
   return [
     `Engine: ${settings.engine}`,
     `Figlet font: ${settings.figletFont}`,
+    `One-line art id: ${settings.onelineArtId}`,
     `Glyph mode: ${mode ? "on" : "off"}`,
     `Channel length: ${text.length} chars`,
     "Current content:",
@@ -169,7 +183,7 @@ export async function buildGlyphContextSnapshot(): Promise<string> {
 }
 
 export async function renderGlyphOutput(options: {
-  engine: GlyphPaneEngine;
+  engine: GlyphRenderEngine;
   text: string;
   font?: string;
   decorate?: boolean;

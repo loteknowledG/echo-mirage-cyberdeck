@@ -105,6 +105,7 @@ import {
   setGlyphChannelContent,
   writeGlyphModeActive,
   writeGlyphPaneSettings,
+  type GlyphRenderEngine,
 } from "@/lib/glyph-channel";
 import {
   canNavigateOperatorFileBack,
@@ -1110,7 +1111,7 @@ export default function CyberdeckApp() {
 
   const renderGlyphToChannel = useCallback(
     async (options: {
-      engine: "ascii" | "figlet" | "oneline";
+      engine: GlyphRenderEngine;
       text: string;
       font?: string;
       merge?: "append" | "replace";
@@ -1848,6 +1849,23 @@ export default function CyberdeckApp() {
   useEffect(() => {
     saveDeckMode(deckMode);
   }, [deckMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const warmPanes = () => {
+      void import("@/features/cyberdeck/pane-chunks").then((mod) => {
+        for (const kind of mod.PREFETCH_PANE_KINDS) {
+          mod.prefetchCyberdeckPane(kind);
+        }
+      });
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(warmPanes, { timeout: 8000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(warmPanes, 2000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const active = readGlyphModeActive();

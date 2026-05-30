@@ -9,6 +9,9 @@ import {
   useFigletFontCatalog,
 } from '@/lib/use-figlet-font-catalog';
 
+const FONT_SLIDE_CLASS =
+  'flex w-full min-w-0 items-center justify-center overflow-hidden whitespace-nowrap px-1 font-mono text-[8px] leading-none tracking-[0.04em]';
+
 type FigletFontPickerProps = {
   value: string;
   onChange: (font: string) => void;
@@ -17,6 +20,14 @@ type FigletFontPickerProps = {
   /** Compact glyph toolbar vs registry showroom with figlet previews in the wheel. */
   variant?: 'compact' | 'showroom';
 };
+
+function fontSlide(font: string) {
+  return (
+    <span className={FONT_SLIDE_CLASS} title={font}>
+      {font}
+    </span>
+  );
+}
 
 /** Y-axis figlet font rolodex — neighbors visible while scrolling; figlet preview in showroom mode. */
 export function FigletFontPicker({
@@ -55,11 +66,8 @@ export function FigletFontPicker({
               ),
             }
           : {
-              slide: (
-                <span className="block max-w-full truncate px-0.5 font-mono text-[8px] leading-none tracking-[0.04em]">
-                  {font}
-                </span>
-              ),
+              slide: fontSlide(font),
+              labelSlide: fontSlide(font),
             }),
       })),
     [isShowroom, pickerFonts],
@@ -84,16 +92,17 @@ export function FigletFontPicker({
       viewportClassName={
         isShowroom
           ? 'w-full'
-          : 'h-7 min-w-[5.25rem] w-auto max-w-[10rem] shrink-0'
+          : 'h-7 min-w-0 w-full max-w-none overflow-hidden rounded border border-[#2d2d2d] bg-black [scrollbar-width:none]'
       }
-      wheelExpandOnScroll
+      wheelExpandOnScroll={isShowroom}
       wheelPinnedOpen={isShowroom}
-      wheelTransparent={!isShowroom}
+      wheelTransparent={false}
       wheelNeighborCount={3}
       slideHeightPx={isShowroom ? 44 : 28}
       wheelScrollStep={1}
-      showTextWhileScrolling
+      showTextWhileScrolling={false}
       wheelSettledShowsSlide={false}
+      loop={!isShowroom}
     />
   );
 }

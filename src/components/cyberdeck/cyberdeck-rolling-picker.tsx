@@ -67,6 +67,12 @@ export type CyberdeckRollingPickerProps = {
   wheelMomentumDuration?: number;
   /** While spinning show `label`; when snapped show `slide` (e.g. asky title → ascii). */
   wheelSettledShowsSlide?: boolean;
+  /** Override inline expand-wheel panel width (e.g. glyph 1-line full-width strip). */
+  inlinePanelClassName?: string;
+  /** Stretch expand wheel to all remaining toolbar width. */
+  wheelFullWidth?: boolean;
+  /** Embla infinite loop (default off for lists with 120+ items). */
+  loop?: boolean;
 };
 
 function wheelStepsFromDelta(deltaY: number, baseStep: number): number {
@@ -104,7 +110,17 @@ export function CyberdeckRollingPicker({
   wheelMomentumFriction,
   wheelMomentumDuration,
   wheelSettledShowsSlide = false,
+  inlinePanelClassName,
+  wheelFullWidth = false,
+  loop: loopProp,
 }: CyberdeckRollingPickerProps) {
+  const loopEnabled = loopProp ?? (items.length > 1 && items.length < 120);
+  const inlinePanelFullWidth =
+    wheelFullWidth ||
+    inlinePanelClassName?.includes("w-full") ||
+    viewportClassName.includes("w-full");
+  const compactToolbarFill =
+    inlinePanelFullWidth || viewportClassName.includes("max-w-none");
   const useWheelMomentum = wheelMomentum ?? true;
   const useExpandMomentum = wheelExpandOnScroll || wheelPinnedOpen;
   const resolvedMomentumGain =
@@ -254,12 +270,17 @@ export function CyberdeckRollingPicker({
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
     axis: "y",
-    loop: items.length > 1 && items.length < 120,
+    loop: loopEnabled,
     align: "center",
     containScroll: false as const,
     dragFree: true,
     duration: wheelExpandOnScroll ? 14 : 20,
   });
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    emblaApi.reInit({ loop: loopEnabled });
+  }, [emblaApi, loopEnabled, items.length]);
 
   const commitSelection = useCallback((embla: EmblaCarouselType) => {
     const list = itemsRef.current;
@@ -553,9 +574,13 @@ export function CyberdeckRollingPicker({
       className={cn(
         floatWheelStyles.panel,
         wheelPinnedOpen ? floatWheelStyles.showroomPinned : floatWheelStyles.inline,
+        wheelFullWidth && !wheelPinnedOpen && floatWheelStyles.inlineFullWidth,
         wheelPinnedOpen && floatWheelStyles.spinningHost,
         wheelTransparent && floatWheelStyles.panelTransparent,
-        !wheelPinnedOpen && "min-w-[5.25rem] max-w-[10rem] shrink-0 touch-pan-y",
+        !wheelPinnedOpen &&
+          !wheelFullWidth &&
+          (inlinePanelClassName ?? "min-w-[5.25rem] max-w-[10rem] shrink-0 touch-pan-y"),
+        !wheelPinnedOpen && wheelFullWidth && "touch-pan-y",
       )}
       style={{
         ["--float-wheel-row-px" as string]: `${slideHeightPx}px`,
@@ -602,8 +627,11 @@ export function CyberdeckRollingPicker({
       className={cn(
         "cursor-default overflow-hidden touch-pan-y transition-[width] duration-150 ease-out",
         viewportClassName,
-        useLabelSlides && "w-auto",
-        useLabelSlides && !alwaysShowLabel && "min-w-[5.25rem] max-w-[6.75rem]",
+        useLabelSlides && !compactToolbarFill && "w-auto",
+        useLabelSlides &&
+          !alwaysShowLabel &&
+          !compactToolbarFill &&
+          "min-w-[5.25rem] max-w-[6.75rem]",
       )}
     >
       <div className="flex h-full flex-col">
@@ -635,9 +663,10 @@ export function CyberdeckRollingPicker({
   return (
     <div
       className={cn(
-        "flex shrink-0 flex-col items-stretch",
+        "flex flex-col items-stretch",
+        inlinePanelFullWidth ? "h-full min-w-0 w-full flex-1 basis-0" : "shrink-0",
         wheelExpandOnScroll && "overflow-visible",
-        !wheelExpandOnScroll && "rounded border border-[#2d2d2d] bg-black",
+        !wheelExpandOnScroll && !inlinePanelFullWidth && "rounded border border-[#2d2d2d] bg-black",
       )}
       aria-label={wheelExpandOnScroll ? undefined : ariaLabel}
     >

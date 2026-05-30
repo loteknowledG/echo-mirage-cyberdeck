@@ -4,8 +4,8 @@ import {
   parseAsciiRenderOperatorInput,
 } from "@/lib/muthur-ascii-skill/parse-request";
 import type { AsciiRenderRequest } from "@/lib/muthur-ascii-skill/types";
+import type { GlyphRenderEngine } from "@/lib/glyph-channel";
 
-export type GlyphRenderEngine = "ascii" | "figlet" | "oneline";
 export type GlyphMergeMode = "append" | "replace";
 
 export type GlyphCommand =

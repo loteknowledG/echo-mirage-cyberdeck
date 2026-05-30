@@ -327,7 +327,7 @@ export function CyberdeckGlyphChannelPaneBody() {
           engine,
           text: payload,
           font: usesFigletFont ? figletFont : undefined,
-          decorate: options?.decorate ?? !editSelection,
+          decorate: options?.decorate ?? false,
         });
         const normalizedOutput = normalizeGlyphChannelText(output);
         let merged: string;
@@ -740,7 +740,9 @@ export function CyberdeckGlyphChannelPaneBody() {
                 placeholder={
                   glyphModeOn
                     ? "⟁ ASCII mode — figlet ECHO MIRAGE or plain text to render"
-                    : "figlet ECHO MIRAGE · ascii edit · ascii view · ascii clear"
+                    : settings.engine === "oneline"
+                      ? "spin rolodex below · enter to render"
+                      : "figlet ECHO MIRAGE · ascii edit · ascii view · ascii clear"
                 }
                 className={`box-border w-full min-w-0 rounded-none border-0 bg-black py-2 pl-9 pr-4 font-mono text-sm text-green-400 placeholder:text-green-800 transition-all focus:outline-none ${
                   inputFocused ? "caret-transparent" : ""
@@ -764,37 +766,48 @@ export function CyberdeckGlyphChannelPaneBody() {
             </div>
 
             <div className="min-w-0 border-t border-[#1a1a1a]">
-              <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 overflow-visible px-2 py-2">
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 overflow-visible">
-                  <GlyphEnginePicker
-                    value={settings.engine}
-                    onChange={(engine) => {
-                      setSettings((prev) => ({ ...prev, engine }));
-                      focusComposer();
-                    }}
-                  />
-                  {settings.engine === "figlet" ? (
-                    <div className="relative z-10 shrink-0 overflow-visible">
-                      <FigletFontPicker
-                        value={settings.figletFont}
-                        onChange={(figletFont) =>
-                          setSettings((prev) => ({ ...prev, figletFont }))
-                        }
-                        onWheelSettled={focusComposer}
-                      />
-                    </div>
-                  ) : null}
-                  {settings.engine === "oneline" ? (
-                    <OnelineArtPicker
-                      value={composer}
-                      onChange={(art) => {
-                        setComposer(art);
-                        setCaretIndex(art.length);
-                        focusComposer();
-                      }}
+              <div className="flex min-h-7 min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden px-2 py-1.5">
+                <GlyphEnginePicker
+                  value={settings.engine}
+                  onChange={(engine) => {
+                    setSettings((prev) => ({ ...prev, engine }));
+                    focusComposer();
+                  }}
+                />
+                {settings.engine === "figlet" ? (
+                  <div className="relative z-10 min-w-0 flex-1 overflow-visible">
+                    <FigletFontPicker
+                      value={settings.figletFont}
+                      onChange={(figletFont) =>
+                        setSettings((prev) => ({ ...prev, figletFont }))
+                      }
                       onWheelSettled={focusComposer}
                     />
-                  ) : null}
+                  </div>
+                ) : null}
+                {settings.engine === "oneline" ? (
+                  <div className="flex h-7 min-w-0 flex-1">
+                    <OnelineArtPicker
+                      value={settings.onelineArtId}
+                      onChange={(onelineArtId) =>
+                        setSettings((prev) => ({ ...prev, onelineArtId }))
+                      }
+                      onWheelSettled={(entry) => {
+                        setComposer(entry.content);
+                        setCaretIndex(entry.content.length);
+                        const preview = entry.title.replace(/\s+/g, " ").trim().slice(0, 32);
+                        const previewSuffix =
+                          preview.length < entry.title.trim().length ? "…" : "";
+                        setStatusLine(
+                          `⟁ 1 LINE // ${preview}${previewSuffix} — ENTER TO RENDER`,
+                        );
+                        focusComposer();
+                      }}
+                    />
+                  </div>
+                ) : null}
+
+                <div className="ml-auto flex shrink-0 items-center gap-1.5">
                   <CyberdeckControlTooltip label="Decrease display zoom">
                     <button
                       type="button"
@@ -834,34 +847,34 @@ export function CyberdeckGlyphChannelPaneBody() {
                       +
                     </button>
                   </CyberdeckControlTooltip>
-                </div>
 
-                <CyberdeckControlTooltip
-                  label="Render"
-                  disabled={!composer.trim() || rendering}
-                >
-                  <button
-                    type="button"
-                    onClick={() => void handleComposerSubmit()}
+                  <CyberdeckControlTooltip
+                    label="Render"
                     disabled={!composer.trim() || rendering}
-                    aria-label="Render"
-                    className={realmorphismControlClass(deckMode, {
-                      size: "send",
-                      signal: true,
-                      legacyClassName: LEGACY_SEND_CONTROL,
-                    })}
                   >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
-                    <path
-                      d="M3 11.5L20.5 3.5L13.5 20.5L11.2 13.8L3 11.5Z"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-                </CyberdeckControlTooltip>
+                    <button
+                      type="button"
+                      onClick={() => void handleComposerSubmit()}
+                      disabled={!composer.trim() || rendering}
+                      aria-label="Render"
+                      className={realmorphismControlClass(deckMode, {
+                        size: "send",
+                        signal: true,
+                        legacyClassName: LEGACY_SEND_CONTROL,
+                      })}
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+                        <path
+                          d="M3 11.5L20.5 3.5L13.5 20.5L11.2 13.8L3 11.5Z"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </CyberdeckControlTooltip>
+                </div>
               </div>
 
               <p

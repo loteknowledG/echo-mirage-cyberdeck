@@ -16,6 +16,7 @@
   --pf-cyan: #67e8f9;
   --pf-card-h: 200px;
   --pf-card-peek: 38%;
+  --pf-deck-band: 72%;
 
   box-sizing: border-box;
   margin: 0;
@@ -68,14 +69,24 @@
   border-radius: 22px;
   overflow: hidden;
   position: relative;
-  touch-action: none;
-  cursor: grab;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.03),
     0 20px 80px rgba(0, 0, 0, 0.45);
 }
 
-.powerfist-preview-root .matrix:active {
+.powerfist-preview-root .handViewport {
+  overflow: hidden;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  cursor: grab;
+  touch-action: pan-x pinch-zoom;
+}
+
+.powerfist-preview-root .handViewport:active {
   cursor: grabbing;
 }
 
@@ -83,6 +94,12 @@
   height: 100%;
   width: 100%;
   overflow: hidden;
+  cursor: grab;
+  touch-action: pan-y pinch-zoom;
+}
+
+.powerfist-preview-root .deckViewport:active {
+  cursor: grabbing;
 }
 
 .powerfist-preview-root .deckContainer {
@@ -92,13 +109,27 @@
 }
 
 .powerfist-preview-root .deckSlide {
-  flex: 0 0 100%;
+  flex: 0 0 var(--pf-deck-band);
+  height: var(--pf-deck-band);
   min-height: 0;
   display: grid;
-  grid-template-rows: auto 1fr;
-  align-content: center;
-  padding: 12px 16px 14px;
-  gap: 10px;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  padding: 8px 16px 10px;
+  gap: 6px;
+  transition:
+    opacity 200ms ease,
+    filter 200ms ease;
+}
+
+.powerfist-preview-root .deckSlide:not(.is-selected) {
+  opacity: 0.55;
+  filter: grayscale(0.3);
+}
+
+.powerfist-preview-root .deckSlide.is-selected {
+  opacity: 1;
+  filter: none;
 }
 
 .powerfist-preview-root .deckHeader {
@@ -124,24 +155,20 @@
   font-size: 10px;
 }
 
-.powerfist-preview-root .handViewport {
-  overflow: hidden;
-  width: 100%;
-  min-height: 0;
-  display: grid;
-  align-items: center;
-}
-
 .powerfist-preview-root .handContainer {
   display: flex;
-  align-items: center;
-  height: var(--pf-card-h);
+  align-items: stretch;
+  height: 100%;
+  max-height: var(--pf-card-h);
 }
 
 .powerfist-preview-root .cardSlide {
   flex: 0 0 var(--pf-card-peek);
   min-width: 0;
-  padding: 8px;
+  height: 100%;
+  padding: 0 8px;
+  display: flex;
+  align-items: stretch;
   cursor: grab;
   transition:
     transform 180ms ease,
@@ -151,7 +178,9 @@
 }
 
 .powerfist-preview-root .card {
-  height: var(--pf-card-h);
+  flex: 1;
+  min-height: 0;
+  width: 100%;
   border: 1px solid rgba(134, 239, 172, 0.32);
   border-radius: 16px;
   padding: 12px 14px;
@@ -166,15 +195,24 @@
 }
 
 .powerfist-preview-root .cardSlide:not(.is-selected) {
-  transform: scale(0.82);
+  transform: scale(0.88);
   opacity: 0.48;
   filter: grayscale(0.45) blur(0.4px);
 }
 
 .powerfist-preview-root .cardSlide.is-selected {
-  transform: scale(1.03);
+  transform: scale(1);
   opacity: 1;
   filter: none;
+  z-index: 1;
+}
+
+.powerfist-preview-root .cardSlide.is-selected .card {
+  border-color: rgba(134, 239, 172, 0.55);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(134, 239, 172, 0.2),
+    0 16px 46px rgba(0, 0, 0, 0.45);
 }
 
 .powerfist-preview-root .cardTop {
@@ -248,22 +286,79 @@
 
 .powerfist-preview-root .controls {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
 }
 
-.powerfist-preview-root .controls button {
-  border: 1px solid rgba(134, 239, 172, 0.3);
-  background: rgba(8, 17, 13, 0.9);
+.powerfist-preview-root .dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(3, 40px);
+  gap: 0;
+}
+
+.powerfist-preview-root .dpadBtn {
+  border: 1px solid rgba(134, 239, 172, 0.35);
+  background: rgba(8, 17, 13, 0.92);
   color: var(--pf-text);
-  border-radius: 12px;
-  padding: 10px 12px;
   font: inherit;
+  font-size: 16px;
+  line-height: 1;
   cursor: pointer;
+  padding: 0;
+  display: grid;
+  place-items: center;
 }
 
-.powerfist-preview-root .controls button:hover {
-  border-color: rgba(134, 239, 172, 0.7);
+.powerfist-preview-root .dpadBtn:hover {
+  border-color: rgba(134, 239, 172, 0.75);
+  background: rgba(134, 239, 172, 0.12);
+}
+
+.powerfist-preview-root .dpadBtn:active {
+  background: rgba(134, 239, 172, 0.22);
+}
+
+.powerfist-preview-root .dpadUp {
+  grid-column: 2;
+  grid-row: 1;
+  border-radius: 10px 10px 4px 4px;
+}
+
+.powerfist-preview-root .dpadLeft {
+  grid-column: 1;
+  grid-row: 2;
+  border-radius: 10px 4px 4px 10px;
+}
+
+.powerfist-preview-root .dpadPlay {
+  grid-column: 2;
+  grid-row: 2;
+  border-radius: 4px;
+  border-color: rgba(134, 239, 172, 0.55);
+  background: rgba(134, 239, 172, 0.12);
+  color: var(--pf-green);
+}
+
+.powerfist-preview-root .dpadPlay:hover {
+  background: rgba(134, 239, 172, 0.22);
+}
+
+.powerfist-preview-root .dpadPlayIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.powerfist-preview-root .dpadRight {
+  grid-column: 3;
+  grid-row: 2;
+  border-radius: 4px 10px 10px 4px;
+}
+
+.powerfist-preview-root .dpadDown {
+  grid-column: 2;
+  grid-row: 3;
+  border-radius: 4px 4px 10px 10px;
 }
 
 .powerfist-preview-root .stackLog {
@@ -307,4 +402,18 @@
   min-height: 280px;
   height: min(520px, 100%);
   max-height: 520px;
+}
+
+.cyberdeck-rola-dex-pane .powerfist-preview-root .deckSlide {
+  padding: 6px 14px 8px;
+  gap: 4px;
+}
+
+.cyberdeck-rola-dex-pane .powerfist-preview-root .deckTitle {
+  font-size: 14px;
+}
+
+.cyberdeck-rola-dex-pane .powerfist-preview-root .deckBadge {
+  font-size: 9px;
+  padding: 3px 7px;
 }

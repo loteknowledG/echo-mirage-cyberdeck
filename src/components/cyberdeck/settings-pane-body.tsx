@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
 import type { Identity } from "@/lib/identity/identity-types";
 import { cn } from "@/lib/utils";
+import { DepthButton, DepthPanel } from "@/components/realmorphism";
 
 const SWITCH_LEGACY_EMERALD =
   "data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]";
@@ -158,6 +159,26 @@ export function CyberdeckSettingsPaneBody({
               </div>
             </div>
           </section>
+          {deckMode === "realmorphism" ? (
+            <section className="flex flex-col gap-2">
+              <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">DEPTH PANEL LAB</div>
+              <DepthPanel variant="module" depth={8} className="w-full max-w-md">
+                <div className="space-y-3 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em]">
+                  <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">MECHANICAL DEPTH PRIMITIVE</div>
+                  <p className="text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
+                    Front face + right/bottom walls — no box-shadow extrusion. Press the control; walls
+                    drop away as the face moves down.
+                  </p>
+                  <div className="flex flex-wrap items-end gap-4 pt-1">
+                    <DepthButton posture="signal">CONNECT</DepthButton>
+                    <DepthPanel variant="inset" depth={6} className="min-w-[7rem]">
+                      <div className="px-2 py-1.5 text-[9px] tracking-[0.06em] text-[#8a8a8a]">INSET</div>
+                    </DepthPanel>
+                  </div>
+                </div>
+              </DepthPanel>
+            </section>
+          ) : null}
           <section className="flex flex-col gap-2">
             <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">OPERATOR IDENTITY</div>
             <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">

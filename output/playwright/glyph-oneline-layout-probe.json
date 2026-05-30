@@ -1,0 +1,63 @@
+{
+  "composer": {
+    "x": 744.296875,
+    "y": 586,
+    "width": 515.703125,
+    "height": 126,
+    "top": 586,
+    "right": 1260,
+    "bottom": 712,
+    "left": 744.296875
+  },
+  "toolbarRow": {
+    "x": 745.296875,
+    "y": 635,
+    "width": 513.703125,
+    "height": 76,
+    "top": 635,
+    "right": 1259,
+    "bottom": 711,
+    "left": 745.296875
+  },
+  "engine": {
+    "x": 753.296875,
+    "y": 645,
+    "width": 50,
+    "height": 30,
+    "top": 645,
+    "right": 803.296875,
+    "bottom": 675,
+    "left": 753.296875
+  },
+  "wheel": {
+    "x": 809.296875,
+    "y": 646,
+    "width": 304.015625,
+    "height": 28,
+    "top": 646,
+    "right": 1113.3125,
+    "bottom": 674,
+    "left": 809.296875
+  },
+  "zoom": {
+    "x": 1119.3125,
+    "y": 644,
+    "width": 28,
+    "height": 32,
+    "top": 644,
+    "right": 1147.3125,
+    "bottom": 676,
+    "left": 1119.3125
+  },
+  "send": {
+    "x": 1217,
+    "y": 644,
+    "width": 36,
+    "height": 36,
+    "top": 644,
+    "right": 1253,
+    "bottom": 680,
+    "left": 1217
+  },
+  "wheelHtml": "<div class=\"flex flex-col items-stretch h-full min-w-0 w-full flex-1 basis-0\" aria-label=\"One-line ASCII art\"><div class=\"cursor-default overflow-hidden touch-pan-y transition-[width] duration-150 ease-out h-7 min-w-0 w-full max-w-none rounded border border-[#2d2d2d] bg-black\"><div class=\"flex h-full flex-col\" style=\"transform: translate3d(0px, 0px, 0px);\"><div class=\"flex min-h-0 flex-[0_0_100%] shrink-0 items-center justify-center px-0.5\"><div class=\"text-emerald-200\"><span data-oneline-art=\"t"
+}

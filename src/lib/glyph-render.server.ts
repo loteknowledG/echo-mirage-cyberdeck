@@ -7,7 +7,7 @@ export type GlyphRenderRequest = {
   engine: "ascii" | "figlet" | "oneline";
   text: string;
   font?: string;
-  /** When false, return raw body only (no channel header / divider). Default true. */
+  /** When true, wrap output with channel header / divider. Default false — raw art only. */
   decorate?: boolean;
 };
 
@@ -54,7 +54,7 @@ async function renderFigletAllFonts(text: string, decorate: boolean): Promise<st
 export async function renderGlyph(request: GlyphRenderRequest): Promise<string> {
   const text = request.text.replace(/\r\n/g, "\n").trim();
   if (!text) return "⟁ // EMPTY SIGNAL";
-  const decorate = request.decorate !== false;
+  const decorate = request.decorate === true;
 
   if (request.engine === "figlet") {
     if (isFigletAllFonts(request.font)) {
