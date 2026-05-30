@@ -414,7 +414,7 @@ type CustomTab = {
 
 type CustomTabContextMenuAction =
   | { label: string; kind: CustomTabKind; action: "convert" }
-  | { label: string; action: "settings-pane" | "connection-pane" };
+  | { label: string; action: "settings-pane" | "connection-pane" | "kit-pane" };
 
 const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Document", kind: "document", action: "convert" },
@@ -426,6 +426,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Flight Log", kind: "flight-log", action: "convert" },
   { label: "Drop Bay", kind: "drop-bay", action: "convert" },
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
+  { label: "Kit", action: "kit-pane" },
   { label: "Rola Dex", kind: "rola-dex", action: "convert" },
   { label: "Sound Profile", kind: "sound-profile", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
@@ -2956,6 +2957,63 @@ export default function CyberdeckApp() {
     setNavRailContext("gateway");
     playDeckSystemSound("chirp", 0.05);
   }, [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
+
+  const openRealmorphismKitTab = useCallback(
+    (tabId?: string) => {
+      closeRailTabContextMenu();
+      closeMirageContextMenu();
+      closeGatewayPaneContextMenu();
+
+      const registryUrl =
+        typeof window !== "undefined" ? `${window.location.origin}/registry` : "/registry";
+      const targetTabId = tabId || `tab-${crypto.randomUUID()}`;
+
+      flushSync(() => {
+        const store = useCyberdeckTabStore.getState();
+        const existing = store.customTabs.some((tab) => tab.id === targetTabId);
+
+        if (existing) {
+          store.setCustomTabs((prev) =>
+            prev.map((tab) =>
+              tab.id === targetTabId
+                ? {
+                    ...tab,
+                    label: "REALMORPHISM KIT",
+                    glyph: "K",
+                    kind: "web",
+                    browserUrl: registryUrl,
+                    asset: null,
+                  }
+                : tab,
+            ),
+          );
+        } else {
+          store.setCustomTabs((prev) => [
+            ...prev,
+            {
+              id: targetTabId,
+              label: "REALMORPHISM KIT",
+              glyph: "K",
+              kind: "web",
+              browserUrl: registryUrl,
+              asset: null,
+            },
+          ]);
+        }
+
+        store.setActiveCustomTabId(targetTabId);
+        store.mountCustomTab(targetTabId);
+      });
+
+      setNavRailContext("tabs");
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: "TAB_KIT // REALMORPHISM REGISTRY OPENED" },
+      ]);
+      playDeckSystemSound("chirp", 0.05);
+    },
+    [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu],
+  );
 
   const deleteActiveTab = useCallback(() => {
     closeRailTabContextMenu();
@@ -6360,9 +6418,34 @@ const resolved = resolveUiTarget(userMessage);
                 >
                   Copy server id
                 </button>
+                <div className="my-1 h-px bg-[#232323]" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    closeRailTabContextMenu();
+                    openRealmorphismKitTab();
+                  }}
+                  className={realmorphismMenuItemClass(deckMode)}
+                >
+                  Open Realmorphism kit
+                </button>
               </>
             ) : (
               <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    const id = railTabContextMenu.tabId;
+                    closeRailTabContextMenu();
+                    openRealmorphismKitTab(id);
+                  }}
+                  className={realmorphismMenuItemClass(deckMode)}
+                >
+                  Open Realmorphism kit
+                </button>
+                <div className="my-1 h-px bg-[#232323]" />
                 {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) =>
                   action.action === "convert" ? (
                     <button
@@ -6385,6 +6468,20 @@ const resolved = resolveUiTarget(userMessage);
                       onClick={() => {
                         closeRailTabContextMenu();
                         handleModelLabelClick("b");
+                      }}
+                      className={realmorphismMenuItemClass(deckMode)}
+                    >
+                      {action.label}
+                    </button>
+                  ) : action.action === "kit-pane" ? (
+                    <button
+                      key="kit-pane"
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        const id = railTabContextMenu.tabId;
+                        closeRailTabContextMenu();
+                        openRealmorphismKitTab(id);
                       }}
                       className={realmorphismMenuItemClass(deckMode)}
                     >

@@ -18,6 +18,29 @@ function getEchoMirageProjectRoot() {
   return app.getPath('documents');
 }
 
+async function getDevOrigin() {
+  if (process.env.ECHO_MIRAGE_DEV_ORIGIN) {
+    return process.env.ECHO_MIRAGE_DEV_ORIGIN;
+  }
+
+  if (!app.isPackaged) {
+    try {
+      const statePath = path.resolve(__dirname, '..', '.tmp', 'dev-server.json');
+      const state = JSON.parse(await fs.readFile(statePath, 'utf8'));
+      if (state?.origin) {
+        return String(state.origin);
+      }
+      if (state?.appPort) {
+        return `http://127.0.0.1:${state.appPort}`;
+      }
+    } catch {
+      /* fixed-port dev fallback */
+    }
+  }
+
+  return 'http://127.0.0.1:3050';
+}
+
 const OPERATOR_FOLDER_IGNORED_NAMES = new Set([
   'node_modules',
   '.git',
@@ -336,7 +359,7 @@ function buildContextMenu(win, params) {
   menu.popup({ window: win });
 }
 
-function createWindow() {
+async function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -354,7 +377,8 @@ function createWindow() {
 
   // Load your Next.js app (dev server)
   // Keep in sync with package.json dev/start port (avoids clash with Weyland-Yutani on :3000).
-  win.loadURL('http://127.0.0.1:3050/cyberdeck');
+  const origin = await getDevOrigin();
+  win.loadURL(`${origin}/cyberdeck`);
 }
 
 ipcMain.handle('echo-mirage-browser:navigate', async (_event, url) => {

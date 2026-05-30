@@ -1,9 +1,22 @@
 /**
- * Stops stale echo-mirage dev listeners on :3050 (Next) and :3051 (readiness sidecar).
+ * Stops stale echo-mirage dev listeners on fixed ports and the last recorded auto-port pair.
  */
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const PORTS = [3050, 3051];
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const devStatePath = path.join(root, '.tmp', 'dev-server.json');
+const PORTS = new Set([3050, 3051]);
+
+try {
+  const state = JSON.parse(fs.readFileSync(devStatePath, 'utf8'));
+  if (Number.isFinite(Number(state.appPort))) PORTS.add(Number(state.appPort));
+  if (Number.isFinite(Number(state.readyPort))) PORTS.add(Number(state.readyPort));
+} catch {
+  /* no recorded auto-port session */
+}
 
 /** @param {number} port */
 function pidsOnPort(port) {
@@ -28,7 +41,7 @@ for (const port of PORTS) {
 }
 
 if (targets.size === 0) {
-  process.stdout.write('[dev:stop] no listeners on :3050 or :3051\n');
+  process.stdout.write(`[dev:stop] no listeners on ${[...PORTS].map((port) => `:${port}`).join(', ')}\n`);
   process.exit(0);
 }
 

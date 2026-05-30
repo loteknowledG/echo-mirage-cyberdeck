@@ -1,0 +1,9 @@
+{
+  "appPort": 3050,
+  "readyPort": 3051,
+  "origin": "http://127.0.0.1:3050",
+  "route": "http://127.0.0.1:3050/cyberdeck",
+  "pid": 14000,
+  "mode": "fixed",
+  "updatedAt": "2026-05-29T20:39:51.218Z"
+}

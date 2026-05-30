@@ -8,6 +8,7 @@ Realmorphism is now registered as a shadcn registry theme item for Echo Mirage d
 
 - `public/registry/realmorphism.json` - installable `registry:theme` item.
 - `public/registry/realmorphism-base.json` - installable wrapper kit for shadcn controls.
+- `public/registry/realmorphism-site.json` - installable showroom page.
 - `public/registry/registry.json` - local registry index.
 
 ## Local Install
@@ -22,6 +23,12 @@ To install the turnkey component wrappers:
 
 ```bash
 npx shadcn@latest add http://localhost:3050/registry/realmorphism-base.json
+```
+
+To install the showroom page:
+
+```bash
+npx shadcn@latest add http://localhost:3050/registry/realmorphism-site.json
 ```
 
 If the app is served from another host or port, replace the origin and keep the same path:

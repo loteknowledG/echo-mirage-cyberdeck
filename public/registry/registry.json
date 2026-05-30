@@ -16,6 +16,12 @@
       "description": "Turnkey Realmorphism wrappers for shadcn/ui controls."
     },
     {
+      "name": "realmorphism-site",
+      "type": "registry:block",
+      "title": "Realmorphism Registry Site",
+      "description": "A portable showroom page for presenting the Realmorphism registry."
+    },
+    {
       "name": "shadcn-sidebar",
       "type": "registry:block",
       "title": "Shadcn Sidebar",
