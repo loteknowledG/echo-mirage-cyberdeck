@@ -139,3 +139,8 @@ dist
 # Voice tuning scratch artifacts
 .tmp_*
 .tmp_whisper/
+/.playwright-mcp
+/tmp
+/.tmp
+/test-results
+/test-results

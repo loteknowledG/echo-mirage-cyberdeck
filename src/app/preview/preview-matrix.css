@@ -14,6 +14,8 @@
   --pf-amber: #facc15;
   --pf-red: #fb7185;
   --pf-cyan: #67e8f9;
+  --pf-card-h: 200px;
+  --pf-card-peek: 38%;
 
   box-sizing: border-box;
   margin: 0;
@@ -66,13 +68,20 @@
   border-radius: 22px;
   overflow: hidden;
   position: relative;
+  touch-action: none;
+  cursor: grab;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.03),
     0 20px 80px rgba(0, 0, 0, 0.45);
 }
 
+.powerfist-preview-root .matrix:active {
+  cursor: grabbing;
+}
+
 .powerfist-preview-root .deckViewport {
   height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
@@ -83,30 +92,13 @@
 }
 
 .powerfist-preview-root .deckSlide {
-  /* <100% height so previous/next deck rows peek like side cards at 42% width */
-  flex: 0 0 84%;
+  flex: 0 0 100%;
   min-height: 0;
   display: grid;
   grid-template-rows: auto 1fr;
-  padding: 20px;
-  gap: 18px;
-  transition:
-    transform 180ms ease,
-    opacity 180ms ease,
-    filter 180ms ease;
-  will-change: transform;
-}
-
-.powerfist-preview-root .deckSlide:not(.is-selected) {
-  transform: scale(0.9);
-  opacity: 0.45;
-  filter: grayscale(0.4) blur(0.35px);
-}
-
-.powerfist-preview-root .deckSlide.is-selected {
-  transform: scale(1);
-  opacity: 1;
-  filter: none;
+  align-content: center;
+  padding: 12px 16px 14px;
+  gap: 10px;
 }
 
 .powerfist-preview-root .deckHeader {
@@ -114,11 +106,12 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .powerfist-preview-root .deckTitle {
-  font-size: 22px;
-  letter-spacing: 0.12em;
+  font-size: 16px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--pf-green);
 }
@@ -126,14 +119,15 @@
 .powerfist-preview-root .deckBadge {
   color: var(--pf-muted);
   border: 1px solid rgba(134, 239, 172, 0.25);
-  padding: 6px 10px;
+  padding: 4px 8px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .powerfist-preview-root .handViewport {
   overflow: hidden;
-  height: 100%;
+  width: 100%;
+  min-height: 0;
   display: grid;
   align-items: center;
 }
@@ -141,13 +135,14 @@
 .powerfist-preview-root .handContainer {
   display: flex;
   align-items: center;
-  height: 100%;
+  height: var(--pf-card-h);
 }
 
 .powerfist-preview-root .cardSlide {
-  flex: 0 0 42%;
+  flex: 0 0 var(--pf-card-peek);
   min-width: 0;
-  padding: 12px;
+  padding: 8px;
+  cursor: grab;
   transition:
     transform 180ms ease,
     opacity 180ms ease,
@@ -156,10 +151,10 @@
 }
 
 .powerfist-preview-root .card {
-  height: 310px;
+  height: var(--pf-card-h);
   border: 1px solid rgba(134, 239, 172, 0.32);
-  border-radius: 22px;
-  padding: 18px;
+  border-radius: 16px;
+  padding: 12px 14px;
   background:
     linear-gradient(145deg, rgba(13, 31, 23, 0.95), rgba(5, 10, 8, 0.98)),
     radial-gradient(circle at top left, rgba(103, 232, 249, 0.12), transparent 40%);
@@ -184,26 +179,30 @@
 
 .powerfist-preview-root .cardTop {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .powerfist-preview-root .cardType {
-  font-size: 12px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.16em;
   color: var(--pf-cyan);
 }
 
 .powerfist-preview-root .cardTitle {
-  font-size: 24px;
-  line-height: 1.1;
+  font-size: 17px;
+  line-height: 1.15;
   color: var(--pf-text);
 }
 
 .powerfist-preview-root .cardPurpose {
   color: var(--pf-muted);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .powerfist-preview-root .cardBottom {
@@ -214,9 +213,9 @@
 }
 
 .powerfist-preview-root .risk {
-  font-size: 12px;
+  font-size: 10px;
   border-radius: 999px;
-  padding: 6px 9px;
+  padding: 4px 7px;
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
@@ -236,8 +235,9 @@
   border: 1px solid rgba(134, 239, 172, 0.55);
   background: rgba(134, 239, 172, 0.12);
   color: var(--pf-green);
-  border-radius: 12px;
-  padding: 10px 14px;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 11px;
   font: inherit;
   cursor: pointer;
 }
@@ -276,14 +276,35 @@
   color: var(--pf-amber);
 }
 
-/* Cyberdeck pane embed — fill pane height instead of viewport */
+/* Cyberdeck pane embed */
 .cyberdeck-rola-dex-pane .powerfist-preview-layout {
   min-height: 0;
   height: 100%;
 }
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root {
-  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   height: 100%;
-  overflow: auto;
+  width: 100%;
+  overflow: hidden;
+  place-items: stretch;
+}
+
+.cyberdeck-rola-dex-pane .powerfist-preview-root .shell {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 10px;
+}
+
+.cyberdeck-rola-dex-pane .powerfist-preview-root .matrix {
+  flex: 1 1 auto;
+  min-height: 280px;
+  height: min(520px, 100%);
+  max-height: 520px;
 }
