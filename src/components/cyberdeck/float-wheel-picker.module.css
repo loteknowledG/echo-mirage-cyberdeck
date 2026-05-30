@@ -1,0 +1,90 @@
+/* Figlet wheel — fixed slot; neighbors extend outside while spinning (iOS picker) */
+
+.panel {
+  position: relative;
+  background: #000;
+  border-radius: 2px;
+  border: 1px solid #2d2d2d;
+}
+
+.panelTransparent {
+  background: transparent;
+}
+
+.inline {
+  height: var(--float-wheel-row-px);
+  overflow: visible;
+  box-shadow: none;
+}
+
+.spinningHost {
+  z-index: 50;
+}
+
+/* Taller embla band, centered on the single-row slot */
+.wheelStage {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  overflow: hidden;
+  background: #000;
+}
+
+.wheelStageTransparent {
+  background: transparent;
+}
+
+.wheelStage.spinning {
+  box-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
+}
+
+.wheelStageTransparent.spinning {
+  box-shadow: none;
+}
+
+/* Edge fade on the tall wheel band */
+.wheelStage::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.96) 0%,
+    rgba(0, 0, 0, 0.1) 28%,
+    rgba(0, 0, 0, 0.1) 72%,
+    rgba(0, 0, 0, 0.96) 100%
+  );
+}
+
+.wheelStageTransparent::before {
+  display: none;
+}
+
+/* Selection band — fixed on the toolbar slot (center row) */
+.inline::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - var(--float-wheel-row-px) / 2);
+  height: var(--float-wheel-row-px);
+  z-index: 4;
+  border-top: 1px solid rgba(255, 255, 255, 0.28);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.28);
+  background: transparent;
+}
+
+.viewport {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  touch-action: pan-y;
+  cursor: default;
+}

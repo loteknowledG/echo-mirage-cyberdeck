@@ -80,10 +80,10 @@ function ExecutionCardTile({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={isSelected}
       className={cn(
         realmorphismControlClass(deckMode, {
           size: "tile",
-          latched: isSelected,
           signal: isSelected,
           legacyClassName: isSelected
             ? "group relative w-full rounded-sm border bg-black p-2 text-left transition-all border-[#22c55e]/60 bg-[#22c55e]/5"
@@ -135,6 +135,7 @@ function HandSelector({
             key={hand.id}
             type="button"
             onClick={() => onSelect(hand.id)}
+            aria-pressed={isActive}
             className={realmorphismFilterClass(deckMode, isActive, "signal")}
           >
             {hand.name}

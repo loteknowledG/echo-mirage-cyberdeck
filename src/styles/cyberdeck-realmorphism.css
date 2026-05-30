@@ -30,6 +30,8 @@
   --realmorphism-wall-hover: #3a9174;
   --realmorphism-wall-amber: #8a6530;
   --realmorphism-wall-amber-hover: #b8873f;
+  --realmorphism-wall-critical: #7a2a2a;
+  --realmorphism-wall-critical-hover: #a83232;
 
   /* ── Plane 3: face (control top) ──────────────────────────────────────── */
   --realmorphism-face: #171c19;
@@ -38,6 +40,8 @@
   --realmorphism-face-active-border: #2f6b52;
   --realmorphism-face-amber: #1c1810;
   --realmorphism-face-amber-border: #6b5428;
+  --realmorphism-face-critical: #1c1010;
+  --realmorphism-face-critical-border: #6b2828;
 
   /* ── Ink on host (labels, body copy on bench) ─────────────────────────── */
   --realmorphism-ink-on-host: #9eada7;
@@ -47,15 +51,17 @@
   --realmorphism-ink-on-face: #e8efeb;
   --realmorphism-ink-on-face-active: #d6ffec;
   --realmorphism-ink-on-face-amber: #fde68a;
+  --realmorphism-ink-on-face-critical: #fecaca;
 
   /* Glyphs on realmorphism controls only */
   --realmorphism-glyph-rest: #d4dcd8;
   --realmorphism-glyph-hover: #a8b8ff;
-  --realmorphism-glyph-latched: #8fffc8;
+  --realmorphism-glyph-active: #8fffc8;
 
   /* ── Shared ink roles ─────────────────────────────────────────────────── */
   --realmorphism-ink-signal: #7dffb4;
   --realmorphism-ink-caution: #fcd34d;
+  --realmorphism-ink-critical: #fca5a5;
   --realmorphism-ink-disabled: #56605c;
 
   --realmorphism-inset: rgba(0, 0, 0, 0.52);
@@ -66,8 +72,12 @@
   --realmorphism-shadow-hover: 4px 4px 0 1px var(--realmorphism-wall-hover);
   --realmorphism-shadow-amber-rest: 2px 2px 0 1px var(--realmorphism-wall-amber);
   --realmorphism-shadow-amber-hover: 4px 4px 0 1px var(--realmorphism-wall-amber-hover);
+  --realmorphism-shadow-critical-rest: 2px 2px 0 1px var(--realmorphism-wall-critical);
+  --realmorphism-shadow-critical-hover: 4px 4px 0 1px var(--realmorphism-wall-critical-hover);
   --realmorphism-shadow-inset: inset 1px 1px 0 0 var(--realmorphism-inset);
   --realmorphism-shadow-inset-active: inset 1px 1px 0 0 var(--realmorphism-inset-active);
+  --realmorphism-field-shadow-cast: color-mix(in srgb, #1a201d 68%, var(--realmorphism-wall));
+  --realmorphism-shadow-inset-field: inset 2px 2px 0 1px var(--realmorphism-field-shadow-cast);
 
   /* Curve — matches realmorphism Button / realmorphism-button (0.5rem). */
   --realmorphism-radius: 0.5rem;
@@ -112,8 +122,8 @@
   color: var(--realmorphism-glyph-hover);
 }
 
-[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-glyph-latched {
-  color: var(--realmorphism-glyph-latched);
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-glyph-active {
+  color: var(--realmorphism-glyph-active);
 }
 
 /* Observe presence relay — localized panel morphology for L-18. */
@@ -242,8 +252,12 @@
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control:disabled {
+  border-color: color-mix(in srgb, var(--realmorphism-face-border) 72%, var(--realmorphism-host));
+  background: color-mix(in srgb, var(--realmorphism-face) 78%, var(--realmorphism-host));
   color: var(--realmorphism-ink-disabled);
-  opacity: 0.5;
+  box-shadow: none;
+  transform: translate(2px, 2px);
+  opacity: 1;
   cursor: not-allowed;
   pointer-events: none;
 }
@@ -264,7 +278,21 @@
   color: var(--realmorphism-ink-caution);
 }
 
-[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-latched {
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-critical {
+  border-color: var(--realmorphism-face-critical-border);
+  background-color: var(--realmorphism-face-critical);
+  color: var(--realmorphism-ink-on-face-critical);
+  box-shadow: var(--realmorphism-shadow-critical-rest);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-critical:hover:not(:disabled) {
+  box-shadow: var(--realmorphism-shadow-critical-hover);
+  color: var(--realmorphism-ink-critical);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[aria-pressed="true"],
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[data-state="on"],
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[data-state="checked"] {
   border-color: var(--realmorphism-face-active-border);
   background-color: var(--realmorphism-face-active);
   color: var(--realmorphism-ink-on-face-active);
@@ -272,13 +300,17 @@
   transform: translate(2px, 2px);
 }
 
-[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-latched:hover:not(:disabled) {
-  transform: translate(0, 0);
-  box-shadow: var(--realmorphism-shadow-hover);
-  color: var(--realmorphism-glyph-latched);
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[aria-pressed="true"]:hover:not(:disabled),
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[data-state="on"]:hover:not(:disabled),
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[data-state="checked"]:hover:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: var(--realmorphism-shadow-inset-active);
+  color: var(--realmorphism-ink-on-face-active);
 }
 
-[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.is-latched:active:not(:disabled) {
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[aria-pressed="true"]:active:not(:disabled),
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[data-state="on"]:active:not(:disabled),
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control[data-state="checked"]:active:not(:disabled) {
   transform: translate(4px, 4px);
   box-shadow: none;
 }
@@ -317,6 +349,37 @@
   color: #fecaca;
 }
 
+/* Raised bench panels — rest pose only; no hover/press motion. */
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-panel,
+[data-deck-mode="realmorphism"] .realmorphism-panel {
+  border-radius: var(--realmorphism-radius);
+  border: 1px solid var(--realmorphism-face-border);
+  background-color: var(--realmorphism-host-raised);
+  color: var(--realmorphism-ink-on-face);
+  box-shadow: var(--realmorphism-shadow-rest);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-field,
+[data-deck-mode="realmorphism"] .realmorphism-field {
+  display: block;
+  border: 0;
+  border-top: 1px solid var(--realmorphism-field-shadow-cast);
+  border-left: 1px solid var(--realmorphism-field-shadow-cast);
+  border-radius: var(--realmorphism-radius-sm);
+  background-color: var(--realmorphism-host);
+  color: var(--realmorphism-ink-on-face);
+  box-shadow: var(--realmorphism-shadow-inset-field);
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-field:focus-visible,
+[data-deck-mode="realmorphism"] .realmorphism-field:focus-visible {
+  border-top-color: var(--realmorphism-face-active-border);
+  border-left-color: var(--realmorphism-face-active-border);
+  outline: none;
+  box-shadow: var(--realmorphism-shadow-inset-field);
+}
+
 /* Controls outside [data-morphism="realmorphism"] (boot overlay, etc.) */
 
 [data-deck-mode="realmorphism"] .realmorphism-control:not(.is-menu) {
@@ -351,7 +414,7 @@
   cursor: not-allowed;
 }
 
-[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.size-tile.is-latched {
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-control.size-tile[aria-pressed="true"] {
   transform: translate(1px, 1px);
 }
 
@@ -384,8 +447,8 @@
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] button.realmorphism-switch[data-state="checked"]:hover {
-  transform: translate(0, 0);
-  box-shadow: var(--realmorphism-shadow-hover);
+  transform: translate(2px, 2px);
+  box-shadow: var(--realmorphism-shadow-inset-active);
 }
 
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] button.realmorphism-switch > span {

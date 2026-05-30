@@ -80,7 +80,7 @@ readyServer.on('error', (err) => {
     process.stderr.write(
       `[dev] port ${readyPort} already in use - a previous dev session is still running.\n` +
         `[dev] run: pnpm dev:stop\n` +
-        `[dev] or use: pnpm electron:dev:auto\n`,
+        `[dev] or use: pnpm electron:dev (auto-port) or pnpm dev:stop\n`,
     );
     process.exit(1);
   }

@@ -1,0 +1,2 @@
+# Optional — pyfiglet 400+ fonts for Glyph Channel (pip install -r requirements-glyph.txt)
+pyfiglet>=1.0.2

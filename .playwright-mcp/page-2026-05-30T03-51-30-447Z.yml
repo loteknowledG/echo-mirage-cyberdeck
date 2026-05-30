@@ -1,0 +1,14 @@
+- generic [ref=e4]:
+  - generic [ref=e5]: "[plugin:vite:import-analysis] Failed to resolve import \"react-dom/client\" from \"src/demo.tsx\". Does the file exist?"
+  - generic [ref=e6]: F:/dev/realmorphism/src/demo.tsx:2:27
+  - generic [ref=e7]: "1 | import * as React from \"react\"; 2 | import { createRoot } from \"react-dom/client\"; | ^ 3 | import { DemoLab } from \"./demo-lab.tsx\"; 4 | import { DemoShowroom } from \"./demo-showroom.tsx\";"
+  - generic [ref=e8]: at TransformPluginContext._formatLog (file:///F:/dev/realmorphism/node_modules/.pnpm/@voidzero-dev+vite-plus-cor_6566064d33351a4a54e6e0c7cdc3bd84/node_modules/@voidzero-dev/vite-plus-core/dist/vite/node/chunks/node.js:35915:39) at TransformPluginContext.error (file:///F:/dev/realmorphism/node_modules/.pnpm/@voidzero-dev+vite-plus-cor_6566064d33351a4a54e6e0c7cdc3bd84/node_modules/@voidzero-dev/vite-plus-core/dist/vite/node/chunks/node.js:35912:14) at normalizeUrl (file:///F:/dev/realmorphism/node_modules/.pnpm/@voidzero-dev+vite-plus-cor_6566064d33351a4a54e6e0c7cdc3bd84/node_modules/@voidzero-dev/vite-plus-core/dist/vite/node/chunks/node.js:33194:18) at async file:///F:/dev/realmorphism/node_modules/.pnpm/@voidzero-dev+vite-plus-cor_6566064d33351a4a54e6e0c7cdc3bd84/node_modules/@voidzero-dev/vite-plus-core/dist/vite/node/chunks/node.js:33257:30 at async Promise.all (index 1) at async TransformPluginContext.transform (file:///F:/dev/realmorphism/node_modules/.pnpm/@voidzero-dev+vite-plus-cor_6566064d33351a4a54e6e0c7cdc3bd84/node_modules/@voidzero-dev/vite-plus-core/dist/vite/node/chunks/node.js:33225:4) at async EnvironmentPluginContainer.transform (file:///F:/dev/realmorphism/node_modules/.pnpm/@voidzero-dev+vite-plus-cor_6566064d33351a4a54e6e0c7cdc3bd84/node_modules/@voidzero-dev/vite-plus-core/dist/vite/node/chunks/node.js:35704:14) at async loadAndTransform (file:///F:/dev/realmorphism/node_modules/.pnpm/@voidzero-dev+vite-plus-cor_6566064d33351a4a54e6e0c7cdc3bd84/node_modules/@voidzero-dev/vite-plus-core/dist/vite/node/chunks/node.js:30029:26)
+  - generic [ref=e9]:
+    - text: Click outside, press Esc key, or fix the code to dismiss.
+    - text: You can also disable this overlay by setting
+    - code [ref=e10]: server.hmr.overlay
+    - text: to
+    - code [ref=e11]: "false"
+    - text: in
+    - code [ref=e12]: vite.config.ts
+    - text: .

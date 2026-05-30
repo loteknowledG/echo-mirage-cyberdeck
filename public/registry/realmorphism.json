@@ -24,6 +24,7 @@
       "realmorphism-face-active-border": "#2f6b52",
       "realmorphism-ink-on-face": "#e8efeb",
       "realmorphism-ink-on-face-active": "#d6ffec",
+      "realmorphism-ink-disabled": "#56605c",
       "realmorphism-glyph-hover": "#a8b8ff",
       "realmorphism-shadow-rest": "2px 2px 0 1px var(--realmorphism-wall)",
       "realmorphism-shadow-hover": "4px 4px 0 1px var(--realmorphism-wall-hover)",
@@ -61,7 +62,8 @@
       "sidebar-accent": "150 10% 10%",
       "sidebar-accent-foreground": "150 18% 92%",
       "sidebar-border": "150 12% 19%",
-      "sidebar-ring": "161 43% 40%"
+      "sidebar-ring": "161 43% 40%",
+      "realmorphism-ink-disabled": "#8a9690"
     },
     "dark": {
       "background": "0 0% 3%",
@@ -130,7 +132,23 @@
         "border-color": "var(--realmorphism-face-active-border)",
         "background": "var(--realmorphism-face-active)",
         "color": "var(--realmorphism-ink-on-face-active)",
-        "box-shadow": "var(--realmorphism-shadow-rest), var(--realmorphism-shadow-inset-active)"
+        "transform": "translate(2px, 2px)",
+        "box-shadow": "var(--realmorphism-shadow-inset-active)"
+      },
+      ".theme-realmorphism .realmorphism-action[aria-pressed=\"true\"]:hover:not(:disabled), .theme-realmorphism .realmorphism-action[data-state=\"checked\"]:hover:not(:disabled)": {
+        "transform": "translate(2px, 2px)",
+        "box-shadow": "var(--realmorphism-shadow-inset-active)",
+        "color": "var(--realmorphism-ink-on-face-active)"
+      },
+      ".theme-realmorphism .realmorphism-action:disabled, .theme-realmorphism .realmorphism-control:disabled": {
+        "border-color": "color-mix(in srgb, var(--realmorphism-face-border) 72%, var(--realmorphism-host))",
+        "background": "color-mix(in srgb, var(--realmorphism-face) 78%, var(--realmorphism-host))",
+        "color": "var(--realmorphism-ink-disabled)",
+        "box-shadow": "none",
+        "transform": "translate(2px, 2px)",
+        "opacity": "1",
+        "cursor": "not-allowed",
+        "pointer-events": "none"
       }
     },
     "@media (prefers-reduced-motion: reduce)": {
@@ -141,6 +159,7 @@
   },
   "meta": {
     "doctrine": "The motion is the affordance. Hard-offset shadows and press states communicate that action is available.",
-    "installNote": "Apply the theme class `theme-realmorphism` to the app root and add `realmorphism-action` to tactile controls."
+    "installNote": "Apply the theme class `theme-realmorphism` to the app root and add `realmorphism-action` to tactile controls.",
+    "disabledNote": "Disabled controls use `--realmorphism-ink-disabled`, stay flat on the surface, and do not lift on hover."
   }
 }

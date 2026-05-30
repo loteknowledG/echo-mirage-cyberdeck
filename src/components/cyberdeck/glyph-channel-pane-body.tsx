@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { GlyphEnginePicker } from "@/components/cyberdeck/glyph-engine-picker";
 import { FigletFontPicker } from "@/components/cyberdeck/figlet-font-picker";
+import { OnelineArtPicker } from "@/components/cyberdeck/oneline-art-picker";
 import {
   CyberdeckControlTooltip,
   CyberdeckPaneTooltipProvider,
@@ -38,6 +39,9 @@ import {
   GLYPH_PANE_MODE_UPDATE_EVENT,
   mergeGlyphChannelContent,
   writeGlyphPaneSettings,
+  defaultGlyphChannelMerge,
+  glyphEngineStatusLabel,
+  glyphEngineUsesFigletFont,
   type GlyphPaneEngine,
   type GlyphPaneSettings,
   normalizeGlyphChannelText,
@@ -294,7 +298,8 @@ export function CyberdeckGlyphChannelPaneBody() {
           : null;
 
       const figletFont = options?.font?.trim() || settings.figletFont;
-      if (engine === "figlet" && options?.font?.trim()) {
+      const usesFigletFont = glyphEngineUsesFigletFont(engine);
+      if (usesFigletFont && options?.font?.trim()) {
         setSettings((prev) => {
           const next = { ...prev, figletFont: options.font!.trim() };
           writeGlyphPaneSettings(next);
@@ -306,18 +311,20 @@ export function CyberdeckGlyphChannelPaneBody() {
       setStatusLine(
         engine === "figlet" && isFigletAllFonts(figletFont)
           ? "⟁ RENDERING // ALL FONTS"
-          : `⟁ RENDERING // ${engine.toUpperCase()}`,
+          : `⟁ RENDERING // ${glyphEngineStatusLabel(engine)}`,
       );
       try {
         const output = await renderGlyphOutput({
           engine,
           text: payload,
-          font: engine === "figlet" ? figletFont : undefined,
+          font: usesFigletFont ? figletFont : undefined,
           decorate: options?.decorate ?? !editSelection,
         });
         const normalizedOutput = normalizeGlyphChannelText(output);
         let merged: string;
         let caretAfter: number | null = null;
+        const mergeMode =
+          options?.merge ?? defaultGlyphChannelMerge(Boolean(text.trim()));
 
         if (editSelection) {
           merged = insertGlyphChannelTextAt(
@@ -328,20 +335,24 @@ export function CyberdeckGlyphChannelPaneBody() {
           );
           caretAfter = editSelection.start + normalizedOutput.length;
         } else {
-          const mergeMode =
-            options?.merge ?? (engine === "figlet" && text.trim() ? "append" : "replace");
           merged = mergeGlyphChannelContent(text, normalizedOutput, mergeMode);
         }
 
         applyOutput(merged);
-        if (engine === "figlet" && !editSelection) scrollFigletAfterTextRef.current = true;
+        if (!editSelection && mergeMode === "append") {
+          scrollFigletAfterTextRef.current = true;
+        }
         setSettings((prev) => ({ ...prev, engine }));
+        const preview = payload.replace(/\s+/g, " ").trim().slice(0, 32);
+        const previewSuffix = preview.length < payload.trim().length ? "…" : "";
         setStatusLine(
           engine === "figlet"
             ? isFigletAllFonts(figletFont)
-              ? `⟁ FIGLET // ALL // ${payload.slice(0, 32)}${payload.length > 32 ? "…" : ""}`
-              : `⟁ FIGLET // ${figletFont} // ${payload.slice(0, 32)}${payload.length > 32 ? "…" : ""}`
-            : `⟁ ${engine.toUpperCase()} // OK`,
+              ? `⟁ FIGLET // ALL // ${preview}${previewSuffix}`
+              : `⟁ FIGLET // ${figletFont} // ${preview}${previewSuffix}`
+            : engine === "oneline"
+              ? `⟁ 1 LINE ASCII // ${preview}${previewSuffix}`
+              : `⟁ TEXT // OK`,
         );
 
         requestAnimationFrame(() => {
@@ -508,10 +519,10 @@ export function CyberdeckGlyphChannelPaneBody() {
                 type="button"
                 onClick={() => setPaneModeWithFocus("view")}
                 aria-label="View mode"
+                aria-pressed={paneMode === "view"}
                 className={realmorphismControlClass(deckMode, {
                   size: "toolbar",
-                  latched: paneMode === "view",
-                  signal: true,
+                  signal: paneMode === "view",
                   legacyClassName: `${HEADER_ICON_BTN} ${
                     paneMode === "view" ? "border-emerald-500/60 text-emerald-200" : ""
                   }`,
@@ -535,10 +546,10 @@ export function CyberdeckGlyphChannelPaneBody() {
                 type="button"
                 onClick={() => setPaneModeWithFocus("edit")}
                 aria-label="Edit mode"
+                aria-pressed={paneMode === "edit"}
                 className={realmorphismControlClass(deckMode, {
                   size: "toolbar",
-                  latched: paneMode === "edit",
-                  signal: true,
+                  signal: paneMode === "edit",
                   legacyClassName: `${HEADER_ICON_BTN} ${
                     paneMode === "edit" ? "border-emerald-500/60 text-emerald-200" : ""
                   }`,
@@ -682,7 +693,7 @@ export function CyberdeckGlyphChannelPaneBody() {
 
         <footer className="cyberdeck-message-box w-full min-w-0 max-w-full shrink-0 bg-black p-0">
           <div className="glyph-channel-composer rounded-sm border border-green-900/70 bg-black transition-colors focus-within:border-green-500/80 focus-within:shadow-[0_0_0_1px_rgba(34,197,94,0.45)_inset]">
-            <div className="relative flex min-w-0 items-center px-2 py-1.5">
+            <div className="glyph-channel-composer__input-band relative flex min-w-0 items-center px-2 py-1.5">
               <span className="pointer-events-none absolute left-3 z-10 text-lg font-bold text-green-500">
                 $
               </span>
@@ -736,8 +747,8 @@ export function CyberdeckGlyphChannelPaneBody() {
             </div>
 
             <div className="min-w-0 border-t border-[#1a1a1a]">
-              <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 px-2 py-2">
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 overflow-visible px-2 py-2">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 overflow-visible">
                   <GlyphEnginePicker
                     value={settings.engine}
                     onChange={(engine) => {
@@ -745,13 +756,26 @@ export function CyberdeckGlyphChannelPaneBody() {
                       focusComposer();
                     }}
                   />
-                  <FigletFontPicker
-                    value={settings.figletFont}
-                    onChange={(figletFont) =>
-                      setSettings((prev) => ({ ...prev, figletFont }))
-                    }
-                    onWheelSettled={focusComposer}
-                  />
+                  {settings.engine === "figlet" ? (
+                    <FigletFontPicker
+                      value={settings.figletFont}
+                      onChange={(figletFont) =>
+                        setSettings((prev) => ({ ...prev, figletFont }))
+                      }
+                      onWheelSettled={focusComposer}
+                    />
+                  ) : null}
+                  {settings.engine === "oneline" ? (
+                    <OnelineArtPicker
+                      value={composer}
+                      onChange={(art) => {
+                        setComposer(art);
+                        setCaretIndex(art.length);
+                        focusComposer();
+                      }}
+                      onWheelSettled={focusComposer}
+                    />
+                  ) : null}
                   <CyberdeckControlTooltip label="Decrease display zoom">
                     <button
                       type="button"
@@ -822,7 +846,7 @@ export function CyberdeckGlyphChannelPaneBody() {
               </div>
 
               <p
-                className={`truncate px-2 pb-1 pt-0.5 font-mono text-[10px] leading-none ${
+                className={`min-h-[1.125rem] truncate px-2 pb-2 pt-1 font-mono text-[10px] leading-normal ${
                   rendering ? "text-amber-300" : "text-green-300"
                 }`}
                 title={statusLine}

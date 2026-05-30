@@ -4,12 +4,20 @@ import { listFigletFonts, resolveFigletFontName } from "@/lib/figlet-fonts.serve
 
 const ALL_FONTS_BATCH_SIZE = 16;
 export type GlyphRenderRequest = {
-  engine: "ascii" | "figlet";
+  engine: "ascii" | "figlet" | "oneline";
   text: string;
   font?: string;
   /** When false, return raw body only (no channel header / divider). Default true. */
   decorate?: boolean;
 };
+
+function collapseToSingleLine(text: string): string {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(" ");
+}
 
 function formatGlyphOutput(header: string, body: string): string {
   const divider = "─".repeat(Math.min(56, Math.max(header.length + 8, 36)));
@@ -59,8 +67,15 @@ export async function renderGlyph(request: GlyphRenderRequest): Promise<string> 
     return formatGlyphOutput(`⟁ FIGLET // ${fontName}`, banner);
   }
 
+  if (request.engine === "oneline") {
+    const line = collapseToSingleLine(text);
+    if (!line) return "⟁ // EMPTY SIGNAL";
+    if (!decorate) return line;
+    return formatGlyphOutput("⟁ 1 LINE ASCII", `⟁ ${line}`);
+  }
+
   if (!decorate) return text;
 
   const lines = text.split("\n").map((line) => `⟁ ${line}`);
-  return formatGlyphOutput("⟁ ASCII SIGNAL", lines.join("\n"));
+  return formatGlyphOutput("⟁ TEXT SIGNAL", lines.join("\n"));
 }

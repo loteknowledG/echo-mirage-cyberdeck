@@ -1099,7 +1099,7 @@ export default function CyberdeckApp() {
 
   const renderGlyphToChannel = useCallback(
     async (options: {
-      engine: "ascii" | "figlet";
+      engine: "ascii" | "figlet" | "oneline";
       text: string;
       font?: string;
       merge?: "append" | "replace";
@@ -1108,7 +1108,8 @@ export default function CyberdeckApp() {
       const { engine, text, font, merge, decorate } = options;
       const paneSettings = readGlyphPaneSettings();
       const figletFont = font?.trim() || paneSettings.figletFont;
-      if (engine === "figlet" && font?.trim()) {
+      const usesFigletFont = engine === "figlet";
+      if (usesFigletFont && font?.trim()) {
         writeGlyphPaneSettings({ ...paneSettings, figletFont: font.trim() });
       }
 
@@ -1116,11 +1117,12 @@ export default function CyberdeckApp() {
       const output = await renderGlyphOutput({
         engine,
         text,
-        font: engine === "figlet" ? figletFont : undefined,
+        font: usesFigletFont ? figletFont : undefined,
         decorate,
       });
       const mergeMode =
-        merge ?? (engine === "figlet" && existing.trim() ? "append" : "replace");
+        merge ??
+        (existing.trim() ? "append" : "replace");
       const merged = mergeGlyphChannelContent(existing, output, mergeMode);
       await setGlyphChannelContent(merged, {
         scrollToBottom: mergeMode === "append",
@@ -6876,6 +6878,7 @@ const resolved = resolveUiTarget(userMessage);
                       type="button"
                       onClick={toggleVoiceEnabled}
                       aria-label={voiceEnabled ? "Voice on" : "Voice off"}
+                      aria-pressed={voiceEnabled && voiceHealth === "backend"}
                       className={voiceControlClass(deckMode, voiceEnabled, voiceHealth)}
                     >
                       {voiceEnabled ? (
@@ -7018,10 +7021,10 @@ const resolved = resolveUiTarget(userMessage);
                         type="button"
                         onClick={handleStop}
                         aria-label="Stop"
+                        aria-pressed
                         className={realmorphismControlClass(deckMode, {
                           size: "icon",
                           amber: true,
-                          latched: true,
                           legacyClassName: LEGACY_STOP_CONTROL,
                         })}
                       >

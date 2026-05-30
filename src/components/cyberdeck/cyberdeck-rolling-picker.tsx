@@ -11,35 +11,25 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CYBERDECK_PANE_TOOLTIP_CLASS } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
+import { applyIosPickerSlideStyles, findClosestSnapIndex } from "@/lib/embla-ios-picker-loop";
+import floatWheelStyles from "@/components/cyberdeck/float-wheel-picker.module.css";
 
 const SNAP_ALIGN_THRESHOLD_PX = 0.5;
 const SNAP_TOOLTIP_VISIBLE_MS = 1400;
 const WHEEL_DELTA_TRIGGER_PX = 4;
+const WHEEL_DELTA_PER_EXTRA_STEP_PX = 100;
+const WHEEL_MAX_STEPS_PER_TICK = 3;
+/** Scale wheel deltaY into Embla scroll distance (dragFree momentum). */
+const WHEEL_MOMENTUM_GAIN = 0.52;
+const WHEEL_MOMENTUM_FRICTION = 0.5;
+const WHEEL_MOMENTUM_DURATION = 30;
 
 export type CyberdeckRollingPickerItem = {
   value: string;
   label: string;
   slide: ReactNode;
-  /** Shown while dragging or scrolling; defaults to `label`. */
   labelSlide?: ReactNode;
 };
-
-function findClosestSnapIndex(emblaApi: EmblaCarouselType): number {
-  const { scrollSnaps, location } = emblaApi.internalEngine();
-  const current = location.get();
-  let closestIndex = 0;
-  let minDistance = Number.POSITIVE_INFINITY;
-
-  scrollSnaps.forEach((snap, index) => {
-    const distance = Math.abs(snap - current);
-    if (distance < minDistance) {
-      minDistance = distance;
-      closestIndex = index;
-    }
-  });
-
-  return closestIndex;
-}
 
 function snapOffsetPx(emblaApi: EmblaCarouselType, index: number): number {
   const { scrollSnaps, location } = emblaApi.internalEngine();
@@ -50,18 +40,31 @@ export type CyberdeckRollingPickerProps = {
   items: CyberdeckRollingPickerItem[];
   value: string;
   onChange: (value: string) => void;
-  /** Fires when the user finishes a drag/wheel gesture on a settled slide. */
   onUserSelect?: (value: string) => void;
   ariaLabel: string;
-  /** Viewport around one slide (default: 7×7 icon cell). */
   viewportClassName?: string;
-  /** Icon when settled; text (or `labelSlide`) while drag / wheel scroll. */
   showTextWhileScrolling?: boolean;
-  /** Keep label visible and viewport expanded when idle (not only while scrolling). */
   alwaysShowLabel?: boolean;
+  /** Same rotary always; neighbor opacity on while moving, off when snapped. */
+  wheelExpandOnScroll?: boolean;
+  /** See-through wheel band while spinning (glyph toolbar over status / composer). */
+  wheelTransparent?: boolean;
+  wheelNeighborCount?: number;
+  slideHeightPx?: number;
+  /** Minimum items to move per wheel tick (larger = faster for long lists). */
+  wheelScrollStep?: number;
+  /** Flick-style coast on wheel (uses Embla dragFree physics). Default on with `wheelExpandOnScroll`. */
+  wheelMomentum?: boolean;
+  /** While spinning show `label`; when snapped show `slide` (e.g. asky title → ascii). */
+  wheelSettledShowsSlide?: boolean;
   tooltipSide?: "top" | "right" | "bottom" | "left";
   showTooltipOnSnap?: boolean;
 };
+
+function wheelStepsFromDelta(deltaY: number, baseStep: number): number {
+  const extra = Math.floor(Math.abs(deltaY) / WHEEL_DELTA_PER_EXTRA_STEP_PX);
+  return Math.min(WHEEL_MAX_STEPS_PER_TICK, baseStep + extra);
+}
 
 function normalizeIndex(index: number, count: number): number {
   if (count <= 0) return 0;
@@ -73,7 +76,6 @@ function indexForValue(items: CyberdeckRollingPickerItem[], target: string): num
   return idx >= 0 ? idx : 0;
 }
 
-/** Compact Y-axis Embla picker — one slide visible, looped, dragFree with snap-to-center. */
 export function CyberdeckRollingPicker({
   items,
   value,
@@ -83,9 +85,17 @@ export function CyberdeckRollingPicker({
   viewportClassName = "h-7 w-7",
   showTextWhileScrolling = true,
   alwaysShowLabel = false,
+  wheelExpandOnScroll = false,
+  wheelTransparent = false,
+  wheelNeighborCount = 3,
+  slideHeightPx = 28,
+  wheelScrollStep = 1,
+  wheelMomentum,
+  wheelSettledShowsSlide = false,
   tooltipSide = "top",
   showTooltipOnSnap = true,
 }: CyberdeckRollingPickerProps) {
+  const useWheelMomentum = wheelMomentum ?? wheelExpandOnScroll;
   const valueRef = useRef(value);
   valueRef.current = value;
 
@@ -100,22 +110,68 @@ export function CyberdeckRollingPicker({
 
   const isProgrammaticScrollRef = useRef(false);
   const itemsLengthRef = useRef(items.length);
+  const neighborsVisibleRef = useRef(false);
+  const [showLabels, setShowLabels] = useState(false);
+  const [wheelSettled, setWheelSettled] = useState(true);
+  const [centerIndex, setCenterIndex] = useState(0);
 
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const [tooltipLabel, setTooltipLabel] = useState("");
-  const [showLabels, setShowLabels] = useState(false);
-  const showLabelsRef = useRef(false);
   const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userDraggedRef = useRef(false);
 
-  const setScrollingLabels = useCallback((active: boolean) => {
-    showLabelsRef.current = active;
-    setShowLabels(active);
-    if (active && tooltipTimerRef.current) {
-      clearTimeout(tooltipTimerRef.current);
-      tooltipTimerRef.current = null;
-      setTooltipOpen(false);
-    }
+  const maxNeighborSteps = Math.max(0, Math.floor((wheelNeighborCount - 1) / 2));
+  const expandedWheelHeightPx = slideHeightPx * wheelNeighborCount;
+
+  const hideNeighborPreviews = useCallback((embla: EmblaCarouselType) => {
+    neighborsVisibleRef.current = false;
+    setWheelSettled(true);
+    const center = findClosestSnapIndex(embla);
+    setCenterIndex(center);
+    embla.slideNodes().forEach((node, index) => {
+      const inner = node.querySelector<HTMLElement>("[data-ios-picker-inner]");
+      const target = inner ?? node;
+      if (index === center) {
+        target.style.opacity = "1";
+        target.style.transform = "";
+        target.style.pointerEvents = "";
+      } else {
+        target.style.opacity = "0";
+        target.style.transform = "scale(1)";
+        target.style.pointerEvents = "none";
+      }
+    });
+  }, []);
+
+  const showNeighborPreviews = useCallback(
+    (embla: EmblaCarouselType, eventName?: string) => {
+      neighborsVisibleRef.current = true;
+      setWheelSettled(false);
+      applyIosPickerSlideStyles(embla, eventName, {
+        compact: true,
+        rolodex: false,
+        itemSizePx: slideHeightPx,
+        maxNeighborSteps,
+      });
+      setCenterIndex(findClosestSnapIndex(embla));
+    },
+    [slideHeightPx, maxNeighborSteps],
+  );
+
+  const endProgrammaticScroll = useCallback((embla: EmblaCarouselType) => {
+    isProgrammaticScrollRef.current = false;
+  }, []);
+
+  const wheelScrollStepRef = useRef(wheelScrollStep);
+  wheelScrollStepRef.current = wheelScrollStep;
+  const useWheelMomentumRef = useRef(useWheelMomentum);
+  useWheelMomentumRef.current = useWheelMomentum;
+
+  const applyWheelMomentum = useCallback((embla: EmblaCarouselType, deltaY: number) => {
+    const engine = embla.internalEngine();
+    engine.scrollBody.useFriction(WHEEL_MOMENTUM_FRICTION).useDuration(WHEEL_MOMENTUM_DURATION);
+    engine.animation.start();
+    engine.scrollTo.distance(deltaY * WHEEL_MOMENTUM_GAIN, false);
   }, []);
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
@@ -124,7 +180,7 @@ export function CyberdeckRollingPicker({
     align: "center",
     containScroll: false,
     dragFree: true,
-    duration: 20,
+    duration: wheelExpandOnScroll ? 14 : 20,
   });
 
   const commitSelection = useCallback((embla: EmblaCarouselType) => {
@@ -147,7 +203,7 @@ export function CyberdeckRollingPicker({
   }, []);
 
   const showSnapTooltip = useCallback((embla: EmblaCarouselType) => {
-    if (!showTooltipOnSnap || showLabelsRef.current) return;
+    if (!showTooltipOnSnap || neighborsVisibleRef.current) return;
     const closest = findClosestSnapIndex(embla);
     if (snapOffsetPx(embla, closest) > SNAP_ALIGN_THRESHOLD_PX) return;
 
@@ -171,6 +227,11 @@ export function CyberdeckRollingPicker({
   }, []);
 
   useEffect(() => {
+    if (!emblaApi || !wheelExpandOnScroll) return;
+    hideNeighborPreviews(emblaApi);
+  }, [emblaApi, wheelExpandOnScroll, hideNeighborPreviews, items.length]);
+
+  useEffect(() => {
     if (!emblaApi) return;
 
     const onSelect = () => {
@@ -182,34 +243,55 @@ export function CyberdeckRollingPicker({
 
     const onPointerDown = () => {
       userDraggedRef.current = true;
-      if (showTextWhileScrolling) setScrollingLabels(true);
+      if (wheelExpandOnScroll) {
+        showNeighborPreviews(emblaApi, "scroll");
+      } else if (showTextWhileScrolling) {
+        setShowLabels(true);
+      }
     };
 
     const onWheel = (event: WheelEvent) => {
-      if (isProgrammaticScrollRef.current) return;
       if (itemsRef.current.length <= 1) return;
       if (Math.abs(event.deltaY) < WHEEL_DELTA_TRIGGER_PX) return;
 
       event.preventDefault();
       event.stopPropagation();
       userDraggedRef.current = true;
-      if (showTextWhileScrolling) setScrollingLabels(true);
+
+      if (wheelExpandOnScroll) {
+        showNeighborPreviews(emblaApi, "scroll");
+      }
+
+      if (useWheelMomentumRef.current) {
+        applyWheelMomentum(emblaApi, event.deltaY);
+        return;
+      }
 
       const direction = event.deltaY > 0 ? 1 : -1;
+      const steps = wheelStepsFromDelta(event.deltaY, wheelScrollStepRef.current);
       const currentIndex = findClosestSnapIndex(emblaApi);
-      const nextIndex = normalizeIndex(currentIndex + direction, itemsRef.current.length);
+      const nextIndex = normalizeIndex(
+        currentIndex + direction * steps,
+        itemsRef.current.length,
+      );
       isProgrammaticScrollRef.current = true;
       emblaApi.scrollTo(nextIndex);
     };
 
     const onSettle = () => {
-      isProgrammaticScrollRef.current = false;
+      endProgrammaticScroll(emblaApi);
+
       const stillCentering = ensureSnappedToCenter(emblaApi);
       if (stillCentering) return;
 
       commitSelection(emblaApi);
 
-      if (showTextWhileScrolling) setScrollingLabels(false);
+      if (wheelExpandOnScroll) {
+        hideNeighborPreviews(emblaApi);
+      } else {
+        setShowLabels(false);
+      }
+
       const dragged = userDraggedRef.current;
       userDraggedRef.current = false;
       if (dragged) {
@@ -218,17 +300,20 @@ export function CyberdeckRollingPicker({
         if (entry) {
           onUserSelectRef.current?.(entry.value);
         }
-        showSnapTooltip(emblaApi);
+        if (!wheelExpandOnScroll) showSnapTooltip(emblaApi);
       }
     };
 
     const onScroll = () => {
       const engine = emblaApi.internalEngine();
-      if (showTextWhileScrolling && !isProgrammaticScrollRef.current && !engine.scrollBody.settled()) {
-        setScrollingLabels(true);
+      if (wheelExpandOnScroll && !engine.scrollBody.settled()) {
+        showNeighborPreviews(emblaApi, "scroll");
       }
       if (engine.dragHandler.pointerDown()) return;
       if (!engine.scrollBody.settled()) return;
+      if (useWheelMomentumRef.current) {
+        showNeighborPreviews(emblaApi, "scroll");
+      }
       ensureSnappedToCenter(emblaApi);
     };
 
@@ -245,7 +330,18 @@ export function CyberdeckRollingPicker({
       emblaApi.off("scroll", onScroll);
       emblaApi.rootNode().removeEventListener("wheel", onWheel);
     };
-  }, [emblaApi, commitSelection, ensureSnappedToCenter, setScrollingLabels, showSnapTooltip, showTextWhileScrolling]);
+  }, [
+    emblaApi,
+    applyWheelMomentum,
+    commitSelection,
+    endProgrammaticScroll,
+    ensureSnappedToCenter,
+    hideNeighborPreviews,
+    showNeighborPreviews,
+    showSnapTooltip,
+    showTextWhileScrolling,
+    wheelExpandOnScroll,
+  ]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -254,36 +350,64 @@ export function CyberdeckRollingPicker({
     isProgrammaticScrollRef.current = true;
     emblaApi.reInit();
     emblaApi.scrollTo(indexForValue(itemsRef.current, valueRef.current), true);
-  }, [emblaApi, items.length]);
+    const onDone = () => {
+      endProgrammaticScroll(emblaApi);
+      if (wheelExpandOnScroll) hideNeighborPreviews(emblaApi);
+      emblaApi.off("settle", onDone);
+    };
+    emblaApi.on("settle", onDone);
+  }, [emblaApi, items.length, wheelExpandOnScroll, hideNeighborPreviews, endProgrammaticScroll]);
 
   useEffect(() => {
-    if (!emblaApi || items.length === 0) return;
+    if (!emblaApi || items.length === 0 || wheelExpandOnScroll) return;
     const index = indexForValue(items, value);
     if (emblaApi.selectedScrollSnap() === index) return;
     isProgrammaticScrollRef.current = true;
     emblaApi.scrollTo(index, true);
-  }, [emblaApi, items.length, value]);
+  }, [emblaApi, items.length, value, wheelExpandOnScroll]);
 
-  const activeItem =
-    items.find((item) => item.value === value) ?? items[0];
+  useEffect(() => {
+    if (!emblaApi || !wheelExpandOnScroll || items.length === 0) return;
+    if (neighborsVisibleRef.current) return;
+    const index = indexForValue(items, value);
+    if (findClosestSnapIndex(emblaApi) === index) return;
+    isProgrammaticScrollRef.current = true;
+    emblaApi.scrollTo(index, true);
+    const onDone = () => {
+      endProgrammaticScroll(emblaApi);
+      hideNeighborPreviews(emblaApi);
+      emblaApi.off("settle", onDone);
+    };
+    emblaApi.on("settle", onDone);
+  }, [emblaApi, items.length, value, wheelExpandOnScroll, hideNeighborPreviews, endProgrammaticScroll]);
+
+  const activeItem = items.find((item) => item.value === value) ?? items[0];
   const tooltipText = tooltipLabel || activeItem?.label || "";
-  const useLabelSlides = alwaysShowLabel || (showTextWhileScrolling && showLabels);
+  const useLabelSlides = wheelSettledShowsSlide
+    ? !wheelSettled
+    : alwaysShowLabel || (showTextWhileScrolling && showLabels) || wheelExpandOnScroll;
   const shouldRenderTooltip = showTooltipOnSnap && Boolean(tooltipText);
 
+  const renderLabelSlide = (item: CyberdeckRollingPickerItem, isActive: boolean) =>
+    item.labelSlide ?? (
+      <span
+        className={cn(
+          "block max-w-full truncate px-1 font-mono text-[8px] leading-none tracking-[0.04em]",
+          isActive ? "text-emerald-200" : "text-[#b8c4be]",
+          wheelTransparent &&
+            "drop-shadow-[0_0_4px_rgba(0,0,0,1)] drop-shadow-[0_1px_2px_rgba(0,0,0,1)]",
+        )}
+      >
+        {item.label}
+      </span>
+    );
+
   const renderSlideContent = (item: CyberdeckRollingPickerItem, isActive: boolean) => {
+    if (wheelSettledShowsSlide && wheelExpandOnScroll && wheelSettled && isActive) {
+      return item.slide ?? renderLabelSlide(item, true);
+    }
     if (useLabelSlides) {
-      return (
-        item.labelSlide ?? (
-          <span
-            className={cn(
-              "block max-w-full truncate px-1 font-mono text-[8px] leading-none tracking-[0.04em]",
-              isActive ? "text-emerald-200" : "text-[#8a8a8a]",
-            )}
-          >
-            {item.label}
-          </span>
-        )
-      );
+      return renderLabelSlide(item, isActive);
     }
     return item.slide;
   };
@@ -298,7 +422,50 @@ export function CyberdeckRollingPicker({
     );
   }
 
-  const viewport = (
+  const viewport = wheelExpandOnScroll ? (
+    <div
+      className={cn(
+        floatWheelStyles.panel,
+        floatWheelStyles.inline,
+        floatWheelStyles.spinningHost,
+        wheelTransparent && floatWheelStyles.panelTransparent,
+        "min-w-[5.25rem] max-w-[10rem] shrink-0 touch-pan-y",
+      )}
+      style={{ ["--float-wheel-row-px" as string]: `${slideHeightPx}px` }}
+      aria-label={ariaLabel}
+    >
+      <div
+        className={cn(
+          floatWheelStyles.wheelStage,
+          floatWheelStyles.spinning,
+          wheelTransparent && floatWheelStyles.wheelStageTransparent,
+        )}
+        style={{ height: expandedWheelHeightPx }}
+      >
+        <div ref={emblaRef} className={floatWheelStyles.viewport}>
+          <div className="flex h-full flex-col">
+            {items.map((item, index) => {
+              const isCenter = index === centerIndex;
+              return (
+                <div
+                  key={item.value}
+                  className="flex min-h-0 shrink-0 items-center justify-center px-0.5"
+                  style={{ flex: `0 0 ${slideHeightPx}px`, height: slideHeightPx }}
+                >
+                  <div
+                    data-ios-picker-inner
+                    className="flex w-full min-w-0 items-center justify-center will-change-[transform,opacity]"
+                  >
+                    {renderSlideContent(item, isCenter)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : (
     <div
       ref={emblaRef}
       className={cn(
@@ -314,7 +481,7 @@ export function CyberdeckRollingPicker({
           return (
             <div
               key={item.value}
-              className="flex min-h-0 flex-[0_0_100%] items-center justify-center px-0.5"
+              className="flex min-h-0 flex-[0_0_100%] shrink-0 items-center justify-center px-0.5"
             >
               <div
                 className={
@@ -337,8 +504,12 @@ export function CyberdeckRollingPicker({
   return (
     <TooltipProvider delayDuration={300}>
       <div
-        className="flex shrink-0 flex-col items-center rounded border border-[#2d2d2d] bg-black"
-        aria-label={ariaLabel}
+        className={cn(
+          "flex shrink-0 flex-col items-stretch",
+          wheelExpandOnScroll && "overflow-visible",
+          !wheelExpandOnScroll && "rounded border border-[#2d2d2d] bg-black",
+        )}
+        aria-label={wheelExpandOnScroll ? undefined : ariaLabel}
       >
         {shouldRenderTooltip ? (
           <Tooltip open={tooltipOpen} onOpenChange={setTooltipOpen}>

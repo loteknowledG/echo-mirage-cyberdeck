@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import { CyberdeckRollingPicker } from "@/components/cyberdeck/cyberdeck-rolling-picker";
-import { DEFAULT_FIGLET_FONT, FIGLET_FONT_ALL, isFigletAllFonts } from "@/lib/figlet-fonts";
+import { useEffect, useMemo, useState } from 'react';
+import { CyberdeckRollingPicker } from '@/components/cyberdeck/cyberdeck-rolling-picker';
+import { DEFAULT_FIGLET_FONT, FIGLET_FONT_ALL, isFigletAllFonts } from '@/lib/figlet-fonts';
 
 type FigletFontPickerProps = {
   value: string;
@@ -11,31 +11,53 @@ type FigletFontPickerProps = {
   onWheelSettled?: () => void;
 };
 
-/** Figlet font rolodex — same Y-axis picker as operator document type. */
+/** Compact Y-axis font rolodex — snaps to center on stop (operator doc-type picker pattern). */
 export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFontPickerProps) {
   const [fonts, setFonts] = useState<string[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
+
+    const applyFonts = (names: string[], error: string | null) => {
+      if (!mounted) return;
+      if (names.length > 0) {
+        setFonts(names);
+        setLoadError(error);
+        return;
+      }
+      setFonts([DEFAULT_FIGLET_FONT]);
+      setLoadError(error ?? 'Font list unavailable');
+    };
+
     (async () => {
       try {
-        const res = await fetch("/api/glyph/fonts");
+        const res = await fetch('/api/glyph/fonts');
         const payload = (await res.json()) as { ok?: boolean; fonts?: string[]; error?: string };
-        if (!mounted) return;
-        if (!payload.ok || !Array.isArray(payload.fonts)) {
-          setLoadError(payload.error || "Font list unavailable");
-          setFonts([DEFAULT_FIGLET_FONT]);
+        if (payload.ok && Array.isArray(payload.fonts) && payload.fonts.length > 0) {
+          applyFonts(payload.fonts, null);
           return;
         }
-        setFonts(payload.fonts);
-        setLoadError(null);
-      } catch (err) {
-        if (!mounted) return;
-        setLoadError(err instanceof Error ? err.message : "Font list failed");
-        setFonts([DEFAULT_FIGLET_FONT]);
+      } catch {
+        /* try static manifest */
       }
+
+      try {
+        const res = await fetch('/glyph/figlet-fonts.json');
+        if (res.ok) {
+          const payload = (await res.json()) as { fonts?: string[] };
+          if (Array.isArray(payload.fonts) && payload.fonts.length > 0) {
+            applyFonts(payload.fonts, 'Using bundled font manifest');
+            return;
+          }
+        }
+      } catch {
+        /* fall through */
+      }
+
+      applyFonts([], 'Font list unavailable — run pnpm fonts:manifest');
     })();
+
     return () => {
       mounted = false;
     };
@@ -45,7 +67,7 @@ export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFont
     if (fonts.length === 0) return fonts;
     if (fonts.some((font) => isFigletAllFonts(font))) return fonts;
     return [...fonts, FIGLET_FONT_ALL].sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" }),
+      a.localeCompare(b, undefined, { sensitivity: 'base' }),
     );
   }, [fonts]);
 
@@ -55,7 +77,7 @@ export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFont
         value: font,
         label: font,
         slide: (
-          <span className="block whitespace-nowrap px-0.5 font-mono text-[8px] leading-none tracking-[0.04em]">
+          <span className="block max-w-full truncate px-0.5 font-mono text-[8px] leading-none tracking-[0.04em]">
             {font}
           </span>
         ),
@@ -73,7 +95,7 @@ export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFont
     return (
       <div
         className="flex h-7 min-w-[5.25rem] shrink-0 items-center justify-center rounded border border-[#2d2d2d] bg-black px-1 font-mono text-[8px] text-[#6a6a6a]"
-        title={loadError ?? "Loading fonts"}
+        title={loadError ?? 'Loading fonts'}
       >
         …
       </div>
@@ -90,7 +112,11 @@ export function FigletFontPicker({ value, onChange, onWheelSettled }: FigletFont
       }}
       ariaLabel="Figlet font"
       viewportClassName="h-7 min-w-[5.25rem] w-auto max-w-[10rem]"
-      alwaysShowLabel
+      wheelExpandOnScroll
+      wheelTransparent
+      wheelNeighborCount={3}
+      slideHeightPx={28}
+      wheelScrollStep={1}
       showTextWhileScrolling
       showTooltipOnSnap={false}
       tooltipSide="top"

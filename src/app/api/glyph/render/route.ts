@@ -10,8 +10,11 @@ export async function POST(req: NextRequest) {
     const engine = body.engine;
     const text = typeof body.text === "string" ? body.text : "";
 
-    if (engine !== "ascii" && engine !== "figlet") {
-      return NextResponse.json({ ok: false, error: "engine must be ascii or figlet" }, { status: 400 });
+    if (engine !== "ascii" && engine !== "figlet" && engine !== "oneline") {
+      return NextResponse.json(
+        { ok: false, error: "engine must be ascii, figlet, or oneline" },
+        { status: 400 },
+      );
     }
 
     if (!text.trim()) {

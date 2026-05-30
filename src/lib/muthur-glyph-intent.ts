@@ -5,7 +5,7 @@ import {
 } from "@/lib/muthur-ascii-skill/parse-request";
 import type { AsciiRenderRequest } from "@/lib/muthur-ascii-skill/types";
 
-export type GlyphRenderEngine = "ascii" | "figlet";
+export type GlyphRenderEngine = "ascii" | "figlet" | "oneline";
 export type GlyphMergeMode = "append" | "replace";
 
 export type GlyphCommand =
@@ -102,7 +102,12 @@ export function parseGlyphCommand(input: string): GlyphCommand | null {
     return { kind: "render", engine: "figlet", text: figlet[1].trim() };
   }
 
-  const ascii = /^(?:ascii|glyph)\s+([\s\S]+)$/i.exec(trimmed);
+  const oneline = /^1\s*line\s+ascii\s+([\s\S]+)$/i.exec(trimmed);
+  if (oneline?.[1]?.trim()) {
+    return { kind: "render", engine: "oneline", text: oneline[1].trim() };
+  }
+
+  const ascii = /^(?:ascii|glyph|text)\s+([\s\S]+)$/i.exec(trimmed);
   if (ascii?.[1]?.trim()) {
     return { kind: "render", engine: "ascii", text: ascii[1].trim() };
   }
@@ -237,7 +242,12 @@ function parseGlyphDirectiveBody(body: string): GlyphApplyAction | null {
     };
   }
 
-  const engine = engineRaw === "ascii" || engineRaw === "figlet" ? engineRaw : null;
+  const engine =
+    engineRaw === "ascii" || engineRaw === "figlet" || engineRaw === "oneline"
+      ? engineRaw
+      : engineRaw === "1line" || engineRaw === "1-line" || engineRaw === "1 line"
+        ? "oneline"
+        : null;
   const text = args.text ?? "";
   if (!engine || !text) return null;
 

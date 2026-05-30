@@ -1,19 +1,21 @@
 .picker {
   display: flex;
   align-items: center;
-  height: var(--ios-picker-item-size);
-  perspective: 800px;
-  -webkit-perspective: 800px;
+  justify-content: center;
+  height: var(--ios-picker-height);
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
 }
 
 .viewport {
   position: relative;
-  height: var(--ios-picker-item-size);
+  height: var(--ios-picker-height);
   width: var(--ios-picker-width);
   overflow: hidden;
   touch-action: pan-y;
   cursor: grab;
   border-radius: 2px;
+  border: 1px solid #2d2d2d;
   background: #000;
 }
 
@@ -21,55 +23,81 @@
   cursor: grabbing;
 }
 
-/* Keep the centered row readable */
+/* Center band + edge fade (iOS rolodex window) */
 .viewport::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.92) 0%,
+    rgba(0, 0, 0, 0.15) 22%,
+    rgba(0, 0, 0, 0.15) 78%,
+    rgba(0, 0, 0, 0.92) 100%
+  );
+}
+
+.viewport::after {
   content: "";
   pointer-events: none;
   position: absolute;
   left: 0;
   right: 0;
-  top: 0;
+  top: calc(50% - var(--ios-picker-item-size) / 2);
   height: var(--ios-picker-item-size);
   z-index: 1;
   box-shadow:
-    inset 0 10px 12px -10px rgba(0, 0, 0, 0.85),
-    inset 0 -10px 12px -10px rgba(0, 0, 0, 0.85);
+    inset 0 1px 0 rgba(52, 211, 153, 0.12),
+    inset 0 -1px 0 rgba(52, 211, 153, 0.08);
 }
 
 .container {
   display: flex;
   flex-direction: column;
-  height: var(--ios-picker-item-size);
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
+  backface-visibility: hidden;
 }
 
 .slide {
   flex: 0 0 var(--ios-picker-item-size);
-  min-height: 0;
+  min-height: var(--ios-picker-item-size);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: ui-monospace, monospace;
-  font-size: 8px;
-  line-height: 1;
-  letter-spacing: 0.02em;
-  color: #9ca3af;
   user-select: none;
-  will-change: transform, opacity;
 }
 
-.slideSelected {
+.slideInner {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+.slideSelected .slideLabel {
   color: rgb(167 243 208);
   font-weight: 600;
-  text-shadow: 0 0 8px rgba(52, 211, 153, 0.35);
+  text-shadow: 0 0 10px rgba(52, 211, 153, 0.4);
 }
 
 .slideLabel {
   display: block;
-  max-width: 4.5rem;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: center;
+  font-family: ui-monospace, monospace;
+  font-size: 7px;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  color: #9ca3af;
 }

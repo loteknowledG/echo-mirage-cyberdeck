@@ -11,7 +11,38 @@ export const GLYPH_PANE_MODE_UPDATE_EVENT = "echo-mirage-glyph-pane-mode-update"
 export type GlyphPaneViewMode = "view" | "edit";
 export type GlyphMergeMode = "append" | "replace";
 
-export type GlyphPaneEngine = "ascii" | "figlet";
+export type GlyphPaneEngine = "ascii" | "figlet" | "oneline";
+
+export function glyphEngineUsesFigletFont(engine: GlyphPaneEngine): boolean {
+  return engine === "figlet";
+}
+
+/** Default merge when posting rendered output to the channel (all engines append if non-empty). */
+export function defaultGlyphChannelMerge(hasExistingContent: boolean): GlyphMergeMode {
+  return hasExistingContent ? "append" : "replace";
+}
+
+export function glyphEnginePickerLabel(engine: GlyphPaneEngine): string {
+  switch (engine) {
+    case "ascii":
+      return "TEXT";
+    case "figlet":
+      return "FIGLET";
+    case "oneline":
+      return "1 LINE";
+  }
+}
+
+export function glyphEngineStatusLabel(engine: GlyphPaneEngine): string {
+  switch (engine) {
+    case "ascii":
+      return "TEXT";
+    case "figlet":
+      return "FIGLET";
+    case "oneline":
+      return "1 LINE ASCII";
+  }
+}
 
 export type GlyphPaneSettings = {
   engine: GlyphPaneEngine;
@@ -94,7 +125,7 @@ export function readGlyphPaneSettings(): GlyphPaneSettings {
         : DEFAULT_GLYPH_SETTINGS.figletFont;
     const engineRaw = parsed.engine;
     const engine =
-      engineRaw === "ascii" || engineRaw === "figlet"
+      engineRaw === "ascii" || engineRaw === "figlet" || engineRaw === "oneline"
         ? engineRaw
         : engineRaw === "glyph" || engineRaw === "toilet"
           ? engineRaw === "glyph"

@@ -59,9 +59,9 @@ export function CyberdeckMemoryAtlasPaneBody() {
                       severity: "info",
                     });
                   }}
+                  aria-pressed={selectedEntity?.id === entity.id}
                   className={realmorphismControlClass(deckMode, {
                     size: "tile",
-                    latched: selectedEntity?.id === entity.id,
                     signal: selectedEntity?.id === entity.id,
                     legacyClassName:
                       selectedEntity?.id === entity.id ? LEGACY_TILE_SELECTED : LEGACY_TILE_NEUTRAL,

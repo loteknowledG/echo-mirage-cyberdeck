@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
 
+import { RegistryKnobs } from './registry-knobs';
+import { RegistryRollingPicker } from './registry-rolling-picker';
+
 const installCommands = [
   {
     label: 'Theme',
@@ -74,14 +77,14 @@ export default function RegistryPage() {
               </p>
             </div>
           </div>
-          <div className="grid gap-3 rounded-[var(--realmorphism-radius)] border border-[#2a3530] bg-[#0e1011] p-4 shadow-[var(--realmorphism-shadow-rest)]">
+          <div className="realmorphism-panel grid gap-3 p-4">
             <div className="font-mono text-xs uppercase tracking-[0.16em] text-[#9eada7]">
               Install
             </div>
             {installCommands.map((item) => (
               <div key={item.label} className="space-y-1">
                 <div className="font-mono text-xs text-[#7dffb4]">{item.label}</div>
-                <pre className="overflow-x-auto rounded-[var(--realmorphism-radius-sm)] border border-[#2a3530] bg-[#060708] p-3 text-xs text-[#e8efeb]">
+                <pre className="realmorphism-field overflow-x-auto p-3 font-mono text-xs text-[#e8efeb]">
                   {item.command}
                 </pre>
               </div>
@@ -115,11 +118,18 @@ export default function RegistryPage() {
               <button className="realmorphism-control border px-5 py-3 font-mono text-sm">
                 Commit
               </button>
-              <button className="realmorphism-control is-latched border px-5 py-3 font-mono text-sm">
-                Latched
+              <button
+                type="button"
+                aria-pressed
+                className="realmorphism-control border px-5 py-3 font-mono text-sm"
+              >
+                Selected
               </button>
               <button className="realmorphism-control is-amber border px-5 py-3 font-mono text-sm">
                 Caution
+              </button>
+              <button className="realmorphism-control is-critical border px-5 py-3 font-mono text-sm">
+                Danger
               </button>
               <button className="realmorphism-control border px-4 py-3 font-mono text-sm" disabled>
                 Disabled
@@ -129,11 +139,7 @@ export default function RegistryPage() {
 
           <div className="grid gap-3">
             {registryItems.map((item) => (
-              <a
-                key={item.name}
-                href={item.href}
-                className="realmorphism-control grid gap-2 border p-4 no-underline"
-              >
+              <article key={item.name} className="realmorphism-panel grid gap-2 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="font-mono text-lg text-[#e8efeb]">{item.name}</div>
                   <div className="font-mono text-xs uppercase tracking-[0.14em] text-[#7dffb4]">
@@ -141,10 +147,14 @@ export default function RegistryPage() {
                   </div>
                 </div>
                 <p className="text-sm leading-6 text-[#9eada7]">{item.summary}</p>
-              </a>
+              </article>
             ))}
           </div>
         </section>
+
+        <RegistryKnobs />
+
+        <RegistryRollingPicker />
 
         <section className="rounded-[var(--realmorphism-radius)] border border-[#2a3530] bg-[#0e1011] p-5">
           <h2 className="mb-3 text-xl font-semibold">Community Upload Notes</h2>

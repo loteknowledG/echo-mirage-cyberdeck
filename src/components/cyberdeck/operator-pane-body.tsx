@@ -142,14 +142,14 @@ function OperatorToolbarIconButton({
   onClick,
   disabled = false,
   className = "",
-  latched = false,
+  pressed = false,
   children,
 }: {
   label: string;
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
-  latched?: boolean;
+  pressed?: boolean;
   children: ReactNode;
 }) {
   const deckMode = useDeckMode();
@@ -159,11 +159,11 @@ function OperatorToolbarIconButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
+      aria-pressed={pressed}
       className={cn(
         realmorphismControlClass(deckMode, {
           size: "toolbar",
-          latched,
-          signal: latched,
+          signal: pressed,
           legacyClassName: OPERATOR_HEADER_ICON_BTN,
         }),
         disabled && "disabled:cursor-not-allowed disabled:opacity-30",
@@ -219,7 +219,7 @@ function OperatorViewEditControls({
     <div className="flex shrink-0 items-center gap-1">
       <OperatorToolbarIconButton
         label="View"
-        latched={operatorDocMode === "view"}
+        pressed={operatorDocMode === "view"}
         onClick={() => {
           onCommitOperatorDocName();
           onSetOperatorDocMode("view");
@@ -246,7 +246,7 @@ function OperatorViewEditControls({
       </CyberdeckPaneTooltip>
       <OperatorToolbarIconButton
         label="Edit"
-        latched={operatorDocMode === "edit"}
+        pressed={operatorDocMode === "edit"}
         onClick={() => onSetOperatorDocMode("edit")}
       >
         <CodexIcon icon={cdxIconEdit} className="h-3.5 w-3.5" />

@@ -11,7 +11,9 @@ It is not only a color palette. The theme depends on a physical interaction mode
 - hard-offset wall shadow
 - hover lift
 - active press
-- latched state
+- pressed / selected state (aria-pressed, checked, data-state="on")
+
+Motion applies to **controls only** (`realmorphism-control`, `realmorphism-action`). Static surfaces use `realmorphism-panel`. Text fields on a panel use `realmorphism-field` (sunken top/left inset, no lift).
 
 The motion is the affordance. It tells the operator that an action is available.
 

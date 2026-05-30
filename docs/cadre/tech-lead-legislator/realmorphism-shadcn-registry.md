@@ -53,7 +53,7 @@ realmorphism-action
 
 to tactile controls.
 
-The motion layer is part of the design, not decoration. It communicates available action, hover lift, active press, and latched state.
+The motion layer is part of the design, not decoration. It communicates available action, hover lift, active press, and pressed/on state.
 
 ## Base Exports
 

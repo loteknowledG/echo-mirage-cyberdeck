@@ -4,14 +4,16 @@ import {
   listFigletFonts,
   resolveFigletFontName,
 } from "@/lib/figlet-fonts.server";
-import { ensureCustomFigletFontsLoaded } from "@/lib/figlet-custom-fonts.server";
+import { loadCustomFigletFont } from "@/lib/figlet-custom-fonts.server";
+import { isPyfigletAvailable, renderPyfigletText } from "@/lib/pyfiglet.server";
 
 export { DEFAULT_FIGLET_FONT, resolveFigletFontName };
 
-export async function renderFigletText(text: string, font?: string): Promise<string> {
-  ensureCustomFigletFontsLoaded();
-  const fonts = await listFigletFonts();
-  const fontName = resolveFigletFontName(font, fonts);
+type FigletNode = typeof figlet & {
+  loadFontSync?: (font: string) => unknown;
+};
+
+function renderWithFigletJs(text: string, fontName: string): Promise<string> {
   return new Promise((resolve, reject) => {
     figlet.text(
       text,
@@ -28,4 +30,48 @@ export async function renderFigletText(text: string, font?: string): Promise<str
       },
     );
   });
+}
+
+/** figlet.js lists many fonts before they are parsed into memory — load from disk when needed. */
+function ensureFigletJsFontLoaded(fontName: string): boolean {
+  if (figlet.figFonts[fontName]) return true;
+  if (loadCustomFigletFont(fontName)) return true;
+
+  const loadSync = (figlet as FigletNode).loadFontSync;
+  if (!loadSync) return false;
+
+  try {
+    loadSync(fontName);
+    return Boolean(figlet.figFonts[fontName]);
+  } catch {
+    return false;
+  }
+}
+
+export async function renderFigletText(text: string, font?: string): Promise<string> {
+  const fonts = await listFigletFonts();
+  const fontName = resolveFigletFontName(font, fonts);
+
+  ensureFigletJsFontLoaded(fontName);
+
+  try {
+    return await renderWithFigletJs(text, fontName);
+  } catch (figletError) {
+    if (!(await isPyfigletAvailable())) {
+      const message =
+        figletError instanceof Error ? figletError.message : String(figletError);
+      throw new Error(`Figlet render failed for "${fontName}": ${message}`);
+    }
+
+    try {
+      return await renderPyfigletText(text, fontName);
+    } catch (pyError) {
+      const pyMessage = pyError instanceof Error ? pyError.message : String(pyError);
+      const figletMessage =
+        figletError instanceof Error ? figletError.message : String(figletError);
+      throw new Error(
+        `Figlet render failed for "${fontName}" (figlet.js: ${figletMessage}; pyfiglet: ${pyMessage})`,
+      );
+    }
+  }
 }

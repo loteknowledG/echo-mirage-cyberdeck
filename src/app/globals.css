@@ -281,7 +281,13 @@ body,
   box-sizing: border-box;
   margin: 8px;
   min-width: 0;
+  /* Allow figlet wheel neighbors + status line; clip only the command input band. */
+  overflow: visible;
+}
+
+.glyph-channel-composer__input-band {
   overflow: hidden;
+  border-radius: 2px 2px 0 0;
 }
 
 .pi-pane-host message-editor > div {

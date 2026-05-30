@@ -7,9 +7,9 @@ export const REALMORPHISM_CONTROL = "realmorphism-control";
 export type RealmorphismControlOptions = {
   /** Icon square (default) or compact text button. */
   size?: "icon" | "compact" | "send" | "toolbar" | "action" | "menu" | "micro" | "wide" | "tile" | "filter";
-  latched?: boolean;
   signal?: boolean;
   amber?: boolean;
+  critical?: boolean;
   danger?: boolean;
   off?: boolean;
   /** Flat list-row style (context menus). */
@@ -22,9 +22,9 @@ export function realmorphismControlClass(
   deckMode: DeckMode,
   {
     size = "icon",
-    latched,
     signal,
     amber,
+    critical,
     danger,
     off,
     menu,
@@ -45,9 +45,9 @@ export function realmorphismControlClass(
     size === "tile" && "w-full justify-start px-2 py-2 text-left text-[9px] tracking-[0.06em]",
     size === "menu" && "w-full justify-start px-3 py-2 text-left text-[10px] tracking-[0.08em]",
     menu && "is-menu",
-    latched && "is-latched",
     signal && "is-signal",
     amber && "is-amber",
+    critical && "is-critical",
     danger && "is-danger",
     off && "is-off",
     deckMode === "ascii" && legacyClassName,
@@ -97,7 +97,6 @@ export function realmorphismFilterClass(
 
   return realmorphismControlClass(deckMode, {
     size: "filter",
-    latched: active,
     signal: active && tone === "signal",
     amber: active && tone === "amber",
     legacyClassName: active ? legacyActive : legacyInactive,
@@ -121,7 +120,6 @@ export function voiceControlClass(
   return realmorphismControlClass(deckMode, {
     size: "icon",
     legacyClassName: legacy,
-    latched: voiceEnabled && voiceHealth === "backend",
     signal: voiceEnabled && voiceHealth !== "fallback" && voiceHealth !== "off",
     amber: voiceEnabled && voiceHealth === "fallback",
     off: !voiceEnabled || voiceHealth === "off",

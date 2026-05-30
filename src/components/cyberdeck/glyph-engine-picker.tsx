@@ -5,8 +5,9 @@ import { CyberdeckRollingPicker } from "@/components/cyberdeck/cyberdeck-rolling
 import type { GlyphPaneEngine } from "@/lib/glyph-channel";
 
 const GLYPH_ENGINE_ENTRIES: Array<{ value: GlyphPaneEngine; label: string; glyph: string }> = [
-  { value: "ascii", label: "ASCII", glyph: "A" },
+  { value: "ascii", label: "TEXT", glyph: "T" },
   { value: "figlet", label: "FIGLET", glyph: "F" },
+  { value: "oneline", label: "1 LINE ASCII", glyph: "1" },
 ];
 
 type GlyphEnginePickerProps = {
@@ -38,7 +39,8 @@ export function GlyphEnginePicker({ value, onChange }: GlyphEnginePickerProps) {
       value={resolvedValue}
       onChange={(next) => onChange(next as GlyphPaneEngine)}
       ariaLabel="Render engine"
-      viewportClassName="h-7 w-7"
+      viewportClassName="h-7 min-w-[3rem] w-auto max-w-[4.75rem]"
+      alwaysShowLabel
       showTextWhileScrolling
       showTooltipOnSnap
     />

@@ -3,15 +3,28 @@ import type { EmblaCarouselType } from "embla-carousel";
 export const IOS_PICKER_ITEM_SIZE_PX = 22;
 
 export type IosPickerStyleOptions = {
-  /** Gentler falloff for long lists (e.g. 328 figlet fonts). */
+  /** Gentler opacity falloff for long lists (e.g. figlet fonts). */
   compact?: boolean;
+  /** Cylindrical rolodex: rotateX + translateZ on inner slide nodes. */
+  rolodex?: boolean;
+  /** Slide row height in px — used for translateZ radius. */
+  itemSizePx?: number;
+  /** Hide slides farther than N steps from center (e.g. 1 = one preview per side). */
+  maxNeighborSteps?: number;
 };
 
 export function numberWithinRange(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), max);
 }
 
-/** Embla iOS-style picker loop: scale + light rotateX from scroll progress. */
+function pickerInnerNode(emblaApi: EmblaCarouselType, slideIndex: number): HTMLElement | null {
+  const slide = emblaApi.slideNodes()[slideIndex];
+  if (!slide) return null;
+  const inner = slide.querySelector<HTMLElement>("[data-ios-picker-inner]");
+  return inner ?? slide;
+}
+
+/** Embla [iOS-style picker](https://www.embla-carousel.com/docs/examples/predefined#ios-style-picker-default): 3D rolodex from scroll progress. */
 export function applyIosPickerSlideStyles(
   emblaApi: EmblaCarouselType,
   eventName?: string,
@@ -25,10 +38,14 @@ export function applyIosPickerSlideStyles(
   if (!snapCount) return;
 
   const compact = options?.compact ?? false;
+  const rolodex = options?.rolodex ?? false;
+  const maxNeighborSteps = options?.maxNeighborSteps;
+  const itemSize = options?.itemSizePx ?? IOS_PICKER_ITEM_SIZE_PX;
   const snapSpacing = snapCount > 1 ? 1 / (snapCount - 1) : 1;
-  const minOpacity = compact ? 0.72 : 0.45;
-  const maxRotate = compact ? 14 : 42;
-  const opacityFalloff = compact ? 0.18 : 0.14;
+  const minOpacity = compact ? 0.35 : 0.2;
+  const maxRotate = compact ? 22 : 48;
+  const opacityFalloff = compact ? 0.22 : 0.14;
+  const wheelRadius = (itemSize * Math.max(snapCount, 3)) / (2 * Math.PI);
 
   snapList.forEach((snap, snapIndex) => {
     let diffToTarget = snap - scrollProgress;
@@ -38,6 +55,7 @@ export function applyIosPickerSlideStyles(
       if (
         isScrollEvent &&
         !compact &&
+        !rolodex &&
         !emblaApi.slidesInView().includes(slideIndex)
       ) {
         return;
@@ -59,24 +77,41 @@ export function applyIosPickerSlideStyles(
       }
 
       const stepsFromCenter = Math.abs(diffToTarget) / snapSpacing;
+      const stepSigned = diffToTarget / snapSpacing;
+
+      const node = pickerInnerNode(emblaApi, slideIndex);
+      if (!node) return;
+
+      if (maxNeighborSteps != null && stepsFromCenter > maxNeighborSteps + 0.35) {
+        node.style.opacity = "0";
+        node.style.transform = "scale(0.82)";
+        node.style.pointerEvents = "none";
+        return;
+      }
+      node.style.pointerEvents = "";
+
       const isCentered = stepsFromCenter < 0.55;
       const opacity = isCentered
         ? 1
         : numberWithinRange(1 - stepsFromCenter * opacityFalloff, minOpacity, 1);
       const rotateX = isCentered
         ? 0
-        : numberWithinRange(diffToTarget / snapSpacing, -2.5, 2.5) *
-          (-maxRotate / 2.5);
+        : numberWithinRange(stepSigned, -2.5, 2.5) * (-maxRotate / 2.5);
       const scale = isCentered
         ? 1
-        : numberWithinRange(1 - stepsFromCenter * 0.06, 0.88, 1);
+        : numberWithinRange(1 - stepsFromCenter * 0.08, 0.82, 1);
 
-      const node = emblaApi.slideNodes()[slideIndex];
-      if (!node) return;
+      let transform = `scale(${scale})`;
+      if (rolodex) {
+        const angleRad = stepSigned * (Math.PI / 7);
+        const translateZ = wheelRadius * (Math.cos(angleRad) - 1);
+        transform = `translateZ(${translateZ.toFixed(2)}px) rotateX(${rotateX.toFixed(2)}deg) scale(${scale})`;
+      } else if (!compact) {
+        transform = `rotateX(${rotateX.toFixed(2)}deg) scale(${scale})`;
+      }
+
       node.style.opacity = `${opacity}`;
-      node.style.transform = compact
-        ? `scale(${scale})`
-        : `rotateX(${rotateX}deg) scale(${scale})`;
+      node.style.transform = transform;
     });
   });
 }
@@ -111,12 +146,24 @@ export function snapOffsetPx(emblaApi: EmblaCarouselType, index: number): number
   return Math.abs((scrollSnaps[index] ?? 0) - location.get());
 }
 
-/** Snap carousel to the nearest slide when dragFree stops between items. */
-export function snapPickerToNearest(emblaApi: EmblaCarouselType): boolean {
+/** True when scroll position is not centered on a snap. */
+export function pickerNeedsSnapToCenter(emblaApi: EmblaCarouselType): boolean {
   const closest = findClosestSnapIndex(emblaApi);
-  if (snapOffsetPx(emblaApi, closest) > SNAP_ALIGN_THRESHOLD_PX) {
-    emblaApi.scrollTo(closest);
-    return true;
-  }
-  return false;
+  return (
+    snapOffsetPx(emblaApi, closest) > SNAP_ALIGN_THRESHOLD_PX ||
+    emblaApi.selectedScrollSnap() !== closest
+  );
+}
+
+/** Animate to the nearest snap — call on settle / pointerUp after dragFree. */
+export function ensurePickerSnappedToCenter(emblaApi: EmblaCarouselType): boolean {
+  const closest = findClosestSnapIndex(emblaApi);
+  if (!pickerNeedsSnapToCenter(emblaApi)) return false;
+  emblaApi.scrollTo(closest);
+  return true;
+}
+
+/** @deprecated Use ensurePickerSnappedToCenter */
+export function snapPickerToNearest(emblaApi: EmblaCarouselType): boolean {
+  return ensurePickerSnappedToCenter(emblaApi);
 }
