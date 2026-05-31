@@ -45,6 +45,7 @@ import { useBrowserController } from "@/lib/use-browser-controller";
 import { CyberdeckCustomTabBrowserSync } from "@/components/cyberdeck/cyberdeck-custom-tab-browser-sync";
 import { CyberdeckWebTabFrame } from "@/components/cyberdeck/cyberdeck-web-tab-frame";
 import { RegistryShowroom } from "@/app/registry/registry-showroom";
+import { RegistryKitScrollFrame } from "@/app/registry/registry-kit-scroll-frame";
 import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
 import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import type { CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
@@ -6114,13 +6115,26 @@ const resolved = resolveUiTarget(userMessage);
   const renderCustomTabSurface = useCallback(
     (tab: CustomTab) => {
       const server = useCyberdeckTabStore.getState().server;
-      const shell = (content: JSX.Element, right?: JSX.Element) => (
+      const shell = (
+        content: JSX.Element,
+        right?: JSX.Element,
+        opts?: { scrollContent?: boolean },
+      ) => (
         <div
-          className="custom-scrollbar flex h-full flex-1 flex-col overflow-y-auto bg-black p-4"
+          className={cn(
+            "custom-scrollbar flex h-full min-h-0 min-w-0 w-full flex-1 flex-col bg-black p-4",
+            opts?.scrollContent ? "overflow-hidden" : "overflow-y-auto",
+          )}
           data-pointer-target={tab.kind}
         >
-          <div className="flex flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors">
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors",
+              opts?.scrollContent && "overflow-hidden",
+            )}
+          >
             <CyberdeckPaneHeader
+              className={opts?.scrollContent ? "shrink-0" : undefined}
               left={
                 <div className="flex flex-col">
                   <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
@@ -6140,17 +6154,17 @@ const resolved = resolveUiTarget(userMessage);
                 ) : null)
               }
             />
-            {content}
+            {opts?.scrollContent ? (
+              <RegistryKitScrollFrame>{content}</RegistryKitScrollFrame>
+            ) : (
+              content
+            )}
           </div>
         </div>
       );
 
       if (tab.kind === "realmorphism-kit" || (tab.kind === "web" && tab.label === "REALMORPHISM KIT")) {
-        return shell(
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <RegistryShowroom variant="embedded" />
-          </div>,
-        );
+        return shell(<RegistryShowroom variant="embedded" />, undefined, { scrollContent: true });
       }
 
       if (tab.kind === "web") {

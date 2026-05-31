@@ -102,7 +102,6 @@ export function FigletFontPicker({
       wheelScrollStep={1}
       showTextWhileScrolling={false}
       wheelSettledShowsSlide={false}
-      loop={!isShowroom}
     />
   );
 }

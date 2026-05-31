@@ -5,6 +5,7 @@ import { Mrs_Saint_Delafield, Satisfy } from 'next/font/google';
 import './globals.css';
 
 import { ThemeProvider } from '@/components/providers/theme-provider';
+import { QueryProvider } from '@/components/providers/query-provider';
 import { ChunkReload } from '@/components/providers/chunk-reload';
 
 const SignatureScript = Mrs_Saint_Delafield({
@@ -49,11 +50,13 @@ export default async function RootLayout({
         className={`${GeistSans.className} ${SignatureScript.variable} ${SatisfyScript.variable} h-screen overflow-y-hidden overflow-x-auto`}
       >
         <ThemeProvider attribute="class" forcedTheme="dark">
-          <div className="app-min-width-wrapper min-h-screen bg-background">
-            <ChunkReload />
-            {children}
-            <script suppressHydrationWarning={true} />
-          </div>
+          <QueryProvider>
+            <div className="app-min-width-wrapper min-h-screen bg-background">
+              <ChunkReload />
+              {children}
+              <script suppressHydrationWarning={true} />
+            </div>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

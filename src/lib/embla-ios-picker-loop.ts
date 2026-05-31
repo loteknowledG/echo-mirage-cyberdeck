@@ -23,10 +23,11 @@ export function indexDistanceFromSnapCenter(
   index: number,
   centerIndex: number,
   count: number,
+  loop = false,
 ): number {
   if (count <= 1) return 0;
   const raw = Math.abs(index - centerIndex);
-  return Math.min(raw, count - raw);
+  return loop ? Math.min(raw, count - raw) : raw;
 }
 
 /**
@@ -40,6 +41,7 @@ export function applyPinnedShowroomSlideStyles(
   const snapCount = emblaApi.scrollSnapList().length;
   if (!snapCount) return;
 
+  const loop = emblaApi.internalEngine().options.loop;
   const maxNeighborSteps = options?.maxNeighborSteps ?? 1;
   const centerEmphasis = options?.centerEmphasis ?? false;
   const minOpacity = centerEmphasis ? 0.28 : 0.35;
@@ -49,7 +51,7 @@ export function applyPinnedShowroomSlideStyles(
     const node = pickerInnerNode(emblaApi, index);
     if (!node) return;
 
-    const stepsFromCenter = indexDistanceFromSnapCenter(index, centerIndex, snapCount);
+    const stepsFromCenter = indexDistanceFromSnapCenter(index, centerIndex, snapCount, loop);
     if (stepsFromCenter > maxNeighborSteps + 0.01) {
       node.style.opacity = "0";
       node.style.transform = "scale(0.82)";

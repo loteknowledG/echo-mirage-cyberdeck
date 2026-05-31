@@ -1,8 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+
 import { BUNDLED_FIGLET_FONTS } from '@/lib/figlet-font-manifest';
 import { DEFAULT_FIGLET_FONT, FIGLET_FONT_ALL, isFigletAllFonts } from '@/lib/figlet-fonts';
+import { queryFigletFontCatalog } from '@/lib/glyph-catalog-queries';
+import { queryKeys } from '@/lib/query-client';
 
 function sortPickerFonts(fonts: readonly string[]): string[] {
   const list = [...fonts];
@@ -12,80 +16,23 @@ function sortPickerFonts(fonts: readonly string[]): string[] {
   return list.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
-let sharedFonts: string[] | null = null;
-let sharedLoadError: string | null = null;
-let catalogPromise: Promise<string[]> | null = null;
-const catalogListeners = new Set<() => void>();
-
-function notifyCatalogListeners() {
-  catalogListeners.forEach((listener) => listener());
-}
-
-async function loadFigletFontCatalog(): Promise<string[]> {
-  if (sharedFonts) return sharedFonts;
-  if (catalogPromise) return catalogPromise;
-
-  catalogPromise = (async () => {
-    let names = [...BUNDLED_FIGLET_FONTS];
-    let error: string | null = null;
-
-    try {
-      const res = await fetch('/api/glyph/fonts');
-      const payload = (await res.json()) as { ok?: boolean; fonts?: string[]; error?: string };
-      if (payload.ok && Array.isArray(payload.fonts) && payload.fonts.length > 0) {
-        sharedFonts = payload.fonts;
-        sharedLoadError = null;
-        notifyCatalogListeners();
-        return payload.fonts;
-      }
-      if (payload.error) error = payload.error;
-    } catch {
-      /* try static fallback */
-    }
-
-    try {
-      const res = await fetch('/glyph/figlet-fonts.json');
-      if (res.ok) {
-        const payload = (await res.json()) as { fonts?: string[] };
-        if (Array.isArray(payload.fonts) && payload.fonts.length > 0) {
-          names = payload.fonts;
-          error = null;
-        }
-      }
-    } catch {
-      /* keep bundled list */
-    }
-
-    sharedFonts = names;
-    sharedLoadError = error;
-    notifyCatalogListeners();
-    return names;
-  })();
-
-  return catalogPromise;
-}
-
 export function useFigletFontCatalog() {
-  const [fonts, setFonts] = useState<string[]>(() => sharedFonts ?? [...BUNDLED_FIGLET_FONTS]);
-  const [loadError, setLoadError] = useState<string | null>(() => sharedLoadError);
+  const query = useQuery({
+    queryKey: queryKeys.figletFontCatalog,
+    queryFn: queryFigletFontCatalog,
+    placeholderData: () => [...BUNDLED_FIGLET_FONTS],
+  });
 
-  useEffect(() => {
-    const sync = () => {
-      if (sharedFonts) setFonts([...sharedFonts]);
-      setLoadError(sharedLoadError);
-    };
-
-    catalogListeners.add(sync);
-    void loadFigletFontCatalog().then(sync);
-
-    return () => {
-      catalogListeners.delete(sync);
-    };
-  }, []);
-
+  const fonts = query.data ?? BUNDLED_FIGLET_FONTS;
   const pickerFonts = useMemo(() => sortPickerFonts(fonts), [fonts]);
+  const loadError =
+    query.error instanceof Error
+      ? query.error.message
+      : query.error
+        ? String(query.error)
+        : null;
 
-  return { pickerFonts, loadError };
+  return { pickerFonts, loadError, isLoading: query.isLoading, isPending: query.isPending };
 }
 
 export function resolveFigletPickerValue(value: string, pickerFonts: readonly string[]) {

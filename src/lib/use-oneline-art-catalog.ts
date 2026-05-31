@@ -1,38 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import {
-  fetchOnelineArtCatalog,
-  type OnelineArtCatalogEntry,
-} from '@/lib/oneline-art';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
-let sharedCatalog: OnelineArtCatalogEntry[] | null = null;
-let sharedLoadError: string | null = null;
-let catalogPromise: Promise<OnelineArtCatalogEntry[]> | null = null;
-const catalogListeners = new Set<() => void>();
-
-function notifyCatalogListeners() {
-  catalogListeners.forEach((listener) => listener());
-}
-
-async function loadOnelineArtCatalog(): Promise<OnelineArtCatalogEntry[]> {
-  if (sharedCatalog) return sharedCatalog;
-  if (catalogPromise) return catalogPromise;
-
-  catalogPromise = (async () => {
-    try {
-      sharedCatalog = await fetchOnelineArtCatalog();
-      sharedLoadError = null;
-    } catch (err) {
-      sharedLoadError = err instanceof Error ? err.message : 'Failed to load one-line art';
-      sharedCatalog = [];
-    }
-    notifyCatalogListeners();
-    return sharedCatalog;
-  })();
-
-  return catalogPromise;
-}
+import { queryKeys } from '@/lib/query-client';
+import { queryOnelineArtCatalog } from '@/lib/glyph-catalog-queries';
+import type { OnelineArtCatalogEntry } from '@/lib/oneline-art';
 
 export function resolveOnelinePickerValue(
   value: string,
@@ -51,24 +24,25 @@ export function findOnelineArtEntry(
 }
 
 export function useOnelineArtCatalog() {
-  const [catalog, setCatalog] = useState<OnelineArtCatalogEntry[]>(() => sharedCatalog ?? []);
-  const [loadError, setLoadError] = useState<string | null>(() => sharedLoadError);
+  const query = useQuery({
+    queryKey: queryKeys.onelineArtCatalog,
+    queryFn: queryOnelineArtCatalog,
+  });
 
-  useEffect(() => {
-    const sync = () => {
-      if (sharedCatalog) setCatalog([...sharedCatalog]);
-      setLoadError(sharedLoadError);
-    };
-
-    catalogListeners.add(sync);
-    void loadOnelineArtCatalog().then(sync);
-
-    return () => {
-      catalogListeners.delete(sync);
-    };
-  }, []);
-
+  const catalog = query.data ?? [];
   const byId = useMemo(() => new Map(catalog.map((entry) => [entry.id, entry])), [catalog]);
+  const loadError =
+    query.error instanceof Error
+      ? query.error.message
+      : query.error
+        ? String(query.error)
+        : null;
 
-  return { catalog, byId, loadError };
+  return {
+    catalog,
+    byId,
+    loadError,
+    isLoading: query.isLoading,
+    isPending: query.isPending,
+  };
 }

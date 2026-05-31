@@ -18,7 +18,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "realmorphism": ["../realmorphism/src/components/ui/rolling-picker.tsx"]
     },
     "target": "ES2017"
   },

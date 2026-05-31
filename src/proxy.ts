@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /** Dev pollers (wait-on, Electron, IDE preview) use HEAD — skip heavy route compiles. */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   if (request.method !== "HEAD") {
     return NextResponse.next();
   }

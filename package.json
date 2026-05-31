@@ -34,10 +34,12 @@
     "probe:memory-cards": "tsx scripts/probe-memory-card-registry.ts && tsx scripts/probe-memory-card-parser-regression.ts",
     "probe:muthur-observation": "tsx scripts/probe-muthur-observation.ts",
     "e2e": "playwright test",
+    "e2e:kit": "playwright test e2e/realmorphism-kit-scroll.spec.ts e2e/realmorphism-kit-rolling-picker.spec.ts e2e/glyph-oneline-art-roller.spec.ts",
     "e2e:layout": "playwright test e2e/cyberdeck.layout.spec.ts",
     "e2e:headed": "playwright test --headed",
     "e2e:report": "playwright show-report",
     "test:predeploy:layout": "pnpm exec tsc --noEmit && pnpm build && playwright test e2e/cyberdeck.layout.spec.ts",
+    "test:predeploy:kit": "pnpm exec tsc --noEmit && playwright test e2e/realmorphism-kit-scroll.spec.ts e2e/realmorphism-kit-rolling-picker.spec.ts e2e/glyph-oneline-art-roller.spec.ts",
     "test:predeploy": "pnpm exec tsc --noEmit && pnpm probe:muthur-observation && pnpm build && playwright test",
     "voice:cursor:read-last-response": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CURSOR_HOOK_MECHANICUS_EXTRACT='full'; $j = Join-Path (Get-Location) '.cursor/hooks/sample-after-agent.json'; if (-not (Test-Path $j)) { Write-Error 'Missing .cursor/hooks/sample-after-agent.json'; exit 1 }; Get-Content -Raw $j | python -u (Join-Path (Get-Location) '.cursor/hooks/speak_last_sentence_mechanicus.py')\"",
     "voice:cursor:read-last-response:dry": "python .cursor/hooks/speak_last_sentence_mechanicus.py --dry-run"
@@ -67,13 +69,14 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@radix-ui/react-visually-hidden": "^1.2.4",
+    "@tanstack/react-query": "^5.100.14",
     "@wikimedia/codex-icons": "^2.5.1",
     "ai": "^6.0.141",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "cropperjs": "^2.1.0",
-    "electron": "^41.3.0",
+    "electron": "41.3.0",
     "embla-carousel": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "figlet": "^1.11.0",
@@ -97,6 +100,7 @@
     "react-json-view": "^1.21.3",
     "react-resizable-panels": "^4.7.6",
     "react-type-animation": "^3.2.0",
+    "realmorphism": "file:../realmorphism",
     "sonner": "^2.0.7",
     "sql.js": "^1.14.1",
     "streamdown": "^2.5.0",
@@ -133,7 +137,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "@google/genai",
-      "@mongodb-js/zstd"
+      "@mongodb-js/zstd",
+      "electron"
     ]
   }
 }

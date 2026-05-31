@@ -61,7 +61,9 @@ function onelineArtPicker(page: Page) {
 }
 
 function onelineWheel(page: Page) {
-  return glyphChannelPane(page).locator('[aria-label="One-line ASCII art"]');
+  return glyphChannelPane(page).locator(
+    '[data-oneline-art-picker] [aria-label="One-line ASCII art"]',
+  );
 }
 
 function glyphComposer(page: Page) {
@@ -122,7 +124,8 @@ async function waitForOnelineCatalog(page: Page) {
 }
 
 async function wheelRoller(roller: Locator, page: Page, deltaY: number) {
-  await roller.hover();
+  await roller.scrollIntoViewIfNeeded();
+  await roller.hover({ force: true });
   await page.mouse.wheel(0, deltaY);
   await page.waitForTimeout(700);
 }
@@ -153,6 +156,29 @@ test.describe("Glyph channel 1-line ASCII roller", () => {
     const height = await wheel.evaluate((el) => el.getBoundingClientRect().height);
     expect(height).toBeGreaterThanOrEqual(FIGLET_ROW_PX - 2);
     expect(height).toBeLessThanOrEqual(FIGLET_ROW_PX + 2);
+
+    await expect
+      .poll(async () => {
+        return wheel.evaluate((el) => {
+          const panelRect = el.getBoundingClientRect();
+          const rowPx =
+            Number.parseFloat(getComputedStyle(el).getPropertyValue("--float-wheel-row-px")) || 28;
+          const bandTop = panelRect.top + panelRect.height / 2 - rowPx / 2;
+          const bandBottom = bandTop + rowPx;
+          let count = 0;
+          for (const node of el.querySelectorAll("[data-oneline-title]")) {
+            const html = node as HTMLElement;
+            if (Number.parseFloat(getComputedStyle(html).opacity) < 0.45) continue;
+            const rect = html.getBoundingClientRect();
+            if (rect.height < 2 || rect.width < 2) continue;
+            const midY = rect.top + rect.height / 2;
+            if (midY < bandTop - 1 || midY > bandBottom + 1) continue;
+            count += 1;
+          }
+          return count;
+        });
+      })
+      .toBe(1);
 
     const composerShell = glyphChannelPane(page).locator(".glyph-channel-composer");
     const shellWidth = await composerShell.evaluate((el) => el.getBoundingClientRect().width);
@@ -213,5 +239,35 @@ test.describe("Glyph channel 1-line ASCII roller", () => {
 
     const title = await readCenterBandText(wheel, "oneline-title");
     expect(title.length).toBeGreaterThan(2);
+  });
+
+  test("oneline roller wraps catalog and returns to start", async ({ page }) => {
+    const wheel = onelineWheel(page);
+    await waitForOnelineCatalog(page);
+
+    await expect(page.locator('[data-oneline-art-picker] [data-rolling-picker-loop="true"]')).toHaveAttribute(
+      "data-rolling-picker-loop",
+      "true",
+    );
+
+    const seen = new Set<string>();
+    const start = await readCenterBandText(wheel, "oneline-title");
+    expect(start.length).toBeGreaterThan(0);
+    seen.add(start);
+
+    let wrapped = false;
+    for (let spin = 0; spin < 80; spin += 1) {
+      await wheelRoller(wheel, page, 360);
+      const title = await readCenterBandText(wheel, "oneline-title");
+      expect(title.length).toBeGreaterThan(0);
+      if (title === start && seen.size > 2) {
+        wrapped = true;
+        break;
+      }
+      seen.add(title);
+    }
+
+    expect(seen.size).toBeGreaterThan(2);
+    expect(wrapped).toBe(true);
   });
 });

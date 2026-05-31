@@ -1,10 +1,13 @@
 'use client';
 
 import * as React from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { RegistryFigletFontSection } from './registry-figlet-font-section';
 import { RegistryKnobs } from './registry-knobs';
 import { RegistryRollingPicker } from './registry-rolling-picker';
+import { RegistryTextRollingPicker } from './registry-text-rolling-picker';
+import { prefetchGlyphCatalogs } from '@/lib/glyph-catalog-queries';
 
 const installCommands = [
   {
@@ -58,6 +61,11 @@ type RegistryShowroomProps = {
 export function RegistryShowroom({ variant = 'page' }: RegistryShowroomProps) {
   const isEmbedded = variant === 'embedded';
   const [toggleSelected, setToggleSelected] = React.useState(true);
+  const queryClient = useQueryClient();
+
+  React.useEffect(() => {
+    void prefetchGlyphCatalogs(queryClient);
+  }, [queryClient]);
 
   return (
     <main
@@ -65,7 +73,7 @@ export function RegistryShowroom({ variant = 'page' }: RegistryShowroomProps) {
       data-deck-mode="realmorphism"
       className={
         isEmbedded
-          ? 'theme-realmorphism min-h-0 bg-[#060708] px-3 py-4 text-[#e8efeb] sm:px-4'
+          ? 'theme-realmorphism min-h-0 min-w-0 overflow-x-hidden bg-[#060708] px-3 py-4 text-[#e8efeb] sm:px-4'
           : 'theme-realmorphism h-screen overflow-y-auto bg-[#060708] px-4 py-6 text-[#e8efeb] sm:px-6 lg:px-10'
       }
     >
@@ -181,6 +189,8 @@ export function RegistryShowroom({ variant = 'page' }: RegistryShowroomProps) {
         <RegistryKnobs />
 
         <RegistryRollingPicker />
+
+        <RegistryTextRollingPicker />
 
         <RegistryFigletFontSection />
 

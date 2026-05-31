@@ -77,7 +77,10 @@ export function OnelineArtPicker({ value, onChange, onWheelSettled }: OnelineArt
         if (entry) onWheelSettled?.(entry);
       }}
       ariaLabel="One-line ASCII art"
-      viewportClassName="h-7 min-w-0 w-full max-w-none overflow-hidden rounded border border-[#2d2d2d] bg-black [scrollbar-width:none]"
+      viewportClassName="h-7 min-w-0 w-full max-w-none overflow-hidden [scrollbar-width:none]"
+      wheelExpandOnScroll
+      wheelFullWidth
+      wheelTransparent
       slideHeightPx={ROW_PX}
       wheelScrollStep={1}
       showTextWhileScrolling={false}

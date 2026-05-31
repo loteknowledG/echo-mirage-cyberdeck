@@ -1,3 +1,15 @@
+import path from "path";
+import { fileURLToPath } from "url";
+
+const realmorphismRoot = path.resolve(
+	path.dirname(fileURLToPath(import.meta.url)),
+	"../realmorphism/src",
+);
+const realmorphismPicker = path.join(
+	realmorphismRoot,
+	"components/ui/rolling-picker.tsx",
+);
+
 /** @type {import('next').NextConfig} */
 const RUNTIME_WATCH_IGNORE = [
 	"**/.memory/**",
@@ -21,8 +33,13 @@ function normalizeWebpackWatchIgnored(ignored) {
 
 const nextConfig = {
 	devIndicators: false,
+	transpilePackages: ["realmorphism"],
 	allowedDevOrigins: ["127.0.0.1", "localhost"],
-	turbopack: {},
+	turbopack: {
+		resolveAlias: {
+			realmorphism: realmorphismPicker,
+		},
+	},
 	experimental: {
 		webpackMemoryOptimizations: true,
 	},
@@ -37,6 +54,11 @@ const nextConfig = {
 		"@mongodb-js/zstd",
 	],
 	webpack: (config, { dev }) => {
+		config.resolve.alias = {
+			...config.resolve.alias,
+			realmorphism: realmorphismPicker,
+		};
+
 		config.ignoreWarnings = [
 			...(config.ignoreWarnings ?? []),
 			{

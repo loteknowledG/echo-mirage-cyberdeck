@@ -35,7 +35,7 @@ export function RegistryFigletFontSection() {
 
       <div className="grid gap-6 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start">
         <div className="flex flex-col items-center gap-3">
-          <div className="flex w-fit flex-col items-center gap-2 rounded border border-[#2a3530] bg-[#060708] px-3 py-2.5">
+          <div className="flex w-fit min-h-[8.25rem] flex-col items-center gap-2 rounded border border-[#2a3530] bg-[#060708] px-3 py-2.5">
             <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6f7a75]">
               Wheel
             </span>

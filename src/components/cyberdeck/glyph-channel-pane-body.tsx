@@ -786,7 +786,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                   </div>
                 ) : null}
                 {settings.engine === "oneline" ? (
-                  <div className="flex h-7 min-w-0 flex-1">
+                  <div className="flex h-7 min-w-0 flex-1" data-oneline-art-picker>
                     <OnelineArtPicker
                       value={settings.onelineArtId}
                       onChange={(onelineArtId) =>

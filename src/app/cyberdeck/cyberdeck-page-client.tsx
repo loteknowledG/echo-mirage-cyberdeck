@@ -2,6 +2,8 @@
 
 import dynamic from "next/dynamic";
 
+import { GlyphCatalogPrefetch } from "@/components/providers/glyph-catalog-prefetch";
+
 const CyberdeckApp = dynamic(() => import("@/features/cyberdeck/cyberdeck-app"), {
   ssr: false,
   loading: () => (
@@ -13,5 +15,10 @@ const CyberdeckApp = dynamic(() => import("@/features/cyberdeck/cyberdeck-app"),
 
 /** Client boundary — dynamic import with ssr:false must live here, not in page.tsx. */
 export function CyberdeckPageClient() {
-  return <CyberdeckApp />;
+  return (
+    <>
+      <GlyphCatalogPrefetch />
+      <CyberdeckApp />
+    </>
+  );
 }
