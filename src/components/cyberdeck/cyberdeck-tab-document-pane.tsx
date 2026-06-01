@@ -520,6 +520,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
       operatorBrowserUrl=""
       operatorDocMode={docMode}
       operatorDocNameDraft={nameDraft}
+      operatorActiveFilePath={activeFilePath}
       operatorEditorRef={editorRef}
       operatorNameInputRef={nameInputRef}
       operatorBrowserRef={browserRef}

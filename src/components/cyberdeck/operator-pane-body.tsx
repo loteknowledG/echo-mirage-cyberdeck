@@ -23,7 +23,6 @@ import { OperatorDocFolderPane } from "@/components/cyberdeck/operator-doc-folde
 import type { OperatorDocFolderRoot } from "@/lib/operator-folder-nav";
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderTitle } from "@/components/cyberdeck/pane-header";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { OperatorDocTypePicker } from "@/components/cyberdeck/operator-doc-type-picker";
 import {
   OperatorExportPicker,
@@ -49,6 +48,7 @@ import {
 import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
 import { CodexIcon } from "@/components/codex-icon";
+import { OperatorMonacoWorkbench } from "@/components/cyberdeck/operator-monaco-workbench";
 
 type DroppedOperatorAsset = {
   kind: string;
@@ -68,6 +68,7 @@ type OperatorPaneBodyProps = {
   operatorBrowserUrl: string;
   operatorDocMode: "view" | "edit";
   operatorDocNameDraft: string;
+  operatorActiveFilePath?: string | null;
   operatorEditorRef: RefObject<HTMLTextAreaElement>;
   operatorNameInputRef: RefObject<HTMLInputElement>;
   operatorBrowserRef: RefObject<HTMLWebViewElement>;
@@ -545,7 +546,7 @@ export function CyberdeckOperatorPaneBody({
   operatorBrowserUrl,
   operatorDocMode,
   operatorDocNameDraft,
-  operatorEditorRef,
+  operatorActiveFilePath,
   operatorNameInputRef,
   operatorBrowserRef,
   onOperatorDragOver,
@@ -720,6 +721,12 @@ export function CyberdeckOperatorPaneBody({
     applyOperatorDocText("", "immediate");
   }, [applyOperatorDocText, onClearOperatorDocument, operatorDocText]);
 
+  const saveOperatorDocInPlaceAndMark = useCallback(async () => {
+    if (!onSaveOperatorDocInPlace) return;
+    await onSaveOperatorDocInPlace();
+    window.dispatchEvent(new CustomEvent("echo-mirage-operator-file-saved"));
+  }, [onSaveOperatorDocInPlace]);
+
   useEffect(() => {
     if (operatorSurfaceMode !== "browser") return;
     const view = operatorBrowserRef.current;
@@ -889,7 +896,7 @@ export function CyberdeckOperatorPaneBody({
             onOperatorDocumentKindChange={onOperatorDocumentKindChange}
             onCopyOperatorDocToClipboard={onCopyOperatorDocToClipboard}
             onPasteClipboardToOperator={onPasteClipboardToOperator}
-            onSaveOperatorDocInPlace={onSaveOperatorDocInPlace}
+            onSaveOperatorDocInPlace={saveOperatorDocInPlaceAndMark}
             onSaveOperatorDocAsFile={onSaveOperatorDocAsFile}
             operatorCanSaveInPlace={operatorCanSaveInPlace}
             onConvertDocumentToMarkdown={onConvertDocumentToMarkdown}
@@ -1071,38 +1078,18 @@ export function CyberdeckOperatorPaneBody({
               </div>
             ) : operatorSurfaceIsDocument ? (
               operatorDocMode === "edit" ? (
-                <Textarea
-                  ref={operatorEditorRef}
+                <OperatorMonacoWorkbench
+                  activeFilePath={operatorActiveFilePath}
+                  fileName={operatorDroppedAsset.name}
                   value={operatorDocText}
-                  onChange={(event) => applyOperatorDocText(event.target.value, "debounced")}
-                  onKeyDown={(event) => {
-                    if (!event.ctrlKey && !event.metaKey) return;
-                    const key = event.key.toLowerCase();
-                    if (key === "s") {
-                      event.preventDefault();
-                      if (operatorCanSaveInPlace && onSaveOperatorDocInPlace) {
-                        void onSaveOperatorDocInPlace();
-                      } else {
-                        void onSaveOperatorDocAsFile();
-                      }
-                      return;
-                    }
-                    if (key === "z" && !event.shiftKey) {
-                      event.preventDefault();
-                      handleOperatorUndo();
-                      return;
-                    }
-                    if (key === "y" || (key === "z" && event.shiftKey)) {
-                      event.preventDefault();
-                      handleOperatorRedo();
+                  onChange={(next) => applyOperatorDocText(next, "debounced")}
+                  onSave={async () => {
+                    if (operatorCanSaveInPlace && onSaveOperatorDocInPlace) {
+                      await saveOperatorDocInPlaceAndMark();
+                    } else {
+                      await onSaveOperatorDocAsFile();
                     }
                   }}
-                  spellCheck={false}
-                  autoCapitalize="off"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  wrap="off"
-                  className={`min-h-[50vh] resize-y overflow-auto shadow-none focus-visible:ring-1 focus-visible:ring-amber-500/40 ${OPERATOR_DOC_SURFACE_CLASS}`}
                 />
               ) : operatorShowsMarkdown ? (
                 <div className={OPERATOR_DOC_SURFACE_CLASS}>

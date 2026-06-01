@@ -7353,6 +7353,7 @@ const resolved = resolveUiTarget(userMessage);
                   operatorBrowserUrl={operatorBrowserUrl}
                   operatorDocMode={operatorDocMode}
                   operatorDocNameDraft={operatorDocNameDraft}
+                  operatorActiveFilePath={operatorActiveFilePath}
                   operatorEditorRef={operatorEditorRef}
                   operatorNameInputRef={operatorNameInputRef}
                   operatorBrowserRef={operatorBrowserRef}
