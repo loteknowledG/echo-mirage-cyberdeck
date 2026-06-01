@@ -12,17 +12,30 @@ type FigletFontPreviewPanelProps = {
   font: string;
   text?: string;
   className?: string;
+  variant?: 'panel' | 'toolbar';
 };
 
 export function FigletFontPreviewPanel({
   font,
   text = 'ECHO',
   className,
+  variant = 'panel',
 }: FigletFontPreviewPanelProps) {
+  const [previewText, setPreviewText] = useState(text);
   const [output, setOutput] = useState<string | null>(() =>
     getCachedFigletPreview(font, text) ?? null,
   );
   const [loading, setLoading] = useState(!output);
+
+  useEffect(() => {
+    if (variant !== 'toolbar') {
+      setPreviewText(text);
+      return;
+    }
+
+    const timer = window.setTimeout(() => setPreviewText(text), 180);
+    return () => window.clearTimeout(timer);
+  }, [text, variant]);
 
   useEffect(() => {
     if (isFigletAllFonts(font)) {
@@ -31,7 +44,7 @@ export function FigletFontPreviewPanel({
       return;
     }
 
-    const cached = getCachedFigletPreview(font, text);
+    const cached = getCachedFigletPreview(font, previewText);
     if (cached) {
       setOutput(cached);
       setLoading(false);
@@ -40,7 +53,7 @@ export function FigletFontPreviewPanel({
 
     let cancelled = false;
     setLoading(true);
-    void fetchFigletPreviewText(font, text).then((rendered) => {
+    void fetchFigletPreviewText(font, previewText).then((rendered) => {
       if (!cancelled) {
         setOutput(rendered);
         setLoading(false);
@@ -49,12 +62,14 @@ export function FigletFontPreviewPanel({
     return () => {
       cancelled = true;
     };
-  }, [font, text]);
+  }, [font, previewText]);
 
   return (
     <div
       className={cn(
-        'realmorphism-panel flex min-h-[12rem] flex-col justify-center overflow-x-auto overflow-y-hidden p-4',
+        variant === 'toolbar'
+          ? 'realmorphism-panel flex h-[8.25rem] min-w-0 flex-col overflow-x-auto overflow-y-hidden px-3 pb-4 pt-2'
+          : 'realmorphism-panel flex min-h-[12rem] flex-col justify-center overflow-x-auto overflow-y-hidden p-4',
         className,
       )}
     >
@@ -64,8 +79,15 @@ export function FigletFontPreviewPanel({
       {loading ? (
         <div className="font-mono text-xs text-[#6f7a75]">Rendering…</div>
       ) : (
-        <pre className="overflow-x-auto overflow-y-hidden font-mono text-[10px] leading-[0.72] text-[#7dffb4] whitespace-pre">
-          {output ?? text}
+        <pre
+          className={cn(
+            'font-mono text-[#7dffb4] whitespace-pre',
+            variant === 'toolbar'
+              ? 'min-h-0 flex-1 overflow-x-auto overflow-y-auto pb-1 text-[8px] leading-[1]'
+              : 'overflow-x-auto overflow-y-hidden text-[10px] leading-[0.72]',
+          )}
+        >
+          {output ?? previewText}
         </pre>
       )}
     </div>

@@ -24,7 +24,7 @@ type CyberdeckServerRailProps = {
   railGlyphForServer: (btn: FixedServerBtn) => string;
   railGlyphForCustomTab: (tab: { kind: string; glyph: string; id?: string; label?: string }) => string;
   onTabClick: (id: string) => void;
-  onCreateBlankTab: () => void;
+  onOpenNewTabMenu: (event: MouseEvent<HTMLButtonElement>) => void;
   onRailContextMenu: (tabId: string, event: MouseEvent<HTMLElement>) => void;
   createRailTabLongPressHandlers: (tabId: string) => Record<string, unknown>;
   consumeClickIfLongPress: (tabId: string) => boolean;
@@ -40,7 +40,7 @@ export function CyberdeckServerRail({
   railGlyphForServer,
   railGlyphForCustomTab,
   onTabClick,
-  onCreateBlankTab,
+  onOpenNewTabMenu,
   onRailContextMenu,
   createRailTabLongPressHandlers,
   consumeClickIfLongPress,
@@ -152,8 +152,8 @@ export function CyberdeckServerRail({
         <CyberdeckRailTabTooltip label="NEW TAB">
         <button
           type="button"
-          onClick={onCreateBlankTab}
-          aria-label="Create blank tab"
+          onClick={onOpenNewTabMenu}
+          aria-label="Choose new tab type"
           className="flex h-8 w-8 items-center justify-center rounded border border-[#2d2d2d] bg-black font-mono text-[9px] leading-none tracking-[0.08em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200"
         >
           +

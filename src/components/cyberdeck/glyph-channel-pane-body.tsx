@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { GlyphEnginePicker } from "@/components/cyberdeck/glyph-engine-picker";
 import { FigletFontPicker } from "@/components/cyberdeck/figlet-font-picker";
+import { FigletFontPreviewPanel } from "@/components/cyberdeck/figlet-font-preview-panel";
 import { OnelineArtPicker } from "@/components/cyberdeck/oneline-art-picker";
 import {
   CyberdeckControlTooltip,
@@ -766,7 +767,14 @@ export function CyberdeckGlyphChannelPaneBody() {
             </div>
 
             <div className="min-w-0 border-t border-[#1a1a1a]">
-              <div className="flex min-h-7 min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden px-2 py-1.5">
+              <div
+                className={cn(
+                  "flex min-w-0 flex-nowrap items-end gap-1.5 px-2 py-1.5",
+                  settings.engine === "figlet"
+                    ? "min-h-[8.25rem] overflow-visible"
+                    : "min-h-7 overflow-hidden",
+                )}
+              >
                 <GlyphEnginePicker
                   value={settings.engine}
                   onChange={(engine) => {
@@ -775,13 +783,22 @@ export function CyberdeckGlyphChannelPaneBody() {
                   }}
                 />
                 {settings.engine === "figlet" ? (
-                  <div className="relative z-10 min-w-0 flex-1 overflow-visible">
-                    <FigletFontPicker
-                      value={settings.figletFont}
-                      onChange={(figletFont) =>
-                        setSettings((prev) => ({ ...prev, figletFont }))
-                      }
-                      onWheelSettled={focusComposer}
+                  <div className="relative z-10 flex min-w-0 flex-1 items-stretch gap-2 overflow-visible">
+                    <div className="w-[10.5rem] shrink-0">
+                      <FigletFontPicker
+                        variant="showroom"
+                        value={settings.figletFont}
+                        onChange={(figletFont) =>
+                          setSettings((prev) => ({ ...prev, figletFont }))
+                        }
+                        onWheelSettled={focusComposer}
+                      />
+                    </div>
+                    <FigletFontPreviewPanel
+                      variant="toolbar"
+                      font={settings.figletFont}
+                      text={composer.trim() || "ECHO MIRAGE"}
+                      className="flex-1"
                     />
                   </div>
                 ) : null}

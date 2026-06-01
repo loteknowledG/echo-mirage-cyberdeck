@@ -937,6 +937,7 @@ export default function CyberdeckApp() {
   const [railTabContextMenu, setRailTabContextMenu] = useState<
     | { variant: "custom"; tabId: string; x: number; y: number }
     | { variant: "fixed"; serverId: (typeof SERVER_IDS)[number]; x: number; y: number }
+    | { variant: "new"; x: number; y: number }
     | null
   >(null);
 
@@ -2971,24 +2972,6 @@ export default function CyberdeckApp() {
     },
     [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu],
   );
-
-  const createBlankTab = useCallback(() => {
-    closeRailTabContextMenu();
-    closeMirageContextMenu();
-    closeGatewayPaneContextMenu();
-    const nextIndex = useCyberdeckTabStore.getState().customTabs.length + 1;
-    const id = `tab-${crypto.randomUUID()}`;
-    const tab: CustomTab = {
-      id,
-      label: `TAB ${nextIndex}`,
-      glyph: String(nextIndex % 10 || nextIndex),
-      kind: "blank",
-    };
-    useCyberdeckTabStore.getState().setCustomTabs((prev) => [...prev, tab]);
-    useCyberdeckTabStore.getState().setActiveCustomTabId(id);
-    setNavRailContext("gateway");
-    playDeckSystemSound("chirp", 0.05);
-  }, [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
 
   const openRealmorphismKitTab = useCallback(
     (tabId?: string) => {
@@ -5830,6 +5813,63 @@ const resolved = resolveUiTarget(userMessage);
     [closeGatewayPaneContextMenu, closeMirageContextMenu],
   );
 
+  const openNewTabMenu = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      if (typeof window === "undefined") return;
+      closeMirageContextMenu();
+      closeGatewayPaneContextMenu();
+
+      const menuWidth = 176;
+      const menuHeight = 520;
+      const padding = 8;
+      const x = Math.min(event.clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
+      const y = Math.min(event.clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
+
+      setRailTabContextMenu({ variant: "new", x, y });
+    },
+    [closeGatewayPaneContextMenu, closeMirageContextMenu],
+  );
+
+  const createTabFromMenuAction = useCallback(
+    (action: CustomTabContextMenuAction) => {
+      closeRailTabContextMenu();
+      if (action.action === "kit-pane") {
+        openRealmorphismKitTab();
+        return;
+      }
+
+      const kind: CustomTabKind =
+        action.action === "convert"
+          ? action.kind
+          : action.action === "settings-pane"
+            ? "settings"
+            : "connection";
+      const id = `tab-${crypto.randomUUID()}`;
+      const tab: CustomTab = {
+        id,
+        label: defaultCustomTabLabelForKind(kind),
+        glyph: defaultCustomTabGlyphForKind(kind),
+        kind,
+        browserUrl: kind === "web" ? OPERATOR_BROWSER_HOME_URL : undefined,
+        asset: null,
+      };
+
+      flushSync(() => {
+        const store = useCyberdeckTabStore.getState();
+        store.setCustomTabs((prev) => [...prev, tab]);
+        store.setActiveCustomTabId(id);
+        store.mountCustomTab(id);
+      });
+      setNavRailContext("tabs");
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: `TAB_CREATED // ${tab.label} // ${kind.toUpperCase()}` },
+      ]);
+      playDeckSystemSound("chirp", 0.05);
+    },
+    [closeRailTabContextMenu, openRealmorphismKitTab],
+  );
+
   const openMirageContextMenu = useCallback(
     (clientX: number, clientY: number) => {
       if (typeof window === "undefined") return;
@@ -6416,7 +6456,11 @@ const resolved = resolveUiTarget(userMessage);
           <div
             role="menu"
             aria-label={
-              railTabContextMenu.variant === "fixed" ? "Fixed server tab actions" : "Tab actions"
+              railTabContextMenu.variant === "fixed"
+                ? "Fixed server tab actions"
+                : railTabContextMenu.variant === "new"
+                  ? "Choose new tab type"
+                  : "Tab actions"
             }
             className="absolute max-h-[70vh] min-w-44 overflow-y-auto rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
             style={{ left: railTabContextMenu.x, top: railTabContextMenu.y }}
@@ -6462,66 +6506,22 @@ const resolved = resolveUiTarget(userMessage);
                   Copy server id
                 </button>
               </>
+            ) : railTabContextMenu.variant === "new" ? (
+              <>
+                {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => createTabFromMenuAction(action)}
+                    className={realmorphismMenuItemClass(deckMode)}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </>
             ) : (
               <>
-                <div className="my-1 h-px bg-[#232323]" />
-                {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) =>
-                  action.action === "convert" ? (
-                    <button
-                      key={action.label}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        convertCustomTab(railTabContextMenu.tabId, action.kind);
-                        closeRailTabContextMenu();
-                      }}
-                      className={realmorphismMenuItemClass(deckMode)}
-                    >
-                      {action.label}
-                    </button>
-                  ) : action.action === "settings-pane" ? (
-                    <button
-                      key="settings-pane"
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        closeRailTabContextMenu();
-                        handleModelLabelClick("b");
-                      }}
-                      className={realmorphismMenuItemClass(deckMode)}
-                    >
-                      {action.label}
-                    </button>
-                  ) : action.action === "kit-pane" ? (
-                    <button
-                      key="kit-pane"
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        const id = railTabContextMenu.tabId;
-                        closeRailTabContextMenu();
-                        openRealmorphismKitTab(id);
-                      }}
-                      className={realmorphismMenuItemClass(deckMode)}
-                    >
-                      {action.label}
-                    </button>
-                  ) : (
-                    <button
-                      key="connection-pane"
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        closeRailTabContextMenu();
-                        handleModelLabelClick("s");
-                      }}
-                      className={realmorphismMenuItemClass(deckMode)}
-                    >
-                      {action.label}
-                    </button>
-                  ),
-                )}
-                <div className="my-1 h-px bg-[#232323]" />
                 <button
                   type="button"
                   role="menuitem"
@@ -6673,7 +6673,7 @@ const resolved = resolveUiTarget(userMessage);
         railGlyphForServer={railGlyphForServer}
         railGlyphForCustomTab={(tab) => railGlyphForCustomTab(tab as CustomTab)}
         onTabClick={handleTabClick}
-        onCreateBlankTab={createBlankTab}
+        onOpenNewTabMenu={openNewTabMenu}
         onRailContextMenu={handleRailTabContextMenu}
         createRailTabLongPressHandlers={createRailTabLongPressHandlers}
         consumeClickIfLongPress={consumeClickIfLongPress}
