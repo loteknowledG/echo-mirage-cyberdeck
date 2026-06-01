@@ -227,9 +227,41 @@ export function looksLikeCaptchaBlock(snapshotText: string) {
   );
 }
 
+const LOCAL_OPERATOR_KEYWORDS = [
+  "operator pane",
+  "the operator pane",
+  "editor pane",
+  "the editor pane",
+  "monaco",
+  "current editor",
+  "active document",
+  "current file",
+  "what's open",
+  "what are you looking at",
+  "what do you see here",
+  "what is in this pane",
+  "whats in the operator",
+  "what's in the operator",
+  "whats on the operator",
+  "what's on the operator",
+  "read the active document",
+  "summarize the current editor",
+  "can you see the current file",
+  "what is open in the editor",
+];
+
+function containsLocalOperatorKeyword(text: string): boolean {
+  const lower = text.toLowerCase();
+  const hasLocalKw = LOCAL_OPERATOR_KEYWORDS.some((kw) => lower.includes(kw));
+  if (!hasLocalKw) return false;
+  const hasExplicitWebSearch = /^(?:search\s+the\s+web|use\s+the\s+web|browse\s+the\s+web|google|duckduckgo)/i.test(text);
+  return !hasExplicitWebSearch;
+}
+
 export function looksLikeOperatorWebIntent(intent: string) {
   const text = intent.trim().toLowerCase();
   if (!text) return false;
+  if (containsLocalOperatorKeyword(text)) return false;
   return (
     /^(?:\/web|web:)\b/i.test(text) ||
     /\b(?:use the web|browse the web|search the web|open the browser|go to the web|in the browser|on the browser)\b/i.test(text) ||
@@ -262,6 +294,8 @@ export function parseBrowserCommand(input: string): BrowserCommand | null {
   const text = input.trim();
   if (!text) return null;
   const commandText = stripMuthurInvocationPrefix(text);
+
+  if (containsLocalOperatorKeyword(commandText)) return null;
 
   const commandMatch = commandText.match(/^(?:\/browser|browser:|\/web|web:)\s*(.+)$/i);
   const body = (commandMatch?.[1] || commandText).trim();
@@ -327,6 +361,7 @@ export function parseBrowserCommand(input: string): BrowserCommand | null {
 export function parseBrowserUseModeCommand(input: string): BrowserCommand | null {
   const text = stripMuthurInvocationPrefix(input).trim();
   if (!text) return null;
+  if (containsLocalOperatorKeyword(text)) return null;
 
   const parsed = parseBrowserCommand(text);
   if (parsed) return parsed;
@@ -353,6 +388,7 @@ function stripAssistantDirectiveMarkup(text: string) {
 export function extractAssistantBrowserCommand(text: string): BrowserCommand | null {
   const cleaned = stripAssistantDirectiveMarkup(text);
   if (!cleaned) return null;
+  if (containsLocalOperatorKeyword(cleaned)) return null;
 
   const lines = cleaned.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const directiveLine = lines[0] || cleaned;

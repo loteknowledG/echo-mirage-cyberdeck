@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import type { editor, IPosition, IRange, ISelection } from "monaco-editor";
 import { appendFlightLog } from "@/lib/flight-log";
+import { setMonacoEditorContext, type MonacoEditorContext } from "@/lib/monaco-editor-context";
 import {
   detectOperatorEditorLanguage,
   exposeOperatorWorkbench,
@@ -107,6 +108,40 @@ export function OperatorMonacoWorkbench({
     setPendingDiff(null);
     pendingDiffRef.current = null;
   }, [activeFilePath, fileName]);
+
+  // Publish context update whenever relevant state changes
+  useEffect(() => {
+    const ctx: Partial<MonacoEditorContext> = {
+      active: true,
+      filePath: activeFilePath ?? null,
+      fileName,
+      fileExtension: operatorEditorFileExtension(fileName),
+      language,
+      content: value,
+      contentLength: value.length,
+      dirty,
+      readOnly,
+      lastUpdated: Date.now(),
+    };
+    setMonacoEditorContext(ctx);
+  }, [activeFilePath, fileName, value, language, dirty, readOnly]);
+
+  // Publish cursor and selection changes
+  useEffect(() => {
+    setMonacoEditorContext({
+      cursorLine: cursor.lineNumber,
+      cursorColumn: cursor.column,
+      selectionStartLine: selection?.selectionStartLineNumber ?? null,
+      selectionStartColumn: selection?.selectionStartColumn ?? null,
+      selectionEndLine: selection?.positionLineNumber ?? null,
+      selectionEndColumn: selection?.positionColumn ?? null,
+      selectionText: selection ? (
+        selection.selectionStartLineNumber !== selection.positionLineNumber ||
+        selection.selectionStartColumn !== selection.positionColumn
+      ) ? value.slice(0, 500) : null : null,
+      lastUpdated: Date.now(),
+    });
+  }, [cursor, selection, value]);
 
   const readState = useCallback((): OperatorEditorState => {
     const model = editorRef.current?.getModel();

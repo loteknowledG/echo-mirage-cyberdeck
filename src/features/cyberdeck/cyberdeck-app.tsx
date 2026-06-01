@@ -6461,33 +6461,9 @@ const resolved = resolveUiTarget(userMessage);
                 >
                   Copy server id
                 </button>
-                <div className="my-1 h-px bg-[#232323]" />
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    closeRailTabContextMenu();
-                    openRealmorphismKitTab();
-                  }}
-                  className={realmorphismMenuItemClass(deckMode)}
-                >
-                  Open Realmorphism kit
-                </button>
               </>
             ) : (
               <>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    const id = railTabContextMenu.tabId;
-                    closeRailTabContextMenu();
-                    openRealmorphismKitTab(id);
-                  }}
-                  className={realmorphismMenuItemClass(deckMode)}
-                >
-                  Open Realmorphism kit
-                </button>
                 <div className="my-1 h-px bg-[#232323]" />
                 {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) =>
                   action.action === "convert" ? (

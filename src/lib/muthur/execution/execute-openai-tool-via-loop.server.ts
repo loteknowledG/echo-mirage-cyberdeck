@@ -3,6 +3,7 @@ import { formatExecutionResultsForOpenAiTool, openAiToolCallToAction } from "./t
 import { executeRegistryToolForOpenAi } from "@/lib/muthur-core/execute-openai-tool";
 import type { ToolRegistry } from "@/lib/muthur-core/types";
 import { auditExecutionSession } from "./audit-log";
+import { recordExecutionLoopHealth, recordFailure, recordProviderHealth } from "@/lib/muthur/health";
 
 export async function executeOpenAiToolViaExecutionLoop(
   registry: ToolRegistry,
@@ -37,17 +38,32 @@ export async function executeOpenAiToolViaExecutionLoop(
   }
 
   const created = loop.enqueue([mapped], { taskLabel: `openai:${functionName}` });
-  await loop.waitForIdle(120_000);
+  let timedOut = false;
+  try {
+    await loop.waitForIdle(120_000);
+  } catch (timeoutErr) {
+    timedOut = true;
+    console.warn(`[execute-openai-tool] waitForIdle timeout for ${functionName}, forcing recovery`);
+    loop.forceRecover();
+  }
+
+  if (timedOut) {
+    recordExecutionLoopHealth({ status: "failed", lastError: `Tool ${functionName} timed out after 120s` });
+    return `[TOOL TIMEOUT] ${functionName}\n\nExecution timed out after 120 seconds. The loop has been recovered and is ready for retry. Please try again.`;
+  }
 
   const state = loop.getState();
   const action = state.completed_actions.find((item) => item.id === created[0]?.id);
   if (!action) {
     const blocked = state.queue.find((item) => item.id === created[0]?.id);
     if (blocked?.status === "blocked") {
+      recordProviderHealth({ status: "degraded", lastError: "Tool blocked - awaiting operator approval" });
       return formatExecutionResultsForOpenAiTool(functionName, blocked);
     }
+    recordExecutionLoopHealth({ status: "degraded", lastError: "No result from execution loop" });
     return `[TOOL ERROR] ${functionName}\n\nExecution loop did not produce a result.`;
   }
 
+  recordProviderHealth({ status: action.status === "completed" ? "healthy" : "degraded", lastError: action.error ?? null });
   return formatExecutionResultsForOpenAiTool(functionName, action);
 }

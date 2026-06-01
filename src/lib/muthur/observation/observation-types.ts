@@ -1,5 +1,20 @@
 export type MuthurObservationSurface = "cyberdeck" | "property-manager";
 
+export type MuthurEditorState = {
+  active: boolean;
+  filePath: string | null;
+  fileName: string | null;
+  fileExtension: string | null;
+  language: string | null;
+  content: string | null;
+  contentExcerpt: string | null;
+  selectionText: string | null;
+  cursorLine: number | null;
+  cursorColumn: number | null;
+  dirty: boolean;
+  readOnly: boolean;
+};
+
 export type MuthurObservationSnapshotInput = {
   observedAt?: number;
   route: string;
@@ -19,6 +34,7 @@ export type MuthurObservationSnapshotInput = {
   transcriptState: string | null;
   operationalWarnings: string[];
   continuityIndicators: string[];
+  editor?: MuthurEditorState | null;
 };
 
 export type MuthurObservationSnapshot = MuthurObservationSnapshotInput & {

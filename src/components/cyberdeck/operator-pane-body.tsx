@@ -49,6 +49,8 @@ import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
 import { CodexIcon } from "@/components/codex-icon";
 import { OperatorMonacoWorkbench } from "@/components/cyberdeck/operator-monaco-workbench";
+import { getMonacoEditorContext } from "@/lib/monaco-editor-context";
+import { detectOperatorEditorLanguage } from "@/lib/operator-workbench";
 
 type DroppedOperatorAsset = {
   kind: string;
@@ -765,6 +767,64 @@ export function CyberdeckOperatorPaneBody({
       view.removeEventListener("drop", blockDrop);
     };
   }, [onOperatorBrowserUrlChange, operatorBrowserRef, operatorSurfaceMode]);
+
+  // Send Monaco editor state to MUTHUR observation store
+  useEffect(() => {
+    if (!operatorSurfaceIsDocument || !operatorDroppedAsset) return;
+
+    // Get live context from MonacoEditorContext store
+    const ctx = getMonacoEditorContext();
+
+    // Also read current text from operatorDocText as fallback
+    const content = ctx.contentLength > 0 ? ctx.content : operatorDocText;
+    const dirty = ctx.dirty ?? (operatorDocText !== operatorDocHistoryTextRef.current);
+    const filePath = operatorActiveFilePath ?? ctx.filePath ?? null;
+
+    const observation = {
+      observedAt: Date.now(),
+      route: typeof window !== "undefined" ? window.location.pathname : "/",
+      surface: "cyberdeck" as const,
+      observing: true,
+      observingPanelId: "operator",
+      observingSubsystem: "monaco-editor",
+      activeTab: null,
+      activePane: "operator",
+      visibleDocument: operatorDroppedAsset.name,
+      documentExcerpt: content.slice(0, 200) + (content.length > 200 ? "..." : ""),
+      selectedProperty: null,
+      selectedUnit: null,
+      visibleLogs: [] as string[],
+      activeTickets: [] as Record<string, unknown>[],
+      operationalMode: "OBSERVE" as const,
+      transcriptState: null,
+      operationalWarnings: [] as string[],
+      continuityIndicators: [] as string[],
+      editor: {
+        active: ctx.active ?? true,
+        filePath,
+        fileName: operatorDroppedAsset.name,
+        fileExtension: filePath?.includes(".") ? filePath.split(".").pop() ?? null : null,
+        language: ctx.language ?? detectOperatorEditorLanguage(operatorDroppedAsset.name),
+        content,
+        contentExcerpt: content.slice(0, 200) + (content.length > 200 ? "..." : ""),
+        selectionText: ctx.selectionText ?? null,
+        cursorLine: ctx.cursorLine ?? null,
+        cursorColumn: ctx.cursorColumn ?? null,
+        dirty,
+        readOnly: operatorDocMode !== "edit",
+      },
+    };
+
+    const payload = JSON.stringify({ snapshot: observation });
+    fetch("/api/muthur/observation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payload,
+      keepalive: true,
+    }).catch((err) => {
+      console.warn("[operator-pane] observation send failed:", err);
+    });
+  }, [operatorSurfaceIsDocument, operatorDroppedAsset, operatorActiveFilePath, operatorDocText, operatorDocMode]);
 
   const navigateBrowser = () => {
     const nextUrl = browserDraft.trim();

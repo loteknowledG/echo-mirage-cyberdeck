@@ -11,6 +11,7 @@ import { isReadOnlyObservationAction, requiresConfirmationForAction } from "./sa
 import { writeVerificationReceipt } from "./verification-receipts.server";
 import { runVerifyConditions } from "./verification-runner.server";
 import type { VerificationOutcome } from "./verification-types";
+import { recordExecutionLoopHealth } from "@/lib/muthur/health";
 
 type RunBatchOptions = {
   taskLabel?: string;
@@ -68,12 +69,14 @@ export class MuthurExecutionLoop {
     this.store.setLoopStatus("stopped");
     this.abortController?.abort();
     void auditExecutionSession({ event: "stop" });
+    recordExecutionLoopHealth({ status: "degraded", state: "stopped", lastError: "Loop stopped by operator" });
   }
 
   pause(): void {
     this.paused = true;
     this.store.setLoopStatus("paused");
     void auditExecutionSession({ event: "pause" });
+    recordExecutionLoopHealth({ status: "degraded", state: "paused" });
   }
 
   resume(): void {
@@ -81,6 +84,7 @@ export class MuthurExecutionLoop {
     this.store.resetInterrupt();
     this.store.setLoopStatus("running");
     void auditExecutionSession({ event: "resume" });
+    recordExecutionLoopHealth({ status: "healthy", state: "running" });
     this.ensurePump();
   }
 
@@ -108,14 +112,85 @@ export class MuthurExecutionLoop {
 
   async waitForIdle(timeoutMs = 120_000): Promise<void> {
     const started = Date.now();
+    const snapshot = this.store.getSnapshot();
+    const actionId = snapshot.active_action?.id;
+    const toolName = snapshot.active_action?.type;
+    recordExecutionLoopHealth({ state: "waiting", activeJobId: actionId ?? null, activeToolName: toolName ?? null, activeSince: started });
+    console.log(`[execution-loop] waitForIdle started: timeout=${timeoutMs}ms, active_action=${actionId ?? "null"}, tool=${toolName ?? "null"}, queue_length=${snapshot.queue_length}`);
+
+    if (!snapshot.active_action && snapshot.queue_length === 0) {
+      console.log(`[execution-loop] waitForIdle early exit: already idle (no active_action, queue=0), elapsed=${Date.now() - started}ms`);
+      recordExecutionLoopHealth({ status: "healthy", state: "idle", activeJobId: null, activeToolName: null, activeSince: null });
+      return;
+    }
+
     while (Date.now() - started < timeoutMs) {
-      const snapshot = this.store.getSnapshot();
-      if (snapshot.loop_status !== "running" && snapshot.queue_length === 0 && !snapshot.active_action) {
+      const snap = this.store.getSnapshot();
+      if (snap.loop_status !== "running" && snap.queue_length === 0 && !snap.active_action) {
+        console.log(`[execution-loop] waitForIdle complete: idle restored, elapsed=${Date.now() - started}ms, queue_length=${snap.queue_length}`);
+        recordExecutionLoopHealth({ status: "healthy", state: "idle", activeJobId: null, activeToolName: null, activeSince: null });
         return;
+      }
+      if (snap.queue_length > 0) {
+        console.log(`[execution-loop] waitForIdle polling: loop_status=${snap.loop_status}, queue_length=${snap.queue_length}, active_action=${snap.active_action?.id ?? "null"}, elapsed=${Date.now() - started}ms`);
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
+
+    const finalSnap = this.store.getSnapshot();
+    console.warn(`[execution-loop] waitForIdle TIMEOUT: active_action=${finalSnap.active_action?.id ?? "null"}, queue_length=${finalSnap.queue_length}, loop_status=${finalSnap.loop_status}, elapsed=${Date.now() - started}ms`);
+
+    if (finalSnap.queue_length > 0) {
+      console.warn(`[execution-loop] waitForIdle: draining ${finalSnap.queue_length} queued items marked cancelled`);
+      for (const item of finalSnap.queue) {
+        const cancelled: MuthurAction = {
+          ...item,
+          status: "cancelled",
+          completed_at: new Date().toISOString(),
+          error: "Execution loop timed out - item cancelled.",
+        };
+        this.store.pushCompleted(cancelled);
+      }
+      this.store.clearQueue();
+    }
+
+    recordExecutionLoopHealth({ status: "failed", state: "idle", lastError: "Execution loop timed out waiting for idle" });
     throw new Error("Execution loop timed out waiting for idle.");
+  }
+
+  forceRecover(): void {
+    const snapshot = this.store.getSnapshot();
+    console.warn(`[execution-loop] forceRecover: active_action=${snapshot.active_action?.id ?? "null"}, queue_length=${snapshot.queue_length}`);
+    if (snapshot.active_action) {
+      const recovered: MuthurAction = {
+        ...snapshot.active_action,
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error: "Execution timed out - recovered by force.",
+      };
+      this.store.setActiveAction(null);
+      this.store.pushCompleted(recovered);
+    }
+    if (snapshot.queue_length > 0) {
+      console.warn(`[execution-loop] forceRecover: cancelling ${snapshot.queue_length} queued items`);
+      for (const item of snapshot.queue) {
+        const cancelled: MuthurAction = {
+          ...item,
+          status: "cancelled",
+          completed_at: new Date().toISOString(),
+          error: "Execution loop force recovered - item cancelled.",
+        };
+        this.store.pushCompleted(cancelled);
+      }
+      this.store.clearQueue();
+    }
+    this.store.setLoopStatus("idle");
+    this.store.setLastResult(null, "Execution loop force recovered after timeout.");
+    this.paused = false;
+    this.abortController?.abort();
+    this.abortController = null;
+    recordExecutionLoopHealth({ status: "degraded", state: "idle", activeJobId: null, activeToolName: null, activeSince: null, lastError: "Force recovered after timeout" });
+    console.warn(`[execution-loop] forceRecover complete: loop_status=${this.store.getSnapshot().loop_status}`);
   }
 
   private ensurePump(): void {

@@ -235,6 +235,72 @@ export function signalToFlightLog(
       const detail = readString(payload, "detail") ?? "OK";
       return { actor: "VOICE", action, result: detail, severity };
     }
+    case "health:provider_connected": {
+      const provider = payload?.["metadata"] ? (payload.metadata as { provider?: string }).provider : readString(payload, "reason");
+      return { actor: "PROVIDER", action: "connected", result: provider ? `// ${provider.toUpperCase()}` : "OK", severity: "success" };
+    }
+    case "health:provider_disconnected": {
+      const reason = readString(payload, "reason");
+      return { actor: "PROVIDER", action: "disconnected", result: reason ?? "LINK_DROPPED", severity: "warning" };
+    }
+    case "health:provider_failure": {
+      const reason = readString(payload, "reason") ?? "UNKNOWN";
+      return { actor: "PROVIDER", action: "failure", result: reason, severity: "error" };
+    }
+    case "health:loop_state_change": {
+      const from = readString(payload, "fromStatus") ?? "—";
+      const to = readString(payload, "toStatus") ?? "—";
+      return { actor: "LOOP", action: "state change", result: `${from} → ${to}`, severity };
+    }
+    case "health:loop_timeout": {
+      const reason = readString(payload, "reason") ?? "TIMEOUT";
+      return { actor: "LOOP", action: "timeout", result: reason, severity: "error" };
+    }
+    case "health:loop_recovered": {
+      const from = readString(payload, "fromStatus") ?? "—";
+      return { actor: "LOOP", action: "recovered", result: `from: ${from}`, severity: "success" };
+    }
+    case "health:editor_context_connected": {
+      const file = readString(payload, "reason") ?? "—";
+      return { actor: "EDITOR", action: "connected", result: file, severity: "success" };
+    }
+    case "health:editor_context_disconnected": {
+      return { actor: "EDITOR", action: "disconnected", result: "LINK_DROPPED", severity: "warning" };
+    }
+    case "health:editor_context_failure": {
+      const reason = readString(payload, "reason") ?? "UNKNOWN";
+      return { actor: "EDITOR", action: "failure", result: reason, severity: "error" };
+    }
+    case "health:browser_connected": {
+      const url = readString(payload, "reason") ?? "—";
+      return { actor: "BROWSER", action: "connected", result: url, severity: "success" };
+    }
+    case "health:browser_disconnected": {
+      const url = readString(payload, "reason") ?? "—";
+      return { actor: "BROWSER", action: "disconnected", result: url, severity: "warning" };
+    }
+    case "health:browser_failure": {
+      const reason = readString(payload, "reason") ?? "UNKNOWN";
+      return { actor: "BROWSER", action: "failure", result: reason, severity: "error" };
+    }
+    case "health:intent_routing_fallback": {
+      const action = payload?.["metadata"] ? (payload.metadata as { chosenAction?: string }).chosenAction : readString(payload, "reason");
+      return { actor: "INTENT", action: "fallback activated", result: action ?? "LOCAL_MODE", severity: "warning" };
+    }
+    case "health:intent_routing_failure": {
+      const reason = readString(payload, "reason") ?? "UNKNOWN";
+      return { actor: "INTENT", action: "failure", result: reason, severity: "error" };
+    }
+    case "health:failure_recorded": {
+      const category = payload?.["metadata"] ? (payload.metadata as { category?: string }).category : readString(payload, "reason");
+      return { actor: "HEALTH", action: "failure logged", result: category ?? "UNKNOWN", severity: "error" };
+    }
+    case "health:health_status_change": {
+      const from = readString(payload, "fromStatus") ?? "—";
+      const to = readString(payload, "toStatus") ?? "—";
+      const reason = readString(payload, "reason");
+      return { actor: "HEALTH", action: `status change ${from} → ${to}`, result: reason ?? "—", severity };
+    }
     default:
       return null;
   }

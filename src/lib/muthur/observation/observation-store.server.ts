@@ -1,4 +1,4 @@
-import type { MuthurObservationSnapshot, MuthurObservationSnapshotInput } from "./observation-types";
+import type { MuthurEditorState, MuthurObservationSnapshot, MuthurObservationSnapshotInput } from "./observation-types";
 
 const MAX_TEXT_LENGTH = 800;
 const MAX_ITEMS = 12;
@@ -28,6 +28,27 @@ function tickets(value: unknown): Array<Record<string, unknown>> {
   });
 }
 
+function sanitizeEditor(raw: unknown): MuthurEditorState | null {
+  if (!raw || typeof raw !== "object") return null;
+  const e = raw as Record<string, unknown>;
+  const content = typeof e.content === "string" ? e.content : null;
+  const excerpt = content && content.length > 200 ? content.slice(0, 200) + "..." : content;
+  return {
+    active: e.active === true,
+    filePath: text(e.filePath, 500) ?? null,
+    fileName: text(e.fileName, 260) ?? null,
+    fileExtension: text(e.fileExtension, 20) ?? null,
+    language: text(e.language, 40) ?? null,
+    content,
+    contentExcerpt: excerpt,
+    selectionText: text(e.selectionText, 500) ?? null,
+    cursorLine: typeof e.cursorLine === "number" ? e.cursorLine : null,
+    cursorColumn: typeof e.cursorColumn === "number" ? e.cursorColumn : null,
+    dirty: e.dirty === true,
+    readOnly: e.readOnly === true,
+  };
+}
+
 function sanitizeSnapshot(raw: unknown): MuthurObservationSnapshotInput {
   const input = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const observedAt = typeof input.observedAt === "number" && Number.isFinite(input.observedAt) ? input.observedAt : Date.now();
@@ -50,6 +71,7 @@ function sanitizeSnapshot(raw: unknown): MuthurObservationSnapshotInput {
     transcriptState: text(input.transcriptState, 120),
     operationalWarnings: stringList(input.operationalWarnings),
     continuityIndicators: stringList(input.continuityIndicators),
+    editor: sanitizeEditor(input.editor),
   };
 }
 

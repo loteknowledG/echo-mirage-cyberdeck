@@ -1,19 +1,6 @@
-import { useEffect, useState } from "react";
+import type { SignalSource, SignalSeverity, HealthSignalType, HealthSignalPayload } from "./signal-router";
 
-export type SignalSource =
-  | "command"
-  | "catalog"
-  | "operators"
-  | "atlas"
-  | "voice"
-  | "audio"
-  | "settings"
-  | "system"
-  | "ui"
-  | "muthur"
-  | "health";
-
-export type SignalSeverity = "info" | "success" | "warning" | "error";
+export type { SignalSource, SignalSeverity, HealthSignalType, HealthSignalPayload };
 
 export interface DeckSignal {
   id: string;
@@ -33,17 +20,6 @@ let ringBuffer: DeckSignal[] = [];
 let idCounter = 0;
 
 function generateId(): string {
-  const cryptoApi: Crypto | undefined =
-    typeof globalThis !== "undefined" && (globalThis as { crypto?: Crypto }).crypto
-      ? (globalThis as { crypto?: Crypto }).crypto
-      : undefined;
-  if (cryptoApi && typeof cryptoApi.randomUUID === "function") {
-    try {
-      return cryptoApi.randomUUID();
-    } catch {
-      /* fall through to counter */
-    }
-  }
   idCounter += 1;
   return `signal-${Date.now().toString(36)}-${idCounter.toString(36)}`;
 }
@@ -89,33 +65,6 @@ export function clearSignalHistory(): void {
   ringBuffer = [];
 }
 
-export type HealthSignalType =
-  | "health_status_change"
-  | "provider_connected"
-  | "provider_disconnected"
-  | "provider_failure"
-  | "loop_state_change"
-  | "loop_timeout"
-  | "loop_recovered"
-  | "editor_context_connected"
-  | "editor_context_disconnected"
-  | "editor_context_failure"
-  | "browser_connected"
-  | "browser_disconnected"
-  | "browser_failure"
-  | "intent_routing_fallback"
-  | "intent_routing_failure"
-  | "failure_recorded";
-
-export interface HealthSignalPayload {
-  subsystem?: string;
-  fromStatus?: string;
-  toStatus?: string;
-  reason?: string;
-  error?: string;
-  metadata?: Record<string, unknown>;
-}
-
 export function emitHealthSignal(
   type: HealthSignalType,
   payload?: HealthSignalPayload,
@@ -127,25 +76,4 @@ export function emitHealthSignal(
     payload: payload as Record<string, unknown> | undefined,
     severity: severity ?? (type.includes("failure") || type === "provider_failure" ? "error" : type.includes("recovered") || type === "provider_connected" ? "success" : "info"),
   });
-}
-
-/** Subscribe to live deck signals as long as the component is mounted. */
-export function useDeckSignal(handler: SignalListener): void {
-  useEffect(() => {
-    const unsubscribe = subscribeSignals(handler);
-    return unsubscribe;
-  }, [handler]);
-}
-
-/** Reactive view of the last N signals from the ring buffer. */
-export function useSignalHistory(limit: number = 20): DeckSignal[] {
-  const [snapshot, setSnapshot] = useState<DeckSignal[]>(() => getSignalHistory(limit));
-  useEffect(() => {
-    setSnapshot(getSignalHistory(limit));
-    const unsubscribe = subscribeSignals(() => {
-      setSnapshot(getSignalHistory(limit));
-    });
-    return unsubscribe;
-  }, [limit]);
-  return snapshot;
 }

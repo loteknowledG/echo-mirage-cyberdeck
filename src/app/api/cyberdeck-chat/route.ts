@@ -8,6 +8,9 @@ import {
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { EMPTY_TOOL_REGISTRY } from "@/lib/muthur-core/empty-tool-registry";
 import type { ToolRegistry } from "@/lib/muthur-core/types";
+import { getLatestMuthurObservation } from "@/lib/muthur/observation/observation-store.server";
+import { handleLocalFallback, updateCachedObservation } from "@/lib/muthur/local-fallback";
+import { recordProviderHealth, recordFailure } from "@/lib/muthur/health";
 import {
   buildGlyphContextPrompt,
   MUTHUR_GLYPH_DOCTRINE,
@@ -76,6 +79,26 @@ function buildMemoryPrompt(clientMemory: unknown, serverMemory: string): string 
     return `\n\nMUTHUR Memory Context:\n${serverMemory.trim()}`;
   }
   return "";
+}
+
+function buildEditorContextPrompt(): string {
+  try {
+    const obs = getLatestMuthurObservation("cyberdeck");
+    if (!obs) return "";
+    const e = obs.editor;
+    if (!e || !e.active) return "";
+    const lines = [
+      `\n\nOperator pane editor state:`,
+      `File: ${e.fileName ?? "unknown"}`,
+      `Language: ${e.language ?? "unknown"}`,
+      `Dirty: ${e.dirty ? "true" : "false"}`,
+      e.cursorLine != null ? `Cursor: line ${e.cursorLine}, column ${e.cursorColumn ?? 1}` : null,
+      `Content excerpt: ${e.contentExcerpt ?? e.content?.slice(0, 200) ?? "(empty)"}`,
+    ].filter(Boolean);
+    return lines.join("\n");
+  } catch {
+    return "";
+  }
 }
 
 async function getMuthurMemoryContext(message: string): Promise<string> {
@@ -191,6 +214,20 @@ export async function POST(request: Request) {
       typeof memoryContext === "string" && memoryContext.trim().length > 0;
     /** Cyberdeck always ships client memory — skip boot_muthur on the hot path. */
     const clientSentMemoryField = typeof memoryContext === "string";
+
+    // Always refresh cached observation at the start of each request
+    updateCachedObservation();
+
+    // Check for local-only intents first — no provider required
+    const normalizedMsg = typeof message === "string" ? message.toLowerCase().trim() : "";
+    const localFallback = handleLocalFallback(message as string);
+    if (localFallback && !chatHistory.length) {
+      return new Response(localFallback, {
+        status: 200,
+        headers: { "Content-Type": "text/plain", "X-Muthur-Local-Fallback": "true" },
+      });
+    }
+
     const browserPrompt =
       typeof browserContext === "string" && browserContext.trim()
         ? `\n\nLive browser pane snapshot:\n${browserContext.trim()}`
@@ -283,8 +320,6 @@ export async function POST(request: Request) {
       }
     }
 
-    const normalizedMsg = typeof message === "string" ? message.toLowerCase().trim() : "";
-
     // User session: stream via selected provider (keys from client)
     if (provider && typeof message === "string" && message.trim()) {
       const endpoint = CHAT_URL[provider as string];
@@ -332,10 +367,17 @@ export async function POST(request: Request) {
         const serverMemoryCtx =
           clientSentMemoryField || clientHasMemory ? "" : await getMuthurMemoryContext(message);
         const memoryPrompt = buildMemoryPrompt(memoryContext, serverMemoryCtx);
+        const editorCtxPrompt = buildEditorContextPrompt();
 
         const systemContent =
           "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
-          "\n\nYou may call tools: justbash (workspace shell), localfs (read paths on the machine; mkdir and write_text only inside this project workspace), clock (server time). Use tools when the user asks about the repo, files, time, or when inspection is more reliable than guessing." +
+          "\n\nAVAILABLE TOOLS:" +
+          "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane. Returns: file name, language, cursor line/column, dirty state, and content excerpt (up to 200 chars)." +
+          "\n- justbash: Run shell commands in the workspace (rg, git, ls, cat)." +
+          "\n- localfs: Read files, mkdir, write (workspace only)." +
+          "\n- clock: Server date/time." +
+          "\n\nIMPORTANT: When the user asks what is visible in the Operator pane or what file is open, call observe_operator_pane immediately. It provides the Monaco editor content and metadata." +
+          editorCtxPrompt +
           glyphDoctrine +
           memoryPrompt +
           browserPrompt +
@@ -409,10 +451,17 @@ export async function POST(request: Request) {
         ? ""
         : await getMuthurMemoryContext(typeof message === "string" ? message : "");
     const fallbackMemoryPrompt = buildMemoryPrompt(memoryContext, fallbackMemoryCtx);
+    const editorCtxPrompt = buildEditorContextPrompt();
 
     const systemContent =
       "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
-      "\n\nYou may call tools: justbash (workspace shell), localfs (read paths on the machine; mkdir and write_text only inside this project workspace), clock (server time). Use tools when the user asks about the repo, files, time, or when inspection is more reliable than guessing." +
+      "\n\nAVAILABLE TOOLS:" +
+      "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane. Returns: file name, language, cursor line/column, dirty state, and content excerpt (up to 200 chars)." +
+      "\n- justbash: Run shell commands in the workspace (rg, git, ls, cat)." +
+      "\n- localfs: Read files, mkdir, write (workspace only)." +
+      "\n- clock: Server date/time." +
+      "\n\nIMPORTANT: When the user asks what is visible in the Operator pane or what file is open, call observe_operator_pane immediately. It provides the Monaco editor content and metadata." +
+      editorCtxPrompt +
       glyphDoctrine +
       fallbackMemoryPrompt +
       browserPrompt +
@@ -434,40 +483,60 @@ export async function POST(request: Request) {
       });
     }
 
-    const providerResponse = await fetchWithTimeout(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: envModel,
-        messages: [
-          {
-            role: "system",
-            content: systemContent,
-          },
-          ...chatHistory,
-          { role: "user", content: message },
-        ],
-        stream: true,
-      }),
-    });
+    // No API key — try provider, fall back to local if it fails
+    try {
+      const providerResponse = await fetchWithTimeout(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: envModel,
+          messages: [
+            {
+              role: "system",
+              content: systemContent,
+            },
+            ...chatHistory,
+            { role: "user", content: message },
+          ],
+          stream: true,
+        }),
+      });
 
-    if (!providerResponse.ok) {
-      const text = await providerResponse.text().catch(() => "");
+      if (!providerResponse.ok) {
+        const text = await providerResponse.text().catch(() => "");
+        recordProviderHealth({ status: "failed", connected: false, lastError: `HTTP ${providerResponse.status}: ${text}` });
+        recordFailure("PROVIDER_ERROR", `Provider HTTP error ${providerResponse.status}`, text);
+        // Provider error — try local fallback
+        const localResponse = handleLocalFallback(message as string);
+        if (localResponse) return new Response(localResponse, { status: 200, headers: { "Content-Type": "text/plain" } });
+        return NextResponse.json(
+          { error: `API error ${providerResponse.status}: ${text}` },
+          { status: 502 }
+        );
+      }
+
+      recordProviderHealth({ status: "healthy", connected: true, lastSuccessAt: Date.now() });
+      return new Response(await streamProviderResponse(providerResponse), {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+        },
+      });
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Provider unavailable";
+      recordProviderHealth({ status: "failed", connected: false, lastError: errMsg });
+      recordFailure("NETWORK_ERROR", errMsg);
+      // Provider failure — try local fallback
+      const localResponse = handleLocalFallback(message as string);
+      if (localResponse) return new Response(localResponse, { status: 200, headers: { "Content-Type": "text/plain" } });
       return NextResponse.json(
-        { error: `API error ${providerResponse.status}: ${text}` },
-        { status: 502 }
+        { error: errMsg },
+        { status: 503 }
       );
     }
-
-    return new Response(await streamProviderResponse(providerResponse), {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-      },
-    });
   } catch (err) {
     console.error("[api/cyberdeck-chat][error]", err);
     return NextResponse.json(
