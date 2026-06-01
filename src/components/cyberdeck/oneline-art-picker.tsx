@@ -83,7 +83,10 @@ export function OnelineArtPicker({ value, onChange, onWheelSettled }: OnelineArt
       wheelTransparent
       slideHeightPx={ROW_PX}
       wheelScrollStep={1}
+      alwaysShowLabel
       showTextWhileScrolling={false}
+      wheelMomentumGain={1.35}
+      wheelMomentumDuration={88}
       loop
     />
   );

@@ -2,72 +2,50 @@
 
 ## Purpose
 
-Realmorphism is now registered as a shadcn registry theme item for Echo Mirage distribution.
+Realmorphism ships as **optional install layers**: theme, base controls, rolling pickers, kit showroom, or the `realmorphism` npm package.
 
-## Registry Files
+## Install options (pick what you need)
 
-- `public/registry/realmorphism.json` - installable `registry:theme` item.
-- `public/registry/realmorphism-base.json` - installable wrapper kit for shadcn controls.
-- `public/registry/realmorphism-site.json` - installable showroom page.
-- `public/registry/registry.json` - local registry index.
+| Layer | Command | You get |
+|-------|---------|---------|
+| Theme | `npx shadcn@latest add <origin>/registry/realmorphism.json` | Tokens + motion CSS |
+| Base controls | `npx shadcn@latest add <origin>/registry/realmorphism-base.json` | Wrapped shadcn primitives |
+| **Rolling pickers** | `npx shadcn@latest add <origin>/registry/realmorphism-rolling-pickers.json` | `DocTypeRollingPicker`, `TextRollingPicker`, `ShowroomFontPicker`, `RollingPicker` |
+| Kit showroom | `npx shadcn@latest add <origin>/registry/realmorphism-kit.json` | `KitShowroom` + kit sections + knobs |
+| Registry page | `npx shadcn@latest add <origin>/registry/realmorphism-site.json` | `app/registry/page.tsx` → `KitShowroom` |
+| **Package** | `pnpm add realmorphism` | Same pickers/kit via import (Echo monorepo: `file:../realmorphism`) |
 
-## Local Install
+Replace `<origin>` with your registry host (`http://localhost:3050` for Echo Mirage dev, or GitHub Pages when deployed).
 
-When Echo Mirage is running locally, another project can install the theme from:
+## Registry files
+
+- `public/registry/realmorphism.json` — theme
+- `public/registry/realmorphism-base.json` — base wrappers
+- `public/registry/realmorphism-rolling-pickers.json` — **pickers** (generated)
+- `public/registry/realmorphism-kit.json` — **kit showroom** (generated)
+- `public/registry/realmorphism-site.json` — portable page (generated)
+- `public/registry/registry.json` — index
+
+## Regenerate from source
+
+Picker and kit registry JSON is generated from `f:\dev\realmorphism\src`:
 
 ```bash
-npx shadcn@latest add http://localhost:3050/registry/realmorphism.json
+# realmorphism repo
+pnpm registry:build
+
+# echo-mirage (build + sync to public/registry)
+pnpm registry:build
 ```
 
-To install the turnkey component wrappers:
+Run after changing pickers, kit sections, or install commands in `KitShowroom`.
 
-```bash
-npx shadcn@latest add http://localhost:3050/registry/realmorphism-base.json
-```
+## Echo Mirage (primary consumer)
 
-To install the showroom page:
+Echo uses the **package path** (`realmorphism: file:../realmorphism`) for the live Kit tab. Registry items stay in sync for shadcn `add` and for other projects.
 
-```bash
-npx shadcn@latest add http://localhost:3050/registry/realmorphism-site.json
-```
+## Usage contract
 
-If the app is served from another host or port, replace the origin and keep the same path:
-
-```text
-/registry/realmorphism.json
-```
-
-## Usage Contract
-
-The registry item installs color tokens and the Realmorphism action layer. To express the full theme, apply:
-
-```text
-theme-realmorphism
-```
-
-to the app root and:
-
-```text
-realmorphism-action
-```
-
-to tactile controls.
-
-The motion layer is part of the design, not decoration. It communicates available action, hover lift, active press, and pressed/on state.
-
-## Base Exports
-
-The base item installs:
-
-- `RealmorphismShell`
-- `RealmorphismButton`
-- `RealmorphismIconButton`
-- `RealmorphismCard`
-- `RealmorphismInput`
-- `RealmorphismSwitch`
-- `RealmorphismToolbar`
-- `RealmorphismTabs`
-- `RealmorphismTabsList`
-- `RealmorphismTabsTrigger`
-
-It also re-exports common shadcn card and tabs subcomponents.
+- Root shell: `theme-realmorphism`
+- Actionable controls: `realmorphism-action` or `realmorphism-control`
+- Kit panels: `realmorphism-panel`, `realmorphism-kit-toolbar`

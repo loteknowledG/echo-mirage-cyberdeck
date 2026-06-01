@@ -94,14 +94,15 @@ export function FigletFontPicker({
           ? 'w-full'
           : 'h-7 min-w-0 w-full max-w-none overflow-hidden rounded border border-[#2d2d2d] bg-black [scrollbar-width:none]'
       }
+      wheelTransparent={false}
       wheelExpandOnScroll={isShowroom}
       wheelPinnedOpen={isShowroom}
-      wheelTransparent={false}
       wheelNeighborCount={3}
       slideHeightPx={isShowroom ? 44 : 28}
       wheelScrollStep={1}
       showTextWhileScrolling={false}
       wheelSettledShowsSlide={false}
+      loop
     />
   );
 }

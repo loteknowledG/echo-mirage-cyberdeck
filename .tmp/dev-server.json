@@ -1,9 +1,9 @@
 {
-  "appPort": 3050,
-  "readyPort": 3051,
-  "origin": "http://127.0.0.1:3050",
-  "route": "http://127.0.0.1:3050/cyberdeck",
-  "pid": 27684,
+  "appPort": 3052,
+  "readyPort": 3053,
+  "origin": "http://127.0.0.1:3052",
+  "route": "http://127.0.0.1:3052/cyberdeck",
+  "pid": 26464,
   "mode": "auto",
-  "updatedAt": "2026-05-31T01:29:28.181Z"
+  "updatedAt": "2026-06-01T03:50:34.472Z"
 }

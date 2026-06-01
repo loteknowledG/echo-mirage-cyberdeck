@@ -841,32 +841,33 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 }
 
 /* Echo Mirage wireframe override — content zone only ([data-morphism="realmorphism"]).
-   Asciimorphism chrome (rail, echo/mirage/pane headers) is never touched. */
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] {
+   Asciimorphism chrome (rail, echo/mirage/pane headers) is never touched.
+   Kit showroom ([data-registry-showroom]) keeps full realmorphism color. */
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) {
   text-shadow: none !important;
 }
 
-[data-deck-mode="ascii"] [data-morphism="realmorphism"],
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] * {
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)),
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) * {
   backdrop-filter: none !important;
 }
 
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] .rounded,
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] .rounded-sm,
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] .rounded-\[6px\] {
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) .rounded,
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) .rounded-sm,
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) .rounded-\[6px\] {
   border-radius: 0 !important;
 }
 
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] .shadow-\[0_12px_30px_rgba\(0\,0\,0\,0\.65\)\],
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] .shadow-\[0_0_0_1px_rgba\(16\,185\,129\,0\.30\)_inset\,0_0_14px_rgba\(16\,185\,129\,0\.22\)\,0_3px_10px_rgba\(0\,0\,0\,0\.5\)\],
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] .shadow-\[0_0_0_1px_rgba\(245\,158\,11\,0\.20\)_inset\,0_0_12px_rgba\(245\,158\,11\,0\.12\)\,0_3px_10px_rgba\(0\,0\,0\,0\.5\)\] {
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) .shadow-\[0_12px_30px_rgba\(0\,0\,0\,0\.65\)\],
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) .shadow-\[0_0_0_1px_rgba\(16\,185\,129\,0\.30\)_inset\,0_0_14px_rgba\(16\,185\,129\,0\.22\)\,0_3px_10px_rgba\(0\,0\,0\,0\.5\)\],
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) .shadow-\[0_0_0_1px_rgba\(245\,158\,11\,0\.20\)_inset\,0_0_12px_rgba\(245\,158\,11\,0\.12\)\,0_3px_10px_rgba\(0\,0\,0\,0\.5\)\] {
   box-shadow: none !important;
 }
 
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] div:not([data-morphism="asciimorphism"]),
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] section:not([data-morphism="asciimorphism"]),
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] article:not([data-morphism="asciimorphism"]),
-[data-deck-mode="ascii"] [data-morphism="realmorphism"] aside:not([data-morphism="asciimorphism"]) {
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) div:not([data-morphism="asciimorphism"]),
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) section:not([data-morphism="asciimorphism"]),
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) article:not([data-morphism="asciimorphism"]),
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) aside:not([data-morphism="asciimorphism"]) {
   border-style: dashed;
 }
 

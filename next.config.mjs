@@ -1,13 +1,16 @@
 import path from "path";
 import { fileURLToPath } from "url";
 
-const realmorphismRoot = path.resolve(
-	path.dirname(fileURLToPath(import.meta.url)),
-	"../realmorphism/src",
-);
-const realmorphismPicker = path.join(
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+const realmorphismPackageRoot = path.resolve(projectRoot, "../realmorphism");
+const realmorphismRoot = path.join(realmorphismPackageRoot, "src");
+const realmorphismWheelCss = path.join(
 	realmorphismRoot,
-	"components/ui/rolling-picker.tsx",
+	"components/ui/float-wheel-picker.module.css",
+);
+const echoWheelCss = path.join(
+	projectRoot,
+	"src/components/cyberdeck/float-wheel-picker.module.css",
 );
 
 /** @type {import('next').NextConfig} */
@@ -37,7 +40,11 @@ const nextConfig = {
 	allowedDevOrigins: ["127.0.0.1", "localhost"],
 	turbopack: {
 		resolveAlias: {
-			realmorphism: realmorphismPicker,
+			[realmorphismWheelCss]: echoWheelCss,
+			"realmorphism/styles/kit.css": path.join(
+				realmorphismPackageRoot,
+				"src/styles/realmorphism-kit.css",
+			),
 		},
 	},
 	experimental: {
@@ -56,7 +63,11 @@ const nextConfig = {
 	webpack: (config, { dev }) => {
 		config.resolve.alias = {
 			...config.resolve.alias,
-			realmorphism: realmorphismPicker,
+			[realmorphismWheelCss]: echoWheelCss,
+			"realmorphism/styles/kit.css": path.join(
+				realmorphismPackageRoot,
+				"src/styles/realmorphism-kit.css",
+			),
 		};
 
 		config.ignoreWarnings = [

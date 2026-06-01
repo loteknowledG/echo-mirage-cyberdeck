@@ -47,7 +47,7 @@ async function expectFocusedCardVisibleInMatrix(page: import("@playwright/test")
     };
   });
   expect(visible.ok, visible.reason).toBe(true);
-  expect(visible.title.length).toBeGreaterThan(0);
+  expect(visible.title?.length ?? 0).toBeGreaterThan(0);
   return visible.title;
 }
 

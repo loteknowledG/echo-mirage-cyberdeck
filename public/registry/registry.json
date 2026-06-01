@@ -16,10 +16,22 @@
       "description": "Turnkey Realmorphism wrappers for shadcn/ui controls."
     },
     {
+      "name": "realmorphism-rolling-pickers",
+      "type": "registry:block",
+      "title": "Realmorphism Rolling Pickers",
+      "description": "Compact, text, and showroom Y-axis rolling pickers."
+    },
+    {
+      "name": "realmorphism-kit",
+      "type": "registry:block",
+      "title": "Realmorphism Kit",
+      "description": "Knobs plus all three rolling picker kit sections and KitShowroom."
+    },
+    {
       "name": "realmorphism-site",
       "type": "registry:block",
       "title": "Realmorphism Registry Site",
-      "description": "A portable showroom page for presenting the Realmorphism registry."
+      "description": "Portable KitShowroom page for the registry."
     },
     {
       "name": "shadcn-sidebar",

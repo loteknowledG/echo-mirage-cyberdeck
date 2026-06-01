@@ -18,6 +18,9 @@
       "realmorphism-wall-hover": "#3a9174",
       "realmorphism-wall-amber": "#8a6530",
       "realmorphism-wall-amber-hover": "#b8873f",
+      "realmorphism-wall-critical": "#7a2a2a",
+      "realmorphism-wall-critical-hover": "#a83232",
+      "realmorphism-ink-critical": "#fca5a5",
       "realmorphism-face": "#171c19",
       "realmorphism-face-border": "#2a3530",
       "realmorphism-face-active": "#12241c",
@@ -28,7 +31,9 @@
       "realmorphism-glyph-hover": "#a8b8ff",
       "realmorphism-shadow-rest": "2px 2px 0 1px var(--realmorphism-wall)",
       "realmorphism-shadow-hover": "4px 4px 0 1px var(--realmorphism-wall-hover)",
-      "realmorphism-shadow-inset-active": "inset 1px 1px 0 0 rgba(16, 185, 129, 0.22)"
+          "realmorphism-shadow-inset-active": "inset 1px 1px 0 0 rgba(16, 185, 129, 0.22)",
+      "realmorphism-field-shadow-cast": "color-mix(in srgb, #1a201d 68%, var(--realmorphism-wall))",
+      "realmorphism-shadow-inset-field": "inset 2px 2px 0 1px var(--realmorphism-field-shadow-cast)"
     },
     "light": {
       "background": "150 14% 91%",
@@ -128,14 +133,14 @@
         "transform": "translate(4px, 4px)",
         "box-shadow": "none"
       },
-      ".theme-realmorphism .realmorphism-action[aria-pressed=\"true\"], .theme-realmorphism .realmorphism-action[data-state=\"checked\"]": {
+      ".theme-realmorphism .realmorphism-action[aria-pressed=\"true\"], .theme-realmorphism .realmorphism-action[data-state=\"on\"], .theme-realmorphism .realmorphism-action[data-state=\"checked\"], .theme-realmorphism .realmorphism-control[aria-pressed=\"true\"], .theme-realmorphism .realmorphism-control[data-state=\"on\"], .theme-realmorphism .realmorphism-control[data-state=\"checked\"]": {
         "border-color": "var(--realmorphism-face-active-border)",
         "background": "var(--realmorphism-face-active)",
         "color": "var(--realmorphism-ink-on-face-active)",
         "transform": "translate(2px, 2px)",
         "box-shadow": "var(--realmorphism-shadow-inset-active)"
       },
-      ".theme-realmorphism .realmorphism-action[aria-pressed=\"true\"]:hover:not(:disabled), .theme-realmorphism .realmorphism-action[data-state=\"checked\"]:hover:not(:disabled)": {
+      ".theme-realmorphism .realmorphism-action[aria-pressed=\"true\"]:hover:not(:disabled), .theme-realmorphism .realmorphism-action[data-state=\"on\"]:hover:not(:disabled), .theme-realmorphism .realmorphism-action[data-state=\"checked\"]:hover:not(:disabled), .theme-realmorphism .realmorphism-control[aria-pressed=\"true\"]:hover:not(:disabled), .theme-realmorphism .realmorphism-control[data-state=\"on\"]:hover:not(:disabled), .theme-realmorphism .realmorphism-control[data-state=\"checked\"]:hover:not(:disabled)": {
         "transform": "translate(2px, 2px)",
         "box-shadow": "var(--realmorphism-shadow-inset-active)",
         "color": "var(--realmorphism-ink-on-face-active)"
@@ -149,6 +154,32 @@
         "opacity": "1",
         "cursor": "not-allowed",
         "pointer-events": "none"
+      },
+      ".theme-realmorphism .realmorphism-action.is-critical, .theme-realmorphism .realmorphism-control.is-critical": {
+        "--realmorphism-wall": "var(--realmorphism-wall-critical)",
+        "--realmorphism-wall-hover": "var(--realmorphism-wall-critical-hover)",
+        "box-shadow": "2px 2px 0 1px var(--realmorphism-wall-critical)"
+      },
+      ".theme-realmorphism .realmorphism-action.is-critical:hover:not(:disabled), .theme-realmorphism .realmorphism-control.is-critical:hover:not(:disabled)": {
+        "box-shadow": "4px 4px 0 1px var(--realmorphism-wall-critical-hover)",
+        "color": "var(--realmorphism-ink-critical)"
+      },
+      ".theme-realmorphism .realmorphism-panel": {
+        "border": "1px solid var(--realmorphism-face-border)",
+        "border-radius": "var(--radius)",
+        "background": "var(--realmorphism-host-raised)",
+        "color": "var(--realmorphism-ink-on-face)",
+        "box-shadow": "var(--realmorphism-shadow-rest)"
+      },
+      ".theme-realmorphism .realmorphism-field": {
+        "display": "block",
+        "border": "0",
+        "border-top": "1px solid var(--realmorphism-field-shadow-cast)",
+        "border-left": "1px solid var(--realmorphism-field-shadow-cast)",
+        "border-radius": "var(--radius)",
+        "background": "var(--realmorphism-host)",
+        "color": "var(--realmorphism-ink-on-face)",
+        "box-shadow": "var(--realmorphism-shadow-inset-field)"
       }
     },
     "@media (prefers-reduced-motion: reduce)": {
@@ -159,7 +190,7 @@
   },
   "meta": {
     "doctrine": "The motion is the affordance. Hard-offset shadows and press states communicate that action is available.",
-    "installNote": "Apply the theme class `theme-realmorphism` to the app root and add `realmorphism-action` to tactile controls.",
+    "installNote": "Apply the theme class `theme-realmorphism` to the app root. Use `realmorphism-action` / `realmorphism-control` on interactive controls; use `realmorphism-panel` on static raised surfaces.",
     "disabledNote": "Disabled controls use `--realmorphism-ink-disabled`, stay flat on the surface, and do not lift on hover."
   }
 }

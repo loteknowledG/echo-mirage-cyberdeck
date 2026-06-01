@@ -6,7 +6,7 @@
   "description": "Turnkey Realmorphism wrappers for shadcn/ui controls. Installs the theme dependency plus tactile primitives for buttons, cards, inputs, switches, toolbars, and tabs.",
   "author": "LT Lo TeknowledG",
   "registryDependencies": [
-    "http://localhost:3050/registry/realmorphism.json",
+    "https://loteknowledG.github.io/realmorphism/registry/realmorphism.json",
     "button",
     "card",
     "input",
@@ -23,6 +23,6 @@
   ],
   "meta": {
     "doctrine": "Use RealmorphismShell once near the root. Use realmorphism-action on controls where motion should communicate action availability.",
-    "installNote": "Install with `npx shadcn@latest add http://localhost:3050/registry/realmorphism-base.json` while Echo Mirage is serving locally."
+    "installNote": "Install with `npx shadcn@latest add https://loteknowledG.github.io/realmorphism/registry/realmorphism-base.json` while Echo Mirage is serving locally."
   }
 }

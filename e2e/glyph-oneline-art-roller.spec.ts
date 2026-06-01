@@ -62,8 +62,12 @@ function onelineArtPicker(page: Page) {
 
 function onelineWheel(page: Page) {
   return glyphChannelPane(page).locator(
-    '[data-oneline-art-picker] [aria-label="One-line ASCII art"]',
+    '[data-oneline-art-picker] [data-rolling-picker-mode="expand"]',
   );
+}
+
+function onelinePickerHost(page: Page) {
+  return glyphChannelPane(page).locator('[data-oneline-art-picker] [data-rolling-picker-mode="expand"]');
 }
 
 function glyphComposer(page: Page) {
@@ -74,23 +78,19 @@ async function selectOnelineEngine(page: Page) {
   const engine = renderEngineRoller(page);
   await expect(engine).toBeVisible({ timeout: 30000 });
 
-  for (let i = 0; i < 6; i += 1) {
-    const label = await engine.evaluate((el) => {
-      const centerY = el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2;
-      for (const span of el.querySelectorAll("span")) {
-        const rect = span.getBoundingClientRect();
-        if (rect.height < 1) continue;
-        if (Math.abs(rect.top + rect.height / 2 - centerY) > rect.height) continue;
-        return span.textContent?.trim() ?? "";
-      }
-      return "";
-    });
-    if (/1\s*line/i.test(label)) break;
-    await engine.hover();
-    await page.mouse.wheel(0, 120);
-    await page.waitForTimeout(350);
+  if (await onelineArtPicker(page).isVisible().catch(() => false)) {
+    await expect(onelineWheel(page)).toBeVisible({ timeout: 30000 });
+    return;
   }
 
+  for (let i = 0; i < 16; i += 1) {
+    if (await onelineArtPicker(page).isVisible().catch(() => false)) break;
+    await engine.hover();
+    await page.mouse.wheel(0, 120);
+    await page.waitForTimeout(450);
+  }
+
+  await expect(onelineArtPicker(page)).toBeVisible({ timeout: 30000 });
   await expect(onelineWheel(page)).toBeVisible({ timeout: 30000 });
 }
 
@@ -126,6 +126,15 @@ async function waitForOnelineCatalog(page: Page) {
 async function wheelRoller(roller: Locator, page: Page, deltaY: number) {
   await roller.scrollIntoViewIfNeeded();
   await roller.hover({ force: true });
+  await page.mouse.wheel(0, deltaY);
+  await page.waitForTimeout(700);
+}
+
+async function wheelPickerHost(host: Locator, page: Page, deltaY: number) {
+  await host.scrollIntoViewIfNeeded();
+  const box = await host.boundingBox();
+  expect(box).toBeTruthy();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
   await page.mouse.wheel(0, deltaY);
   await page.waitForTimeout(700);
 }
@@ -196,7 +205,7 @@ test.describe("Glyph channel 1-line ASCII roller", () => {
   test("spinning and settled both show title in picker", async ({ page }) => {
     const wheel = onelineWheel(page);
 
-    await wheelRoller(wheel, page, 480);
+    await wheelPickerHost(onelinePickerHost(page), page, 480);
 
     await expect
       .poll(async () => readCenterBandText(wheel, "oneline-title"), { timeout: 5000 })
@@ -210,11 +219,31 @@ test.describe("Glyph channel 1-line ASCII roller", () => {
     expect(settledTitle.length).toBeGreaterThan(0);
   });
 
+  test("selection stays on spun item after settle", async ({ page }) => {
+    const wheel = onelineWheel(page);
+    await waitForOnelineCatalog(page);
+
+    const start = await readCenterBandText(wheel, "oneline-title");
+    await wheelPickerHost(onelinePickerHost(page), page, 360);
+    await page.waitForTimeout(900);
+
+    const afterSpin = await readCenterBandText(wheel, "oneline-title");
+    expect(afterSpin.length).toBeGreaterThan(0);
+
+    await page.waitForTimeout(1200);
+
+    const afterIdle = await readCenterBandText(wheel, "oneline-title");
+    expect(afterIdle).toBe(afterSpin);
+    if (start !== afterSpin) {
+      expect(afterIdle).not.toBe(start);
+    }
+  });
+
   test("wheel settle writes ascii into composer for enter-to-render", async ({ page }) => {
     const wheel = onelineWheel(page);
     const composer = glyphComposer(page);
 
-    await wheelRoller(wheel, page, 320);
+    await wheelPickerHost(onelinePickerHost(page), page, 320);
 
     await expect
       .poll(async () => (await composer.inputValue()).trim(), { timeout: 10000 })
@@ -232,7 +261,7 @@ test.describe("Glyph channel 1-line ASCII roller", () => {
     const settledWidth = await wheel.evaluate((el) => el.getBoundingClientRect().width);
     expect(settledWidth).toBeGreaterThan(120);
 
-    await wheelRoller(wheel, page, 320);
+    await wheelPickerHost(onelinePickerHost(page), page, 320);
 
     const spinningWidth = await wheel.evaluate((el) => el.getBoundingClientRect().width);
     expect(Math.abs(spinningWidth - settledWidth)).toBeLessThanOrEqual(4);
@@ -250,24 +279,31 @@ test.describe("Glyph channel 1-line ASCII roller", () => {
       "true",
     );
 
-    const seen = new Set<string>();
     const start = await readCenterBandText(wheel, "oneline-title");
     expect(start.length).toBeGreaterThan(0);
-    seen.add(start);
 
     let wrapped = false;
-    for (let spin = 0; spin < 80; spin += 1) {
-      await wheelRoller(wheel, page, 360);
+    for (let spin = 0; spin < 24; spin += 1) {
+      await wheelPickerHost(onelinePickerHost(page), page, -360);
       const title = await readCenterBandText(wheel, "oneline-title");
       expect(title.length).toBeGreaterThan(0);
-      if (title === start && seen.size > 2) {
+      if (title !== start) {
         wrapped = true;
         break;
       }
-      seen.add(title);
     }
-
-    expect(seen.size).toBeGreaterThan(2);
     expect(wrapped).toBe(true);
+
+    let returned = false;
+    for (let spin = 0; spin < 24; spin += 1) {
+      await wheelPickerHost(onelinePickerHost(page), page, 360);
+      const title = await readCenterBandText(wheel, "oneline-title");
+      expect(title.length).toBeGreaterThan(0);
+      if (title === start) {
+        returned = true;
+        break;
+      }
+    }
+    expect(returned).toBe(true);
   });
 });

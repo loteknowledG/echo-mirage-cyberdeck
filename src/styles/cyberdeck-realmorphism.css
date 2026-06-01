@@ -394,6 +394,70 @@
   box-shadow: var(--realmorphism-shadow-rest);
 }
 
+/* Host-plane kit cards (toolbar shells, nested benches on raised panels). */
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-kit-toolbar,
+[data-deck-mode="realmorphism"] .realmorphism-kit-toolbar {
+  border-radius: var(--realmorphism-radius-sm);
+  border: 1px solid var(--realmorphism-face-border);
+  background-color: var(--realmorphism-host);
+  box-shadow: var(--realmorphism-shadow-rest);
+}
+
+/*
+ * Showroom rolling picker — global fallback when CSS modules from linked realmorphism
+ * do not bind (Echo Mirage bundles picker wheel CSS via next.config alias).
+ */
+[data-deck-mode="realmorphism"] [data-float-wheel-showroom] {
+  --showroom-wheel-band: calc(var(--float-wheel-row-px) * var(--float-wheel-visible-rows, 3));
+  position: relative;
+  height: var(--showroom-wheel-band);
+  width: max(var(--showroom-wheel-band), 9.75rem);
+  max-width: 10.5rem;
+  overflow: hidden;
+  border-radius: 2px;
+  border: 1px solid #2d2d2d;
+  background: #000;
+}
+
+[data-deck-mode="realmorphism"] [data-float-wheel-showroom] [data-float-wheel-stage] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: var(--showroom-wheel-band);
+  overflow: hidden;
+  background: #000;
+}
+
+[data-deck-mode="realmorphism"] [data-float-wheel-showroom] [data-float-wheel-stage]::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    to bottom,
+    rgba(6, 7, 8, 0.75) 0%,
+    rgba(6, 7, 8, 0) 38%,
+    rgba(6, 7, 8, 0) 62%,
+    rgba(6, 7, 8, 0.75) 100%
+  );
+}
+
+[data-deck-mode="realmorphism"] [data-float-wheel-showroom]::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - var(--float-wheel-row-px) / 2);
+  height: var(--float-wheel-row-px);
+  z-index: 4;
+  border-top: 1px solid rgba(255, 255, 255, 0.28);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.28);
+}
+
 [data-deck-mode="realmorphism"] [data-morphism="realmorphism"] .realmorphism-field,
 [data-deck-mode="realmorphism"] .realmorphism-field {
   display: block;

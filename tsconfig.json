@@ -17,9 +17,9 @@
         "name": "next"
       }
     ],
+    "allowImportingTsExtensions": true,
     "paths": {
-      "@/*": ["./src/*"],
-      "realmorphism": ["../realmorphism/src/components/ui/rolling-picker.tsx"]
+      "@/*": ["./src/*"]
     },
     "target": "ES2017"
   },

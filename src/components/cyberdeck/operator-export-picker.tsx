@@ -59,6 +59,7 @@ export function OperatorExportPicker({ disabled, onExport }: OperatorExportPicke
         ariaLabel="Export format"
         viewportClassName="h-7 w-7"
         showTextWhileScrolling
+        loop
       />
     </div>
   );
