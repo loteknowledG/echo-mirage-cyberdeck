@@ -63,6 +63,36 @@ async function choosePorts() {
 }
 
 const { appPort, readyPort } = await choosePorts();
+const nextDistDir =
+  useAutoPort && appPort !== DEFAULT_APP_PORT ? `.next-dev/${appPort}` : '.next';
+const nextEnvPath = path.join(root, 'next-env.d.ts');
+const tsconfigPath = path.join(root, 'tsconfig.json');
+
+async function normalizeGeneratedTypePaths() {
+  if (nextDistDir === '.next') return;
+
+  try {
+    const nextEnv = await fs.readFile(nextEnvPath, 'utf8');
+    const normalized = nextEnv.replace(
+      /import "\.\/\.next-dev\/\d+\/dev\/types\/routes\.d\.ts";/,
+      'import "./.next/dev/types/routes.d.ts";',
+    );
+    if (normalized !== nextEnv) await fs.writeFile(nextEnvPath, normalized, 'utf8');
+  } catch {
+    /* Next may not have generated next-env.d.ts yet. */
+  }
+
+  try {
+    const raw = await fs.readFile(tsconfigPath, 'utf8');
+    const normalized = raw.replace(
+      /,\r?\n\s*"\.next-dev\/\d+\/(?:dev\/)?types\/\*\*\/\*\.ts"/g,
+      '',
+    );
+    if (normalized !== raw) await fs.writeFile(tsconfigPath, normalized, 'utf8');
+  } catch {
+    /* Keep dev startup resilient if tsconfig is absent or temporarily invalid. */
+  }
+}
 
 const readyServer = http.createServer((req, res) => {
   const url = req.url?.split('?')[0] ?? '/';
@@ -111,7 +141,7 @@ readyServer.listen(readyPort, '127.0.0.1', async () => {
     process.stdout.write('[dev] turbopack mode - if PostCSS panics on Windows, use: pnpm dev (webpack)\n');
   }
   process.stdout.write(
-    `[dev] app :${appPort}/cyberdeck | sidecar :${readyPort}/health | node heap ${HEAP_MB}MB | bundler ${bundler}\n`,
+    `[dev] app :${appPort}/cyberdeck | sidecar :${readyPort}/health | cache ${nextDistDir} | node heap ${HEAP_MB}MB | bundler ${bundler}\n`,
   );
 });
 
@@ -141,6 +171,7 @@ function noteNextReady(line) {
   if (/\bReady in\b/.test(line) || /✓ Ready\b/.test(line)) {
     nextReady = true;
     process.stdout.write(`[dev] Next ready - sidecar :${readyPort}/health open\n`);
+    void normalizeGeneratedTypePaths();
   }
 }
 
@@ -156,7 +187,10 @@ const nextArgs = [
 const child = spawn(process.execPath, nextArgs, {
   cwd: root,
   stdio: ['inherit', 'pipe', 'pipe'],
-  env: devNodeEnv(),
+  env: {
+    ...devNodeEnv(),
+    CYBERDECK_NEXT_DIST_DIR: nextDistDir,
+  },
 });
 
 function pipeLines(stream, /** @type {NodeJS.WriteStream} */ out) {
@@ -178,8 +212,9 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
   });
 }
 
-child.on('close', (code, signal) => {
+child.on('close', async (code, signal) => {
   shutdownReadyServer();
+  await normalizeGeneratedTypePaths();
   if (signal) process.kill(process.pid, signal);
   else process.exit(code ?? 0);
 });
