@@ -179,6 +179,11 @@ import {
 } from "@/components/cyberdeck/muthur-command-input";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
+import {
+  POWERFIST_STACK_CHANNEL,
+  POWERFIST_STACK_PUSH_EVENT,
+  type PowerFistStackCommand,
+} from "@/lib/cyberdeck/powerfist-events";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
 import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration";
@@ -1854,19 +1859,11 @@ export default function CyberdeckApp() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const warmPanes = () => {
-      void import("@/features/cyberdeck/pane-chunks").then((mod) => {
-        for (const kind of mod.PREFETCH_PANE_KINDS) {
-          mod.prefetchCyberdeckPane(kind);
-        }
-      });
-    };
-    if (typeof window.requestIdleCallback === "function") {
-      const id = window.requestIdleCallback(warmPanes, { timeout: 8000 });
-      return () => window.cancelIdleCallback(id);
-    }
-    const timer = window.setTimeout(warmPanes, 2000);
-    return () => window.clearTimeout(timer);
+    void import("@/features/cyberdeck/pane-chunks").then((mod) => {
+      for (const kind of mod.PREFETCH_PANE_KINDS) {
+        mod.prefetchCyberdeckPane(kind);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -4186,7 +4183,10 @@ export default function CyberdeckApp() {
     });
   }, []);
 
-  const handleSend = async (messageText?: string) => {
+  const handleSend = async (
+    messageText?: string,
+    options?: { preserveSelectedSurface?: boolean },
+  ) => {
     const userMessage = (messageText ?? messageInputRef.current?.getValue() ?? "").trim();
     if (!userMessage) return;
 
@@ -4828,8 +4828,10 @@ if (detectExecDeckPrepareIntent(userMessage)) {
     if (detectExecDeckPushIntent(userMessage)) {
       openDeck();
       const result = pushHandToStack();
-      useCyberdeckTabStore.getState().setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
-      useCyberdeckTabStore.getState().setActiveCustomTabId(null);
+      if (!options?.preserveSelectedSurface) {
+        useCyberdeckTabStore.getState().setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
+        useCyberdeckTabStore.getState().setActiveCustomTabId(null);
+      }
       if (result.pushed > 0) {
         if (isObserving()) recordEvent("hand_pushed_to_stack", "Hand Pushed", `${result.pushed} cards pushed to stack, depth now ${result.stackDepth}`);
         narrate("HAND_PUSHED_TO_STACK");
@@ -5450,6 +5452,32 @@ const resolved = resolveUiTarget(userMessage);
       setIsStreaming(false);
     }
   };
+
+  useEffect(() => {
+    const pushToChat = (detail: PowerFistStackCommand | undefined) => {
+      const message = detail?.message?.trim();
+      if (!message) return;
+      void handleSend(message, { preserveSelectedSurface: true });
+    };
+    const handlePowerFistPush = (event: Event) => {
+      event.preventDefault();
+      pushToChat((event as CustomEvent<PowerFistStackCommand>).detail);
+    };
+    const channel =
+      typeof BroadcastChannel === "undefined"
+        ? null
+        : new BroadcastChannel(POWERFIST_STACK_CHANNEL);
+    if (channel) {
+      channel.onmessage = (event: MessageEvent<PowerFistStackCommand>) => {
+        pushToChat(event.data);
+      };
+    }
+    window.addEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
+    return () => {
+      window.removeEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
+      channel?.close();
+    };
+  });
 
   const handleStop = useCallback(() => {
     abortMotherSpeech();

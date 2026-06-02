@@ -1,4 +1,5 @@
 const fs = require('fs/promises');
+const fsSync = require('fs');
 const path = require('path');
 const { app, BrowserWindow, Menu, shell, ipcMain, clipboard, dialog } = require('electron');
 
@@ -379,6 +380,69 @@ async function createWindow() {
   // Keep in sync with package.json dev/start port (avoids clash with Weyland-Yutani on :3000).
   const origin = await getDevOrigin();
   win.loadURL(`${origin}/cyberdeck`);
+
+  if (!app.isPackaged) {
+    setupDevRendererReload(win);
+  }
+}
+
+function setupDevRendererReload(win) {
+  const projectRoot = path.resolve(__dirname, '..');
+  const watchRoots = [
+    path.join(projectRoot, 'src', 'app', 'preview'),
+    path.join(projectRoot, 'src', 'components', 'cyberdeck'),
+    path.join(projectRoot, 'src', 'features', 'cyberdeck', 'pane-loaders'),
+  ];
+
+  const watchers = [];
+  let reloadTimer = null;
+
+  const triggerReload = () => {
+    if (win.isDestroyed()) return;
+    if (reloadTimer) clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(() => {
+      if (win.isDestroyed()) return;
+      try {
+        win.webContents.reloadIgnoringCache();
+      } catch {
+        /* ignore reload failures during dev transitions */
+      }
+    }, 120);
+  };
+
+  for (const watchRoot of watchRoots) {
+    if (!fsSync.existsSync(watchRoot)) continue;
+    try {
+      const watcher = fsSync.watch(
+        watchRoot,
+        { recursive: true },
+        (_eventType, filename) => {
+          if (!filename) return;
+          const normalized = String(filename).replace(/\\/g, '/');
+          if (normalized.includes('/.next/')) return;
+          if (normalized.includes('/node_modules/')) return;
+          triggerReload();
+        },
+      );
+      watchers.push(watcher);
+    } catch {
+      /* best-effort watcher; HMR remains primary path */
+    }
+  }
+
+  win.on('closed', () => {
+    if (reloadTimer) {
+      clearTimeout(reloadTimer);
+      reloadTimer = null;
+    }
+    for (const watcher of watchers) {
+      try {
+        watcher.close();
+      } catch {
+        /* ignore close errors */
+      }
+    }
+  });
 }
 
 ipcMain.handle('echo-mirage-browser:navigate', async (_event, url) => {

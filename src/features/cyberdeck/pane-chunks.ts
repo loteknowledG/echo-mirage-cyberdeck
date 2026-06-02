@@ -39,4 +39,8 @@ export function prefetchCyberdeckPane(kind: string): void {
 }
 
 /** Panes worth pre-warming when the deck shell mounts. */
-export const PREFETCH_PANE_KINDS: readonly CyberdeckPaneKind[] = ["glyph-channel", "operator"];
+export const PREFETCH_PANE_KINDS: readonly CyberdeckPaneKind[] = [
+  "glyph-channel",
+  "operator",
+  "rola-dex",
+];

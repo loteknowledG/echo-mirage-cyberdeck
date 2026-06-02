@@ -130,10 +130,12 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
     await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
 
-    await page.getByRole("button", { name: "Next deck" }).click();
+    await page.getByRole("button", { name: "Move cards up" }).click();
+    await page.waitForTimeout(450);
     await expectFocusedCardVisibleInMatrix(page);
 
-    await page.getByRole("button", { name: "Next card" }).click();
+    await page.getByRole("button", { name: "Move cards left" }).click();
+    await page.waitForTimeout(450);
     await expectFocusedCardVisibleInMatrix(page);
   });
 
@@ -146,10 +148,10 @@ test.describe("Rola Dex / Preview matrix", () => {
       "true",
     );
 
-    await page.getByRole("button", { name: "Next card" }).click();
+    await page.getByRole("button", { name: "Move cards left" }).click();
     await expect(page.locator(".cardTitle", { hasText: "Request Codex Review" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Previous card" }).click();
+    await page.getByRole("button", { name: "Move cards right" }).click();
     await expect(page.locator(".cardTitle", { hasText: "Capture Builder Result" })).toBeVisible();
   });
 
@@ -353,28 +355,81 @@ test.describe("Rola Dex / Preview matrix", () => {
     }
 
     await expect(page.locator(".cardTitle", { hasText: "Render Plain Text" })).toBeVisible();
-    await page.getByRole("button", { name: "Next deck" }).click();
+    await page.getByRole("button", { name: "Move cards up" }).click();
     await expect(page.locator(".cardSlide.is-selected .cardArtifactPreviewOneline")).toBeVisible();
-    await page.getByRole("button", { name: "Next deck" }).click();
+    await page.getByRole("button", { name: "Move cards up" }).click();
     await expect(page.locator(".cardSlide.is-selected .cardArtifactPreviewFiglet")).toBeVisible();
   });
 
-  test("long press traces the card outline and dispatches on completion", async ({ page }) => {
+  test("long press prepares the card and reveals push on completion", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    const card = page.locator(".cardSlide.is-selected .card");
+    const card = page.locator(".deckSlide.is-selected .cardSlide.is-selected .card");
     const box = await card.boundingBox();
     expect(box).not.toBeNull();
 
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.down();
-    await expect(card.locator(".cardHoldTrace")).toBeVisible();
+    await expect(card).toHaveClass(/is-arming/);
+    await expect(page.locator(".stackLog")).toHaveText("Stack idle.");
     await page.waitForTimeout(980);
-    await expect(page.locator(".stackLog")).toContainText(/Played Capture Builder Result/i);
+    await expect(card).not.toHaveClass(/is-arming/);
     await page.mouse.up();
+    await expect(card).toHaveClass(/is-armed/);
+    const openCard = page.getByTestId("powerfist-open-card");
+    await expect(openCard).toContainText("Prepared // Locked");
+    const viewportFit = await page.evaluate(() => {
+      const matrix = document.querySelector(".powerfist-preview-root .matrix")?.getBoundingClientRect();
+      const open = document
+        .querySelector('[data-testid="powerfist-open-card"]')
+        ?.getBoundingClientRect();
+      return matrix && open
+        ? {
+            heightDelta: Math.abs(matrix.height - open.height),
+            widthDelta: Math.abs(matrix.width - open.width),
+          }
+        : null;
+    });
+    expect(viewportFit).not.toBeNull();
+    expect(viewportFit?.heightDelta).toBeLessThanOrEqual(2);
+    expect(viewportFit?.widthDelta).toBeLessThanOrEqual(2);
+    await expect(page.locator(".stackLog")).toHaveText("Stack idle.");
+    await expect(openCard.getByRole("button", { name: "Close" })).toBeVisible();
+    await page.evaluate(() => {
+      window.addEventListener(
+        "echo-mirage:powerfist-stack-push",
+        (event) => {
+          (window as typeof window & { __powerfistPush?: unknown }).__powerfistPush = (
+            event as CustomEvent
+          ).detail;
+        },
+        { once: true },
+      );
+    });
+    await openCard.getByRole("button", { name: "Push" }).click();
+    await expect(page.locator(".stackLog")).toHaveText("Stack idle.");
+    const pushReceipt = page.getByTestId("powerfist-push-receipt");
+    await expect(pushReceipt).toContainText(/Pushed Capture Builder Result/i);
+    await expect(card).not.toHaveClass(/is-armed/);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as typeof window & { __powerfistPush?: unknown }).__powerfistPush,
+        ),
+      )
+      .toMatchObject({
+        kind: "powerfist-stack-push",
+        actor: "operator",
+        card: {
+          title: "Capture Builder Result",
+          deckName: "Execution Deck",
+        },
+        targetPane: "OPERATOR",
+      });
+    await expect(pushReceipt).toHaveCount(0, { timeout: 3500 });
   });
 
-  test("dragging cancels long press activation before carousel swipe", async ({ page }) => {
+  test("dragging the card remains a carousel swipe without pushing", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
     const card = page.locator(".cardSlide.is-selected .card");
@@ -384,11 +439,11 @@ test.describe("Rola Dex / Preview matrix", () => {
     const y = box!.y + box!.height / 2;
     await page.mouse.move(box!.x + box!.width * 0.75, y);
     await page.mouse.down();
-    await expect(card.locator(".cardHoldTrace")).toBeVisible();
     await page.mouse.move(box!.x + box!.width * 0.25, y, { steps: 5 });
-    await expect(card.locator(".cardHoldTrace")).toBeHidden();
     await page.mouse.up();
-    await page.waitForTimeout(980);
     await expect(page.locator(".stackLog")).toHaveText("Stack idle.");
+    await expect(page.locator(".cardSlide.is-selected .cardTitle")).not.toHaveText(
+      "Capture Builder Result",
+    );
   });
 });

@@ -19,9 +19,19 @@ import {
   type CyberdeckPaneKind,
 } from "@/features/cyberdeck/pane-registry";
 import { ensurePickerSnappedToCenter } from "@/lib/embla-ios-picker-loop";
+import {
+  POWERFIST_STACK_CHANNEL,
+  POWERFIST_STACK_PUSH_EVENT,
+  type PowerFistStackCommand,
+} from "@/lib/cyberdeck/powerfist-events";
 import { GLYPH_CHANNEL_PREVIEW_DECKS, PREVIEW_DECKS } from "./preview-data";
 import { scrollMatrixTo, wrapIndex } from "./preview-matrix-nav";
 import "./preview-matrix.css";
+
+const CARD_PLAY_TRAIL_DURATION_MS = 900;
+const CARD_PUSH_RECEIPT_DURATION_MS = 2400;
+const CARD_PLAY_TRACE_PATH =
+  "M 50 1 L 93 1 A 6 6 0 0 1 99 7 L 99 93 A 6 6 0 0 1 93 99 L 7 99 A 6 6 0 0 1 1 93 L 1 7 A 6 6 0 0 1 7 1 L 50 1";
 
 function escapeHtml(value: string): string {
   return value
@@ -30,6 +40,20 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function cardChatMessage(
+  deckName: string,
+  targetPaneLabel: string,
+  card: (typeof PREVIEW_DECKS)[number]["cards"][number],
+): string {
+  const preview =
+    card.preview?.kind === "figlet"
+      ? ` Render the result as figlet using the "${card.preview.value}" font.`
+      : card.preview?.kind === "oneline"
+        ? ` Include this one-line ASCII artifact: ${card.preview.value}`
+        : "";
+  return `POWERFIST STACK PUSH // "${card.title}" from "${deckName}" against ${targetPaneLabel}. ${card.purpose}${preview}`;
 }
 
 export function PreviewMatrix() {
@@ -41,6 +65,8 @@ export function PreviewMatrix() {
   const [targetPane, setTargetPane] = useState<CyberdeckPaneKind>("operator");
   const [message, setMessage] = useState("");
   const [armingCardKey, setArmingCardKey] = useState<string | null>(null);
+  const [armedCardKey, setArmedCardKey] = useState<string | null>(null);
+  const [pushReceiptHtml, setPushReceiptHtml] = useState<string | null>(null);
 
   const matrixRef = useRef<HTMLElement>(null);
   const paneRef = useRef<HTMLElement>(null);
@@ -58,9 +84,17 @@ export function PreviewMatrix() {
     startY: number;
     timer: ReturnType<typeof setTimeout>;
   } | null>(null);
+  const pushReceiptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const targetPaneLabel = CYBERDECK_PANE_REGISTRY[targetPane].label;
   const activeDecks = targetPane === "glyph-channel" ? GLYPH_CHANNEL_PREVIEW_DECKS : PREVIEW_DECKS;
+  const armedCard = useMemo(() => {
+    if (!armedCardKey) return null;
+    const [deckIndex, cardIndex] = armedCardKey.split(":").map(Number);
+    const deck = activeDecks[deckIndex];
+    const card = deck?.cards[cardIndex];
+    return deck && card ? { card, cardIndex, deck, deckIndex } : null;
+  }, [activeDecks, armedCardKey]);
   const paneRollerItems = useMemo(
     () =>
       CYBERDECK_PANE_KINDS.map((kind) => {
@@ -275,17 +309,9 @@ export function PreviewMatrix() {
     return () => cancelAnimationFrame(raf);
   }, [isCompactCards, recenterSelectedCard]);
 
-  const playFocusedCard = useCallback(() => {
-    const deck = activeDecks[activeDeckIndex];
-    const card = deck?.cards[activeCardIndex];
-    if (!deck || !card) return;
-    setStackLogHtml(
-      `Played <strong>${card.title}</strong> from <strong>${deck.name}</strong> against <strong>${targetPaneLabel}</strong>. Card would be pushed to Stack. Execution still blocked in prototype.`,
-    );
-  }, [activeDeckIndex, activeCardIndex, activeDecks, targetPaneLabel]);
-
   const navigateCard = useCallback(
     (direction: 1 | -1) => {
+      if (armedCardKey) return;
       const deck = activeDecks[activeDeckIndex];
       if (!deck || deck.cards.length < 1) return;
 
@@ -294,32 +320,47 @@ export function PreviewMatrix() {
       if (direction < 0) handEmbla.scrollPrev();
       else handEmbla.scrollNext();
     },
-    [activeDeckIndex, activeDecks],
+    [activeDeckIndex, activeDecks, armedCardKey],
   );
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const deckEmbla = deckEmblaRef.current;
-      if (!deckEmbla) return;
-      if (event.key === "ArrowUp") deckEmbla.scrollPrev();
-      if (event.key === "ArrowDown") deckEmbla.scrollNext();
-      if (event.key === "ArrowLeft") navigateCard(-1);
-      if (event.key === "ArrowRight") navigateCard(1);
-      if (event.key === "Enter") playFocusedCard();
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [navigateCard, playFocusedCard]);
-
-  const handlePlayCard = useCallback(
+  const handlePushCard = useCallback(
     (deckIndex: number, cardIndex: number) => {
       applyFocus(deckIndex, cardIndex);
       const deck = activeDecks[deckIndex];
       const card = deck.cards[cardIndex];
-      setStackLogHtml(
-        `Played <strong>${card.title}</strong> from <strong>${deck.name}</strong> against <strong>${targetPaneLabel}</strong>. Card would be pushed to Stack. Execution still blocked in prototype.`,
+      const chatMessage = cardChatMessage(deck.name, targetPaneLabel, card);
+      const detail: PowerFistStackCommand = {
+        kind: "powerfist-stack-push",
+        actor: "operator",
+        card: {
+          deckName: deck.name,
+          risk: card.risk,
+          title: card.title,
+          type: card.type,
+        },
+        commandId: crypto.randomUUID(),
+        message: chatMessage,
+        preparedArtifact: card.preview,
+        targetPane: targetPaneLabel,
+      };
+      const event = new CustomEvent<PowerFistStackCommand>(POWERFIST_STACK_PUSH_EVENT, {
+        cancelable: true,
+        detail,
+      });
+      window.dispatchEvent(event);
+      if (!event.defaultPrevented && "BroadcastChannel" in window) {
+        const channel = new BroadcastChannel(POWERFIST_STACK_CHANNEL);
+        channel.postMessage(detail);
+        channel.close();
+      }
+      if (pushReceiptTimerRef.current) clearTimeout(pushReceiptTimerRef.current);
+      setPushReceiptHtml(
+        `Pushed <strong>${card.title}</strong> from <strong>${deck.name}</strong> onto the Echo Mirage command stack against <strong>${targetPaneLabel}</strong>.`,
       );
+      pushReceiptTimerRef.current = setTimeout(() => {
+        setPushReceiptHtml(null);
+        pushReceiptTimerRef.current = null;
+      }, CARD_PUSH_RECEIPT_DURATION_MS);
     },
     [activeDecks, applyFocus, targetPaneLabel],
   );
@@ -332,18 +373,36 @@ export function PreviewMatrix() {
     setArmingCardKey(null);
   }, []);
 
+  const resetCardPlay = useCallback(() => {
+    cancelCardHold();
+    const openedCardKey = armedCardKey;
+    setArmedCardKey(null);
+    if (!openedCardKey) return;
+    const [deckIndex, cardIndex] = openedCardKey.split(":").map(Number);
+    requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
+  }, [applyFocus, armedCardKey, cancelCardHold]);
+
+  const playFocusedCard = useCallback(() => {
+    const key = `${activeDeckIndex}:${activeCardIndex}`;
+    if (armedCardKey !== key) return;
+    handlePushCard(activeDeckIndex, activeCardIndex);
+    resetCardPlay();
+  }, [activeCardIndex, activeDeckIndex, armedCardKey, handlePushCard, resetCardPlay]);
+
   const handleCardPointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>, deckIndex: number, cardIndex: number) => {
       if (event.button !== 0 || !event.isPrimary) return;
+      if (armedCardKey) return;
       cancelCardHold();
+      setArmedCardKey(null);
       applyFocus(deckIndex, cardIndex);
       const key = `${deckIndex}:${cardIndex}`;
       const timer = setTimeout(() => {
         if (cardHoldRef.current?.key !== key) return;
         cardHoldRef.current = null;
         setArmingCardKey(null);
-        handlePlayCard(deckIndex, cardIndex);
-      }, 900);
+        setArmedCardKey(key);
+      }, CARD_PLAY_TRAIL_DURATION_MS);
       cardHoldRef.current = {
         key,
         pointerId: event.pointerId,
@@ -353,7 +412,7 @@ export function PreviewMatrix() {
       };
       setArmingCardKey(key);
     },
-    [applyFocus, cancelCardHold, handlePlayCard],
+    [applyFocus, armedCardKey, cancelCardHold],
   );
 
   const handleCardPointerMove = useCallback(
@@ -367,7 +426,35 @@ export function PreviewMatrix() {
     [cancelCardHold],
   );
 
-  useEffect(() => cancelCardHold, [cancelCardHold]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const deckEmbla = deckEmblaRef.current;
+      if (!deckEmbla) return;
+      if (armedCardKey) {
+        if (event.key === "Escape") resetCardPlay();
+        return;
+      }
+      if (event.key === "ArrowUp") deckEmbla.scrollNext();
+      if (event.key === "ArrowDown") deckEmbla.scrollPrev();
+      if (event.key === "ArrowLeft") navigateCard(1);
+      if (event.key === "ArrowRight") navigateCard(-1);
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [armedCardKey, navigateCard, resetCardPlay]);
+
+  useEffect(
+    () => cancelCardHold,
+    [cancelCardHold],
+  );
+
+  useEffect(
+    () => () => {
+      if (pushReceiptTimerRef.current) clearTimeout(pushReceiptTimerRef.current);
+    },
+    [],
+  );
 
   const queueMessage = useCallback(
     () => {
@@ -449,6 +536,8 @@ export function PreviewMatrix() {
                           const isSelected =
                             deckIndex === activeDeckIndex && cardIndex === activeCardIndex;
                           const cardKey = `${deckIndex}:${cardIndex}`;
+                          const isArming = armingCardKey === cardKey;
+                          const isArmed = armedCardKey === cardKey;
                           return (
                             <article
                               key={`${deck.name}-${card.title}`}
@@ -462,22 +551,19 @@ export function PreviewMatrix() {
                               onPointerUp={cancelCardHold}
                               onPointerCancel={cancelCardHold}
                             >
-                              <div className="card">
-                                {armingCardKey === cardKey ? (
+                              <div
+                                className={`card${isArming ? " is-arming" : ""}${isArmed ? " is-armed" : ""}`}
+                              >
+                                {isArming ? (
                                   <svg
                                     aria-hidden
-                                    className="cardHoldTrace"
+                                    className="cardPlayTrace"
                                     preserveAspectRatio="none"
                                     viewBox="0 0 100 100"
                                   >
-                                    <rect
-                                      className="cardHoldTracePath"
-                                      x="1"
-                                      y="1"
-                                      width="98"
-                                      height="98"
-                                      rx="6"
-                                      ry="6"
+                                    <path
+                                      className="cardPlayTracePath"
+                                      d={CARD_PLAY_TRACE_PATH}
                                       pathLength="1"
                                     />
                                   </svg>
@@ -504,17 +590,6 @@ export function PreviewMatrix() {
                                 </div>
                                 <div className="cardBottom">
                                   <span className={`risk ${card.risk}`}>{card.risk}</span>
-                                  <button
-                                    type="button"
-                                    className="play"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      handlePlayCard(deckIndex, cardIndex);
-                                    }}
-                                    onPointerDown={(event) => event.stopPropagation()}
-                                  >
-                                    Play
-                                  </button>
                                 </div>
                               </div>
                             </article>
@@ -526,38 +601,99 @@ export function PreviewMatrix() {
                 ))}
               </div>
             </div>
+            {armedCard ? (
+              <section className="cardOpenViewport" data-testid="powerfist-open-card">
+                <div className="cardOpenViewportHeader">
+                  <div>
+                    <div className="cardArmedPanelStatus">
+                      <span className="cardArmedPanelDot" aria-hidden />
+                      Prepared // Locked
+                    </div>
+                    <h2 className="cardOpenViewportTitle">{armedCard.card.title}</h2>
+                  </div>
+                  <span className={`risk ${armedCard.card.risk}`}>{armedCard.card.risk}</span>
+                </div>
+                <div className="cardOpenViewportBody">
+                  <div className="cardOpenViewportType">{armedCard.card.type}</div>
+                  {armedCard.card.preview?.kind === "figlet" ? (
+                    <div className="cardOpenViewportArtifact">
+                      <FigletFontPreviewSlide
+                        font={armedCard.card.preview.value}
+                        active
+                        loadPreview
+                        size="lg"
+                      />
+                    </div>
+                  ) : null}
+                  {armedCard.card.preview?.kind === "oneline" ? (
+                    <pre className="cardOpenViewportArtifact cardOpenViewportAscii">
+                      {armedCard.card.preview.value}
+                    </pre>
+                  ) : null}
+                  <p className="cardOpenViewportPurpose">{armedCard.card.purpose}</p>
+                </div>
+                <div className="cardOpenViewportActions">
+                  <button type="button" className="cardClose" onClick={resetCardPlay}>
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    className="push"
+                    onClick={() => {
+                      handlePushCard(armedCard.deckIndex, armedCard.cardIndex);
+                      resetCardPlay();
+                    }}
+                  >
+                    Push
+                  </button>
+                </div>
+              </section>
+            ) : null}
+            {pushReceiptHtml ? (
+              <div
+                aria-live="polite"
+                className="cardPushReceipt"
+                data-testid="powerfist-push-receipt"
+                dangerouslySetInnerHTML={{ __html: pushReceiptHtml }}
+                role="status"
+              />
+            ) : null}
           </section>
-          {isCompactCards ? (
+          {isCompactCards && !armedCardKey ? (
             <div className="compactCardControls">
               <button
                 type="button"
                 className="dpadBtn compactCardControl compactCardControlLeft"
-                aria-label="Previous card"
-                onClick={() => navigateCard(-1)}
+                aria-label="Move cards left"
+                disabled={Boolean(armedCardKey)}
+                onClick={() => navigateCard(1)}
               >
                 ←
               </button>
               <button
                 type="button"
                 className="dpadBtn compactCardControl compactCardControlRight"
-                aria-label="Next card"
-                onClick={() => navigateCard(1)}
+                aria-label="Move cards right"
+                disabled={Boolean(armedCardKey)}
+                onClick={() => navigateCard(-1)}
               >
                 →
               </button>
               <button
                 type="button"
                 className="dpadBtn compactCardControl compactCardControlUp"
-                aria-label="Previous deck"
-                onClick={() => deckEmblaRef.current?.scrollPrev()}
+                aria-label="Move cards up"
+                disabled={Boolean(armedCardKey)}
+                onClick={() => deckEmblaRef.current?.scrollNext()}
               >
                 ↑
               </button>
               <button
                 type="button"
                 className="dpadBtn compactCardControl compactCardControlDown"
-                aria-label="Next deck"
-                onClick={() => deckEmblaRef.current?.scrollNext()}
+                aria-label="Move cards down"
+                disabled={Boolean(armedCardKey)}
+                onClick={() => deckEmblaRef.current?.scrollPrev()}
               >
                 ↓
               </button>
@@ -566,7 +702,7 @@ export function PreviewMatrix() {
         </section>
 
         <section className="controls">
-          {!isCompactCards ? (
+        {!isCompactCards && !armedCardKey ? (
             <motion.div
               className="dpad"
               aria-label="Matrix navigation"
@@ -579,26 +715,26 @@ export function PreviewMatrix() {
               <button
                 type="button"
                 className="dpadBtn dpadUp"
-                aria-label="Previous deck"
-                disabled={isDraggingDpad}
-                onClick={() => deckEmblaRef.current?.scrollPrev()}
+                aria-label="Move cards up"
+                disabled={isDraggingDpad || Boolean(armedCardKey)}
+                onClick={() => deckEmblaRef.current?.scrollNext()}
               >
                 ↑
               </button>
               <button
                 type="button"
                 className="dpadBtn dpadLeft"
-                aria-label="Previous card"
-                disabled={isDraggingDpad}
-                onClick={() => navigateCard(-1)}
+                aria-label="Move cards left"
+                disabled={isDraggingDpad || Boolean(armedCardKey)}
+                onClick={() => navigateCard(1)}
               >
                 ←
               </button>
               <button
                 type="button"
                 className="dpadBtn dpadPlay"
-                aria-label="Play focused card"
-                disabled={isDraggingDpad}
+                aria-label="Push focused card"
+                disabled={isDraggingDpad || !armedCardKey}
                 onClick={playFocusedCard}
               >
                 <LuPlay aria-hidden className="dpadPlayIcon" />
@@ -606,18 +742,18 @@ export function PreviewMatrix() {
               <button
                 type="button"
                 className="dpadBtn dpadRight"
-                aria-label="Next card"
-                disabled={isDraggingDpad}
-                onClick={() => navigateCard(1)}
+                aria-label="Move cards right"
+                disabled={isDraggingDpad || Boolean(armedCardKey)}
+                onClick={() => navigateCard(-1)}
               >
                 →
               </button>
               <button
                 type="button"
                 className="dpadBtn dpadDown"
-                aria-label="Next deck"
-                disabled={isDraggingDpad}
-                onClick={() => deckEmblaRef.current?.scrollNext()}
+                aria-label="Move cards down"
+                disabled={isDraggingDpad || Boolean(armedCardKey)}
+                onClick={() => deckEmblaRef.current?.scrollPrev()}
               >
                 ↓
               </button>
