@@ -51,10 +51,60 @@ async function expectFocusedCardVisibleInMatrix(page: import("@playwright/test")
   return visible.title;
 }
 
+async function expectFocusedCardContainedInMatrix(page: import("@playwright/test").Page) {
+  const contained = await page.evaluate(() => {
+    const matrix = document.querySelector(".powerfist-preview-root .matrix");
+    const card = document.querySelector(
+      ".powerfist-preview-root .cardSlide.is-selected .card",
+    );
+    if (!matrix || !card) return { ok: false, reason: "missing nodes" };
+    const m = matrix.getBoundingClientRect();
+    const r = card.getBoundingClientRect();
+    const ok = r.top >= m.top && r.bottom <= m.bottom;
+    return {
+      ok,
+      reason: ok
+        ? "ok"
+        : `card vertical box ${Math.round(r.top)}..${Math.round(r.bottom)} outside matrix ${Math.round(m.top)}..${Math.round(m.bottom)}`,
+    };
+  });
+  expect(contained.ok, contained.reason).toBe(true);
+}
+
+async function expectFocusedCardCenteredInActiveHand(page: import("@playwright/test").Page) {
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const deck = document.querySelector(".powerfist-preview-root .deckSlide.is-selected");
+        const hand = deck?.querySelector(".handViewport")?.getBoundingClientRect();
+        const card = deck?.querySelector(".cardSlide.is-selected .card")?.getBoundingClientRect();
+        if (!hand || !card) return Number.POSITIVE_INFINITY;
+        return Math.abs(card.left + card.width / 2 - (hand.left + hand.width / 2));
+      }),
+    )
+    .toBeLessThanOrEqual(2);
+}
+
+async function dragCompactCard(
+  page: import("@playwright/test").Page,
+  direction: "left" | "right",
+) {
+  const hand = page.locator(".powerfist-preview-root .handViewport").first();
+  const box = await hand.boundingBox();
+  expect(box).not.toBeNull();
+  const y = box!.y + box!.height * 0.5;
+  const startX = direction === "left" ? box!.x + box!.width * 0.8 : box!.x + box!.width * 0.2;
+  const endX = direction === "left" ? box!.x + box!.width * 0.2 : box!.x + box!.width * 0.8;
+  await page.mouse.move(startX, y);
+  await page.mouse.down();
+  await page.mouse.move(endX, y, { steps: 8 });
+  await page.mouse.up();
+}
+
 test.describe("Rola Dex / Preview matrix", () => {
   test("/preview route shows focused card inside matrix", async ({ page }) => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText("POWERFIST MATRIX")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible({ timeout: 15000 });
     const title = await expectFocusedCardVisibleInMatrix(page);
     expect(title).toContain("Capture");
     await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(18);
@@ -72,27 +122,163 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.getByRole("menuitem", { name: "Rola Dex" }).click();
 
     await expect(page.locator(".cyberdeck-rola-dex-pane")).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText("POWERFIST MATRIX")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible({ timeout: 15000 });
     await expectFocusedCardVisibleInMatrix(page);
   });
 
   test("deck and card controls update focused card", async ({ page }) => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText("POWERFIST MATRIX")).toBeVisible();
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
 
     await page.getByRole("button", { name: "Next deck" }).click();
-    await expect(page.getByText(/POWERFIST MATRIX.*Diagnostics Deck/i)).toBeVisible({
-      timeout: 5000,
-    });
     await expectFocusedCardVisibleInMatrix(page);
 
     await page.getByRole("button", { name: "Next card" }).click();
     await expectFocusedCardVisibleInMatrix(page);
   });
 
+  test("single-card mode card controls move left and right", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 900 });
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expect(page.locator(".powerfist-preview-root")).toHaveAttribute(
+      "data-compact-cards",
+      "true",
+    );
+
+    await page.getByRole("button", { name: "Next card" }).click();
+    await expect(page.locator(".cardTitle", { hasText: "Request Codex Review" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Previous card" }).click();
+    await expect(page.locator(".cardTitle", { hasText: "Capture Builder Result" })).toBeVisible();
+  });
+
+  test("single-card mode matrix remains square while shrinking", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 900 });
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+
+    const wideCompactSize = await page.locator(".matrixStage").evaluate((stage) => {
+      const box = stage.getBoundingClientRect();
+      return { width: box.width, height: box.height };
+    });
+    expect(Math.abs(wideCompactSize.width - wideCompactSize.height)).toBeLessThanOrEqual(1);
+
+    await page.setViewportSize({ width: 340, height: 900 });
+    const narrowCompactSize = await page.locator(".matrixStage").evaluate((stage) => {
+      const box = stage.getBoundingClientRect();
+      return { width: box.width, height: box.height };
+    });
+    expect(Math.abs(narrowCompactSize.width - narrowCompactSize.height)).toBeLessThanOrEqual(1);
+    expect(narrowCompactSize.width).toBeLessThan(wideCompactSize.width);
+  });
+
+  test("single-card mode horizontal drag moves between cards", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 900 });
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+
+    await dragCompactCard(page, "left");
+    await expect(page.locator(".cardTitle", { hasText: "Request Codex Review" })).toBeVisible();
+  });
+
+  test("single-card mode repeated drags preserve direction and wraparound", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 900 });
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+
+    await dragCompactCard(page, "left");
+    await expect(page.locator(".cardTitle", { hasText: "Request Codex Review" })).toBeVisible();
+    await dragCompactCard(page, "left");
+    await expect(page.locator(".cardTitle", { hasText: "Archive Outcome" })).toBeVisible();
+    await dragCompactCard(page, "right");
+    await expect(page.locator(".cardTitle", { hasText: "Request Codex Review" })).toBeVisible();
+    await dragCompactCard(page, "right");
+    await expect(page.locator(".cardTitle", { hasText: "Capture Builder Result" })).toBeVisible();
+    await dragCompactCard(page, "right");
+    await expect(page.locator(".cardTitle", { hasText: "Emergency Halt" })).toBeVisible();
+  });
+
+  test("single-card mode keeps nested horizontal carousel motion", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 900 });
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(18);
+
+    const hand = page.locator(".powerfist-preview-root .handViewport").first();
+    const box = await hand.boundingBox();
+    expect(box).not.toBeNull();
+    const y = box!.y + box!.height * 0.5;
+    await page.mouse.move(box!.x + box!.width * 0.8, y);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width * 0.45, y, { steps: 6 });
+    await expect
+      .poll(async () =>
+        page
+          .locator(".powerfist-preview-root .handContainer")
+          .first()
+          .evaluate((container) => getComputedStyle(container).transform),
+      )
+      .not.toBe("none");
+    await page.mouse.move(box!.x + box!.width * 0.2, y, { steps: 4 });
+    await page.mouse.up();
+    await expect(page.locator(".cardTitle", { hasText: "Request Codex Review" })).toBeVisible();
+  });
+
+  test("single-card mode preserves drag-free power swipe motion", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 900 });
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+
+    const hand = page.locator(".powerfist-preview-root .handViewport").first();
+    const box = await hand.boundingBox();
+    expect(box).not.toBeNull();
+    const y = box!.y + box!.height * 0.5;
+    await page.mouse.move(box!.x + box!.width * 0.75, y);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width * 0.5, y, { steps: 4 });
+
+    await expect
+      .poll(async () =>
+        page
+          .locator(".powerfist-preview-root .handContainer")
+          .first()
+          .evaluate((container) => getComputedStyle(container).transform),
+      )
+      .not.toBe("none");
+    const transformWhileDragging = await page
+      .locator(".powerfist-preview-root .handContainer")
+      .first()
+      .evaluate((container) => getComputedStyle(container).transform);
+    expect(transformWhileDragging).not.toBe("matrix(1, 0, 0, 1, 0, 0)");
+
+    await page.mouse.move(box!.x + box!.width * 0.15, y, { steps: 2 });
+    await page.mouse.up();
+    const transformAfterRelease = await page
+      .locator(".powerfist-preview-root .handContainer")
+      .first()
+      .evaluate((container) => getComputedStyle(container).transform);
+    expect(transformAfterRelease).not.toBe("none");
+    expect(transformAfterRelease).not.toBe("matrix(1, 0, 0, 1, 0, 0)");
+    await page.waitForTimeout(1200);
+    await expectFocusedCardVisibleInMatrix(page);
+    await expectFocusedCardCenteredInActiveHand(page);
+  });
+
+  test("multi-card mode keeps the focused card inside the matrix", async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 900 });
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expect(page.locator(".powerfist-preview-root")).toHaveAttribute(
+      "data-compact-cards",
+      "false",
+    );
+    await expectFocusedCardContainedInMatrix(page);
+  });
+
   test("neighbor decks peek above and below the focused deck", async ({ page }) => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText("POWERFIST MATRIX")).toBeVisible();
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
 
     const peek = await page.evaluate(() => {
       const matrix = document.querySelector(".powerfist-preview-root .matrix");
@@ -117,7 +303,7 @@ test.describe("Rola Dex / Preview matrix", () => {
 
   test("horizontal drag on hand scrolls cards", async ({ page }) => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText("POWERFIST MATRIX")).toBeVisible();
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
 
     const hand = page.locator(".powerfist-preview-root .handViewport").first();
     const box = await hand.boundingBox();
@@ -141,5 +327,68 @@ test.describe("Rola Dex / Preview matrix", () => {
     });
     expect(moved).toBe(true);
     await expectFocusedCardVisibleInMatrix(page);
+  });
+
+  test("message box queues instructions for the selected target pane", async ({ page }) => {
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    const input = page.getByLabel("PowerFist instruction");
+    await expect(input).toBeVisible();
+    await expect(page.getByLabel("PowerFist target pane")).toBeVisible();
+    await input.fill("Open the current document");
+    await page.getByRole("button", { name: "Queue" }).click();
+    await expect(page.locator(".stackLog")).toContainText(
+      /Queued instruction for OPERATOR: Open the current document/i,
+    );
+  });
+
+  test("glyph channel target exposes text, one-line ASCII, and figlet decks", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 900 });
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+
+    await page.getByLabel("PowerFist target pane").hover();
+    for (let step = 0; step < 11; step += 1) {
+      await page.mouse.wheel(0, 120);
+      await page.waitForTimeout(90);
+    }
+
+    await expect(page.locator(".cardTitle", { hasText: "Render Plain Text" })).toBeVisible();
+    await page.getByRole("button", { name: "Next deck" }).click();
+    await expect(page.locator(".cardSlide.is-selected .cardArtifactPreviewOneline")).toBeVisible();
+    await page.getByRole("button", { name: "Next deck" }).click();
+    await expect(page.locator(".cardSlide.is-selected .cardArtifactPreviewFiglet")).toBeVisible();
+  });
+
+  test("long press traces the card outline and dispatches on completion", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 900 });
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    const card = page.locator(".cardSlide.is-selected .card");
+    const box = await card.boundingBox();
+    expect(box).not.toBeNull();
+
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.mouse.down();
+    await expect(card.locator(".cardHoldTrace")).toBeVisible();
+    await page.waitForTimeout(980);
+    await expect(page.locator(".stackLog")).toContainText(/Played Capture Builder Result/i);
+    await page.mouse.up();
+  });
+
+  test("dragging cancels long press activation before carousel swipe", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 900 });
+    await page.goto("/preview", { waitUntil: "domcontentloaded" });
+    const card = page.locator(".cardSlide.is-selected .card");
+    const box = await card.boundingBox();
+    expect(box).not.toBeNull();
+
+    const y = box!.y + box!.height / 2;
+    await page.mouse.move(box!.x + box!.width * 0.75, y);
+    await page.mouse.down();
+    await expect(card.locator(".cardHoldTrace")).toBeVisible();
+    await page.mouse.move(box!.x + box!.width * 0.25, y, { steps: 5 });
+    await expect(card.locator(".cardHoldTrace")).toBeHidden();
+    await page.mouse.up();
+    await page.waitForTimeout(980);
+    await expect(page.locator(".stackLog")).toHaveText("Stack idle.");
   });
 });

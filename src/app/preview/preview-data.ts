@@ -5,6 +5,10 @@ export type PreviewCard = {
   title: string;
   purpose: string;
   risk: PreviewCardRisk;
+  preview?: {
+    kind: "figlet" | "oneline";
+    value: string;
+  };
 };
 
 export type PreviewDeck = {
@@ -144,6 +148,90 @@ export const PREVIEW_DECKS: PreviewDeck[] = [
         title: "Gangbang",
         purpose: "Deal recovery options after failure.",
         risk: "safe",
+      },
+    ],
+  },
+];
+
+/** Glyph Channel demonstration: one vertical engine deck with horizontal action cards per engine. */
+export const GLYPH_CHANNEL_PREVIEW_DECKS: PreviewDeck[] = [
+  {
+    name: "Text",
+    badge: "plain text",
+    cards: [
+      {
+        type: "text",
+        title: "Render Plain Text",
+        purpose: "Send the current instruction to Glyph Channel as a clean text render.",
+        risk: "safe",
+      },
+    ],
+  },
+  {
+    name: "1 Line ASCII",
+    badge: "one-line art",
+    cards: [
+      {
+        type: "1 line ascii",
+        title: "Signal Route",
+        purpose: "Compact directional line for routing a selected pane.",
+        risk: "safe",
+        preview: { kind: "oneline", value: "<===[ POWERFIST ]===>" },
+      },
+      {
+        type: "1 line ascii",
+        title: "Divider Pulse",
+        purpose: "Narrow divider line that can travel through chat and logs.",
+        risk: "safe",
+        preview: { kind: "oneline", value: "----[ ECHO MIRAGE ]----" },
+      },
+      {
+        type: "1 line ascii",
+        title: "Status Spark",
+        purpose: "Short one-line status ornament for the selected pane.",
+        risk: "safe",
+        preview: { kind: "oneline", value: "*.*.* UPLINK VERIFIED *.*.*" },
+      },
+      {
+        type: "1 line ascii",
+        title: "Banner Trace",
+        purpose: "Compact decorative trace from the one-line showroom catalog.",
+        risk: "safe",
+        preview: { kind: "oneline", value: "<<<---=={ SIGNAL }==--->>>" },
+      },
+    ],
+  },
+  {
+    name: "Figlet",
+    badge: "font render",
+    cards: [
+      {
+        type: "figlet",
+        title: "ANSI Shadow",
+        purpose: "Rendered ECHO banner in ANSI Shadow.",
+        risk: "safe",
+        preview: { kind: "figlet", value: "ANSI Shadow" },
+      },
+      {
+        type: "figlet",
+        title: "Impossible",
+        purpose: "Rendered ECHO banner in Impossible.",
+        risk: "safe",
+        preview: { kind: "figlet", value: "Impossible" },
+      },
+      {
+        type: "figlet",
+        title: "S Blood",
+        purpose: "Rendered ECHO banner in S Blood.",
+        risk: "safe",
+        preview: { kind: "figlet", value: "S Blood" },
+      },
+      {
+        type: "figlet",
+        title: "Slant",
+        purpose: "Rendered ECHO banner in Slant.",
+        risk: "caution",
+        preview: { kind: "figlet", value: "Slant" },
       },
     ],
   },
