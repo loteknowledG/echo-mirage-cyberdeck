@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import EmblaCarousel, { type EmblaCarouselType } from "embla-carousel";
+import { motion } from "motion/react";
 import { LuPlay } from "react-icons/lu";
 import { PREVIEW_DECKS } from "./preview-data";
 import { scrollMatrixTo, wrapIndex } from "./preview-matrix-nav";
@@ -17,8 +18,10 @@ export function PreviewMatrix() {
   const [activeDeckIndex, setActiveDeckIndex] = useState(0);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [stackLogHtml, setStackLogHtml] = useState("Stack idle.");
+  const [isDraggingDpad, setIsDraggingDpad] = useState(false);
 
   const matrixRef = useRef<HTMLElement>(null);
+  const paneRef = useRef<HTMLElement>(null);
   const deckViewportRef = useRef<HTMLDivElement>(null);
   const handViewportRefs = useRef<(HTMLDivElement | null)[]>([]);
   const deckEmblaRef = useRef<EmblaCarouselType | null>(null);
@@ -52,6 +55,25 @@ export function PreviewMatrix() {
     setActiveDeckIndex(deckIdx);
     setActiveCardIndex(handEmbla?.selectedScrollSnap() ?? 0);
   }, []);
+
+  const recenterSelectedCard = useCallback(() => {
+    const deckEmbla = deckEmblaRef.current;
+    if (!deckEmbla) return;
+
+    const deckIdx = deckEmbla.selectedScrollSnap();
+    const handEmbla = handEmblaRefs.current[deckIdx];
+
+    deckEmbla.reInit();
+    deckEmbla.scrollTo(deckIdx, true);
+
+    if (handEmbla) {
+      const cardIdx = handEmbla.selectedScrollSnap();
+      handEmbla.reInit();
+      handEmbla.scrollTo(cardIdx, true);
+    }
+
+    syncFromEmbla();
+  }, [syncFromEmbla]);
 
   const mountCarousels = useCallback(() => {
     const deckViewport = deckViewportRef.current;
@@ -101,11 +123,6 @@ export function PreviewMatrix() {
     deckEmbla.on("select", syncFromEmbla);
     deckEmbla.scrollTo(0, true);
     syncFromEmbla();
-    requestAnimationFrame(() => {
-      deckEmbla.reInit();
-      deckEmbla.scrollTo(deckEmbla.selectedScrollSnap(), true);
-      syncFromEmbla();
-    });
 
     return true;
   }, [syncFromEmbla]);
@@ -151,8 +168,6 @@ export function PreviewMatrix() {
             mountCarousels();
             return;
           }
-          deckEmblaRef.current.reInit();
-          deckEmblaRef.current.scrollTo(deckEmblaRef.current.selectedScrollSnap(), true);
           syncFromEmbla();
         });
       },
@@ -162,6 +177,32 @@ export function PreviewMatrix() {
     observer.observe(matrix);
     return () => observer.disconnect();
   }, [mountCarousels, syncFromEmbla]);
+
+  useEffect(() => {
+    const matrix = matrixRef.current;
+    const deckViewport = deckViewportRef.current;
+    if (!matrix || !deckViewport) return;
+
+    let raf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        recenterSelectedCard();
+      });
+    };
+
+    const observer = new ResizeObserver(onResize);
+    observer.observe(matrix);
+    observer.observe(deckViewport);
+
+    const activeHandViewport = handViewportRefs.current[activeDeckIndex];
+    if (activeHandViewport) observer.observe(activeHandViewport);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, [activeDeckIndex, recenterSelectedCard]);
 
   const playFocusedCard = useCallback(() => {
     const deck = PREVIEW_DECKS[activeDeckIndex];
@@ -203,7 +244,7 @@ export function PreviewMatrix() {
 
   return (
     <div className="powerfist-preview-root">
-      <main className="shell">
+      <main className="shell" ref={paneRef}>
         <section className="status">
           <div>
             POWERFIST MATRIX // <strong>{activeDeck?.name ?? "—"}</strong> //{" "}
@@ -278,11 +319,20 @@ export function PreviewMatrix() {
         </section>
 
         <section className="controls">
-          <div className="dpad" aria-label="Matrix navigation">
+          <motion.div
+            className="dpad"
+            aria-label="Matrix navigation"
+            drag
+            dragConstraints={paneRef}
+            dragMomentum
+            onDragStart={() => setIsDraggingDpad(true)}
+            onDragEnd={() => setIsDraggingDpad(false)}
+          >
             <button
               type="button"
               className="dpadBtn dpadUp"
               aria-label="Previous deck"
+              disabled={isDraggingDpad}
               onClick={() => deckEmblaRef.current?.scrollPrev()}
             >
               ↑
@@ -291,6 +341,7 @@ export function PreviewMatrix() {
               type="button"
               className="dpadBtn dpadLeft"
               aria-label="Previous card"
+              disabled={isDraggingDpad}
               onClick={() => handEmblaRefs.current[activeDeckIndex]?.scrollPrev()}
             >
               ←
@@ -299,6 +350,7 @@ export function PreviewMatrix() {
               type="button"
               className="dpadBtn dpadPlay"
               aria-label="Play focused card"
+              disabled={isDraggingDpad}
               onClick={playFocusedCard}
             >
               <LuPlay aria-hidden className="dpadPlayIcon" />
@@ -307,6 +359,7 @@ export function PreviewMatrix() {
               type="button"
               className="dpadBtn dpadRight"
               aria-label="Next card"
+              disabled={isDraggingDpad}
               onClick={() => handEmblaRefs.current[activeDeckIndex]?.scrollNext()}
             >
               →
@@ -315,11 +368,12 @@ export function PreviewMatrix() {
               type="button"
               className="dpadBtn dpadDown"
               aria-label="Next deck"
+              disabled={isDraggingDpad}
               onClick={() => deckEmblaRef.current?.scrollNext()}
             >
               ↓
             </button>
-          </div>
+          </motion.div>
         </section>
 
         <section

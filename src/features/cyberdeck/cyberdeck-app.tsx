@@ -419,7 +419,7 @@ type CustomTab = {
 
 type CustomTabContextMenuAction =
   | { label: string; kind: CustomTabKind; action: "convert" }
-  | { label: string; action: "settings-pane" | "connection-pane" | "kit-pane" };
+  | { label: string; action: "settings-pane" | "kit-pane" };
 
 const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Document", kind: "document", action: "convert" },
@@ -437,7 +437,6 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
   { label: "Pi", kind: "pi", action: "convert" },
   { label: "Settings", action: "settings-pane" },
-  { label: "Connection", action: "connection-pane" },
 ] as CustomTabContextMenuAction[]).sort((a, b) =>
   a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
 );
@@ -5842,9 +5841,7 @@ const resolved = resolveUiTarget(userMessage);
       const kind: CustomTabKind =
         action.action === "convert"
           ? action.kind
-          : action.action === "settings-pane"
-            ? "settings"
-            : "connection";
+          : "settings";
       const id = `tab-${crypto.randomUUID()}`;
       const tab: CustomTab = {
         id,
@@ -6266,23 +6263,6 @@ const resolved = resolveUiTarget(userMessage);
             onAudioMuteToggle={toggleAudioMuted}
             identity={identity}
           />,
-        );
-      }
-
-      if (tab.kind === "connection") {
-        return shell(
-          <div className="grid flex-1 gap-3 overflow-auto p-3">
-            <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3 font-mono text-[10px] leading-snug text-[#8a8a8a]">
-              CONNECTION TAB // STATUS
-              <div className="mt-2 text-[#cfcfcf]">
-                STATE: {connectionState.toUpperCase()}
-                <br />
-                PROVIDER: {activeProvider.toUpperCase()}
-                <br />
-                MODEL: {modelID || "UNSET"}
-              </div>
-            </div>
-          </div>,
         );
       }
 

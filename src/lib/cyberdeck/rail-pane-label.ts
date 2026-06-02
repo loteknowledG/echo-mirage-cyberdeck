@@ -16,6 +16,7 @@ const RAIL_KIND_DISPLAY: Partial<Record<CyberdeckPaneKind, string>> = {
   "glyph-channel": "ASCII",
   "voice-lab": "VOICE",
   "sound-profile": "SOUND",
+  "rola-dex": "POWERFIST",
 };
 
 /** Human pane name for a fixed server-rail tab (m / s / ct / b). */

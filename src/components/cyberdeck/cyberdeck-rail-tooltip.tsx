@@ -20,7 +20,7 @@ export function formatAsciiRailTooltipFrame(label: string): string {
 }
 
 export const CYBERDECK_RAIL_TOOLTIP_CONTENT_CLASS =
-  "z-[60] border-0 bg-transparent p-0 text-transparent shadow-none animate-in fade-in-0 zoom-in-95";
+  "z-[60] bg-black/95 p-0 text-emerald-200 shadow-[0_8px_24px_rgba(0,0,0,0.6)] animate-in fade-in-0 zoom-in-95";
 
 type CyberdeckRailTabTooltipProps = {
   label: string;
@@ -45,8 +45,8 @@ export function CyberdeckRailTabTooltip({ label, children }: CyberdeckRailTabToo
       >
         <pre
           className={cn(
-            "m-0 whitespace-pre font-mono text-[10px] leading-tight tracking-[0.04em]",
-            "text-emerald-300/95 shadow-[2px_2px_0_0_#222]",
+            "m-0 whitespace-pre bg-black px-0 py-0 font-mono text-[10px] leading-tight tracking-[0.04em]",
+            "text-emerald-200 shadow-none",
           )}
         >
           {formatAsciiRailTooltipFrame(label)}
