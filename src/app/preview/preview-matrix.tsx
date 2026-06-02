@@ -19,6 +19,7 @@ export function PreviewMatrix() {
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [stackLogHtml, setStackLogHtml] = useState("Stack idle.");
   const [isDraggingDpad, setIsDraggingDpad] = useState(false);
+  const [isCompactCards, setIsCompactCards] = useState(false);
 
   const matrixRef = useRef<HTMLElement>(null);
   const paneRef = useRef<HTMLElement>(null);
@@ -59,21 +60,23 @@ export function PreviewMatrix() {
   const recenterSelectedCard = useCallback(() => {
     const deckEmbla = deckEmblaRef.current;
     if (!deckEmbla) return;
+    const deckCount = PREVIEW_DECKS.length;
+    if (deckCount < 1) return;
 
-    const deckIdx = deckEmbla.selectedScrollSnap();
-    const handEmbla = handEmblaRefs.current[deckIdx];
-
+    // Re-measure all carousels, then restore the UI's selected deck/card as the canonical focus.
     deckEmbla.reInit();
-    deckEmbla.scrollTo(deckIdx, true);
+    handEmblaRefs.current.forEach((embla) => embla?.reInit());
 
-    if (handEmbla) {
-      const cardIdx = handEmbla.selectedScrollSnap();
-      handEmbla.reInit();
-      handEmbla.scrollTo(cardIdx, true);
-    }
-
-    syncFromEmbla();
-  }, [syncFromEmbla]);
+    const next = scrollMatrixTo(
+      deckEmbla,
+      handEmblaRefs.current,
+      activeDeckIndex,
+      activeCardIndex,
+      deckCount,
+    );
+    setActiveDeckIndex(next.deckIndex);
+    setActiveCardIndex(next.cardIndex);
+  }, [activeCardIndex, activeDeckIndex]);
 
   const mountCarousels = useCallback(() => {
     const deckViewport = deckViewportRef.current;
@@ -187,6 +190,7 @@ export function PreviewMatrix() {
     const onResize = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
+        setIsCompactCards(matrix.clientWidth <= 520);
         recenterSelectedCard();
       });
     };
@@ -203,6 +207,14 @@ export function PreviewMatrix() {
       observer.disconnect();
     };
   }, [activeDeckIndex, recenterSelectedCard]);
+
+  useEffect(() => {
+    const matrix = matrixRef.current;
+    if (!matrix) return;
+    setIsCompactCards(matrix.clientWidth <= 520);
+    const raf = requestAnimationFrame(() => recenterSelectedCard());
+    return () => cancelAnimationFrame(raf);
+  }, [isCompactCards, recenterSelectedCard]);
 
   const playFocusedCard = useCallback(() => {
     const deck = PREVIEW_DECKS[activeDeckIndex];
@@ -243,7 +255,7 @@ export function PreviewMatrix() {
   );
 
   return (
-    <div className="powerfist-preview-root">
+    <div className="powerfist-preview-root" data-compact-cards={isCompactCards ? "true" : "false"}>
       <main className="shell" ref={paneRef}>
         <section className="status">
           <div>

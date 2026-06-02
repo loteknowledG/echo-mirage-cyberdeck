@@ -215,6 +215,24 @@
     0 16px 46px rgba(0, 0, 0, 0.45);
 }
 
+/* Compact mode: narrow pane behaves like single-card viewport. */
+.powerfist-preview-root[data-compact-cards="true"] {
+  --pf-card-peek: 100%;
+  --pf-deck-band: 100%;
+}
+
+.powerfist-preview-root[data-compact-cards="true"] .deckSlide {
+  padding-inline: 8px;
+}
+
+.powerfist-preview-root[data-compact-cards="true"] .cardSlide {
+  padding-inline: 0;
+}
+
+.powerfist-preview-root[data-compact-cards="true"] .cardSlide:not(.is-selected) {
+  opacity: 0.35;
+}
+
 .powerfist-preview-root .cardTop {
   display: grid;
   gap: 6px;
@@ -385,16 +403,25 @@
   width: 100%;
   overflow: hidden;
   place-items: stretch;
+  padding-right: 10px;
 }
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root .shell {
   flex: 1;
   min-height: 0;
-  width: 100%;
+  width: min(100%, calc(100% - 10px));
   max-width: none;
   display: grid;
   grid-template-rows: auto 1fr auto auto;
   gap: 10px;
+}
+
+.cyberdeck-rola-dex-pane .powerfist-preview-root .status,
+.cyberdeck-rola-dex-pane .powerfist-preview-root .matrix,
+.cyberdeck-rola-dex-pane .powerfist-preview-root .controls,
+.cyberdeck-rola-dex-pane .powerfist-preview-root .stackLog {
+  width: 100%;
+  max-width: 100%;
 }
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root .matrix {
