@@ -432,7 +432,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Drop Bay", kind: "drop-bay", action: "convert" },
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Kit", action: "kit-pane" },
-  { label: "Rola Dex", kind: "rola-dex", action: "convert" },
+  { label: "Powerfist", kind: "rola-dex", action: "convert" },
   { label: "Sound Profile", kind: "sound-profile", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
   { label: "Pi", kind: "pi", action: "convert" },
@@ -470,8 +470,9 @@ function sanitizeCustomTabs(value: unknown): CustomTab[] {
     if (isRetiredCustomTabKind(tab.kind)) return [];
     const id = typeof tab.id === "string" && tab.id.trim() ? tab.id.trim() : "";
     const label = typeof tab.label === "string" && tab.label.trim() ? tab.label.trim() : "TAB";
-    const glyph = typeof tab.glyph === "string" && tab.glyph.trim() ? tab.glyph.trim() : "□";
     const kind = isCustomTabKind(tab.kind) ? tab.kind : "blank";
+    const rawGlyph = typeof tab.glyph === "string" && tab.glyph.trim() ? tab.glyph.trim() : "□";
+    const glyph = kind === "rola-dex" ? defaultCustomTabGlyphForKind("rola-dex") : rawGlyph;
     const browserUrl = typeof tab.browserUrl === "string" && tab.browserUrl.trim() ? tab.browserUrl.trim() : undefined;
     const asset = tab.asset && typeof tab.asset === "object" ? (tab.asset as DroppedOperatorAsset) : null;
 
@@ -819,7 +820,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "flight-log") return "F";
   if (kind === "drop-bay") return "⬇";
   if (kind === "glyph-channel") return "⟁";
-  if (kind === "rola-dex") return "▧";
+  if (kind === "rola-dex") return "#";
   if (kind === "sound-profile") return "♪";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
