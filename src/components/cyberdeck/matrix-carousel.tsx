@@ -160,6 +160,13 @@ export function MatrixCarousel() {
       return false;
     }
 
+    const handsReady = MATRIX_DATA.every(
+      (_, rowIndex) => handViewportRefs.current[rowIndex] != null,
+    );
+    if (!handsReady) {
+      return false;
+    }
+
     deckEmblaRef.current?.destroy();
     handEmblaRefs.current.forEach((embla) => embla?.destroy());
     handEmblaRefs.current = [];
@@ -323,14 +330,14 @@ export function MatrixCarousel() {
                             >
                               <div
                                 className={cn(
-                                  "h-full w-full transform-gpu rounded-xl border bg-slate-900 text-white transition-all duration-300",
+                                  "test-matrix__card transform-gpu rounded-xl border bg-slate-900 text-white transition-all duration-300",
                                   isCardSelected
                                     ? "border-emerald-500 bg-slate-900/90 shadow-xl shadow-[0_0_35px_rgba(16,185,129,0.12)]"
                                     : "border-slate-800",
                                 )}
                               >
-                                <CardContent className="flex h-full flex-col justify-between p-8">
-                                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-slate-500">
+                                <CardContent className="test-matrix__cardContent flex h-full min-h-0 flex-col justify-between">
+                                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                     <span>Deck Grid</span>
                                     <span
                                       className={cn(
@@ -345,9 +352,9 @@ export function MatrixCarousel() {
                                   </div>
 
                                   <div className="space-y-2">
-                                    <h2
-                                      className={cn(
-                                        "text-2xl font-bold tracking-tight",
+                                  <h2
+                                    className={cn(
+                                      "text-base font-bold leading-tight tracking-tight",
                                         isCardSelected
                                           ? "text-emerald-400"
                                           : "text-slate-400",
@@ -355,7 +362,7 @@ export function MatrixCarousel() {
                                     >
                                       {item.title}
                                     </h2>
-                                    <p className="text-sm leading-relaxed text-slate-400">
+                                    <p className="text-[11px] leading-snug text-slate-400">
                                       {item.desc}
                                     </p>
                                   </div>

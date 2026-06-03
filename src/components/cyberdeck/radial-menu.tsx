@@ -1,20 +1,33 @@
 "use client";
 
+import { useMemo, useRef, useState } from "react";
 import {
-  CircleMenu,
-  CircleMenuItem,
-  TooltipPlacement,
-} from "react-circular-menu";
-import { useRef, useState } from "react";
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-const items = [
-  { label: "Voice", icon: "V", angle: -90, tooltip: "Voice" },
-  { label: "Logs", icon: "L", angle: -45, tooltip: "Logs" },
-  { label: "Tools", icon: "T", angle: 0, tooltip: "Tools" },
-  { label: "Power", icon: "P", angle: 45, tooltip: "Power" },
-  { label: "Mode", icon: "M", angle: 90, tooltip: "Mode" },
-];
+const MENU_ITEMS = [
+  { label: "Voice", icon: "V", tooltip: "Voice" },
+  { label: "Logs", icon: "L", tooltip: "Logs" },
+  { label: "Tools", icon: "T", tooltip: "Tools" },
+  { label: "Power", icon: "P", tooltip: "Power" },
+  { label: "Mode", icon: "M", tooltip: "Mode" },
+] as const;
+
+const START_ANGLE = -90;
+const ROTATION_ANGLE = 360;
+const ROTATION_ANGLE_INCLUSIVE = false;
+const RADIUS_REM = 4.2;
+
+function radialItemAngles(count: number): number[] {
+  const itemCount = ROTATION_ANGLE_INCLUSIVE ? count - 1 : count;
+  const increment =
+    count > 1 ? Math.round(ROTATION_ANGLE / itemCount) : 0;
+  return Array.from({ length: count }, (_, index) => START_ANGLE + index * increment);
+}
 
 function TwoPositionFace({ label }: { label: string }) {
   return (
@@ -72,6 +85,10 @@ const DRAG_CLICK_THRESHOLD_PX = 8;
 
 export function RadialMenu() {
   const [open, setOpen] = useState(false);
+  const itemAngles = useMemo(
+    () => radialItemAngles(MENU_ITEMS.length),
+    [],
+  );
   const dragRef = useRef({
     active: false,
     startX: 0,
@@ -114,44 +131,71 @@ export function RadialMenu() {
     return false;
   };
 
+  const toggleOpen = () => setOpen((value) => !value);
+
   return (
-    <div
-      className="relative inline-flex items-center justify-center overflow-visible"
-      onPointerDownCapture={onPointerDownCapture}
-      onPointerMoveCapture={onPointerMoveCapture}
-      onPointerUpCapture={onPointerUpCapture}
-      onClickCapture={suppressIfDragging}
-    >
-      <CircleMenu
-        open={open}
-        onMenuToggle={setOpen}
-        startAngle={-90}
-        rotationAngle={360}
-        rotationAngleInclusive={false}
-        radius={4.2}
-        itemSize={3}
-        menuToggleElement={
+    <TooltipProvider delayDuration={200}>
+      <div
+        className="relative inline-flex items-center justify-center overflow-visible"
+        onPointerDownCapture={onPointerDownCapture}
+        onPointerMoveCapture={onPointerMoveCapture}
+        onPointerUpCapture={onPointerUpCapture}
+        onClickCapture={suppressIfDragging}
+      >
+        {open ? (
           <button
             type="button"
-            aria-pressed={open}
-            className="grid h-20 w-20 place-items-center rounded-full border border-cyan-400/20 bg-slate-950/40 text-cyan-100 outline-none backdrop-blur-md transition-all duration-200 hover:border-cyan-400/40 hover:bg-slate-900/60 active:scale-95"
-          >
-            <DialFace open={open} />
-          </button>
-        }
-      >
-        {items.map((item) => (
-          <CircleMenuItem
-            key={item.label}
-            tooltip={item.tooltip}
-            tooltipPlacement={TooltipPlacement.Top}
-            onClick={() => console.log("selected:", item.label)}
-            className="transition-transform duration-200 hover:scale-105 active:scale-95"
-          >
-            <TwoPositionFace label={item.icon} />
-          </CircleMenuItem>
-        ))}
-      </CircleMenu>
-    </div>
+            aria-label="Close radial menu"
+            className="fixed inset-0 z-[100] cursor-default border-0 bg-transparent p-0"
+            onClick={() => setOpen(false)}
+          />
+        ) : null}
+
+        <ul className="relative m-0 list-none p-0">
+          {MENU_ITEMS.map((item, index) => {
+            const angle = itemAngles[index] ?? START_ANGLE;
+            return (
+              <li
+                key={item.label}
+                className={cn(
+                  "absolute left-1/2 top-1/2 z-[102] transition-all duration-500",
+                  open
+                    ? "visible opacity-100"
+                    : "invisible opacity-0",
+                )}
+                style={{
+                  transform: open
+                    ? `translate(-50%, -50%) rotate(${angle}deg) translate(${RADIUS_REM}rem) rotate(${-angle}deg)`
+                    : "translate(-50%, -50%)",
+                }}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => console.log("selected:", item.label)}
+                      className="transition-transform duration-200 hover:scale-105 active:scale-95"
+                    >
+                      <TwoPositionFace label={item.icon} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{item.tooltip}</TooltipContent>
+                </Tooltip>
+              </li>
+            );
+          })}
+        </ul>
+
+        <button
+          type="button"
+          aria-pressed={open}
+          aria-expanded={open}
+          onClick={toggleOpen}
+          className="relative z-[101] grid h-20 w-20 place-items-center rounded-full border border-cyan-400/20 bg-slate-950/40 text-cyan-100 outline-none backdrop-blur-md transition-all duration-200 hover:border-cyan-400/40 hover:bg-slate-900/60 active:scale-95"
+        >
+          <DialFace open={open} />
+        </button>
+      </div>
+    </TooltipProvider>
   );
 }
