@@ -73,10 +73,6 @@ async function dragDividerTo(page: Page, y: number) {
   await page.mouse.up();
 }
 
-async function tapWorkPaneExpand(page: Page) {
-  await page.getByRole("button", { name: "Show more work pane" }).click();
-}
-
 async function openCustomTabContextMenu(page: Page) {
   const input = page.locator('input[placeholder*="GATEWAY"], input[placeholder*="command"], input[placeholder*="COMMAND"]').first();
   await input.fill("new tab named retired-check glyph R");
@@ -147,17 +143,6 @@ test.describe("Cyberdeck responsive split layout", () => {
     const returned = await readSplitGeometry(page);
     expect(Math.abs(returned.dividerTop - placed.dividerTop)).toBeLessThanOrEqual(2);
     expectComposerAttachedToDivider(returned);
-  });
-
-  test("mobile work button expands the lower pane without dragging", async ({ page }) => {
-    await openCyberdeck(page, MOBILE_VIEWPORT);
-
-    const initial = await readSplitGeometry(page);
-    await tapWorkPaneExpand(page);
-    const expanded = await readSplitGeometry(page);
-
-    expect(expanded.dividerTop).toBeLessThan(initial.dividerTop - 40);
-    expectComposerAttachedToDivider(expanded);
   });
 
   test("mobile divider position survives a page reload", async ({ page }) => {

@@ -965,6 +965,19 @@ export default function CyberdeckApp() {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(max-width: 768px)").matches;
   });
+  const [mobileContentSplit, setMobileContentSplit] = useState<number[]>([0.58, 0.42]);
+  const handleContentSplitSizesChange = useCallback((sizes: number[]) => {
+    setMobileContentSplit(sizes);
+  }, []);
+  const mirageHeaderCollapse = useMemo(() => {
+    if (!isMobileLayout || mobileContentSplit.length < 2) return 0;
+    const gatewayFraction = mobileContentSplit[1];
+    const collapseStart = 0.46;
+    const collapseEnd = 0.58;
+    if (gatewayFraction <= collapseStart) return 0;
+    if (gatewayFraction >= collapseEnd) return 1;
+    return (gatewayFraction - collapseStart) / (collapseEnd - collapseStart);
+  }, [isMobileLayout, mobileContentSplit]);
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
@@ -6732,6 +6745,7 @@ const resolved = resolveUiTarget(userMessage);
           orientation={isMobileLayout ? "vertical" : "horizontal"}
           memoryKey="cyberdeck-content-split"
           className="h-full min-h-0 min-w-0 flex-1"
+          onSizesChange={handleContentSplitSizesChange}
         >
           {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
           <ResizablePanel
@@ -7122,7 +7136,7 @@ const resolved = resolveUiTarget(userMessage);
               networkActivityActive ? "is-net-active" : ""
             } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
           >
-            <MirageHeader />
+            <MirageHeader collapse={mirageHeaderCollapse} />
             <p className="sr-only">
               Command. Catalog. Operators. Memory Atlas. Voice Lab. Flight Log. ⟁ Glyph. Settings. Craftwerk Cyberdeck
               Corporation. ChatGPT // Lead. Cursor // Dev. Codex // Test. Samus-Manus // Memory. ASCII. REALMORPH.

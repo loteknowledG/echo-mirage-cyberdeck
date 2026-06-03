@@ -26,6 +26,7 @@ export type ResizablePanelGroupProps = {
   orientation?: Orientation;
   className?: string;
   memoryKey?: string;
+  onSizesChange?: (sizes: number[]) => void;
   children: React.ReactNode;
 };
 
@@ -145,6 +146,7 @@ export function ResizablePanelGroup({
   orientation = 'horizontal',
   className,
   memoryKey,
+  onSizesChange,
   children,
 }: ResizablePanelGroupProps) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -217,6 +219,11 @@ export function ResizablePanelGroup({
     storeRememberedPanelSizes(`${memoryKey}:${orientation}:${panelCount}`, sizes);
   }, [memoryKey, orientation, panelCount, sizes]);
 
+  React.useEffect(() => {
+    if (sizes.length !== panelCount || panelCount === 0) return;
+    onSizesChange?.(sizes);
+  }, [onSizesChange, panelCount, sizes]);
+
   const dragState = React.useRef<{
     index: number;
     startPos: number;
@@ -253,19 +260,6 @@ export function ResizablePanelGroup({
 
     return { minSizes, maxSizes };
   }, [panelCount, panels]);
-
-  const applyLeadingPreset = React.useCallback(
-    (leadingFraction: number) => {
-      if (panelCount !== 2) return;
-      const { minSizes, maxSizes } = collectPanelConstraints();
-      let leading = clamp(leadingFraction, minSizes[0], maxSizes[0]);
-      let trailing = clamp(1 - leading, minSizes[1], maxSizes[1]);
-      leading = clamp(1 - trailing, minSizes[0], maxSizes[0]);
-      trailing = 1 - leading;
-      setSizes([leading, trailing]);
-    },
-    [collectPanelConstraints, panelCount],
-  );
 
   const restoreDocumentTouch = React.useCallback(() => {
     document.body.style.removeProperty('overflow');
@@ -440,7 +434,6 @@ export function ResizablePanelGroup({
 
         const handleIndex = handles.indexOf(child);
         const handle = child as React.ReactElement<ResizableHandleProps>;
-        const stacked = !isHorizontal && handle.props.stacked;
 
         const beginResize = (event: React.PointerEvent<Element>) => {
           event.preventDefault();
@@ -450,15 +443,11 @@ export function ResizablePanelGroup({
 
         return React.cloneElement(handle, {
           role: 'separator',
-          title: stacked
-            ? 'Drag the grip or tap Chat / Work to resize panes.'
-            : 'Drag to resize. Double-click to reset.',
+          title: 'Drag to resize. Double-click to reset.',
           'aria-label':
             handle.props['aria-label'] ??
             (!isHorizontal ? 'Resize chat and work panes' : 'Drag to resize columns'),
-          onResizePointerDown: stacked ? beginResize : undefined,
-          onPointerDown: stacked ? undefined : beginResize,
-          onApplyLeadingPreset: stacked ? applyLeadingPreset : undefined,
+          onPointerDown: beginResize,
           onDoubleClick: (event: React.MouseEvent) => {
             event.preventDefault();
             event.stopPropagation();
@@ -506,78 +495,20 @@ export type ResizableHandleProps = {
   stacked?: boolean;
   className?: string;
   style?: React.CSSProperties;
-  onResizePointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onApplyLeadingPreset?: (leadingFraction: number) => void;
 } & React.HTMLAttributes<HTMLDivElement>;
-
-function stopPresetPointer(event: React.PointerEvent | React.MouseEvent) {
-  event.preventDefault();
-  event.stopPropagation();
-}
 
 export function ResizableHandle({
   withHandle = false,
   stacked = false,
   className,
-  onResizePointerDown,
-  onApplyLeadingPreset,
   onPointerDown,
   ...props
 }: ResizableHandleProps) {
-  const showMobileControls = stacked && withHandle && typeof onApplyLeadingPreset === 'function';
-
-  if (showMobileControls) {
-    return (
-      <div
-        className={cn(
-          'relative z-40 flex min-h-[56px] w-full flex-none shrink-0 items-stretch self-stretch border-y-2 border-cyan-500/25 bg-slate-950/95 shadow-[0_-6px_18px_rgba(0,0,0,0.45),0_6px_18px_rgba(0,0,0,0.45)] select-none [-webkit-tap-highlight-color:transparent]',
-          className,
-        )}
-        {...props}
-      >
-        <button
-          type="button"
-          aria-label="Show more chat"
-          className="flex min-w-[4.25rem] flex-col items-center justify-center gap-0.5 border-r border-cyan-500/15 px-2 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/70 touch-manipulation active:bg-cyan-500/10"
-          onPointerDown={stopPresetPointer}
-          onClick={() => onApplyLeadingPreset(0.98)}
-        >
-          <span aria-hidden className="text-sm leading-none">
-            ▲
-          </span>
-          Chat
-        </button>
-        <div
-          role="presentation"
-          className="flex min-w-0 flex-1 cursor-row-resize touch-none flex-col items-center justify-center gap-1 px-2"
-          onPointerDown={onResizePointerDown ?? onPointerDown}
-        >
-          <div className="h-1.5 w-14 rounded-full bg-cyan-400/85 shadow-[0_0_12px_rgba(34,211,238,0.35)]" />
-          <span className="font-mono text-[8px] uppercase tracking-[0.24em] text-cyan-100/45">
-            Drag
-          </span>
-        </div>
-        <button
-          type="button"
-          aria-label="Show more work pane"
-          className="flex min-w-[4.25rem] flex-col items-center justify-center gap-0.5 border-l border-cyan-500/15 px-2 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/70 touch-manipulation active:bg-cyan-500/10"
-          onPointerDown={stopPresetPointer}
-          onClick={() => onApplyLeadingPreset(0.02)}
-        >
-          <span aria-hidden className="text-sm leading-none">
-            ▼
-          </span>
-          Work
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div
       className={cn(
         stacked
-          ? 'relative z-40 flex-none shrink-0 self-stretch h-14 min-h-[56px] w-full flex items-center justify-center border-y-2 border-cyan-500/25 bg-slate-950/95 shadow-[0_-6px_18px_rgba(0,0,0,0.45),0_6px_18px_rgba(0,0,0,0.45)] hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 cursor-row-resize touch-none select-none [-webkit-tap-highlight-color:transparent]'
+          ? 'relative z-40 box-border flex w-full flex-none shrink-0 cursor-row-resize touch-none select-none items-center justify-center border-y border-slate-800/90 bg-slate-950/70 py-2.5 [-webkit-tap-highlight-color:transparent] before:absolute before:-top-3 before:-bottom-3 before:left-0 before:right-0 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50'
           : 'relative z-20 flex-none self-stretch w-px min-w-[6px] flex items-center justify-center border-x border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none select-none [-webkit-tap-highlight-color:transparent]',
         className,
       )}
@@ -586,12 +517,7 @@ export function ResizableHandle({
     >
       {withHandle ? (
         stacked ? (
-          <div className="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-1">
-            <div className="h-1.5 w-14 rounded-full bg-cyan-400/85 shadow-[0_0_12px_rgba(34,211,238,0.35)]" />
-            <span className="font-mono text-[8px] uppercase tracking-[0.24em] text-cyan-100/45">
-              Drag
-            </span>
-          </div>
+          <div className="pointer-events-none h-px w-12 rounded-full bg-slate-400/70 shadow-[0_0_6px_rgba(148,163,184,0.12)]" />
         ) : (
           <div className="pointer-events-none h-full w-px rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />
         )
