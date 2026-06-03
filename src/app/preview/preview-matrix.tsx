@@ -10,7 +10,6 @@ import {
 } from "react";
 import EmblaCarousel, { type EmblaCarouselType } from "embla-carousel";
 import { motion } from "motion/react";
-import { LuPlay } from "react-icons/lu";
 import { CyberdeckRollingPicker } from "@/components/cyberdeck/cyberdeck-rolling-picker";
 import { FigletFontPreviewSlide } from "@/components/cyberdeck/figlet-font-preview-slide";
 import {
@@ -382,13 +381,6 @@ export function PreviewMatrix() {
     requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
   }, [applyFocus, armedCardKey, cancelCardHold]);
 
-  const playFocusedCard = useCallback(() => {
-    const key = `${activeDeckIndex}:${activeCardIndex}`;
-    if (armedCardKey !== key) return;
-    handlePushCard(activeDeckIndex, activeCardIndex);
-    resetCardPlay();
-  }, [activeCardIndex, activeDeckIndex, armedCardKey, handlePushCard, resetCardPlay]);
-
   const handleCardPointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>, deckIndex: number, cardIndex: number) => {
       if (event.button !== 0 || !event.isPrimary) return;
@@ -489,18 +481,6 @@ export function PreviewMatrix() {
       <main className="shell" ref={paneRef}>
         <section className="status powerfistComposer">
           <form className="powerfistMessageBox" onSubmit={handleMessageSubmit}>
-            <div className="powerfistPaneRoller">
-              <CyberdeckRollingPicker
-                items={paneRollerItems}
-                value={targetPane}
-                onChange={handleTargetPaneChange}
-                ariaLabel="PowerFist target pane"
-                viewportClassName="powerfistPaneRollerViewport"
-                alwaysShowLabel
-                showTextWhileScrolling
-                loop
-              />
-            </div>
             <input
               ref={messageInputRef}
               aria-label="PowerFist instruction"
@@ -732,12 +712,20 @@ export function PreviewMatrix() {
               </button>
               <button
                 type="button"
-                className="dpadBtn dpadPlay"
-                aria-label="Push focused card"
-                disabled={isDraggingDpad || !armedCardKey}
-                onClick={playFocusedCard}
+                className="dpadBtn dpadPaneRoller"
+                aria-label="Set target pane"
+                disabled={isDraggingDpad}
               >
-                <LuPlay aria-hidden className="dpadPlayIcon" />
+                <CyberdeckRollingPicker
+                  items={paneRollerItems}
+                  value={targetPane}
+                  onChange={handleTargetPaneChange}
+                  ariaLabel="PowerFist target pane"
+                  viewportClassName="powerfistPaneRollerViewport powerfistPaneRollerViewportDpad"
+                  alwaysShowLabel
+                  showTextWhileScrolling
+                  loop
+                />
               </button>
               <button
                 type="button"

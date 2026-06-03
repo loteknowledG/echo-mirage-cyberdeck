@@ -5,18 +5,22 @@ import { PanelLoader, type PanelLoadStage } from "@/features/cyberdeck/panel-loa
 
 const STARTUP_STAGES: Array<{ id: string; label: string }> = [
   { id: "runtime", label: "BOOTING RUNTIME" },
-  { id: "memory", label: "WARMING MEMORY" },
-  { id: "panes", label: "MOUNTING PANES" },
-  { id: "signals", label: "LINKING SIGNALS" },
-  { id: "workbench", label: "SYNCING WORKBENCH" },
+  { id: "memory", label: "RESTORING STATE" },
+  { id: "panes", label: "ATTACHING PANES" },
+  { id: "ready", label: "FINAL CHECK" },
 ];
 
 const STARTUP_HINTS = [
   "HYDRATING CLIENT SHELL",
   "RESTORING OPERATOR STATE",
-  "ATTACHING DECK SIGNALS",
   "PRIMING DOCUMENT SURFACES",
   "VERIFYING READY PATH",
+];
+
+const WAIT_NOTES = [
+  "THE FIRST LOAD IS BUILDING THE DECK BUNDLE.",
+  "IF THIS HANGS, THE CLIENT IS STILL HYDRATING PANES.",
+  "ONCE READY, THE SHELL SHIPS STRAIGHT TO THE OPERATOR VIEW.",
 ];
 
 function buildStageState(activeIndex: number): PanelLoadStage[] {
@@ -33,7 +37,7 @@ export function CyberdeckStartupLoader() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setStep((current) => (current + 1) % (STARTUP_STAGES.length + 2));
-    }, 480);
+    }, 240);
 
     return () => window.clearInterval(timer);
   }, []);
@@ -41,6 +45,7 @@ export function CyberdeckStartupLoader() {
   const activeIndex = Math.min(step, STARTUP_STAGES.length - 1);
   const stages = buildStageState(activeIndex);
   const activeHint = STARTUP_HINTS[step % STARTUP_HINTS.length];
+  const waitNote = WAIT_NOTES[step % WAIT_NOTES.length];
 
   return (
     <div className="flex h-[100svh] min-h-0 w-full items-center justify-center bg-black px-4 py-8 text-emerald-300">
@@ -63,6 +68,7 @@ export function CyberdeckStartupLoader() {
         <div className="mt-4 border-t border-[#1c1c1c] pt-3 font-mono text-[9px] tracking-[0.08em] text-[#666]">
           <div>TIP :: THE STARTUP VIEW SHARES THE SAME LOADER LANGUAGE AS PANES.</div>
           <div className="mt-1 text-[#535353]">STATUS :: {activeHint}</div>
+          <div className="mt-1 text-[#4f4f4f]">NOTE :: {waitNote}</div>
         </div>
       </div>
     </div>
