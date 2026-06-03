@@ -6736,7 +6736,7 @@ const resolved = resolveUiTarget(userMessage);
           {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
           <ResizablePanel
             defaultSize={isMobileLayout ? 58 : 55}
-            minSize={isMobileLayout ? 10 : 0}
+            minSize={isMobileLayout ? 2 : 0}
             className="h-full min-h-0 overflow-hidden"
           >
           <div
@@ -7107,7 +7107,7 @@ const resolved = resolveUiTarget(userMessage);
         {/* COL 3 (flipped): gateway nav — Weyland col2 */}
         <ResizablePanel
           defaultSize={isMobileLayout ? 42 : 45}
-          minSize={isMobileLayout ? 10 : 0.01}
+          minSize={isMobileLayout ? 2 : 0.01}
           className="h-full min-h-0"
         >
           <div

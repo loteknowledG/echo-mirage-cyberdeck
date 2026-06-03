@@ -149,6 +149,7 @@ export function ResizablePanelGroup({
 }: ResizablePanelGroupProps) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = React.useState(0);
+  const [handleSpan, setHandleSpan] = React.useState(0);
   const [sizes, setSizes] = React.useState<number[]>([]);
   const initialSizesRef = React.useRef<number[] | null>(null);
   const layoutKeyRef = React.useRef<string>("");
@@ -168,6 +169,15 @@ export function ResizablePanelGroup({
     const update = () => {
       const rect = el.getBoundingClientRect();
       setContainerSize(orientation === 'horizontal' ? rect.width : rect.height);
+      if (orientation === 'vertical') {
+        let span = 0;
+        el.querySelectorAll('[role="separator"]').forEach((node) => {
+          span += node.getBoundingClientRect().height;
+        });
+        setHandleSpan(span);
+      } else {
+        setHandleSpan(0);
+      }
     };
 
     update();
@@ -268,9 +278,12 @@ export function ResizablePanelGroup({
   }, []);
 
   const updateSizes = (index: number, deltaPx: number) => {
-    if (containerSize <= 0) return;
+    const trackSize = isHorizontal
+      ? containerSize
+      : Math.max(containerSize - handleSpan, 1);
+    if (trackSize <= 0) return;
 
-    const deltaFraction = deltaPx / containerSize;
+    const deltaFraction = deltaPx / trackSize;
     const leftIndex = index;
     const rightIndex = index + 1;
 
@@ -282,14 +295,25 @@ export function ResizablePanelGroup({
     const rightMin = state.minSizes[rightIndex];
     const rightMax = state.maxSizes[rightIndex];
 
+    const nextSizes = [...state.startSizes];
+
+    if (state.startSizes.length === 2) {
+      let newLeading = state.startSizes[leftIndex] + deltaFraction;
+      const leadingMax = Math.min(leftMax, 1 - rightMin);
+      const leadingMin = Math.max(leftMin, 1 - rightMax);
+      newLeading = clamp(newLeading, leadingMin, leadingMax);
+      nextSizes[leftIndex] = newLeading;
+      nextSizes[rightIndex] = 1 - newLeading;
+      setSizes(nextSizes);
+      return;
+    }
+
     let newLeft = state.startSizes[leftIndex] + deltaFraction;
     let newRight = state.startSizes[rightIndex] - deltaFraction;
 
-    // Enforce min/max constraints.
     newLeft = clamp(newLeft, leftMin, leftMax);
     newRight = clamp(newRight, rightMin, rightMax);
 
-    // Ensure they still add up to the same total (approx).
     const total = newLeft + newRight;
     const startTotal = state.startSizes[leftIndex] + state.startSizes[rightIndex];
     if (total !== 0 && startTotal !== 0) {
@@ -298,7 +322,6 @@ export function ResizablePanelGroup({
       newRight *= scale;
     }
 
-    const nextSizes = [...state.startSizes];
     nextSizes[leftIndex] = newLeft;
     nextSizes[rightIndex] = newRight;
     setSizes(nextSizes);
@@ -357,16 +380,30 @@ export function ResizablePanelGroup({
 
   React.useEffect(() => () => restoreDocumentTouch(), [restoreDocumentTouch]);
 
+  const useStackedGrid =
+    !isHorizontal && panelCount === 2 && handles.length === 1 && sizes.length === 2;
+  const leadingFraction = useStackedGrid ? getPanelFraction(0) : 0;
+  const trailingFraction = useStackedGrid ? getPanelFraction(1) : 0;
+
   return (
     <div
       ref={containerRef}
       className={cn('h-full w-full', className)}
-      style={{
-        display: 'flex',
-        flexDirection: isHorizontal ? 'row' : 'column',
-        height: '100%',
-        width: '100%',
-      }}
+      style={
+        useStackedGrid
+          ? {
+              display: 'grid',
+              gridTemplateRows: `minmax(0, ${leadingFraction}fr) auto minmax(0, ${trailingFraction}fr)`,
+              height: '100%',
+              width: '100%',
+            }
+          : {
+              display: 'flex',
+              flexDirection: isHorizontal ? 'row' : 'column',
+              height: '100%',
+              width: '100%',
+            }
+      }
     >
       {childrenArray.map((child) => {
         if (getResizableRole(child) === 'panel') {
@@ -503,7 +540,7 @@ export function ResizableHandle({
           aria-label="Show more chat"
           className="flex min-w-[4.25rem] flex-col items-center justify-center gap-0.5 border-r border-cyan-500/15 px-2 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/70 touch-manipulation active:bg-cyan-500/10"
           onPointerDown={stopPresetPointer}
-          onClick={() => onApplyLeadingPreset(0.92)}
+          onClick={() => onApplyLeadingPreset(0.98)}
         >
           <span aria-hidden className="text-sm leading-none">
             ▲
@@ -525,7 +562,7 @@ export function ResizableHandle({
           aria-label="Show more work pane"
           className="flex min-w-[4.25rem] flex-col items-center justify-center gap-0.5 border-l border-cyan-500/15 px-2 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/70 touch-manipulation active:bg-cyan-500/10"
           onPointerDown={stopPresetPointer}
-          onClick={() => onApplyLeadingPreset(0.08)}
+          onClick={() => onApplyLeadingPreset(0.02)}
         >
           <span aria-hidden className="text-sm leading-none">
             ▼
