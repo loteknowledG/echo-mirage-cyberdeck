@@ -144,6 +144,43 @@
   position: relative;
 }
 
+.powerfist-preview-root .powerfistSplitLayout {
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+}
+
+.powerfist-preview-root .powerfistSplitLayout[data-split-mode="stack"] {
+  grid-template-rows: var(--pf-split-size, 108px) 8px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.powerfist-preview-root .powerfistSplitLayout[data-split-mode="side"] {
+  grid-template-columns: var(--pf-split-size, 320px) 8px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.powerfist-preview-root .powerfistSplitLayout .status,
+.powerfist-preview-root .powerfistSplitLayout .matrixStage {
+  min-height: 0;
+  height: 100%;
+}
+
+.powerfist-preview-root .powerfistSplitHandle {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(180deg, rgba(134, 239, 172, 0.16), rgba(134, 239, 172, 0.05));
+  cursor: row-resize;
+}
+
+.powerfist-preview-root .powerfistSplitLayout[data-split-mode="side"] .powerfistSplitHandle {
+  cursor: col-resize;
+}
+
 .powerfist-preview-root .matrix {
   height: 100%;
   border: 1px solid var(--pf-line);
@@ -199,19 +236,6 @@
   align-content: stretch;
   padding: 8px 16px 10px;
   gap: 6px;
-  transition:
-    opacity 200ms ease,
-    filter 200ms ease;
-}
-
-.powerfist-preview-root .deckSlide:not(.is-selected) {
-  opacity: 0.55;
-  filter: grayscale(0.3);
-}
-
-.powerfist-preview-root .deckSlide.is-selected {
-  opacity: 1;
-  filter: none;
 }
 
 .powerfist-preview-root .deckHeader {
@@ -630,9 +654,18 @@
 }
 
 .powerfist-preview-root .controls {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
+  padding-bottom: 14px;
+  pointer-events: none;
+}
+
+.powerfist-preview-root .controls .dpad {
+  pointer-events: auto;
 }
 
 .powerfist-preview-root .compactCardControls {
@@ -747,6 +780,163 @@
   border-radius: 4px 4px 10px 10px;
 }
 
+/* Floating rectangle controller (compare with floating d-pad; d-pad unchanged) */
+.powerfist-preview-root .powerfistRectLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.powerfist-preview-root .powerfistRectDrag {
+  pointer-events: auto;
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  touch-action: none;
+  cursor: grab;
+}
+
+.powerfist-preview-root .powerfistRectDrag:active {
+  cursor: grabbing;
+}
+
+.powerfist-preview-root .powerfistRectController {
+  width: min(100%, 336px);
+  aspect-ratio: 7 / 3;
+  min-height: 72px;
+  border: 1px solid var(--pf-line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(12, 22, 17, 0.96), rgba(6, 12, 10, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+  display: grid;
+  grid-template-columns: 1fr 1.1fr 0.85fr;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+}
+
+.powerfist-preview-root .powerfistRectController__zoneLabel {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 7px;
+  letter-spacing: 0.14em;
+  color: var(--pf-muted);
+  pointer-events: none;
+}
+
+.powerfist-preview-root .powerfistRectController__dpad,
+.powerfist-preview-root .powerfistRectController__center,
+.powerfist-preview-root .powerfistRectController__face {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding-top: 10px;
+}
+
+.powerfist-preview-root .powerfistRectController__dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 26px);
+  grid-template-rows: repeat(3, 26px);
+  gap: 0;
+  justify-content: center;
+}
+
+.powerfist-preview-root .powerfistRectBtn {
+  border: 1px solid rgba(134, 239, 172, 0.35);
+  background: rgba(8, 17, 13, 0.92);
+  color: var(--pf-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.powerfist-preview-root .powerfistRectBtn:hover:not(:disabled) {
+  border-color: rgba(134, 239, 172, 0.75);
+  background: rgba(134, 239, 172, 0.12);
+}
+
+.powerfist-preview-root .powerfistRectBtn:active:not(:disabled) {
+  background: rgba(134, 239, 172, 0.22);
+}
+
+.powerfist-preview-root .powerfistRectBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.powerfist-preview-root .powerfistRectBtn--up {
+  grid-column: 2;
+  grid-row: 1;
+  border-radius: 8px 8px 3px 3px;
+}
+
+.powerfist-preview-root .powerfistRectBtn--left {
+  grid-column: 1;
+  grid-row: 2;
+  border-radius: 8px 3px 3px 8px;
+}
+
+.powerfist-preview-root .powerfistRectBtn--right {
+  grid-column: 3;
+  grid-row: 2;
+  border-radius: 3px 8px 8px 3px;
+}
+
+.powerfist-preview-root .powerfistRectBtn--down {
+  grid-column: 2;
+  grid-row: 3;
+  border-radius: 3px 3px 8px 8px;
+}
+
+.powerfist-preview-root .powerfistRectController__center {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.powerfist-preview-root .powerfistRectController__roller {
+  width: 100%;
+  max-width: 120px;
+  min-height: 28px;
+  border-radius: 4px;
+  border: 1px solid rgba(134, 239, 172, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.powerfist-preview-root .powerfistRectController__face {
+  gap: 10px;
+}
+
+.powerfist-preview-root .powerfistRectBtn--round {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.powerfist-preview-root .powerfistRectBtn--b {
+  color: #facc15;
+  border-color: rgba(250, 204, 21, 0.45);
+}
+
+.powerfist-preview-root .powerfistRectBtn--a {
+  color: #86efac;
+  border-color: rgba(134, 239, 172, 0.55);
+}
+
 .powerfist-preview-root .stackLog {
   min-height: 42px;
   color: var(--pf-muted);
@@ -816,30 +1006,41 @@
 .cyberdeck-rola-dex-pane .powerfist-preview-root .shell {
   flex: 1;
   min-height: 0;
-  width: 100%;
+  width: 100% !important;
   box-sizing: border-box;
-  padding-right: 10px;
-  max-width: none;
+  padding-right: 0;
+  max-width: none !important;
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
   overflow-x: hidden;
+  overflow-y: hidden;
+  position: relative;
 }
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root .status,
 .cyberdeck-rola-dex-pane .powerfist-preview-root .matrixStage,
 .cyberdeck-rola-dex-pane .powerfist-preview-root .matrix,
 .cyberdeck-rola-dex-pane .powerfist-preview-root .controls,
+.cyberdeck-rola-dex-pane .powerfist-preview-root .powerfistRectLayer,
 .cyberdeck-rola-dex-pane .powerfist-preview-root .stackLog {
   width: 100%;
   max-width: 100%;
 }
 
+.cyberdeck-rola-dex-pane .powerfist-preview-root .controls {
+  display: flex;
+}
+
+.cyberdeck-rola-dex-pane .powerfist-preview-root .stackLog {
+  display: none;
+}
+
 .cyberdeck-rola-dex-pane .powerfist-preview-root .matrixStage {
   flex: 1 1 auto;
-  min-height: 280px;
-  height: min(620px, 100%);
-  max-height: 620px;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
 }
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root .matrix {
@@ -847,13 +1048,12 @@
 }
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root[data-compact-cards="true"] .matrixStage {
-  --pf-compact-matrix-size: min(100cqw, 520px);
-  width: var(--pf-compact-matrix-size);
-  height: var(--pf-compact-matrix-size);
+  width: 100%;
+  height: 100%;
   min-height: 0;
   max-height: none;
-  aspect-ratio: 1 / 1;
-  justify-self: center;
+  aspect-ratio: auto;
+  justify-self: stretch;
 }
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root .deckSlide {

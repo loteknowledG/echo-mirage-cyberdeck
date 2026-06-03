@@ -130,7 +130,7 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
     await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
 
-    await page.getByRole("button", { name: "Move cards up" }).click();
+    await page.getByRole("button", { name: "Move deck up" }).click();
     await page.waitForTimeout(450);
     await expectFocusedCardVisibleInMatrix(page);
 
@@ -355,9 +355,9 @@ test.describe("Rola Dex / Preview matrix", () => {
     }
 
     await expect(page.locator(".cardTitle", { hasText: "Render Plain Text" })).toBeVisible();
-    await page.getByRole("button", { name: "Move cards up" }).click();
+    await page.getByRole("button", { name: "Move deck up" }).click();
     await expect(page.locator(".cardSlide.is-selected .cardArtifactPreviewOneline")).toBeVisible();
-    await page.getByRole("button", { name: "Move cards up" }).click();
+    await page.getByRole("button", { name: "Move deck up" }).click();
     await expect(page.locator(".cardSlide.is-selected .cardArtifactPreviewFiglet")).toBeVisible();
   });
 

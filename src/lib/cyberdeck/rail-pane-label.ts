@@ -17,6 +17,7 @@ const RAIL_KIND_DISPLAY: Partial<Record<CyberdeckPaneKind, string>> = {
   "voice-lab": "VOICE",
   "sound-profile": "SOUND",
   "rola-dex": "POWERFIST",
+  "test-pane": "TEST",
 };
 
 /** Human pane name for a fixed server-rail tab (m / s / ct / b). */

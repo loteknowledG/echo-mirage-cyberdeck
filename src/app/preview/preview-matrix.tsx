@@ -25,6 +25,7 @@ import {
 } from "@/lib/cyberdeck/powerfist-events";
 import { GLYPH_CHANNEL_PREVIEW_DECKS, PREVIEW_DECKS } from "./preview-data";
 import { scrollMatrixTo, wrapIndex } from "./preview-matrix-nav";
+import { PowerfistRectController } from "./powerfist-rect-controller";
 import "./preview-matrix.css";
 
 const CARD_PLAY_TRAIL_DURATION_MS = 900;
@@ -66,6 +67,8 @@ export function PreviewMatrix() {
   const [armingCardKey, setArmingCardKey] = useState<string | null>(null);
   const [armedCardKey, setArmedCardKey] = useState<string | null>(null);
   const [pushReceiptHtml, setPushReceiptHtml] = useState<string | null>(null);
+  const [splitMode, setSplitMode] = useState<"stack" | "side">("stack");
+  const [splitSize, setSplitSize] = useState(108);
 
   const matrixRef = useRef<HTMLElement>(null);
   const paneRef = useRef<HTMLElement>(null);
@@ -84,6 +87,9 @@ export function PreviewMatrix() {
     timer: ReturnType<typeof setTimeout>;
   } | null>(null);
   const pushReceiptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const splitDragRef = useRef<{ start: number; size: number; mode: "stack" | "side" } | null>(
+    null,
+  );
 
   const targetPaneLabel = CYBERDECK_PANE_REGISTRY[targetPane].label;
   const activeDecks = targetPane === "glyph-channel" ? GLYPH_CHANNEL_PREVIEW_DECKS : PREVIEW_DECKS;
@@ -206,6 +212,7 @@ export function PreviewMatrix() {
       align: "center",
       dragFree: false,
       containScroll: false,
+      duration: 28,
     });
 
     deckEmblaRef.current = deckEmbla;
@@ -322,6 +329,18 @@ export function PreviewMatrix() {
     [activeDeckIndex, activeDecks, armedCardKey],
   );
 
+  /** Vertical deck band: smooth scroll like dragging the deck viewport (not jump/fade). */
+  const navigateDeck = useCallback(
+    (direction: 1 | -1) => {
+      if (armedCardKey) return;
+      const deckEmbla = deckEmblaRef.current;
+      if (!deckEmbla) return;
+      if (direction < 0) deckEmbla.scrollPrev();
+      else deckEmbla.scrollNext();
+    },
+    [armedCardKey],
+  );
+
   const handlePushCard = useCallback(
     (deckIndex: number, cardIndex: number) => {
       applyFocus(deckIndex, cardIndex);
@@ -420,21 +439,19 @@ export function PreviewMatrix() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const deckEmbla = deckEmblaRef.current;
-      if (!deckEmbla) return;
       if (armedCardKey) {
         if (event.key === "Escape") resetCardPlay();
         return;
       }
-      if (event.key === "ArrowUp") deckEmbla.scrollNext();
-      if (event.key === "ArrowDown") deckEmbla.scrollPrev();
+      if (event.key === "ArrowUp") navigateDeck(-1);
+      if (event.key === "ArrowDown") navigateDeck(1);
       if (event.key === "ArrowLeft") navigateCard(1);
       if (event.key === "ArrowRight") navigateCard(-1);
     };
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [armedCardKey, navigateCard, resetCardPlay]);
+  }, [armedCardKey, navigateCard, navigateDeck, resetCardPlay]);
 
   useEffect(
     () => cancelCardHold,
@@ -476,33 +493,113 @@ export function PreviewMatrix() {
     setTargetPane(next as CyberdeckPaneKind);
   }, []);
 
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane) return;
+
+    const applySplitMode = () => {
+      const rect = pane.getBoundingClientRect();
+      const nextMode: "stack" | "side" = rect.width > rect.height ? "side" : "stack";
+      setSplitMode(nextMode);
+      setSplitSize((current) => {
+        const min = nextMode === "side" ? 260 : 84;
+        const maxBase = nextMode === "side" ? rect.width : rect.height;
+        const max =
+          nextMode === "side"
+            ? Math.max(min + 80, Math.floor(maxBase * 0.55))
+            : Math.max(min + 30, Math.min(220, Math.floor(maxBase * 0.3)));
+        const fallback = nextMode === "side" ? 320 : 108;
+        return Math.min(max, Math.max(min, current || fallback));
+      });
+    };
+
+    applySplitMode();
+    const observer = new ResizeObserver(applySplitMode);
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, []);
+
+  const beginSplitResize = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+
+      splitDragRef.current = {
+        start: splitMode === "side" ? event.clientX : event.clientY,
+        size: splitSize,
+        mode: splitMode,
+      };
+
+      const onMove = (moveEvent: PointerEvent) => {
+        const drag = splitDragRef.current;
+        const pane = paneRef.current;
+        if (!drag || !pane) return;
+
+        const cursor = drag.mode === "side" ? moveEvent.clientX : moveEvent.clientY;
+        const delta = cursor - drag.start;
+        const rect = pane.getBoundingClientRect();
+        const min = drag.mode === "side" ? 260 : 84;
+        const maxBase = drag.mode === "side" ? rect.width : rect.height;
+        const max =
+          drag.mode === "side"
+            ? Math.max(min + 80, Math.floor(maxBase * 0.55))
+            : Math.max(min + 30, Math.min(220, Math.floor(maxBase * 0.3)));
+        const next = Math.min(max, Math.max(min, drag.size + delta));
+        setSplitSize(next);
+      };
+
+      const onUp = () => {
+        splitDragRef.current = null;
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [splitMode, splitSize],
+  );
+
   return (
     <div className="powerfist-preview-root" data-compact-cards={isCompactCards ? "true" : "false"}>
       <main className="shell" ref={paneRef}>
-        <section className="status powerfistComposer">
-          <form className="powerfistMessageBox" onSubmit={handleMessageSubmit}>
-            <input
-              ref={messageInputRef}
-              aria-label="PowerFist instruction"
-              className="powerfistMessageInput"
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              placeholder="Issue instruction to selected pane"
-            />
-            <button className="powerfistMessageSend" type="button" onClick={queueMessage}>
-              Queue
-            </button>
-          </form>
-        </section>
+        <div
+          className="powerfistSplitLayout"
+          data-split-mode={splitMode}
+          style={{ ["--pf-split-size" as string]: `${splitSize}px` }}
+        >
+          <section className="status powerfistComposer">
+            <form className="powerfistMessageBox" onSubmit={handleMessageSubmit}>
+              <input
+                ref={messageInputRef}
+                aria-label="PowerFist instruction"
+                className="powerfistMessageInput"
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                placeholder="Issue instruction to selected pane"
+              />
+              <button className="powerfistMessageSend" type="button" onClick={queueMessage}>
+                Queue
+              </button>
+            </form>
+          </section>
 
-        <section className="matrixStage">
+          <button
+            type="button"
+            className="powerfistSplitHandle"
+            aria-label="Resize message and matrix panes"
+            aria-orientation={splitMode === "side" ? "vertical" : "horizontal"}
+            onPointerDown={beginSplitResize}
+          />
+
+          <section className="matrixStage">
           <section className="matrix" ref={matrixRef} data-testid="preview-matrix">
             <div className="deckViewport" ref={deckViewportRef}>
               <div className="deckContainer">
                 {activeDecks.map((deck, deckIndex) => (
                   <section
                     key={deck.name}
-                    className={`deckSlide${deckIndex === activeDeckIndex ? " is-selected" : ""}`}
+                    className="deckSlide"
                     data-deck-index={deckIndex}
                   >
                     <div
@@ -662,92 +759,106 @@ export function PreviewMatrix() {
               <button
                 type="button"
                 className="dpadBtn compactCardControl compactCardControlUp"
-                aria-label="Move cards up"
+                aria-label="Move deck up"
                 disabled={Boolean(armedCardKey)}
-                onClick={() => deckEmblaRef.current?.scrollNext()}
+                onClick={() => navigateDeck(-1)}
               >
                 ↑
               </button>
               <button
                 type="button"
                 className="dpadBtn compactCardControl compactCardControlDown"
-                aria-label="Move cards down"
+                aria-label="Move deck down"
                 disabled={Boolean(armedCardKey)}
-                onClick={() => deckEmblaRef.current?.scrollPrev()}
+                onClick={() => navigateDeck(1)}
               >
                 ↓
               </button>
             </div>
           ) : null}
-        </section>
 
-        <section className="controls">
-        {!isCompactCards && !armedCardKey ? (
-            <motion.div
-              className="dpad"
-              aria-label="Matrix navigation"
-              drag
-              dragConstraints={paneRef}
-              dragMomentum
-              onDragStart={() => setIsDraggingDpad(true)}
-              onDragEnd={() => setIsDraggingDpad(false)}
-            >
-              <button
-                type="button"
-                className="dpadBtn dpadUp"
-                aria-label="Move cards up"
-                disabled={isDraggingDpad || Boolean(armedCardKey)}
-                onClick={() => deckEmblaRef.current?.scrollNext()}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                className="dpadBtn dpadLeft"
-                aria-label="Move cards left"
-                disabled={isDraggingDpad || Boolean(armedCardKey)}
-                onClick={() => navigateCard(1)}
-              >
-                ←
-              </button>
-              <button
-                type="button"
-                className="dpadBtn dpadPaneRoller"
-                aria-label="Set target pane"
-                disabled={isDraggingDpad}
-              >
-                <CyberdeckRollingPicker
-                  items={paneRollerItems}
-                  value={targetPane}
-                  onChange={handleTargetPaneChange}
-                  ariaLabel="PowerFist target pane"
-                  viewportClassName="powerfistPaneRollerViewport powerfistPaneRollerViewportDpad"
-                  alwaysShowLabel
-                  showTextWhileScrolling
-                  loop
-                />
-              </button>
-              <button
-                type="button"
-                className="dpadBtn dpadRight"
-                aria-label="Move cards right"
-                disabled={isDraggingDpad || Boolean(armedCardKey)}
-                onClick={() => navigateCard(-1)}
-              >
-                →
-              </button>
-              <button
-                type="button"
-                className="dpadBtn dpadDown"
-                aria-label="Move cards down"
-                disabled={isDraggingDpad || Boolean(armedCardKey)}
-                onClick={() => deckEmblaRef.current?.scrollPrev()}
-              >
-                ↓
-              </button>
-            </motion.div>
+          {!armedCardKey && !isCompactCards ? (
+            <PowerfistRectController
+              constraintsRef={paneRef}
+              disabled={Boolean(armedCardKey)}
+              paneRollerItems={paneRollerItems}
+              targetPane={targetPane}
+              onTargetPaneChange={handleTargetPaneChange}
+              onNavigateCard={navigateCard}
+              onDeckUp={() => navigateDeck(-1)}
+              onDeckDown={() => navigateDeck(1)}
+            />
           ) : null}
-        </section>
+
+          <section className="controls">
+          {!armedCardKey ? (
+              <motion.div
+                className="dpad"
+                aria-label="Matrix navigation"
+                drag
+                dragConstraints={paneRef}
+                dragMomentum
+                onDragStart={() => setIsDraggingDpad(true)}
+                onDragEnd={() => setIsDraggingDpad(false)}
+              >
+                <button
+                  type="button"
+                  className="dpadBtn dpadUp"
+                  aria-label="Move deck up"
+                  disabled={isDraggingDpad || Boolean(armedCardKey)}
+                  onClick={() => navigateDeck(-1)}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="dpadBtn dpadLeft"
+                  aria-label="Move cards left"
+                  disabled={isDraggingDpad || Boolean(armedCardKey)}
+                  onClick={() => navigateCard(1)}
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  className="dpadBtn dpadPaneRoller"
+                  aria-label="Set target pane"
+                  disabled={isDraggingDpad}
+                >
+                  <CyberdeckRollingPicker
+                    items={paneRollerItems}
+                    value={targetPane}
+                    onChange={handleTargetPaneChange}
+                    ariaLabel="PowerFist target pane"
+                    viewportClassName="powerfistPaneRollerViewport powerfistPaneRollerViewportDpad"
+                    alwaysShowLabel
+                    showTextWhileScrolling
+                    loop
+                  />
+                </button>
+                <button
+                  type="button"
+                  className="dpadBtn dpadRight"
+                  aria-label="Move cards right"
+                  disabled={isDraggingDpad || Boolean(armedCardKey)}
+                  onClick={() => navigateCard(-1)}
+                >
+                  →
+                </button>
+                <button
+                  type="button"
+                  className="dpadBtn dpadDown"
+                  aria-label="Move deck down"
+                  disabled={isDraggingDpad || Boolean(armedCardKey)}
+                  onClick={() => navigateDeck(1)}
+                >
+                  ↓
+                </button>
+              </motion.div>
+            ) : null}
+          </section>
+          </section>
+        </div>
 
         <section
           className="stackLog"

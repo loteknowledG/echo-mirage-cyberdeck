@@ -344,6 +344,7 @@ const CUSTOM_TAB_KINDS = [
   "glyph-channel",
   "rola-dex",
   "sound-profile",
+  "test-pane",
   "realmorphism-kit",
   "catelog",
 ] as const;
@@ -439,6 +440,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Kit", action: "kit-pane" },
   { label: "Powerfist", kind: "rola-dex", action: "convert" },
   { label: "Sound Profile", kind: "sound-profile", action: "convert" },
+  { label: "Test", kind: "test-pane", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
   { label: "Pi", kind: "pi", action: "convert" },
   { label: "Settings", action: "settings-pane" },
@@ -795,6 +797,9 @@ function normalizeCustomTabKind(kind: string) {
   ) {
     return "realmorphism-kit" as CustomTabKind;
   }
+  if (nextKind === "test-pane" || nextKind === "test_pane" || nextKind === "test") {
+    return "test-pane" as CustomTabKind;
+  }
   if (CUSTOM_TAB_KINDS.includes(nextKind as CustomTabKind)) {
     return nextKind as CustomTabKind;
   }
@@ -826,6 +831,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "glyph-channel") return "⟁";
   if (kind === "rola-dex") return "#";
   if (kind === "sound-profile") return "♪";
+  if (kind === "test-pane") return "T";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
@@ -838,6 +844,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "glyph-channel") return "⟁ GLYPH";
   if (kind === "rola-dex") return "Rola Dex";
   if (kind === "sound-profile") return "Sound Profile";
+  if (kind === "test-pane") return "Test";
   return kind.toUpperCase();
 }
 
@@ -880,7 +887,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -5858,8 +5865,8 @@ const resolved = resolveUiTarget(userMessage);
     [closeGatewayPaneContextMenu, closeMirageContextMenu],
   );
 
-  const createTabFromMenuAction = useCallback(
-    (action: CustomTabContextMenuAction) => {
+  const applyTabMenuAction = useCallback(
+    (action: CustomTabContextMenuAction, existingTabId?: string) => {
       closeRailTabContextMenu();
       if (action.action === "kit-pane") {
         openRealmorphismKitTab();
@@ -5867,9 +5874,13 @@ const resolved = resolveUiTarget(userMessage);
       }
 
       const kind: CustomTabKind =
-        action.action === "convert"
-          ? action.kind
-          : "settings";
+        action.action === "convert" ? action.kind : "settings";
+
+      if (existingTabId) {
+        convertCustomTab(existingTabId, kind);
+        return;
+      }
+
       const id = `tab-${crypto.randomUUID()}`;
       const tab: CustomTab = {
         id,
@@ -5893,7 +5904,7 @@ const resolved = resolveUiTarget(userMessage);
       ]);
       playDeckSystemSound("chirp", 0.05);
     },
-    [closeRailTabContextMenu, openRealmorphismKitTab],
+    [closeRailTabContextMenu, convertCustomTab, openRealmorphismKitTab],
   );
 
   const openMirageContextMenu = useCallback(
@@ -6392,9 +6403,20 @@ const resolved = resolveUiTarget(userMessage);
         );
       }
 
+      if (tab.kind === "test-pane") {
+        return (
+          <div
+            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
+            data-pointer-target="test-pane"
+          >
+            <ActivatedCyberdeckPane kind="test-pane" />
+          </div>
+        );
+      }
+
       return shell(
         <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-          BLANK TAB // USE CHAT COMMANDS TO CONVERT TO DOCUMENT, WEB, CATALOG, OPERATORS, MEMORY-ATLAS, VOICE-LAB, FLIGHT-LOG, GLYPH-CHANNEL, ROLA-DEX, SOUND-PROFILE, SETTINGS, CONNECTION, DIAGNOSTICS, OR PI.
+          BLANK TAB // RIGHT-CLICK TAB RAIL TO PICK A TYPE, OR USE CHAT /tab COMMANDS.
         </div>,
       );
     },
@@ -6522,7 +6544,7 @@ const resolved = resolveUiTarget(userMessage);
                     key={action.label}
                     type="button"
                     role="menuitem"
-                    onClick={() => createTabFromMenuAction(action)}
+                    onClick={() => applyTabMenuAction(action)}
                     className={realmorphismMenuItemClass(deckMode)}
                   >
                     {action.label}
@@ -6531,6 +6553,17 @@ const resolved = resolveUiTarget(userMessage);
               </>
             ) : (
               <>
+                {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
+                  <button
+                    key={`convert-${action.label}`}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => applyTabMenuAction(action, railTabContextMenu.tabId)}
+                    className={realmorphismMenuItemClass(deckMode)}
+                  >
+                    {action.label}
+                  </button>
+                ))}
                 <button
                   type="button"
                   role="menuitem"
