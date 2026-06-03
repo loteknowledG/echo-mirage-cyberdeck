@@ -103,7 +103,7 @@
     "react-json-view": "^1.21.3",
     "react-resizable-panels": "^4.7.6",
     "react-type-animation": "^3.2.0",
-    "realmorphism": "link:../realmorphism",
+    "realmorphism": "github:loteknowledG/realmorphism#master",
     "sonner": "^2.0.7",
     "sql.js": "^1.14.1",
     "streamdown": "^2.5.0",

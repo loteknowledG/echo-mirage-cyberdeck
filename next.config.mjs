@@ -1,8 +1,20 @@
+import { createRequire } from "module";
+import { existsSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
-const realmorphismPackageRoot = path.resolve(projectRoot, "../realmorphism");
+const require = createRequire(import.meta.url);
+
+function resolveRealmorphismPackageRoot() {
+	const sibling = path.resolve(projectRoot, "../realmorphism");
+	if (existsSync(path.join(sibling, "package.json"))) {
+		return sibling;
+	}
+	return path.dirname(require.resolve("realmorphism/package.json"));
+}
+
+const realmorphismPackageRoot = resolveRealmorphismPackageRoot();
 const realmorphismRoot = path.join(realmorphismPackageRoot, "src");
 const realmorphismWheelCss = path.join(
 	realmorphismRoot,
