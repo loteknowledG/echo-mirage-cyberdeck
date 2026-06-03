@@ -784,7 +784,7 @@ export function PreviewMatrix() {
               paneRollerItems={paneRollerItems}
               targetPane={targetPane}
               onTargetPaneChange={handleTargetPaneChange}
-              onNavigateCard={navigateCard}
+              onNavigateCard={(delta) => navigateCard(delta === 1 ? 1 : -1)}
               onDeckUp={() => navigateDeck(-1)}
               onDeckDown={() => navigateDeck(1)}
             />

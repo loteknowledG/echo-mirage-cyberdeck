@@ -61,7 +61,18 @@ const nextConfig = {
 		"just-bash",
 		"@mongodb-js/zstd",
 	],
-	webpack: (config, { dev }) => {
+	webpack: (config, { dev, isServer }) => {
+		if (isServer) {
+			const playwrightExternals = ["playwright", "playwright-core"];
+			if (Array.isArray(config.externals)) {
+				config.externals.push(...playwrightExternals);
+			} else if (config.externals) {
+				config.externals = [config.externals, ...playwrightExternals];
+			} else {
+				config.externals = playwrightExternals;
+			}
+		}
+
 		config.resolve.alias = {
 			...config.resolve.alias,
 			[realmorphismWheelCss]: echoWheelCss,

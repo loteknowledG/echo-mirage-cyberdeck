@@ -7,7 +7,7 @@ import {
   resetMuthurExecutionLoopForTests,
   resetMuthurExecutionStoreForTests,
 } from "../src/lib/muthur/execution/index.server";
-import { MUTHUR_SCREENSHOT_DIR } from "../src/lib/muthur/browser/browser-session";
+import { MUTHUR_SCREENSHOT_DIR } from "../src/lib/muthur/browser/browser-paths.server";
 
 const RECEIPTS_JSONL = path.join(process.cwd(), ".muthur", "logs", "verification-receipts.jsonl");
 const SAFETY_JSONL = path.join(process.cwd(), ".muthur", "logs", "safety-events.jsonl");

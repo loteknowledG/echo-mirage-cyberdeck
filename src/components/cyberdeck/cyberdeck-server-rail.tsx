@@ -54,7 +54,10 @@ export function CyberdeckServerRail({
   const dragX = useMotionValue(0);
   const dragY = useMotionValue(0);
 
-  const handleRailDrag = (_event: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+  const handleRailDrag = (
+    _event: globalThis.PointerEvent | globalThis.MouseEvent | TouchEvent,
+    info: PanInfo,
+  ) => {
     const rail = railRef.current;
     if (!rail) return;
     if (isMobileLayout) {

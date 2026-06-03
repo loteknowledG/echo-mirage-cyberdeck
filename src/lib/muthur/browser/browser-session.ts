@@ -2,12 +2,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { DEFAULT_BROWSER_BASE_URL, validateBrowserUrl } from "./browser-policy";
+import { MUTHUR_SCREENSHOT_DIR } from "./browser-paths.server";
+import { loadPlaywright } from "./load-playwright.server";
 
-// Playwright is optional at runtime (see src/types/playwright-optional.d.ts).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Browser = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Page = any;
+export { MUTHUR_SCREENSHOT_DIR };
 
 export type BrowserConsoleEntry = {
   message: string;
@@ -35,22 +33,16 @@ export type BrowserNavigationSnapshot = {
   navigated_at: string;
 };
 
-export const MUTHUR_SCREENSHOT_DIR = path.join(process.cwd(), ".muthur", "screenshots");
+// Playwright is optional at runtime (see src/types/playwright-optional.d.ts).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Browser = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Page = any;
 
 let browserInstance: Browser | null = null;
 let pageInstance: Page | null = null;
 let lastSnapshot: BrowserNavigationSnapshot | null = null;
 let sessionConsoleEntries: BrowserConsoleEntry[] = [];
-
-async function loadPlaywright() {
-  try {
-    return await import("playwright");
-  } catch {
-    throw new Error(
-      "Playwright is not available. Install with: pnpm exec playwright install chromium",
-    );
-  }
-}
 
 function pushConsoleEntry(message: string, severity: BrowserConsoleEntry["severity"], source: string) {
   sessionConsoleEntries.push({

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readScreenshotPng } from "@/lib/muthur/browser/serve-screenshot.server";
+import { getMuthurExecutionLoop } from "@/lib/muthur/execution/execution-loop";
 import {
-  getMuthurExecutionLoop,
   MUTHUR_EXECUTION_MODES,
   type CreateMuthurActionInput,
   type MuthurExecutionMode,
-} from "@/lib/muthur/execution/index.server";
+} from "@/lib/muthur/execution/execution-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

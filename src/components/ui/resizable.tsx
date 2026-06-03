@@ -83,6 +83,64 @@ const clamp = (value: number, min?: number, max?: number) => {
   return result;
 };
 
+const normalizeInitialSizes = (
+  sizes: number[],
+  panels: React.ReactElement[],
+): number[] => {
+  const panelCount = sizes.length;
+  const minSizes = sizes.map(
+    (_, i) =>
+      parseFraction(
+        (panels[i] as React.ReactElement<{ minSize?: SizeValue }>)?.props?.minSize,
+      ) ?? 0,
+  );
+  const maxSizes = sizes.map(
+    (_, i) =>
+      parseFraction(
+        (panels[i] as React.ReactElement<{ maxSize?: SizeValue }>)?.props?.maxSize,
+      ) ?? 1,
+  );
+
+  const minTotal = minSizes.reduce((sum, size) => sum + size, 0);
+  if (minTotal >= 1) {
+    return minSizes.map((size) => size / minTotal);
+  }
+
+  const next = sizes.map((size, i) => clamp(size, minSizes[i], maxSizes[i]));
+  for (let i = 0; i < panelCount; i += 1) {
+    next[i] = Math.max(next[i], minSizes[i]);
+  }
+
+  let total = next.reduce((sum, size) => sum + size, 0);
+  if (total > 1) {
+    let overflow = total - 1;
+    while (overflow > 0.0001) {
+      let reduced = false;
+      for (let i = panelCount - 1; i >= 0 && overflow > 0; i -= 1) {
+        const slack = next[i] - minSizes[i];
+        if (slack <= 0) continue;
+        const take = Math.min(slack, overflow);
+        next[i] -= take;
+        overflow -= take;
+        reduced = true;
+      }
+      if (!reduced) break;
+    }
+  }
+
+  total = next.reduce((sum, size) => sum + size, 0);
+  if (total < 1) {
+    next[0] += 1 - total;
+  }
+
+  total = next.reduce((sum, size) => sum + size, 0);
+  if (total <= 0) {
+    return Array(panelCount).fill(1 / panelCount);
+  }
+
+  return next.map((size) => size / total);
+};
+
 export function ResizablePanelGroup({
   orientation = 'horizontal',
   className,
@@ -137,9 +195,11 @@ export function ResizablePanelGroup({
       }
     }
 
-    initialSizesRef.current = initialSizes;
+    const normalizedSizes = normalizeInitialSizes(initialSizes, panels as React.ReactElement[]);
+
+    initialSizesRef.current = normalizedSizes;
     layoutKeyRef.current = layoutKey;
-    setSizes(initialSizes);
+    setSizes(normalizedSizes);
   }, [memoryKey, orientation, panelCount, panels, sizes.length]);
 
   React.useEffect(() => {
@@ -153,6 +213,8 @@ export function ResizablePanelGroup({
     startSizes: number[];
     minSizes: number[];
     maxSizes: number[];
+    pointerId: number | null;
+    captureTarget: HTMLElement | null;
   } | null>(null);
 
   const isHorizontal = orientation === 'horizontal';
@@ -202,6 +264,14 @@ export function ResizablePanelGroup({
   };
 
   const endDrag = () => {
+    const state = dragState.current;
+    if (state?.captureTarget && state.pointerId !== null) {
+      try {
+        state.captureTarget.releasePointerCapture(state.pointerId);
+      } catch {
+        // Pointer may already be released.
+      }
+    }
     dragState.current = null;
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', endDrag);
@@ -217,7 +287,11 @@ export function ResizablePanelGroup({
     updateSizes(state.index, delta);
   };
 
-  const startDrag = (index: number, startPos: number) => {
+  const startDrag = (
+    index: number,
+    startPos: number,
+    event: React.PointerEvent<Element>,
+  ) => {
     const minSizes = Array(panelCount).fill(0);
     const maxSizes = Array(panelCount).fill(1);
 
@@ -232,12 +306,17 @@ export function ResizablePanelGroup({
       if (typeof maxFraction === 'number') maxSizes[i] = maxFraction;
     }
 
+    const captureTarget = event.currentTarget as HTMLElement;
+    captureTarget.setPointerCapture(event.pointerId);
+
     dragState.current = {
       index,
       startPos,
       startSizes: [...sizes],
       minSizes,
       maxSizes,
+      pointerId: event.pointerId,
+      captureTarget,
     };
 
     window.addEventListener('pointermove', onPointerMove);
@@ -295,10 +374,13 @@ export function ResizablePanelGroup({
         return React.cloneElement(handle, {
           role: 'separator',
           title: 'Drag to resize. Double-click to reset.',
+          'aria-label':
+            handle.props['aria-label'] ??
+            (!isHorizontal ? 'Drag to resize panes' : 'Drag to resize columns'),
           onPointerDown: (event: React.PointerEvent) => {
             event.preventDefault();
             event.stopPropagation();
-            startDrag(handleIndex, isHorizontal ? event.clientX : event.clientY);
+            startDrag(handleIndex, isHorizontal ? event.clientX : event.clientY, event);
           },
           onDoubleClick: (event: React.MouseEvent) => {
             event.preventDefault();
@@ -354,19 +436,19 @@ export function ResizableHandle({ withHandle = false, stacked = false, className
     <div
       className={cn(
         stacked
-          ? 'relative z-20 flex-none self-stretch h-1 min-h-[6px] w-full flex items-center justify-center border-y border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-row-resize touch-none'
-          : 'relative z-20 flex-none self-stretch w-px min-w-[6px] flex items-center justify-center border-x border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none',
+          ? 'relative z-20 flex-none self-stretch h-11 min-h-[44px] w-full flex items-center justify-center border-y border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-row-resize touch-none select-none [-webkit-tap-highlight-color:transparent]'
+          : 'relative z-20 flex-none self-stretch w-px min-w-[6px] flex items-center justify-center border-x border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none select-none [-webkit-tap-highlight-color:transparent]',
         className,
       )}
       {...props}
     >
       {withHandle ? (
         stacked ? (
-          <div className="flex h-full w-full items-center justify-center">
-            <div className="h-px w-14 rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />
+          <div className="pointer-events-none flex h-full w-full items-center justify-center">
+            <div className="h-1 w-16 rounded-full bg-slate-400/80 shadow-[0_0_10px_rgba(148,163,184,0.18)]" />
           </div>
         ) : (
-          <div className="h-full w-px rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />
+          <div className="pointer-events-none h-full w-px rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />
         )
       ) : null}
     </div>

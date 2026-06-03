@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { MUTHUR_SCREENSHOT_DIR } from "./browser-session";
+import { MUTHUR_SCREENSHOT_DIR } from "./browser-paths.server";
 
 export async function readScreenshotPng(
   name: string,

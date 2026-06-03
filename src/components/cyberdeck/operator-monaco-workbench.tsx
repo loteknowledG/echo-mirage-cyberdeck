@@ -9,6 +9,9 @@ import {
   detectOperatorEditorLanguage,
   exposeOperatorWorkbench,
   operatorEditorFileExtension,
+  type OperatorEditorDiffProposal,
+  type OperatorEditorEdit,
+  type OperatorEditorRange,
   type OperatorEditorState,
 } from "@/lib/operator-workbench";
 import {
