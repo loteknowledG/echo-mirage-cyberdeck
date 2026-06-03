@@ -226,6 +226,47 @@ export function ResizablePanelGroup({
     setSizes([...initialSizesRef.current]);
   }, []);
 
+  const collectPanelConstraints = React.useCallback(() => {
+    const minSizes = Array(panelCount).fill(0);
+    const maxSizes = Array(panelCount).fill(1);
+
+    for (let i = 0; i < panelCount; i += 1) {
+      const panel = panels[i] as React.ReactElement<{
+        minSize?: SizeValue;
+        maxSize?: SizeValue;
+      }>;
+      const minFraction = parseFraction(panel?.props?.minSize);
+      const maxFraction = parseFraction(panel?.props?.maxSize);
+      if (typeof minFraction === 'number') minSizes[i] = minFraction;
+      if (typeof maxFraction === 'number') maxSizes[i] = maxFraction;
+    }
+
+    return { minSizes, maxSizes };
+  }, [panelCount, panels]);
+
+  const applyLeadingPreset = React.useCallback(
+    (leadingFraction: number) => {
+      if (panelCount !== 2) return;
+      const { minSizes, maxSizes } = collectPanelConstraints();
+      let leading = clamp(leadingFraction, minSizes[0], maxSizes[0]);
+      let trailing = clamp(1 - leading, minSizes[1], maxSizes[1]);
+      leading = clamp(1 - trailing, minSizes[0], maxSizes[0]);
+      trailing = 1 - leading;
+      setSizes([leading, trailing]);
+    },
+    [collectPanelConstraints, panelCount],
+  );
+
+  const restoreDocumentTouch = React.useCallback(() => {
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('touch-action');
+  }, []);
+
+  const lockDocumentTouch = React.useCallback(() => {
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+  }, []);
+
   const updateSizes = (index: number, deltaPx: number) => {
     if (containerSize <= 0) return;
 
@@ -273,6 +314,7 @@ export function ResizablePanelGroup({
       }
     }
     dragState.current = null;
+    restoreDocumentTouch();
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', endDrag);
     window.removeEventListener('pointercancel', endDrag);
@@ -292,22 +334,11 @@ export function ResizablePanelGroup({
     startPos: number,
     event: React.PointerEvent<Element>,
   ) => {
-    const minSizes = Array(panelCount).fill(0);
-    const maxSizes = Array(panelCount).fill(1);
-
-    for (let i = 0; i < panelCount; i += 1) {
-      const panel = panels[i] as React.ReactElement<{
-        minSize?: SizeValue;
-        maxSize?: SizeValue;
-      }>;
-      const minFraction = parseFraction(panel?.props?.minSize);
-      const maxFraction = parseFraction(panel?.props?.maxSize);
-      if (typeof minFraction === 'number') minSizes[i] = minFraction;
-      if (typeof maxFraction === 'number') maxSizes[i] = maxFraction;
-    }
+    const { minSizes, maxSizes } = collectPanelConstraints();
 
     const captureTarget = event.currentTarget as HTMLElement;
     captureTarget.setPointerCapture(event.pointerId);
+    lockDocumentTouch();
 
     dragState.current = {
       index,
@@ -323,6 +354,8 @@ export function ResizablePanelGroup({
     window.addEventListener('pointerup', endDrag);
     window.addEventListener('pointercancel', endDrag);
   };
+
+  React.useEffect(() => () => restoreDocumentTouch(), [restoreDocumentTouch]);
 
   return (
     <div
@@ -370,18 +403,25 @@ export function ResizablePanelGroup({
 
         const handleIndex = handles.indexOf(child);
         const handle = child as React.ReactElement<ResizableHandleProps>;
+        const stacked = !isHorizontal && handle.props.stacked;
+
+        const beginResize = (event: React.PointerEvent<Element>) => {
+          event.preventDefault();
+          event.stopPropagation();
+          startDrag(handleIndex, isHorizontal ? event.clientX : event.clientY, event);
+        };
 
         return React.cloneElement(handle, {
           role: 'separator',
-          title: 'Drag to resize. Double-click to reset.',
+          title: stacked
+            ? 'Drag the grip or tap Chat / Work to resize panes.'
+            : 'Drag to resize. Double-click to reset.',
           'aria-label':
             handle.props['aria-label'] ??
-            (!isHorizontal ? 'Drag to resize panes' : 'Drag to resize columns'),
-          onPointerDown: (event: React.PointerEvent) => {
-            event.preventDefault();
-            event.stopPropagation();
-            startDrag(handleIndex, isHorizontal ? event.clientX : event.clientY, event);
-          },
+            (!isHorizontal ? 'Resize chat and work panes' : 'Drag to resize columns'),
+          onResizePointerDown: stacked ? beginResize : undefined,
+          onPointerDown: stacked ? undefined : beginResize,
+          onApplyLeadingPreset: stacked ? applyLeadingPreset : undefined,
           onDoubleClick: (event: React.MouseEvent) => {
             event.preventDefault();
             event.stopPropagation();
@@ -429,23 +469,91 @@ export type ResizableHandleProps = {
   stacked?: boolean;
   className?: string;
   style?: React.CSSProperties;
+  onResizePointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onApplyLeadingPreset?: (leadingFraction: number) => void;
 } & React.HTMLAttributes<HTMLDivElement>;
 
-export function ResizableHandle({ withHandle = false, stacked = false, className, ...props }: ResizableHandleProps) {
+function stopPresetPointer(event: React.PointerEvent | React.MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+export function ResizableHandle({
+  withHandle = false,
+  stacked = false,
+  className,
+  onResizePointerDown,
+  onApplyLeadingPreset,
+  onPointerDown,
+  ...props
+}: ResizableHandleProps) {
+  const showMobileControls = stacked && withHandle && typeof onApplyLeadingPreset === 'function';
+
+  if (showMobileControls) {
+    return (
+      <div
+        className={cn(
+          'relative z-40 flex min-h-[56px] w-full flex-none shrink-0 items-stretch self-stretch border-y-2 border-cyan-500/25 bg-slate-950/95 shadow-[0_-6px_18px_rgba(0,0,0,0.45),0_6px_18px_rgba(0,0,0,0.45)] select-none [-webkit-tap-highlight-color:transparent]',
+          className,
+        )}
+        {...props}
+      >
+        <button
+          type="button"
+          aria-label="Show more chat"
+          className="flex min-w-[4.25rem] flex-col items-center justify-center gap-0.5 border-r border-cyan-500/15 px-2 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/70 touch-manipulation active:bg-cyan-500/10"
+          onPointerDown={stopPresetPointer}
+          onClick={() => onApplyLeadingPreset(0.92)}
+        >
+          <span aria-hidden className="text-sm leading-none">
+            ▲
+          </span>
+          Chat
+        </button>
+        <div
+          role="presentation"
+          className="flex min-w-0 flex-1 cursor-row-resize touch-none flex-col items-center justify-center gap-1 px-2"
+          onPointerDown={onResizePointerDown ?? onPointerDown}
+        >
+          <div className="h-1.5 w-14 rounded-full bg-cyan-400/85 shadow-[0_0_12px_rgba(34,211,238,0.35)]" />
+          <span className="font-mono text-[8px] uppercase tracking-[0.24em] text-cyan-100/45">
+            Drag
+          </span>
+        </div>
+        <button
+          type="button"
+          aria-label="Show more work pane"
+          className="flex min-w-[4.25rem] flex-col items-center justify-center gap-0.5 border-l border-cyan-500/15 px-2 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/70 touch-manipulation active:bg-cyan-500/10"
+          onPointerDown={stopPresetPointer}
+          onClick={() => onApplyLeadingPreset(0.08)}
+        >
+          <span aria-hidden className="text-sm leading-none">
+            ▼
+          </span>
+          Work
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
         stacked
-          ? 'relative z-20 flex-none self-stretch h-11 min-h-[44px] w-full flex items-center justify-center border-y border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-row-resize touch-none select-none [-webkit-tap-highlight-color:transparent]'
+          ? 'relative z-40 flex-none shrink-0 self-stretch h-14 min-h-[56px] w-full flex items-center justify-center border-y-2 border-cyan-500/25 bg-slate-950/95 shadow-[0_-6px_18px_rgba(0,0,0,0.45),0_6px_18px_rgba(0,0,0,0.45)] hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 cursor-row-resize touch-none select-none [-webkit-tap-highlight-color:transparent]'
           : 'relative z-20 flex-none self-stretch w-px min-w-[6px] flex items-center justify-center border-x border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none select-none [-webkit-tap-highlight-color:transparent]',
         className,
       )}
+      onPointerDown={onPointerDown}
       {...props}
     >
       {withHandle ? (
         stacked ? (
-          <div className="pointer-events-none flex h-full w-full items-center justify-center">
-            <div className="h-1 w-16 rounded-full bg-slate-400/80 shadow-[0_0_10px_rgba(148,163,184,0.18)]" />
+          <div className="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-1">
+            <div className="h-1.5 w-14 rounded-full bg-cyan-400/85 shadow-[0_0_12px_rgba(34,211,238,0.35)]" />
+            <span className="font-mono text-[8px] uppercase tracking-[0.24em] text-cyan-100/45">
+              Drag
+            </span>
           </div>
         ) : (
           <div className="pointer-events-none h-full w-px rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />

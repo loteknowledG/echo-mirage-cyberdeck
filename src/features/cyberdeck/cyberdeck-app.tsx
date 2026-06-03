@@ -6735,15 +6735,14 @@ const resolved = resolveUiTarget(userMessage);
         >
           {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
           <ResizablePanel
-            defaultSize={isMobileLayout ? 72 : 55}
-            minSize={isMobileLayout ? 35 : 0}
-            maxSize={isMobileLayout ? 85 : undefined}
+            defaultSize={isMobileLayout ? 58 : 55}
+            minSize={isMobileLayout ? 10 : 0}
             className="h-full min-h-0 overflow-hidden"
           >
           <div
             ref={chatColumnRef}
             onContextMenu={handleMiragePaneContextMenu}
-            className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full max-h-full min-h-0 flex-col overflow-hidden border-b border-gray-800 bg-black max-md:flex-1 max-md:min-h-0 md:min-w-0 md:border-b-0 ${
+            className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full max-h-full min-h-0 flex-col overflow-hidden bg-black max-md:min-h-0 md:min-w-0 md:border-b-0 ${
               networkActivityActive ? "is-net-active" : ""
             }`}
           >
@@ -7107,8 +7106,8 @@ const resolved = resolveUiTarget(userMessage);
 
         {/* COL 3 (flipped): gateway nav — Weyland col2 */}
         <ResizablePanel
-          defaultSize={isMobileLayout ? 28 : 45}
-          minSize={isMobileLayout ? 15 : 0.01}
+          defaultSize={isMobileLayout ? 42 : 45}
+          minSize={isMobileLayout ? 10 : 0.01}
           className="h-full min-h-0"
         >
           <div
