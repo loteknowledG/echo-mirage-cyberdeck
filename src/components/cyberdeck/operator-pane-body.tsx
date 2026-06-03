@@ -1141,6 +1141,7 @@ export function CyberdeckOperatorPaneBody({
                 <OperatorMonacoWorkbench
                   activeFilePath={operatorActiveFilePath}
                   fileName={operatorDroppedAsset.name}
+                  documentKind={operatorDocumentKind}
                   value={operatorDocText}
                   onChange={(next) => applyOperatorDocText(next, "debounced")}
                   onSave={async () => {

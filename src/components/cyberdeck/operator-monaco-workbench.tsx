@@ -9,15 +9,17 @@ import {
   detectOperatorEditorLanguage,
   exposeOperatorWorkbench,
   operatorEditorFileExtension,
-  type OperatorEditorDiffProposal,
-  type OperatorEditorEdit,
-  type OperatorEditorRange,
   type OperatorEditorState,
 } from "@/lib/operator-workbench";
+import {
+  normalizeOperatorDocumentKind,
+  type OperatorDocumentPickerKind,
+} from "@/lib/operator-document-types";
 
 type OperatorMonacoWorkbenchProps = {
   activeFilePath?: string | null;
   fileName: string;
+  documentKind: OperatorDocumentPickerKind;
   value: string;
   onChange: (value: string) => void;
   onSave: () => void | Promise<void>;
@@ -86,6 +88,7 @@ function toRange(selection: ISelection | null): OperatorEditorRange | null {
 export function OperatorMonacoWorkbench({
   activeFilePath = null,
   fileName,
+  documentKind,
   value,
   onChange,
   onSave,
@@ -263,6 +266,8 @@ export function OperatorMonacoWorkbench({
     instance.addCommand(2048 | 49, () => void onSave());
   }, [onSave]);
 
+  const documentKindLabel = normalizeOperatorDocumentKind(documentKind).toUpperCase();
+
   return (
     <div
       className="flex min-h-[50vh] flex-1 flex-col overflow-hidden rounded-sm border border-[#1c1c1c] bg-black"
@@ -271,7 +276,7 @@ export function OperatorMonacoWorkbench({
     >
       <div className="flex items-center justify-between border-b border-[#1c1c1c] px-2 py-1 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
         <span>
-          {language.toUpperCase()} // LN {cursor.lineNumber}, COL {cursor.column}
+          {documentKindLabel} // LN {cursor.lineNumber}, COL {cursor.column}
           {selection &&
           (selection.selectionStartLineNumber !== selection.positionLineNumber ||
             selection.selectionStartColumn !== selection.positionColumn)
