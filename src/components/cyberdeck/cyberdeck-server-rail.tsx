@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, type MouseEvent, type RefObject } from "react";
+import { useEffect, type MouseEvent, type RefObject, type WheelEvent } from "react";
+import { motion, useMotionValue, type PanInfo } from "motion/react";
 import { art } from "@/lib/TerminalArt";
 import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import {
@@ -18,6 +19,7 @@ type FixedServerBtn = { id: string; glyph: string; label: string };
 
 type CyberdeckServerRailProps = {
   railRef: RefObject<HTMLElement | null>;
+  isMobileLayout: boolean;
   fixedServers: FixedServerBtn[];
   navRailContext: "gateway" | "tabs";
   serverKeyboardHighlightId: CyberdeckServerId | null;
@@ -34,6 +36,7 @@ type CyberdeckServerRailProps = {
 /** Isolated rail — tab store updates do not re-render the main cyberdeck page shell. */
 export function CyberdeckServerRail({
   railRef,
+  isMobileLayout,
   fixedServers,
   navRailContext,
   serverKeyboardHighlightId,
@@ -48,6 +51,39 @@ export function CyberdeckServerRail({
 }: CyberdeckServerRailProps) {
   const selectedRailTabId = useCyberdeckTabStore((s) => s.activeCustomTabId ?? s.server);
   const customTabs = useCyberdeckTabStore((s) => s.customTabs);
+  const dragX = useMotionValue(0);
+  const dragY = useMotionValue(0);
+
+  const handleRailDrag = (_event: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+    const rail = railRef.current;
+    if (!rail) return;
+    if (isMobileLayout) {
+      rail.scrollLeft -= info.delta.x;
+      dragX.set(0);
+      return;
+    }
+    rail.scrollTop -= info.delta.y;
+    dragY.set(0);
+  };
+
+  const handleRailWheel = (event: WheelEvent<HTMLElement>) => {
+    const rail = railRef.current;
+    if (!rail) return;
+
+    if (isMobileLayout) {
+      const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+      if (delta !== 0) {
+        rail.scrollLeft += delta;
+        event.preventDefault();
+      }
+      return;
+    }
+
+    if (event.deltaY !== 0) {
+      rail.scrollTop += event.deltaY;
+      event.preventDefault();
+    }
+  };
 
   useEffect(() => {
     const selectedRailTabId = useCyberdeckTabStore.getState().activeCustomTabId
@@ -74,12 +110,18 @@ export function CyberdeckServerRail({
 
   return (
     <CyberdeckRailTooltipProvider>
-    <aside
+    <motion.aside
       ref={railRef as RefObject<HTMLElement>}
       data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
       tabIndex={-1}
       aria-label="Server rail"
-      className="cyberdeck-server-rail z-50 flex w-12 flex-shrink-0 flex-col items-center border-r border-gray-800 bg-black py-4 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 md:min-h-0 md:overflow-y-auto md:overscroll-y-contain max-md:sticky max-md:top-0 max-md:w-full max-md:max-w-[100vw] max-md:shrink-0 max-md:flex-row max-md:flex-nowrap max-md:items-center max-md:justify-start max-md:overflow-x-auto max-md:overscroll-x-contain max-md:border-b max-md:border-r-0 max-md:bg-black max-md:px-2 max-md:pb-2 max-md:pt-[max(0.5rem,env(safe-area-inset-top))] max-md:[-webkit-overflow-scrolling:touch] max-md:[scroll-padding-inline:8px] max-md:touch-pan-x"
+      drag={isMobileLayout ? "x" : "y"}
+      dragDirectionLock
+      dragMomentum={false}
+      style={isMobileLayout ? { x: dragX } : { y: dragY }}
+      onDrag={handleRailDrag}
+      onWheel={handleRailWheel}
+      className="cyberdeck-server-rail z-50 flex w-12 min-h-0 flex-shrink-0 flex-col items-center overflow-x-hidden overflow-y-hidden border-r border-gray-800 bg-black py-4 outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 max-[768px]:sticky max-[768px]:top-0 max-[768px]:w-full max-[768px]:max-w-[100vw] max-[768px]:shrink-0 max-[768px]:flex-row max-[768px]:flex-nowrap max-[768px]:items-center max-[768px]:justify-start max-[768px]:overflow-x-auto max-[768px]:overflow-y-hidden max-[768px]:overscroll-x-contain max-[768px]:border-b max-[768px]:border-r-0 max-[768px]:bg-black max-[768px]:px-2 max-[768px]:pb-2 max-[768px]:pt-[max(0.5rem,env(safe-area-inset-top))] max-[768px]:[-webkit-overflow-scrolling:touch] max-[768px]:[scroll-padding-inline:8px] max-[768px]:touch-pan-x"
     >
       {fixedServers.map((btn) => (
         <CyberdeckRailTabTooltip
@@ -160,7 +202,7 @@ export function CyberdeckServerRail({
         </button>
         </CyberdeckRailTabTooltip>
       </div>
-    </aside>
+    </motion.aside>
     </CyberdeckRailTooltipProvider>
   );
 }

@@ -6676,6 +6676,7 @@ const resolved = resolveUiTarget(userMessage);
       ) : null}
       <CyberdeckServerRail
         railRef={serverRailRef}
+        isMobileLayout={isMobileLayout}
         fixedServers={fixedServers}
         navRailContext={navRailContext}
         serverKeyboardHighlightId={serverKeyboardHighlightId}
