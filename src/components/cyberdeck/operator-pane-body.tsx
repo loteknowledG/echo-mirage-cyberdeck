@@ -23,7 +23,7 @@ import { OperatorDocFolderPane } from "@/components/cyberdeck/operator-doc-folde
 import type { OperatorDocFolderRoot } from "@/lib/operator-folder-nav";
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderTitle } from "@/components/cyberdeck/pane-header";
 import { Switch } from "@/components/ui/switch";
-import { OperatorDocTypePicker } from "@/components/cyberdeck/operator-doc-type-picker";
+import { OperatorDocTypeMenu } from "@/components/cyberdeck/operator-doc-type-menu";
 import {
   OperatorExportPicker,
   type OperatorExportFormat,
@@ -51,6 +51,14 @@ import { CodexIcon } from "@/components/codex-icon";
 import { OperatorMonacoWorkbench } from "@/components/cyberdeck/operator-monaco-workbench";
 import { getMonacoEditorContext } from "@/lib/monaco-editor-context";
 import { detectOperatorEditorLanguage } from "@/lib/operator-workbench";
+import {
+  analyzeTextForBinaryDisplay,
+  isOperatorTextEditableSurface,
+  resolveOperatorAssetSurface,
+  type OperatorAssetSurface,
+} from "@/lib/operator-file-surface";
+import { OperatorPdfPreview } from "@/components/cyberdeck/operator-pdf-preview";
+import { OperatorUnsupportedPreview } from "@/components/cyberdeck/operator-unsupported-preview";
 
 type DroppedOperatorAsset = {
   kind: string;
@@ -59,6 +67,9 @@ type DroppedOperatorAsset = {
   size: number;
   text?: string;
   imageSrc?: string;
+  pdfSrc?: string;
+  localFilePath?: string;
+  surface?: OperatorAssetSurface;
 };
 
 type OperatorPaneBodyProps = {
@@ -381,6 +392,8 @@ function OperatorDocumentHeaderControls({
 
 function OperatorDocumentToolStrip({
   operatorDocumentKind,
+  textEditingEnabled,
+  showConvertImport = false,
   canUndo,
   canRedo,
   canClear,
@@ -397,6 +410,10 @@ function OperatorDocumentToolStrip({
   onExportOperatorMarkdown,
 }: {
   operatorDocumentKind: OperatorDocumentPickerKind;
+  /** Markdown/text/code editor tools (undo, export, save, …). */
+  textEditingEnabled: boolean;
+  /** Import / convert control for PDF and other non-text previews. */
+  showConvertImport?: boolean;
   canUndo: boolean;
   canRedo: boolean;
   canClear: boolean;
@@ -478,63 +495,76 @@ function OperatorDocumentToolStrip({
         tabIndex={-1}
         onChange={(event) => void handleConvertFileInput(event)}
       />
-      <OperatorToolbarIconButton label="Undo" onClick={onUndo} disabled={!canUndo}>
-        <CodexIcon icon={cdxIconUndo} className="h-3.5 w-3.5" />
-      </OperatorToolbarIconButton>
-      <OperatorToolbarIconButton label="Redo" onClick={onRedo} disabled={!canRedo}>
-        <CodexIcon icon={cdxIconRedo} className="h-3.5 w-3.5" />
-      </OperatorToolbarIconButton>
-      <OperatorToolbarIconButton label="Clear document" onClick={onClear} disabled={!canClear}>
-        <CodexIcon icon={cdxIconTrash} className="h-3.5 w-3.5" />
-      </OperatorToolbarIconButton>
-      <span className="mx-0.5 h-4 w-px shrink-0 bg-[#2d2d2d]" aria-hidden />
-      <OperatorDocTypePicker
-        value={normalizeOperatorDocumentKind(operatorDocumentKind)}
-        onChange={onOperatorDocumentKindChange}
-      />
-      <OperatorToolbarIconButton
-        label="Import MD"
-        onClick={() => void handlePickConvertDocument()}
-        disabled={converting}
-      >
-        <CodexIcon icon={cdxIconUpload} className="h-3.5 w-3.5" />
-      </OperatorToolbarIconButton>
-      <OperatorExportPicker
-        disabled={exporting || normalizeOperatorDocumentKind(operatorDocumentKind) !== "markdown"}
-        onExport={async (format) => {
-          setExporting(true);
-          try {
-            await onExportOperatorMarkdown(format);
-          } finally {
-            setExporting(false);
-          }
-        }}
-      />
-      <OperatorToolbarIconButton
-        label="Copy"
-        onClick={() => void onCopyOperatorDocToClipboard()}
-      >
-        <CodexIcon icon={cdxIconCopy} className="h-3.5 w-3.5" />
-      </OperatorToolbarIconButton>
-      <OperatorToolbarIconButton
-        label="Paste"
-        onClick={() => void onPasteClipboardToOperator()}
-      >
-        <CodexIcon icon={cdxIconPaste} className="h-3.5 w-3.5" />
-      </OperatorToolbarIconButton>
-      <OperatorToolbarIconButton
-        label="Save"
-        onClick={() => void (onSaveOperatorDocInPlace ?? onSaveOperatorDocAsFile)()}
-        disabled={!operatorCanSaveInPlace}
-      >
-        <LuSave className="h-3.5 w-3.5" />
-      </OperatorToolbarIconButton>
-      <OperatorToolbarIconButton
-        label="Save as"
-        onClick={() => void onSaveOperatorDocAsFile()}
-      >
-        <CodexIcon icon={cdxIconDownload} className="h-3.5 w-3.5" />
-      </OperatorToolbarIconButton>
+      {textEditingEnabled ? (
+        <>
+          <OperatorToolbarIconButton label="Undo" onClick={onUndo} disabled={!canUndo}>
+            <CodexIcon icon={cdxIconUndo} className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+          <OperatorToolbarIconButton label="Redo" onClick={onRedo} disabled={!canRedo}>
+            <CodexIcon icon={cdxIconRedo} className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+          <OperatorToolbarIconButton label="Clear document" onClick={onClear} disabled={!canClear}>
+            <CodexIcon icon={cdxIconTrash} className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+          <span className="mx-0.5 h-4 w-px shrink-0 bg-[#2d2d2d]" aria-hidden />
+        </>
+      ) : null}
+      {!textEditingEnabled ? (
+        <OperatorDocTypeMenu
+          trigger="toolbar"
+          value={normalizeOperatorDocumentKind(operatorDocumentKind)}
+          onChange={onOperatorDocumentKindChange}
+        />
+      ) : null}
+      {showConvertImport ? (
+        <OperatorToolbarIconButton
+          label="Import MD"
+          onClick={() => void handlePickConvertDocument()}
+          disabled={converting}
+        >
+          <CodexIcon icon={cdxIconUpload} className="h-3.5 w-3.5" />
+        </OperatorToolbarIconButton>
+      ) : null}
+      {textEditingEnabled ? (
+        <>
+          <OperatorExportPicker
+            disabled={exporting || normalizeOperatorDocumentKind(operatorDocumentKind) !== "markdown"}
+            onExport={async (format) => {
+              setExporting(true);
+              try {
+                await onExportOperatorMarkdown(format);
+              } finally {
+                setExporting(false);
+              }
+            }}
+          />
+          <OperatorToolbarIconButton
+            label="Copy"
+            onClick={() => void onCopyOperatorDocToClipboard()}
+          >
+            <CodexIcon icon={cdxIconCopy} className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+          <OperatorToolbarIconButton
+            label="Paste"
+            onClick={() => void onPasteClipboardToOperator()}
+          >
+            <CodexIcon icon={cdxIconPaste} className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+          <OperatorToolbarIconButton
+            label="Save"
+            onClick={() => void (onSaveOperatorDocInPlace ?? onSaveOperatorDocAsFile)()}
+            disabled={!operatorCanSaveInPlace}
+          >
+            <LuSave className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+          <OperatorToolbarIconButton
+            label="Save as"
+            onClick={() => void onSaveOperatorDocAsFile()}
+          >
+            <CodexIcon icon={cdxIconDownload} className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -597,7 +627,77 @@ export function CyberdeckOperatorPaneBody({
   } = useGlyphTextHistory("");
 
   const operatorDocText = operatorDroppedAsset?.text || "";
-  const operatorShowsMarkdown = normalizeOperatorDocumentKind(operatorDocumentKind) === "markdown";
+  const operatorAssetSurface = operatorDroppedAsset
+    ? resolveOperatorAssetSurface(operatorDroppedAsset)
+    : null;
+  const operatorRenderSurface: OperatorAssetSurface | null = (() => {
+    if (!operatorDroppedAsset) return null;
+    if (
+      operatorDocText &&
+      !analyzeTextForBinaryDisplay(operatorDocText, { fileName: operatorDroppedAsset.name }).safe
+    ) {
+      const lowerName = operatorDroppedAsset.name.toLowerCase();
+      if (
+        operatorDocText.trimStart().startsWith("%PDF") ||
+        lowerName.endsWith(".pdf") ||
+        operatorDroppedAsset.kind === "pdf"
+      ) {
+        return "pdf";
+      }
+      return "binary-unsafe";
+    }
+    return operatorAssetSurface;
+  })();
+  const operatorTextDocument =
+    operatorRenderSurface != null
+      ? isOperatorTextEditableSurface(operatorRenderSurface)
+      : false;
+  const operatorShowsMarkdown =
+    operatorTextDocument && normalizeOperatorDocumentKind(operatorDocumentKind) === "markdown";
+  const operatorShowsConvertImport =
+    operatorRenderSurface === "pdf" ||
+    operatorRenderSurface === "office-unsupported" ||
+    operatorRenderSurface === "binary-unsafe";
+  const [convertPickBusy, setConvertPickBusy] = useState(false);
+  const convertInputRef = useRef<HTMLInputElement>(null);
+
+  const runConvertFromPath = useCallback(
+    async (filePath: string) => {
+      setConvertPickBusy(true);
+      try {
+        await onConvertDocumentToMarkdown(filePath);
+      } finally {
+        setConvertPickBusy(false);
+      }
+    },
+    [onConvertDocumentToMarkdown],
+  );
+
+  const handlePickConvertDocument = useCallback(async () => {
+    const openBridge = window.echoMirageOpen;
+    if (openBridge?.pickConvertDocument) {
+      const result = await openBridge.pickConvertDocument();
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      if (!result.canceled && result.filePath) {
+        await runConvertFromPath(result.filePath);
+      }
+      return;
+    }
+    convertInputRef.current?.click();
+  }, [runConvertFromPath]);
+
+  const handleConvertActiveDocument = useCallback(async () => {
+    const path = operatorActiveFilePath?.trim();
+    if (path && isConvertibleDocumentPath(path)) {
+      await runConvertFromPath(path);
+      return;
+    }
+    await handlePickConvertDocument();
+  }, [handlePickConvertDocument, operatorActiveFilePath, runConvertFromPath]);
+
   const operatorFileSizeLabel = operatorDroppedAsset
     ? `// ${Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB`
     : null;
@@ -672,7 +772,7 @@ export function CyberdeckOperatorPaneBody({
   );
 
   useEffect(() => {
-    if (!operatorSurfaceIsDocument || !operatorDroppedAsset) return;
+    if (!operatorTextDocument || !operatorDroppedAsset) return;
     const key = `${operatorDroppedAsset.kind}::${operatorDroppedAsset.name}`;
     if (key !== operatorAssetKeyRef.current) {
       operatorAssetKeyRef.current = key;
@@ -687,7 +787,7 @@ export function CyberdeckOperatorPaneBody({
   }, [
     operatorDocText,
     operatorDroppedAsset,
-    operatorSurfaceIsDocument,
+    operatorTextDocument,
     resetOperatorDocHistory,
     setOperatorDocHistoryText,
   ]);
@@ -770,7 +870,7 @@ export function CyberdeckOperatorPaneBody({
 
   // Send Monaco editor state to MUTHUR observation store
   useEffect(() => {
-    if (!operatorSurfaceIsDocument || !operatorDroppedAsset) return;
+    if (!operatorTextDocument || !operatorDroppedAsset) return;
 
     // Get live context from MonacoEditorContext store
     const ctx = getMonacoEditorContext();
@@ -824,7 +924,7 @@ export function CyberdeckOperatorPaneBody({
     }).catch((err) => {
       console.warn("[operator-pane] observation send failed:", err);
     });
-  }, [operatorSurfaceIsDocument, operatorDroppedAsset, operatorActiveFilePath, operatorDocText, operatorDocMode]);
+  }, [operatorTextDocument, operatorDroppedAsset, operatorActiveFilePath, operatorDocText, operatorDocMode]);
 
   const navigateBrowser = () => {
     const nextUrl = browserDraft.trim();
@@ -864,7 +964,7 @@ export function CyberdeckOperatorPaneBody({
               <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
                 MUTHUR_BROWSER
               </CyberdeckPaneHeaderTitle>
-            ) : operatorSurfaceIsDocument && operatorDroppedAsset ? (
+            ) : operatorDroppedAsset && operatorSurfaceMode === "workspace" ? (
               <OperatorDocumentTitleRow
                 operatorDocMode={operatorDocMode}
                 operatorDocNameDraft={operatorDocNameDraft}
@@ -880,7 +980,7 @@ export function CyberdeckOperatorPaneBody({
               />
             ) : (
               <div className="flex min-w-0 items-center gap-2">
-                {operatorSurfaceIsDocument ? (
+                {operatorActiveFilePath ? (
                   <OperatorFileHistoryNav
                     canBack={operatorCanNavigateFileBack}
                     canForward={operatorCanNavigateFileForward}
@@ -910,7 +1010,7 @@ export function CyberdeckOperatorPaneBody({
                   ENGINE: {operatorBrowserEngine}
                 </span>
               </div>
-            ) : operatorSurfaceIsDocument && operatorDroppedAsset ? (
+            ) : operatorDroppedAsset && operatorSurfaceMode === "workspace" ? (
               <OperatorDocumentHeaderControls
                 operatorDocMode={operatorDocMode}
                 folderPaneOpen={folderPaneOpen}
@@ -918,9 +1018,9 @@ export function CyberdeckOperatorPaneBody({
                 onSetOperatorDocMode={onSetOperatorDocMode}
                 onToggleFolderPane={() => setFolderPaneOpen((open) => !open)}
               />
-            ) : operatorDroppedAsset && !operatorSurfaceIsDocument ? (
+            ) : operatorDroppedAsset ? (
               <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                <span>{operatorDroppedAsset.kind.toUpperCase()}</span>
+                <span>{(operatorRenderSurface ?? operatorDroppedAsset.kind).toUpperCase()}</span>
               </div>
             ) : (
               null
@@ -940,9 +1040,11 @@ export function CyberdeckOperatorPaneBody({
             </OperatorToolbarIconButton>
           </div>
         ) : null}
-        {operatorSurfaceIsDocument && operatorDroppedAsset ? (
+        {operatorDroppedAsset && operatorSurfaceMode === "workspace" ? (
           <OperatorDocumentToolStrip
             operatorDocumentKind={operatorDocumentKind}
+            textEditingEnabled={operatorTextDocument}
+            showConvertImport={operatorShowsConvertImport}
             canUndo={operatorCanUndo}
             canRedo={operatorCanRedo}
             canClear={Boolean(
@@ -1035,8 +1137,33 @@ export function CyberdeckOperatorPaneBody({
           </div>
         ) : operatorDroppedAsset ? (
           <div className="flex min-h-0 flex-1 overflow-hidden">
+            <input
+              ref={convertInputRef}
+              type="file"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="sr-only"
+              aria-hidden
+              tabIndex={-1}
+              onChange={(event) => {
+                void (async () => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  const filePath = (file as File & { path?: string }).path;
+                  if (!filePath) {
+                    toast.error("Could not read a local file path. Use the Echo Mirage desktop app.");
+                    return;
+                  }
+                  if (!isConvertibleDocumentPath(filePath)) {
+                    toast.error("Only .pdf and .docx files can be converted.");
+                    return;
+                  }
+                  await runConvertFromPath(filePath);
+                })();
+              }}
+            />
             <div className="custom-scrollbar min-w-0 flex-1 overflow-auto p-3">
-            {operatorDroppedAsset.kind === "image" ? (
+            {operatorRenderSurface === "image" || operatorDroppedAsset.kind === "image" ? (
               <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <div className="font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
@@ -1136,12 +1263,37 @@ export function CyberdeckOperatorPaneBody({
                   </div>
                 )}
               </div>
-            ) : operatorSurfaceIsDocument ? (
+            ) : operatorRenderSurface === "pdf" ? (
+              <OperatorPdfPreview
+                fileName={operatorDroppedAsset.name}
+                pdfSrc={operatorDroppedAsset.pdfSrc}
+                localFilePath={operatorDroppedAsset.localFilePath}
+                converting={convertPickBusy}
+                onConvertToMarkdown={() => void handleConvertActiveDocument()}
+              />
+            ) : operatorRenderSurface === "office-unsupported" ? (
+              <OperatorUnsupportedPreview
+                title="UNSUPPORTED PREVIEW"
+                message="Office documents cannot be shown as plain text. Convert to Markdown to edit in the operator pane."
+                fileName={operatorDroppedAsset.name}
+                converting={convertPickBusy}
+                onConvertToMarkdown={() => void handleConvertActiveDocument()}
+              />
+            ) : operatorRenderSurface === "binary-unsafe" ? (
+              <OperatorUnsupportedPreview
+                title="BINARY FILE DETECTED"
+                message="This file cannot be displayed in the text viewer."
+                fileName={operatorDroppedAsset.name}
+                converting={convertPickBusy}
+                onConvertToMarkdown={() => void handleConvertActiveDocument()}
+              />
+            ) : operatorTextDocument ? (
               operatorDocMode === "edit" ? (
                 <OperatorMonacoWorkbench
                   activeFilePath={operatorActiveFilePath}
                   fileName={operatorDroppedAsset.name}
                   documentKind={operatorDocumentKind}
+                  onDocumentKindChange={onOperatorDocumentKindChange}
                   value={operatorDocText}
                   onChange={(next) => applyOperatorDocText(next, "debounced")}
                   onSave={async () => {
@@ -1153,17 +1305,37 @@ export function CyberdeckOperatorPaneBody({
                   }}
                 />
               ) : operatorShowsMarkdown ? (
-                <div className={OPERATOR_DOC_SURFACE_CLASS}>
-                  <Streamdown className={OPERATOR_MARKDOWN_VIEW_CLASS}>
-                    {operatorDocText}
-                  </Streamdown>
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-sm border border-[#1c1c1c] bg-black">
+                  <div className="flex items-center gap-1 border-b border-[#1c1c1c] px-2 py-1 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
+                    <OperatorDocTypeMenu
+                      value={normalizeOperatorDocumentKind(operatorDocumentKind)}
+                      onChange={onOperatorDocumentKindChange}
+                      trigger="status"
+                    />
+                    <span>// VIEW</span>
+                  </div>
+                  <div className={`min-h-0 flex-1 overflow-auto ${OPERATOR_DOC_SURFACE_CLASS}`}>
+                    <Streamdown className={OPERATOR_MARKDOWN_VIEW_CLASS}>
+                      {operatorDocText}
+                    </Streamdown>
+                  </div>
                 </div>
               ) : (
-                <pre
-                  className={`whitespace-pre-wrap break-words ${OPERATOR_DOC_SURFACE_CLASS}`}
-                >
-                  {operatorDocText}
-                </pre>
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-sm border border-[#1c1c1c] bg-black">
+                  <div className="flex items-center gap-1 border-b border-[#1c1c1c] px-2 py-1 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
+                    <OperatorDocTypeMenu
+                      value={normalizeOperatorDocumentKind(operatorDocumentKind)}
+                      onChange={onOperatorDocumentKindChange}
+                      trigger="status"
+                    />
+                    <span>// VIEW</span>
+                  </div>
+                  <pre
+                    className={`min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words ${OPERATOR_DOC_SURFACE_CLASS}`}
+                  >
+                    {operatorDocText}
+                  </pre>
+                </div>
               )
             ) : (
               <div className="rounded-sm border border-dashed border-amber-700/60 bg-black p-4 font-mono text-[10px] leading-snug text-amber-300/90">
@@ -1173,7 +1345,7 @@ export function CyberdeckOperatorPaneBody({
               </div>
             )}
             </div>
-            {operatorSurfaceIsDocument ? (
+            {operatorDroppedAsset && operatorSurfaceMode === "workspace" ? (
               folderPaneOpen ? (
                 <>
                   <button

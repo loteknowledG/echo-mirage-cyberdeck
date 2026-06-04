@@ -155,9 +155,20 @@ export function applyOperatorTextAutodetect<T extends {
   };
 }
 
+/** Text-editable operator documents (Monaco / markdown viewer). Excludes PDF (L-13). */
 export function isOperatorDocumentSurfaceKind(kind: string | undefined): boolean {
+  if (kind === "pdf" || kind === "image" || kind === "video" || kind === "file") return false;
   const normalized = normalizeOperatorDocumentKind(kind);
-  return OPERATOR_DOC_TYPE_ENTRIES.some((entry) => entry.value === normalized);
+  return (
+    normalized === "markdown" ||
+    normalized === "text" ||
+    normalized === "json" ||
+    normalized === "css" ||
+    normalized === "html" ||
+    normalized === "javascript" ||
+    normalized === "typescript" ||
+    normalized === "python"
+  );
 }
 
 const GENERIC_MARKDOWN_SAVE_NAMES = new Set(["operator-doc.md", "document.md", "converted.md"]);

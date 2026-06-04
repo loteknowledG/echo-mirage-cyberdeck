@@ -73,6 +73,7 @@ export function isEditableOperatorFile(file: File) {
 
 export function getOperatorFileKind(file: File): OperatorIngestFileKind {
   const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith(".pdf") || file.type === "application/pdf") return "pdf";
   if (lowerName.endsWith(".md") || lowerName.endsWith(".markdown") || file.type === "text/markdown") {
     return "markdown";
   }
@@ -91,6 +92,9 @@ export function getOperatorFileKind(file: File): OperatorIngestFileKind {
   return "file";
 }
 
+export { buildOperatorIngestFromFile } from "@/lib/operator-file-surface";
+export type { OperatorAssetSurface, OperatorIngestedAsset } from "@/lib/operator-file-surface";
+
 export function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -102,4 +106,16 @@ export function readFileAsDataUrl(file: File) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+/** Prefer arrayBuffer for binary previews (avoids UTF-8 corruption from text-backed File blobs). */
+export async function readFileAsDataUrlFromBytes(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  const mime = file.type || "application/octet-stream";
+  return `data:${mime};base64,${btoa(binary)}`;
 }

@@ -1,12 +1,47 @@
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const path = require('path');
-const { app, BrowserWindow, Menu, shell, ipcMain, clipboard, dialog } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, clipboard, dialog, protocol, net } = require('electron');
+const { pathToFileURL } = require('url');
 
 if (!app.isPackaged && process.platform === 'win32') {
   // Dev-only: reduce GPU/network subprocess crashes while hot-reloading a heavy page.
   app.commandLine.appendSwitch('disable-gpu-sandbox');
   app.disableHardwareAcceleration();
+}
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'echo-mirage-file',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+      bypassCSP: true,
+    },
+  },
+]);
+
+function decodeEchoMirageFileUrl(url) {
+  const prefix = 'echo-mirage-file://';
+  if (!url.startsWith(prefix)) return null;
+  let filePath = decodeURIComponent(url.slice(prefix.length));
+  if (process.platform === 'win32' && filePath.startsWith('/')) {
+    filePath = filePath.slice(1);
+  }
+  return path.normalize(filePath);
+}
+
+function registerEchoMirageFileProtocol() {
+  protocol.handle('echo-mirage-file', (request) => {
+    const filePath = decodeEchoMirageFileUrl(request.url);
+    if (!filePath) {
+      return new Response('Not found', { status: 404 });
+    }
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
 }
 
 function getEchoMirageProjectRoot() {
@@ -56,6 +91,52 @@ const OPERATOR_FOLDER_IGNORED_NAMES = new Set([
 ]);
 
 const OPERATOR_FOLDER_LIST_MAX_ENTRIES = 400;
+
+/** Extensions that must never be read as UTF-8 text (L-13). */
+const OPERATOR_BINARY_PREVIEW_EXTENSIONS = new Set([
+  '.pdf',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.gif',
+  '.svg',
+  '.bmp',
+  '.ico',
+]);
+
+const OPERATOR_BINARY_METADATA_EXTENSIONS = new Set([
+  '.docx',
+  '.doc',
+  '.pptx',
+  '.ppt',
+  '.xlsx',
+  '.xls',
+]);
+
+function operatorMimeTypeForFileName(name) {
+  const ext = path.extname(name).toLowerCase();
+  const map = {
+    '.pdf': 'application/pdf',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.bmp': 'image/bmp',
+    '.ico': 'image/x-icon',
+    '.docx':
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.doc': 'application/msword',
+    '.pptx':
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    '.ppt': 'application/vnd.ms-powerpoint',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.xls': 'application/vnd.ms-excel',
+  };
+  return map[ext] || 'application/octet-stream';
+}
 
 function isPathInsideRoot(rootPath, targetPath) {
   const root = path.resolve(rootPath);
@@ -603,11 +684,36 @@ ipcMain.handle('echo-mirage-open:read-operator-file', async (_event, payload) =>
       return { ok: false, error: 'Not a file.' };
     }
     const name = path.basename(filePath);
+    const ext = path.extname(name).toLowerCase();
+    const mimeType = operatorMimeTypeForFileName(name);
+
+    if (OPERATOR_BINARY_PREVIEW_EXTENSIONS.has(ext)) {
+      const buffer = await fs.readFile(filePath);
+      return {
+        ok: true,
+        name,
+        mimeType,
+        base64: buffer.toString('base64'),
+        filePath,
+        size: stat.size,
+      };
+    }
+
+    if (OPERATOR_BINARY_METADATA_EXTENSIONS.has(ext)) {
+      return {
+        ok: true,
+        name,
+        mimeType,
+        size: stat.size,
+        binaryMetadata: true,
+      };
+    }
+
     const text = await fs.readFile(filePath, 'utf8');
     return {
       ok: true,
       name,
-      mimeType: 'text/plain',
+      mimeType: mimeType.startsWith('text/') || mimeType === 'application/json' ? mimeType : 'text/plain',
       text,
       size: stat.size,
     };
@@ -615,6 +721,25 @@ ipcMain.handle('echo-mirage-open:read-operator-file', async (_event, payload) =>
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Could not read file.',
+    };
+  }
+});
+
+ipcMain.handle('echo-mirage-open:open-path', async (_event, payload) => {
+  try {
+    const filePath = String(payload?.filePath || '');
+    if (!filePath) {
+      return { ok: false, error: 'Missing file path.' };
+    }
+    const errorMessage = await shell.openPath(filePath);
+    if (errorMessage) {
+      return { ok: false, error: errorMessage };
+    }
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not open file.',
     };
   }
 });
@@ -873,7 +998,10 @@ ipcMain.handle('computer-use:run-action', async (_event, action) => {
   }
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  registerEchoMirageFileProtocol();
+  return createWindow();
+});
 
 app.on('before-quit', async () => {
   if (playrightBrowserState?.browser) {

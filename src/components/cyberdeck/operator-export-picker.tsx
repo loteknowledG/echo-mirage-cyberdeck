@@ -1,82 +1,126 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { AiOutlineFilePdf } from "react-icons/ai";
 import { BsFileEarmarkWord } from "react-icons/bs";
-import { CyberdeckRollingPicker } from "@/components/cyberdeck/cyberdeck-rolling-picker";
+import { LuShare } from "react-icons/lu";
+import { CyberdeckControlTooltip } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useDeckMode } from "@/lib/deck-mode";
+import {
+  LEGACY_TOOLBAR_ICON,
+  realmorphismControlClass,
+  realmorphismMenuItemClass,
+} from "@/lib/cyberdeck/realmorphism-control";
 import { cn } from "@/lib/utils";
 
 export type OperatorExportFormat = "docx" | "pdf";
 
-const EXPORT_FORMATS: OperatorExportFormat[] = ["docx", "pdf"];
-const LOOP_COPIES = 5;
-const LOOP_MIDDLE_COPY = Math.floor(LOOP_COPIES / 2);
-
-function toPickerValue(format: OperatorExportFormat, copy = LOOP_MIDDLE_COPY): string {
-  return `${format}:${copy}`;
-}
-
-function fromPickerValue(value: string): OperatorExportFormat | null {
-  const [format] = value.split(":");
-  return format === "docx" || format === "pdf" ? format : null;
-}
+const EXPORT_MENU_PANEL_CLASS =
+  "min-w-[9.5rem] rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]";
 
 type OperatorExportPickerProps = {
   disabled?: boolean;
   onExport: (format: OperatorExportFormat) => void | Promise<void>;
 };
 
-/** Y-axis rolodex — scroll to DOCX/PDF label, release to export. */
-export function OperatorExportPicker({ disabled, onExport }: OperatorExportPickerProps) {
-  const [value, setValue] = useState<string>(() => toPickerValue("docx"));
+/** Toolbar export control — icon opens a pop-in menu for DOCX / PDF. */
+export function OperatorExportPicker({ disabled = false, onExport }: OperatorExportPickerProps) {
+  const deckMode = useDeckMode();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const items = useMemo(
-    () =>
-      Array.from({ length: LOOP_COPIES }, (_, copyIndex) =>
-        EXPORT_FORMATS.map((format) => ({
-          value: toPickerValue(format, copyIndex),
-          label: format === "docx" ? "Export to DOCX" : "Export to PDF",
-          slide:
-            format === "docx" ? (
-              <BsFileEarmarkWord className="h-3.5 w-3.5" aria-hidden />
-            ) : (
-              <AiOutlineFilePdf className="h-3.5 w-3.5" aria-hidden />
-            ),
-        })),
-      ).flat(),
-    [],
-  );
-
-  const handleUserSelect = useCallback(
-    (nextValue: string) => {
-      if (disabled) return;
-      const nextFormat = fromPickerValue(nextValue);
-      if (!nextFormat) return;
-      setValue(toPickerValue(nextFormat));
-      void onExport(nextFormat);
+  const runExport = useCallback(
+    async (format: OperatorExportFormat) => {
+      if (disabled || busy) return;
+      setOpen(false);
+      setBusy(true);
+      try {
+        await onExport(format);
+      } finally {
+        setBusy(false);
+      }
     },
-    [disabled, onExport],
+    [busy, disabled, onExport],
   );
 
   return (
-    <div
-      className={cn("shrink-0", disabled && "pointer-events-none opacity-40")}
-      aria-disabled={disabled || undefined}
+    <DropdownMenu
+      open={disabled ? false : open}
+      onOpenChange={(next) => {
+        if (!disabled) setOpen(next);
+      }}
     >
-      <CyberdeckRollingPicker
-        items={items}
-        value={value}
-        onChange={(next) => {
-          const nextFormat = fromPickerValue(next);
-          if (!nextFormat) return;
-          setValue(toPickerValue(nextFormat));
-        }}
-        onUserSelect={handleUserSelect}
-        ariaLabel="Export format"
-        viewportClassName="h-7 w-7"
-        showTextWhileScrolling
-        loop
-      />
-    </div>
+      <CyberdeckControlTooltip label="Export" disabled={disabled}>
+        <DropdownMenuTrigger asChild disabled={disabled}>
+          <button
+            type="button"
+            aria-label="Export"
+            aria-haspopup="menu"
+            aria-expanded={open}
+            disabled={disabled}
+            className={cn(
+              realmorphismControlClass(deckMode, {
+                size: "toolbar",
+                legacyClassName: LEGACY_TOOLBAR_ICON,
+              }),
+              "disabled:cursor-not-allowed disabled:opacity-30",
+              open && !disabled && "is-signal",
+            )}
+          >
+            <LuShare className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </DropdownMenuTrigger>
+      </CyberdeckControlTooltip>
+      <DropdownMenuContent
+        align="end"
+        sideOffset={6}
+        className={cn(
+          EXPORT_MENU_PANEL_CLASS,
+          "rounded-sm border-2 border-[#2d2d2d] bg-black p-1 text-emerald-100 shadow-none",
+        )}
+      >
+        <div
+          className="px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.08em] text-[#8a8a8a]"
+          role="presentation"
+        >
+          Export
+        </div>
+        <div className="mx-0 my-1 h-px bg-[#2d2d2d]" role="separator" />
+        <DropdownMenuItem
+          disabled={busy}
+          className={cn(
+            realmorphismMenuItemClass(deckMode),
+            "cursor-pointer rounded-sm focus:bg-[#141414] focus:text-emerald-200 data-[disabled]:opacity-40",
+          )}
+          onSelect={(event) => {
+            event.preventDefault();
+            void runExport("docx");
+          }}
+        >
+          <BsFileEarmarkWord className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          DOCX
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={busy}
+          className={cn(
+            realmorphismMenuItemClass(deckMode),
+            "cursor-pointer rounded-sm focus:bg-[#141414] focus:text-emerald-200 data-[disabled]:opacity-40",
+          )}
+          onSelect={(event) => {
+            event.preventDefault();
+            void runExport("pdf");
+          }}
+        >
+          <AiOutlineFilePdf className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          PDF
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

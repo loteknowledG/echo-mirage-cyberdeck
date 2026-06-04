@@ -35,4 +35,5 @@ contextBridge.exposeInMainWorld('echoMirageOpen', {
     ipcRenderer.invoke('echo-mirage-open:read-operator-file', { rootPath, logicalPath }),
   writeOperatorFile: (rootPath, logicalPath, content) =>
     ipcRenderer.invoke('echo-mirage-open:write-operator-file', { rootPath, logicalPath, content }),
+  openPath: (filePath) => ipcRenderer.invoke('echo-mirage-open:open-path', { filePath }),
 });

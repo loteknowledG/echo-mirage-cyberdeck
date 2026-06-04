@@ -11,6 +11,7 @@ import {
 } from "@wikimedia/codex-icons";
 import { useDeckMode } from "@/lib/deck-mode";
 import { realmorphismActionClass, realmorphismMenuItemClass } from "@/lib/cyberdeck/realmorphism-control";
+import { isOperatorBinaryPreviewPath } from "@/lib/operator-binary-preview";
 import { operatorFileIcon, operatorFolderIcon, operatorIconSrc } from "@/lib/operator-file-icon";
 import { cn } from "@/lib/utils";
 import { CodexIcon } from "@/components/codex-icon";
@@ -622,9 +623,15 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
       setSelectedPath(path);
       setOpeningPath(path);
       try {
-        const file = await readFileFromFolderRoot(root, path);
-        if (file) await onOpenFile(path, file);
-        else toast.error("Could not read file.");
+        const read = await readFileFromFolderRoot(root, path);
+        if (read) await onOpenFile(path, read.file);
+        else if (isOperatorBinaryPreviewPath(path)) {
+          toast.error(
+            "Could not read this file as binary. Restart the Echo Mirage desktop app and try again.",
+          );
+        } else {
+          toast.error("Could not read file.");
+        }
       } finally {
         setOpeningPath(null);
       }

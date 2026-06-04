@@ -55,6 +55,9 @@ test("operator folder tree replaces generic context actions with copy file path"
       async writeOperatorFile() {
         return { ok: false };
       },
+      async openPath() {
+        return { ok: false };
+      },
     };
   });
   await openCyberdeck(page);

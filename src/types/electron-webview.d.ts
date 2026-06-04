@@ -86,6 +86,9 @@ declare global {
       name?: string;
       mimeType?: string;
       text?: string;
+      base64?: string;
+      binaryMetadata?: boolean;
+      filePath?: string;
       size?: number;
       error?: string;
     }>;
@@ -96,6 +99,10 @@ declare global {
     ): Promise<{
       ok: boolean;
       filePath?: string;
+      error?: string;
+    }>;
+    openPath(filePath: string): Promise<{
+      ok: boolean;
       error?: string;
     }>;
   }

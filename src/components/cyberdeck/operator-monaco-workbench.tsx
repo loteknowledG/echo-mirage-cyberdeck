@@ -14,15 +14,14 @@ import {
   type OperatorEditorRange,
   type OperatorEditorState,
 } from "@/lib/operator-workbench";
-import {
-  normalizeOperatorDocumentKind,
-  type OperatorDocumentPickerKind,
-} from "@/lib/operator-document-types";
+import { OperatorDocTypeMenu } from "@/components/cyberdeck/operator-doc-type-menu";
+import type { OperatorDocumentPickerKind } from "@/lib/operator-document-types";
 
 type OperatorMonacoWorkbenchProps = {
   activeFilePath?: string | null;
   fileName: string;
   documentKind: OperatorDocumentPickerKind;
+  onDocumentKindChange?: (kind: OperatorDocumentPickerKind) => void;
   value: string;
   onChange: (value: string) => void;
   onSave: () => void | Promise<void>;
@@ -92,6 +91,7 @@ export function OperatorMonacoWorkbench({
   activeFilePath = null,
   fileName,
   documentKind,
+  onDocumentKindChange,
   value,
   onChange,
   onSave,
@@ -269,8 +269,6 @@ export function OperatorMonacoWorkbench({
     instance.addCommand(2048 | 49, () => void onSave());
   }, [onSave]);
 
-  const documentKindLabel = normalizeOperatorDocumentKind(documentKind).toUpperCase();
-
   return (
     <div
       className="flex min-h-[50vh] flex-1 flex-col overflow-hidden rounded-sm border border-[#1c1c1c] bg-black"
@@ -278,13 +276,24 @@ export function OperatorMonacoWorkbench({
       onClick={() => editorRef.current?.focus()}
     >
       <div className="flex items-center justify-between border-b border-[#1c1c1c] px-2 py-1 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
-        <span>
-          {documentKindLabel} // LN {cursor.lineNumber}, COL {cursor.column}
-          {selection &&
-          (selection.selectionStartLineNumber !== selection.positionLineNumber ||
-            selection.selectionStartColumn !== selection.positionColumn)
-            ? " // SELECTION ACTIVE"
-            : ""}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
+          {onDocumentKindChange ? (
+            <OperatorDocTypeMenu
+              value={documentKind}
+              onChange={onDocumentKindChange}
+              trigger="status"
+            />
+          ) : (
+            <span className="uppercase text-emerald-200">{documentKind}</span>
+          )}
+          <span>
+            // LN {cursor.lineNumber}, COL {cursor.column}
+            {selection &&
+            (selection.selectionStartLineNumber !== selection.positionLineNumber ||
+              selection.selectionStartColumn !== selection.positionColumn)
+              ? " // SELECTION ACTIVE"
+              : ""}
+          </span>
         </span>
         <span className="flex items-center gap-2">
           <span className={dirty ? "text-amber-300" : "text-emerald-300"}>

@@ -73,12 +73,20 @@ import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import {
   applyOperatorTextAutodetect,
   createBlankOperatorDocument,
-  isOperatorDocumentSurfaceKind,
   normalizeOperatorDocumentKind,
   operatorMimeTypeForKind,
   resolveOperatorDocumentNameForKind,
   type OperatorDocumentPickerKind,
 } from "@/lib/operator-document-types";
+import { revokeOperatorBlobUrl } from "@/lib/operator-binary-preview";
+import {
+  analyzeTextForBinaryDisplay,
+  buildOperatorIngestFromFile,
+  isOperatorTextEditableSurface,
+  resolveOperatorAssetSurface,
+  type OperatorAssetSurface,
+  type OperatorIngestHints,
+} from "@/lib/operator-file-surface";
 import { cleanOperatorPasteText } from "@/lib/operator-paste-cleaner";
 import {
   normalizeMarkdownMechanical,
@@ -412,6 +420,9 @@ type DroppedOperatorAsset = {
   size: number;
   text?: string;
   imageSrc?: string;
+  pdfSrc?: string;
+  localFilePath?: string;
+  surface?: OperatorAssetSurface;
 };
 
 type CustomTab = {
@@ -942,6 +953,7 @@ export default function CyberdeckApp() {
   const operatorFolderRootsRef = useRef<OperatorDocFolderRoot[]>([]);
   const [operatorFolderRootsCount, setOperatorFolderRootsCount] = useState(0);
   const operatorFileHistoryLoadersRef = useRef<Map<string, () => Promise<void>>>(new Map());
+  const operatorPreviewBlobUrlRef = useRef<string | null>(null);
   const [operatorBrowserUrl, setOperatorBrowserUrl] = useState(OPERATOR_BROWSER_HOME_URL);
   const [operatorBrowserSnapshot, setOperatorBrowserSnapshot] = useState("");
   const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
@@ -2115,7 +2127,9 @@ export default function CyberdeckApp() {
     return () => window.cancelAnimationFrame(id);
   }, [deckUiHydrated, navRailContext]);
 
-  const operatorSurfaceIsDocument = isOperatorDocumentSurfaceKind(operatorDroppedAsset?.kind);
+  const operatorSurfaceIsDocument = operatorDroppedAsset
+    ? isOperatorTextEditableSurface(resolveOperatorAssetSurface(operatorDroppedAsset))
+    : false;
 
   const { captureOperatorBrowserSnapshot, openOperatorBrowser, performBrowserCommand } = useBrowserController({
     operatorBrowserRef,
@@ -2177,6 +2191,17 @@ export default function CyberdeckApp() {
   }, []);
 
   const setOperatorTextAsset = useCallback((asset: DroppedOperatorAsset) => {
+    if (asset.surface && asset.surface !== "markdown" && asset.surface !== "text") {
+      setOperatorDroppedAsset(asset);
+      setOperatorDocNameDraft(asset.name || "");
+      return false;
+    }
+    if (asset.text && !analyzeTextForBinaryDisplay(asset.text, { fileName: asset.name }).safe) {
+      const { text: _text, ...rest } = asset;
+      setOperatorDroppedAsset({ ...rest, surface: "binary-unsafe", kind: "file" });
+      setOperatorDocNameDraft(asset.name || "");
+      return false;
+    }
     let prepared = asset;
     if (asset.text) {
       const cleanedText = cleanOperatorPasteText(asset.text);
@@ -2254,6 +2279,14 @@ export default function CyberdeckApp() {
 
   const openConvertedMarkdownInOperator = useCallback(
     async (filePath: string) => {
+      const convertHints = {
+        activeFilePath: operatorActiveFilePath,
+        localFilePath: operatorDroppedAsset?.localFilePath ?? null,
+        folderRoots: operatorFolderRootsRef.current.map((root) => ({
+          name: root.name,
+          diskPath: root.diskPath,
+        })),
+      };
       setMessages((prev) => [
         ...prev,
         { role: "system", text: `MUTHUR_CONVERT // ${filePath}` },
@@ -2262,7 +2295,7 @@ export default function CyberdeckApp() {
         const res = await fetch("/api/convert-document-to-markdown", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filePath }),
+          body: JSON.stringify({ filePath, ...convertHints }),
         });
         const payload = (await res.json()) as {
           ok?: boolean;
@@ -2318,7 +2351,12 @@ export default function CyberdeckApp() {
         ]);
       }
     },
-    [openOperatorFile, setOperatorTextAsset],
+    [
+      openOperatorFile,
+      operatorActiveFilePath,
+      operatorDroppedAsset?.localFilePath,
+      setOperatorTextAsset,
+    ],
   );
 
   const handleOperatorDocumentKindChange = useCallback((nextKind: OperatorDocumentPickerKind) => {
@@ -2326,11 +2364,34 @@ export default function CyberdeckApp() {
     setOperatorDroppedAsset((prev) => {
       if (!prev) return prev;
       const name = resolveOperatorDocumentNameForKind(nextKind, prev.text || "", prev.name);
+      if (nextKind === "pdf") {
+        const hasPdfPreview = Boolean(
+          prev.pdfSrc ||
+            prev.surface === "pdf" ||
+            prev.name.toLowerCase().endsWith(".pdf") ||
+            prev.localFilePath?.toLowerCase().endsWith(".pdf"),
+        );
+        if (!hasPdfPreview) {
+          toast.error("Open a PDF file before switching document type to PDF.");
+          return prev;
+        }
+        const { text: _text, imageSrc: _imageSrc, ...rest } = prev;
+        return {
+          ...rest,
+          kind: nextKind,
+          mimeType: operatorMimeTypeForKind(nextKind),
+          name,
+          surface: "pdf",
+        };
+      }
       return {
         ...prev,
         kind: nextKind,
         mimeType: operatorMimeTypeForKind(nextKind),
         name,
+        surface: undefined,
+        pdfSrc: undefined,
+        text: prev.text ?? "",
       };
     });
   }, []);
@@ -2689,16 +2750,16 @@ export default function CyberdeckApp() {
         const result = await exportMarkdownToDocx({ markdown: text, suggestedFilename });
         toast.success(
           result.outputPath
-            ? `Exported DOCX to ${result.outputPath}`
-            : `Exported "${result.filename}".`,
+            ? `Exported as DOCX → ${result.outputPath}`
+            : `Exported as DOCX: "${result.filename}".`,
         );
       } else {
         const suggestedFilename = pdfFilenameFromMarkdownName(baseName);
         const result = await exportMarkdownToPdf({ markdown: text, suggestedFilename });
         toast.success(
           result.outputPath
-            ? `Exported PDF to ${result.outputPath}`
-            : `Exported "${result.filename}".`,
+            ? `Exported as PDF → ${result.outputPath}`
+            : `Exported as PDF: "${result.filename}".`,
         );
       }
     } catch (err) {
@@ -2813,55 +2874,36 @@ export default function CyberdeckApp() {
     }
   }, [openOperatorFile, operatorDroppedAsset?.name, setOperatorTextAsset]);
 
-  const loadOperatorAssetFromFile = useCallback(async (file: File) => {
+  const loadOperatorAssetFromFile = useCallback(async (file: File, hints?: OperatorIngestHints) => {
     operatorKindManualRef.current = false;
-    const kind = getOperatorFileKind(file);
-    const mimeType = file.type || "application/octet-stream";
-    const baseAsset = {
-      kind,
-      name: file.name,
-      mimeType,
-      size: file.size,
-    } satisfies Pick<DroppedOperatorAsset, "kind" | "name" | "mimeType" | "size">;
+    revokeOperatorBlobUrl(operatorPreviewBlobUrlRef.current);
+    operatorPreviewBlobUrlRef.current = null;
+    const ingested = await buildOperatorIngestFromFile(file, hints);
+    const asset: DroppedOperatorAsset = {
+      kind: ingested.kind,
+      name: ingested.name,
+      mimeType: ingested.mimeType,
+      size: ingested.size,
+      surface: ingested.surface,
+      ...(ingested.text !== undefined ? { text: ingested.text } : {}),
+      ...(ingested.imageSrc ? { imageSrc: ingested.imageSrc } : {}),
+      ...(ingested.pdfSrc ? { pdfSrc: ingested.pdfSrc } : {}),
+      ...(hints?.diskAbsolutePath ? { localFilePath: hints.diskAbsolutePath } : {}),
+    };
 
-    if (kind === "image") {
-      try {
-        const imageSrc = await readFileAsDataUrl(file);
-        setOperatorDroppedAsset({ ...baseAsset, imageSrc });
-      } catch {
-        setOperatorDroppedAsset(baseAsset);
+    if (ingested.surface === "markdown" || ingested.surface === "text") {
+      setOperatorTextAsset(asset);
+    } else {
+      const { text: _text, ...binarySafe } = asset;
+      if (binarySafe.pdfSrc?.startsWith("blob:")) {
+        operatorPreviewBlobUrlRef.current = binarySafe.pdfSrc;
       }
-      setOperatorSurfaceMode("workspace");
-      setOperatorDocMode("view");
-      return;
-    }
-
-    if (kind === "video") {
-      setOperatorDroppedAsset(baseAsset);
-      setOperatorSurfaceMode("workspace");
-      setOperatorDocMode("view");
-      return;
-    }
-
-    if (
-      kind === "markdown" ||
-      kind === "code" ||
-      kind === "text" ||
-      kind === "json" ||
-      isEditableOperatorFile(file)
-    ) {
-      try {
-        const text = await file.text();
-        setOperatorTextAsset({ ...baseAsset, text });
-      } catch {
-        setOperatorDroppedAsset(baseAsset);
+      if (binarySafe.imageSrc?.startsWith("blob:")) {
+        operatorPreviewBlobUrlRef.current = binarySafe.imageSrc;
       }
-      setOperatorSurfaceMode("workspace");
-      setOperatorDocMode("view");
-      return;
+      setOperatorDroppedAsset(binarySafe);
+      setOperatorDocNameDraft(asset.name);
     }
-
-    setOperatorDroppedAsset(baseAsset);
     setOperatorSurfaceMode("workspace");
     setOperatorDocMode("view");
   }, [setOperatorTextAsset]);
@@ -2871,9 +2913,12 @@ export default function CyberdeckApp() {
       const rootName = filePath.split("/")[0];
       const root = operatorFolderRootsRef.current.find((entry) => entry.name === rootName);
       if (!root) return;
-      const file = await readFileFromFolderRoot(root, filePath);
-      if (!file) return;
-      await loadOperatorAssetFromFile(file);
+      const read = await readFileFromFolderRoot(root, filePath);
+      if (!read) return;
+      await loadOperatorAssetFromFile(read.file, {
+        diskAbsolutePath: read.diskAbsolutePath,
+        pdfBase64: read.pdfBase64,
+      });
     },
     [loadOperatorAssetFromFile],
   );
@@ -2885,7 +2930,14 @@ export default function CyberdeckApp() {
         const root = operatorFolderRootsRef.current.find((entry) => entry.name === rootName);
         if (root) {
           const fresh = await readFileFromFolderRoot(root, filePath);
-          await loadOperatorAssetFromFile(fresh || file);
+          if (fresh) {
+            await loadOperatorAssetFromFile(fresh.file, {
+              diskAbsolutePath: fresh.diskAbsolutePath,
+              pdfBase64: fresh.pdfBase64,
+            });
+          } else {
+            await loadOperatorAssetFromFile(file);
+          }
           return;
         }
         await loadOperatorAssetFromFile(file);
@@ -5825,29 +5877,20 @@ const resolved = resolveUiTarget(userMessage);
 
   const loadCustomTabAssetFromFile = useCallback(
     async (tabId: string, file: File) => {
-      const kind = getOperatorFileKind(file);
-      const baseAsset: DroppedOperatorAsset = {
-        kind,
-        name: file.name,
-        mimeType: file.type || "application/octet-stream",
-        size: file.size,
+      const ingested = await buildOperatorIngestFromFile(file);
+      let nextAsset: DroppedOperatorAsset = {
+        kind: ingested.kind,
+        name: ingested.name,
+        mimeType: ingested.mimeType,
+        size: ingested.size,
+        surface: ingested.surface,
+        ...(ingested.text !== undefined ? { text: ingested.text } : {}),
+        ...(ingested.imageSrc ? { imageSrc: ingested.imageSrc } : {}),
+        ...(ingested.pdfSrc ? { pdfSrc: ingested.pdfSrc } : {}),
       };
-
-      let nextAsset = baseAsset;
-      if (kind === "image") {
-        try {
-          const imageSrc = await readFileAsDataUrl(file);
-          nextAsset = { ...baseAsset, imageSrc };
-        } catch {
-          nextAsset = baseAsset;
-        }
-      } else if (kind === "markdown" || kind === "code" || kind === "text" || kind === "json") {
-        try {
-          const text = await file.text();
-          nextAsset = { ...baseAsset, text };
-        } catch {
-          nextAsset = baseAsset;
-        }
+      if (ingested.surface !== "markdown" && ingested.surface !== "text") {
+        const { text: _text, ...withoutText } = nextAsset;
+        nextAsset = withoutText;
       }
 
       updateCustomTab(tabId, (tab) => ({
@@ -7446,7 +7489,7 @@ const resolved = resolveUiTarget(userMessage);
                   kind="operator"
                   isOperatorDragOver={isOperatorDragOver}
                   operatorDroppedAsset={operatorDroppedAsset}
-                  operatorSurfaceMode="workspace"
+                  operatorSurfaceMode={operatorSurfaceMode}
                   operatorBrowserEngine={operatorBrowserEngine}
                   operatorSurfaceIsDocument={operatorSurfaceIsDocument}
                   operatorBrowserUrl={operatorBrowserUrl}

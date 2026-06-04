@@ -10,7 +10,15 @@ import {
   operatorFileHistoryBackIndex,
   operatorFileHistoryForwardIndex,
 } from "@/lib/operator-file-history";
-import { getOperatorFileKind, isEditableOperatorFile, readFileAsDataUrl } from "@/lib/operator-file-ingest";
+import { revokeOperatorBlobUrl } from "@/lib/operator-binary-preview";
+import { buildOperatorIngestFromFile } from "@/lib/operator-file-ingest";
+import type { OperatorIngestHints } from "@/lib/operator-file-surface";
+import {
+  analyzeTextForBinaryDisplay,
+  isOperatorTextEditableSurface,
+  resolveOperatorAssetSurface,
+  type OperatorAssetSurface,
+} from "@/lib/operator-file-surface";
 import {
   applyOperatorTextAutodetect,
   createBlankOperatorDocument,
@@ -48,6 +56,8 @@ type TabAsset = {
   size: number;
   text?: string;
   imageSrc?: string;
+  pdfSrc?: string;
+  surface?: OperatorAssetSurface;
 };
 
 type EchoMirageClipboardApi = { readText?: () => Promise<string> };
@@ -91,6 +101,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
   const fileHistoryRef = useRef<string[]>([]);
   const fileHistoryIndexRef = useRef(-1);
   const historyLoadersRef = useRef<Map<string, () => Promise<void>>>(new Map());
+  const previewBlobUrlRef = useRef<string | null>(null);
 
   const updateTabAsset = useCallback(
     (updater: (prev: TabAsset | null) => TabAsset | null) => {
@@ -105,6 +116,17 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
 
   const setTextAsset = useCallback(
     (next: TabAsset) => {
+      if (next.surface && next.surface !== "markdown" && next.surface !== "text") {
+        updateTabAsset(() => next);
+        setNameDraft(next.name || "");
+        return false;
+      }
+      if (next.text && !analyzeTextForBinaryDisplay(next.text, { fileName: next.name }).safe) {
+        const { text: _text, ...rest } = next;
+        updateTabAsset(() => ({ ...rest, surface: "binary-unsafe", kind: "file" }));
+        setNameDraft(next.name || "");
+        return false;
+      }
       let prepared = next;
       if (next.text) {
         const cleanedText = cleanOperatorPasteText(next.text);
@@ -131,50 +153,32 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
   );
 
   const loadAssetFromFile = useCallback(
-    async (file: File) => {
+    async (file: File, hints?: OperatorIngestHints) => {
       kindManualRef.current = false;
-      const kind = getOperatorFileKind(file);
-      const base: TabAsset = {
-        kind,
-        name: file.name,
-        mimeType: file.type || "application/octet-stream",
-        size: file.size,
+      revokeOperatorBlobUrl(previewBlobUrlRef.current);
+      previewBlobUrlRef.current = null;
+      const ingested = await buildOperatorIngestFromFile(file, hints);
+      let next: TabAsset = {
+        kind: ingested.kind,
+        name: ingested.name,
+        mimeType: ingested.mimeType,
+        size: ingested.size,
+        surface: ingested.surface,
+        ...(ingested.text !== undefined ? { text: ingested.text } : {}),
+        ...(ingested.imageSrc ? { imageSrc: ingested.imageSrc } : {}),
+        ...(ingested.pdfSrc ? { pdfSrc: ingested.pdfSrc } : {}),
       };
 
-      if (kind === "image") {
-        try {
-          const imageSrc = await readFileAsDataUrl(file);
-          updateTabAsset(() => ({ ...base, imageSrc }));
-        } catch {
-          updateTabAsset(() => base);
-        }
-        setDocMode("view");
-        return;
+      if (ingested.surface === "markdown" || ingested.surface === "text") {
+        setTextAsset(next);
+      } else {
+        const { text: _text, ...withoutText } = next;
+        next = withoutText;
+        if (next.pdfSrc?.startsWith("blob:")) previewBlobUrlRef.current = next.pdfSrc;
+        if (next.imageSrc?.startsWith("blob:")) previewBlobUrlRef.current = next.imageSrc;
+        updateTabAsset(() => next);
+        setNameDraft(next.name);
       }
-
-      if (kind === "video") {
-        updateTabAsset(() => base);
-        setDocMode("view");
-        return;
-      }
-
-      if (
-        kind === "markdown" ||
-        kind === "code" ||
-        kind === "json" ||
-        isEditableOperatorFile(file)
-      ) {
-        try {
-          const text = await file.text();
-          setTextAsset({ ...base, text });
-        } catch {
-          updateTabAsset(() => base);
-        }
-        setDocMode("view");
-        return;
-      }
-
-      updateTabAsset(() => base);
       setDocMode("view");
     },
     [setTextAsset, updateTabAsset],
@@ -212,7 +216,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
   }, [asset?.kind, asset?.name]);
 
   useLayoutEffect(() => {
-    const isDoc = asset && !["image", "video"].includes(asset.kind);
+    const isDoc = asset ? isOperatorTextEditableSurface(resolveOperatorAssetSurface(asset)) : false;
     if (!isDoc || docMode !== "edit") return;
     const el = editorRef.current;
     if (!el) return;
@@ -250,7 +254,14 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
         const root = folderRootsRef.current.find((entry) => entry.name === rootName);
         if (root) {
           const fresh = await readFileFromFolderRoot(root, filePath);
-          await loadAssetFromFile(fresh || file);
+          if (fresh) {
+            await loadAssetFromFile(fresh.file, {
+              diskAbsolutePath: fresh.diskAbsolutePath,
+              pdfBase64: fresh.pdfBase64,
+            });
+          } else {
+            await loadAssetFromFile(file);
+          }
           return;
         }
         await loadAssetFromFile(file);
@@ -508,7 +519,9 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
     [openFilePath, setTextAsset],
   );
 
-  const surfaceIsDocument = !asset || !["image", "video"].includes(asset.kind);
+  const surfaceIsDocument = asset
+    ? isOperatorTextEditableSurface(resolveOperatorAssetSurface(asset))
+    : false;
 
   return (
     <CyberdeckOperatorPaneBody

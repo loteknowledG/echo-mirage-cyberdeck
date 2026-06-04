@@ -4,6 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { CONVERTIBLE_DOCUMENT_EXTENSIONS } from "@/lib/muthur-document-conversion-intent";
 import { applyOperatorMarkdownHousekeeping } from "@/lib/operator-markdown-housekeeping";
+import {
+  resolveConvertDocumentPath,
+  type ResolveConvertDocumentPathHints,
+} from "@/lib/resolve-convert-document-path";
+
+export type { ResolveConvertDocumentPathHints };
 
 export type ConvertDocumentResult = {
   markdown: string;
@@ -73,8 +79,11 @@ function resolveOutputPath(sourcePath: string): string {
   return path.join(tmpDir, path.basename(beside));
 }
 
-export function convertDocumentToMarkdown(filePath: string): ConvertDocumentResult {
-  const sourcePath = path.resolve(filePath.trim());
+export function convertDocumentToMarkdown(
+  filePath: string,
+  hints?: ResolveConvertDocumentPathHints,
+): ConvertDocumentResult {
+  const sourcePath = resolveConvertDocumentPath(filePath, hints);
 
   if (!fs.existsSync(sourcePath)) {
     throw new Error(`File not found: ${sourcePath}`);

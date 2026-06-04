@@ -1,3 +1,4 @@
+import { isOperatorBinaryPreviewPath } from "@/lib/operator-binary-preview";
 import type { OperatorFolderSnapshot } from "@/lib/operator-folder-snapshot";
 import {
   listSnapshotDirectoryChildren,
@@ -214,6 +215,28 @@ export function isOperatorFolderPaneFilePath(filePath: string | null | undefined
   return !/^[a-z+]+:\/\//i.test(filePath);
 }
 
+export type OperatorFolderFileRead = {
+  file: File;
+  diskAbsolutePath?: string;
+  pdfBase64?: string;
+};
+
+export function resolveOperatorDiskAbsolutePath(
+  root: OperatorDocFolderRoot,
+  logicalPath: string,
+): string | undefined {
+  if (!root.diskPath) return undefined;
+  const relativePath =
+    logicalPath === root.name
+      ? ""
+      : logicalPath.startsWith(`${root.name}/`)
+        ? logicalPath.slice(root.name.length + 1)
+        : logicalPath;
+  if (!relativePath) return root.diskPath;
+  const separator = root.diskPath.includes("\\") ? "\\" : "/";
+  return `${root.diskPath.replace(/[\\/]+$/, "")}${separator}${relativePath.replaceAll("/", separator)}`;
+}
+
 export function canSaveOperatorFileInPlace(
   filePath: string | null | undefined,
   roots: OperatorDocFolderRoot[],
@@ -227,23 +250,77 @@ export function canSaveOperatorFileInPlace(
 export async function readFileFromFolderRoot(
   root: OperatorDocFolderRoot,
   logicalPath: string,
-): Promise<File | null> {
+): Promise<OperatorFolderFileRead | null> {
+  const diskAbsolutePath = resolveOperatorDiskAbsolutePath(root, logicalPath);
+  const binaryPath = isOperatorBinaryPreviewPath(logicalPath);
+
   if (root.snapshot) {
-    return readSnapshotFile(root.snapshot, logicalPath);
+    const file = readSnapshotFile(root.snapshot, logicalPath);
+    return file ? { file } : null;
+  }
+
+  if (root.handle && binaryPath) {
+    const file = await readFileFromFolderPath(root.handle, logicalPath);
+    return file ? { file, diskAbsolutePath } : null;
   }
 
   const bridge = window.echoMirageOpen;
   if (root.diskPath && bridge?.readOperatorFile) {
     const result = await bridge.readOperatorFile(root.diskPath, logicalPath);
-    if (!result.ok || result.text == null || !result.name) return null;
-    return new File([result.text], result.name, {
+    if (!result.ok || !result.name) return null;
+
+    const absolutePath = result.filePath || diskAbsolutePath;
+
+    if (result.base64) {
+      const binary = atob(result.base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], {
+        type: result.mimeType || "application/octet-stream",
+      });
+      const file = new File([blob], result.name, {
+        type: result.mimeType || "application/octet-stream",
+        lastModified: Date.now(),
+      });
+      const isPdf =
+        result.mimeType === "application/pdf" ||
+        result.name.toLowerCase().endsWith(".pdf");
+      return {
+        file,
+        diskAbsolutePath: absolutePath,
+        ...(isPdf ? { pdfBase64: result.base64 } : {}),
+      };
+    }
+
+    if (result.binaryMetadata) {
+      const file = new File([], result.name, {
+        type: result.mimeType || "application/octet-stream",
+        lastModified: Date.now(),
+      });
+      return { file, diskAbsolutePath: absolutePath };
+    }
+
+    if (binaryPath && result.text != null) {
+      if (root.handle) {
+        const file = await readFileFromFolderPath(root.handle, logicalPath);
+        return file ? { file, diskAbsolutePath } : null;
+      }
+      return null;
+    }
+
+    if (result.text == null) return null;
+    const file = new File([result.text], result.name, {
       type: result.mimeType || "text/plain",
       lastModified: Date.now(),
     });
+    return { file, diskAbsolutePath: absolutePath };
   }
 
   if (!root.handle) return null;
-  return readFileFromFolderPath(root.handle, logicalPath);
+  const file = await readFileFromFolderPath(root.handle, logicalPath);
+  return file ? { file, diskAbsolutePath } : null;
 }
 
 export async function readFileFromFolderPath(

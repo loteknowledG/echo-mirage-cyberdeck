@@ -191,7 +191,9 @@ async function runConvertDocumentToMarkdown(call: ToolCall): Promise<ToolResult>
   }
 
   try {
-    const result = convertDocumentToMarkdown(filePath);
+    const result = convertDocumentToMarkdown(filePath, {
+      projectRoot: process.cwd(),
+    });
     const preview = result.markdown.trim().slice(0, 1200);
     return {
       ok: true,
