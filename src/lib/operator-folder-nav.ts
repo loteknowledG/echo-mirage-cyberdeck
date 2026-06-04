@@ -1,3 +1,9 @@
+import type { OperatorFolderSnapshot } from "@/lib/operator-folder-snapshot";
+import {
+  listSnapshotDirectoryChildren,
+  readSnapshotFile,
+} from "@/lib/operator-folder-snapshot";
+
 export type OperatorDocFolderRoot = {
   id: string;
   name: string;
@@ -5,6 +11,8 @@ export type OperatorDocFolderRoot = {
   handle?: FileSystemDirectoryHandle;
   /** Absolute disk path when using the Echo Mirage desktop bridge. */
   diskPath?: string;
+  /** Mobile / webkitdirectory pick — tree lives in memory until reload. */
+  snapshot?: OperatorFolderSnapshot;
 };
 
 export type OperatorFolderTreeNode = {
@@ -142,6 +150,10 @@ export async function listDirectoryChildrenForRoot(
   root: OperatorDocFolderRoot,
   logicalPath: string,
 ): Promise<OperatorFolderTreeNode[]> {
+  if (root.snapshot) {
+    return listSnapshotDirectoryChildren(root.snapshot, logicalPath);
+  }
+
   const bridge = window.echoMirageOpen;
   if (root.diskPath && bridge?.listOperatorFolder) {
     const relativePath = relativePathFromLogicalPath(root.name, logicalPath);
@@ -216,6 +228,10 @@ export async function readFileFromFolderRoot(
   root: OperatorDocFolderRoot,
   logicalPath: string,
 ): Promise<File | null> {
+  if (root.snapshot) {
+    return readSnapshotFile(root.snapshot, logicalPath);
+  }
+
   const bridge = window.echoMirageOpen;
   if (root.diskPath && bridge?.readOperatorFile) {
     const result = await bridge.readOperatorFile(root.diskPath, logicalPath);

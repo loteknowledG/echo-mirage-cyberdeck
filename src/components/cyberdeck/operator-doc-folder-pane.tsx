@@ -1,6 +1,6 @@
 'use client';
 
-import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   cdxIconAdd,
@@ -21,6 +21,11 @@ import {
   type OperatorDocFolderRoot,
   type OperatorFolderTreeNode,
 } from "@/lib/operator-folder-nav";
+import {
+  buildOperatorFolderSnapshot,
+  supportsFileSystemDirectoryPicker,
+  supportsWebkitDirectoryInput,
+} from "@/lib/operator-folder-snapshot";
 
 type OperatorDocFolderPaneProps = {
   onOpenFile: (path: string, file: File) => void | Promise<void>;
@@ -71,6 +76,17 @@ function createRootFromHandle(handle: FileSystemDirectoryHandle, label: string):
     id: crypto.randomUUID(),
     name: label,
     handle,
+  };
+}
+
+function createRootFromSnapshot(
+  label: string,
+  snapshot: NonNullable<OperatorDocFolderRoot["snapshot"]>,
+): OperatorDocFolderRoot {
+  return {
+    id: crypto.randomUUID(),
+    name: label,
+    snapshot,
   };
 }
 
@@ -176,6 +192,7 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
   const [contextMenu, setContextMenu] = useState<FolderContextMenu | null>(null);
   const [folderStateHydrated, setFolderStateHydrated] = useState(false);
   const treeScrollRef = useRef<HTMLDivElement | null>(null);
+  const webkitDirectoryInputRef = useRef<HTMLInputElement | null>(null);
   const isPickingRef = useRef(false);
   const didRestoreExpandedTreeRef = useRef(false);
 
@@ -260,7 +277,7 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
         if (cancelled) return;
         const rootName = path.split("/")[0];
         const root = roots.find((entry) => entry.name === rootName);
-        if (!root?.diskPath) continue;
+        if (!root?.diskPath && !root?.snapshot) continue;
         setPathLoading(path, true);
         try {
           const nodes = await listDirectoryChildrenForRoot(root, path);
@@ -375,38 +392,119 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
       return createRootFromDisk(result.folderPath, baseName);
     }
 
-    const picker = (window as Window & {
-      showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
-    }).showDirectoryPicker;
-    if (typeof picker !== "function") {
-      toast.error("Folder picker is not available in this browser.");
-      return null;
+    if (supportsFileSystemDirectoryPicker()) {
+      const picker = (
+        window as Window & { showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle> }
+      ).showDirectoryPicker;
+      const dirHandle = await picker!();
+      const baseName = dirHandle.name || "folder";
+      return createRootFromHandle(dirHandle, baseName);
     }
-    const dirHandle = await picker();
-    const baseName = dirHandle.name || "folder";
-    return createRootFromHandle(dirHandle, baseName);
+
+    return null;
   }, []);
+
+  const addSnapshotRoot = useCallback((files: File[]) => {
+    const provisional = buildOperatorFolderSnapshot(files);
+    if (!provisional) {
+      toast.error("No files were found in the selected folder.");
+      return;
+    }
+
+    setRoots((prev) => {
+      const label = uniqueRootLabel(provisional.rootSegment, prev.map((root) => root.name));
+      const built =
+        label === provisional.rootSegment
+          ? provisional
+          : buildOperatorFolderSnapshot(files, label);
+      if (!built) return prev;
+
+      const root = createRootFromSnapshot(label, built.snapshot);
+      setTree((treePrev) => ({
+        ...treePrev,
+        [label]: built.snapshot.childrenByDirPath.get(label) ?? [],
+      }));
+      setExpanded((expandedPrev) => new Set(expandedPrev).add(label));
+      return [...prev, root];
+    });
+    toast.success("Folder added. Tap folders in the tree to expand.");
+  }, []);
+
+  const openWebkitDirectoryPicker = useCallback(() => {
+    const input = webkitDirectoryInputRef.current;
+    if (!input) {
+      toast.error("Folder picker is not available in this browser.");
+      return;
+    }
+    input.value = "";
+    input.click();
+  }, []);
+
+  const handleWebkitDirectoryChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      isPickingRef.current = false;
+      setIsPicking(false);
+      const fileList = event.target.files;
+      event.target.value = "";
+      if (!fileList?.length) return;
+      addSnapshotRoot([...fileList]);
+    },
+    [addSnapshotRoot],
+  );
 
   const handleAddFolder = useCallback(async () => {
     if (isPickingRef.current) return;
+
+    const bridge = window.echoMirageOpen;
+    const useWebkitFirst =
+      !bridge?.pickOperatorFolder &&
+      !supportsFileSystemDirectoryPicker() &&
+      supportsWebkitDirectoryInput();
+
+    if (useWebkitFirst) {
+      isPickingRef.current = true;
+      setIsPicking(true);
+      openWebkitDirectoryPicker();
+      return;
+    }
+
     isPickingRef.current = true;
     setIsPicking(true);
     try {
       const picked = await pickDirectoryRoot();
-      if (!picked) return;
+      if (!picked) {
+        if (supportsWebkitDirectoryInput()) {
+          openWebkitDirectoryPicker();
+          return;
+        }
+        toast.error(
+          "Folder picker is not available here. Use the Echo Mirage desktop app, or Chrome/Edge on desktop.",
+        );
+        return;
+      }
 
       setRoots((prev) => {
         const label = uniqueRootLabel(picked.name, prev.map((root) => root.name));
         return [...prev, { ...picked, name: label }];
       });
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (error instanceof DOMException && error.name === "AbortError") {
+        isPickingRef.current = false;
+        setIsPicking(false);
+        return;
+      }
+      if (supportsWebkitDirectoryInput()) {
+        openWebkitDirectoryPicker();
+        return;
+      }
       toast.error(error instanceof Error ? error.message : "Could not add folder.");
     } finally {
-      isPickingRef.current = false;
-      setIsPicking(false);
+      if (!supportsWebkitDirectoryInput() || window.echoMirageOpen?.pickOperatorFolder) {
+        isPickingRef.current = false;
+        setIsPicking(false);
+      }
     }
-  }, [pickDirectoryRoot]);
+  }, [openWebkitDirectoryPicker, pickDirectoryRoot]);
 
   const handleReplaceRoot = useCallback(
     async (rootId: string) => {
@@ -598,12 +696,31 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
         event.stopPropagation();
       }}
     >
+      <input
+        ref={webkitDirectoryInputRef}
+        type="file"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        multiple
+        // @ts-expect-error — non-standard directory picker attributes (mobile Safari / Chrome)
+        webkitdirectory=""
+        directory=""
+        onChange={handleWebkitDirectoryChange}
+        onCancel={() => {
+          isPickingRef.current = false;
+          setIsPicking(false);
+        }}
+      />
       <div className="border-b border-[#1c1c1c] p-2">
         <button
           type="button"
           onClick={() => void handleAddFolder()}
           disabled={isPicking}
-          className={cn(realmorphismActionClass(deckMode, "neutral"), "w-full py-1.5")}
+          className={cn(
+            realmorphismActionClass(deckMode, "neutral"),
+            "w-full min-h-[44px] py-2.5 max-md:text-[11px] md:min-h-0 md:py-1.5",
+          )}
         >
           <span className="flex w-full items-center gap-1.5">
             <CodexIcon icon={cdxIconAdd} className="h-3 w-3" />
@@ -613,8 +730,13 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
       </div>
       <div ref={treeScrollRef} className="custom-scrollbar flex-1 overflow-y-auto py-1">
         {roots.length === 0 ? (
-          <div className="px-3 py-4 text-center font-mono text-[9px] tracking-[0.06em] text-[#5a5a5a]">
+          <div className="px-3 py-4 text-center font-mono text-[9px] leading-snug tracking-[0.06em] text-[#5a5a5a]">
             ADD FOLDER TO BROWSE DOCS
+            {supportsWebkitDirectoryInput() && !supportsFileSystemDirectoryPicker() ? (
+              <span className="mt-2 block text-[#666]">
+                On phone: tap ADD FOLDER, then choose a folder in Files. In-place save needs the desktop app.
+              </span>
+            ) : null}
           </div>
         ) : (
           roots.map((root) => {
