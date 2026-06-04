@@ -1078,6 +1078,35 @@ export default function CyberdeckApp() {
   const startupRailResolvedRef = useRef(false);
   const prevConnectionStateRef = useRef<"offline" | "connecting" | "connected">("offline");
   const serverRef = useRef<CyberdeckServerId>("m");
+
+  const focusGatewayConnectionPanel = useCallback(() => {
+    const scrollToPanel = (panel: HTMLElement) => {
+      const scrollParent = panel.closest(".overflow-y-auto");
+      if (scrollParent && scrollParent instanceof HTMLElement) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        const panelRect = panel.getBoundingClientRect();
+        const offset = panelRect.top - parentRect.top + scrollParent.scrollTop - 12;
+        scrollParent.scrollTo({ top: Math.max(0, offset), behavior: "smooth" });
+        return;
+      }
+      panel.scrollIntoView({
+        block: isMobileLayout ? "center" : "nearest",
+        behavior: "smooth",
+      });
+    };
+
+    const attempt = (triesLeft: number) => {
+      const panel = gatewayConnectionPanelRef.current;
+      if (!panel) {
+        if (triesLeft > 0) window.requestAnimationFrame(() => attempt(triesLeft - 1));
+        return;
+      }
+      window.requestAnimationFrame(() => scrollToPanel(panel));
+    };
+
+    attempt(4);
+  }, [isMobileLayout]);
+
   useEffect(() => {
     const unsub = useCyberdeckTabStore.subscribe((state) => {
       serverRef.current = state.server;
@@ -2985,9 +3014,17 @@ export default function CyberdeckApp() {
         closeGatewayPaneContextMenu();
         setNavRailContext("gateway");
         setServerKeyboardHighlightId(null);
+        if (!isCustomTab && id === "s") {
+          focusGatewayConnectionPanel();
+        }
       });
     },
-    [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu],
+    [
+      closeGatewayPaneContextMenu,
+      closeMirageContextMenu,
+      closeRailTabContextMenu,
+      focusGatewayConnectionPanel,
+    ],
   );
 
   const openRealmorphismKitTab = useCallback(
@@ -5521,11 +5558,11 @@ const resolved = resolveUiTarget(userMessage);
     setModelKeyboardHighlightId(modelID || null);
     gatewayColumnRef.current?.focus({ preventScroll: true });
     if (safe === "s") {
-      gatewayConnectionPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      focusGatewayConnectionPanel();
     } else {
       gatewayBlankSettingsRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
     }
-  }, [activeProvider, modelID]);
+  }, [activeProvider, focusGatewayConnectionPanel, modelID]);
 
   const focusFixedServerPanel = useCallback(
     (serverId: (typeof SERVER_IDS)[number]) => {
@@ -7154,7 +7191,7 @@ const resolved = resolveUiTarget(userMessage);
               </CyberdeckFixedServerPane>
             ) : null}
             <CyberdeckCustomTabPanes renderTab={(tab) => renderCustomTabSurface(tab as CustomTab)} />
-            <CyberdeckGatewaySettingsPane className="custom-scrollbar flex-1 overflow-y-auto bg-black p-4">
+            <CyberdeckGatewaySettingsPane className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))]">
                   {droppedMarkdown ? (
                     <div className="mb-4 rounded-sm border border-amber-700/70 bg-black p-3">
                       <div className="mb-2 flex items-center justify-between">
@@ -7236,7 +7273,11 @@ const resolved = resolveUiTarget(userMessage);
 
                   <div
                     ref={gatewayConnectionPanelRef}
-                    className="mt-5 border-t border-[#111] pt-2"
+                    className={`mt-5 border-t border-[#111] pt-2 max-md:order-first max-md:mt-0 max-md:border-t-0 max-md:pt-0${
+                      !hasProviderAuth || credentialReplaceProvider === activeProvider
+                        ? " max-md:sticky max-md:top-0 max-md:z-10 max-md:border-b max-md:border-[#111] max-md:bg-black max-md:pb-3"
+                        : ""
+                    }`}
                     style={{
                       pointerEvents: probeInFlightByProvider[activeProvider] ? "none" : "auto",
                       opacity: probeInFlightByProvider[activeProvider] ? 0.7 : 1,
@@ -7247,28 +7288,53 @@ const resolved = resolveUiTarget(userMessage);
                       <div className="mb-3">
                         <label
                           htmlFor="gateway-provider-key"
-                          className="mb-1 block font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]"
+                          className="mb-1 block font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] max-md:text-[10px]"
                         >
                           {credentialReplaceProvider === activeProvider
                             ? "ENTER NEW KEY"
                             : "ENTER GATEWAY KEY"}
                         </label>
-                        <input
-                          id="gateway-provider-key"
-                          type="password"
-                          value={gatewayKeyDraft}
-                          onChange={(e) => setGatewayKeyDraft(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              void submitGatewayKey();
+                        {isMobileLayout ? (
+                          <p className="mb-2 font-mono text-[9px] leading-snug text-[#666]">
+                            Tap μ (MAINNET-UPLINK) if this panel is hidden. Paste your key, then Connect — or
+                            paste the key in chat.
+                          </p>
+                        ) : null}
+                        <div className="flex flex-col gap-2 max-md:flex-row max-md:items-stretch">
+                          <input
+                            id="gateway-provider-key"
+                            type="password"
+                            enterKeyHint="done"
+                            value={gatewayKeyDraft}
+                            onChange={(e) => setGatewayKeyDraft(e.target.value)}
+                            onFocus={focusGatewayConnectionPanel}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void submitGatewayKey();
+                              }
+                            }}
+                            autoComplete="off"
+                            spellCheck={false}
+                            className="min-h-[44px] w-full flex-1 rounded border border-[#2d2d2d] bg-black px-3 py-2 font-mono text-base text-green-300 outline-none focus:border-green-700 max-md:text-[16px] md:min-h-0 md:px-2 md:py-1 md:text-[10px]"
+                            placeholder={`${activeProvider.toUpperCase()} API KEY`}
+                          />
+                          <button
+                            type="button"
+                            disabled={
+                              !gatewayKeyDraft.trim() ||
+                              providerModelFetchStatus === "retrieving"
                             }
-                          }}
-                          autoComplete="off"
-                          spellCheck={false}
-                          className="w-full rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[10px] text-green-300 outline-none focus:border-green-700"
-                          placeholder={`${activeProvider.toUpperCase()} API KEY`}
-                        />
+                            onClick={() => void submitGatewayKey()}
+                            className={realmorphismControlClass(deckMode, {
+                              size: "action",
+                              legacyClassName:
+                                "min-h-[44px] shrink-0 rounded border border-green-800/80 px-4 font-mono text-[11px] tracking-[0.06em] text-green-300 hover:border-green-600 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:px-3 md:py-1 md:text-[10px]",
+                            })}
+                          >
+                            {providerModelFetchStatus === "retrieving" ? "LINKING…" : "CONNECT"}
+                          </button>
+                        </div>
                       </div>
                     ) : null}
                     <div
