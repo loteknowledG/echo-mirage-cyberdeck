@@ -10,7 +10,13 @@ export function GlyphCatalogPrefetch() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    void prefetchGlyphCatalogs(queryClient);
+    const run = () => void prefetchGlyphCatalogs(queryClient);
+    const idle = window.requestIdleCallback?.(run, { timeout: 4000 });
+    const fallback = window.setTimeout(run, 1500);
+    return () => {
+      if (idle != null) window.cancelIdleCallback(idle);
+      window.clearTimeout(fallback);
+    };
   }, [queryClient]);
 
   return null;
