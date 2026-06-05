@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld('echoMirageComputerUse', {
 
 contextBridge.exposeInMainWorld('echoMirageSave', {
   showDialog: (options) => ipcRenderer.invoke('echo-mirage-save:show-dialog', options),
+  showBinaryDialog: (options) =>
+    ipcRenderer.invoke('echo-mirage-save:show-binary-dialog', options),
 });
 
 contextBridge.exposeInMainWorld('echoMirageOpen', {
@@ -35,5 +37,7 @@ contextBridge.exposeInMainWorld('echoMirageOpen', {
     ipcRenderer.invoke('echo-mirage-open:read-operator-file', { rootPath, logicalPath }),
   writeOperatorFile: (rootPath, logicalPath, content) =>
     ipcRenderer.invoke('echo-mirage-open:write-operator-file', { rootPath, logicalPath, content }),
+  writeBinaryFile: (filePath, base64) =>
+    ipcRenderer.invoke('echo-mirage-open:write-binary-file', { filePath, base64 }),
   openPath: (filePath) => ipcRenderer.invoke('echo-mirage-open:open-path', { filePath }),
 });

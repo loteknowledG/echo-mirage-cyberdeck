@@ -2,11 +2,16 @@ import {
   docxFilenameFromMarkdownName,
   pdfFilenameFromMarkdownName,
 } from "@/lib/markdown-to-docx-intent";
+import {
+  persistExportBlob,
+  resolveExportDefaultSavePath,
+} from "@/lib/markdown-export-save";
 
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PDF_MIME = "application/pdf";
 
+/** @deprecated Use persistExportBlob */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -25,18 +30,18 @@ export const downloadDocxBlob = downloadBlob;
 async function exportMarkdownToFormat(options: {
   markdown: string;
   suggestedFilename?: string;
-  outputPath?: string;
+  localFilePath?: string | null;
   apiPath: "/api/convert-markdown-to-docx" | "/api/convert-markdown-to-pdf";
   defaultFilename: string;
   formatLabel: string;
-}): Promise<{ filename: string; outputPath?: string }> {
+  format: "pdf" | "docx";
+}): Promise<{ filename: string; outputPath?: string; canceled?: boolean }> {
   const res = await fetch(options.apiPath, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       markdown: options.markdown,
       suggestedFilename: options.suggestedFilename,
-      outputPath: options.outputPath,
     }),
   });
 
@@ -66,33 +71,47 @@ async function exportMarkdownToFormat(options: {
   const match = /filename="([^"]+)"/i.exec(disposition);
   const filename = match?.[1] || options.defaultFilename;
   const blob = await res.blob();
-  downloadBlob(blob, filename);
-  return { filename };
+  const saveTargets = resolveExportDefaultSavePath({
+    suggestedFilename: options.suggestedFilename || options.defaultFilename,
+    localFilePath: options.localFilePath,
+    format: options.format,
+  });
+
+  return persistExportBlob({
+    blob,
+    filename,
+    defaultPath: saveTargets.defaultPath,
+    defaultRelativePath: saveTargets.defaultRelativePath,
+  });
 }
 
 export async function exportMarkdownToDocx(options: {
   markdown: string;
   suggestedFilename?: string;
+  localFilePath?: string | null;
   outputPath?: string;
-}): Promise<{ filename: string; outputPath?: string }> {
+}): Promise<{ filename: string; outputPath?: string; canceled?: boolean }> {
   return exportMarkdownToFormat({
     ...options,
     apiPath: "/api/convert-markdown-to-docx",
     defaultFilename: docxFilenameFromMarkdownName(options.suggestedFilename || "document.md"),
     formatLabel: "DOCX",
+    format: "docx",
   });
 }
 
 export async function exportMarkdownToPdf(options: {
   markdown: string;
   suggestedFilename?: string;
+  localFilePath?: string | null;
   outputPath?: string;
-}): Promise<{ filename: string; outputPath?: string }> {
+}): Promise<{ filename: string; outputPath?: string; canceled?: boolean }> {
   return exportMarkdownToFormat({
     ...options,
     apiPath: "/api/convert-markdown-to-pdf",
     defaultFilename: pdfFilenameFromMarkdownName(options.suggestedFilename || "document.md"),
     formatLabel: "PDF",
+    format: "pdf",
   });
 }
 

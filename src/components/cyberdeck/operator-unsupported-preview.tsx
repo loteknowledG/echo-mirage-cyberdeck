@@ -36,13 +36,8 @@ export function OperatorUnsupportedPreview({
           </button>
         ) : null}
         {onConvertToMarkdown ? (
-          <button
-            type="button"
-            disabled={converting}
-            onClick={onConvertToMarkdown}
-            className={realmorphismActionClass(deckMode, "accent")}
-          >
-            {converting ? "CONVERTING…" : "CONVERT TO MARKDOWN"}
+          <button type="button" disabled={converting} onClick={onConvertToMarkdown} className={realmorphismActionClass(deckMode, "accent")}>
+            {converting ? "CONVERTING..." : "CONVERT TO MARKDOWN"}
           </button>
         ) : null}
       </div>

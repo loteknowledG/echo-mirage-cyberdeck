@@ -257,6 +257,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
           if (fresh) {
             await loadAssetFromFile(fresh.file, {
               diskAbsolutePath: fresh.diskAbsolutePath,
+              fileSize: fresh.fileSize,
               pdfBase64: fresh.pdfBase64,
             });
           } else {
@@ -453,23 +454,30 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
         toast.error("Document has no text.");
         return;
       }
-      if (normalizeOperatorDocumentKind(asset?.kind) !== "markdown") {
-        toast.error(`Export ${format.toUpperCase()} requires markdown.`);
-        return;
-      }
       const baseName = nameDraft || asset?.name || "document.md";
+      const localFilePath = null;
       try {
         if (format === "docx") {
           const result = await exportMarkdownToDocx({
             markdown: text,
             suggestedFilename: docxFilenameFromMarkdownName(baseName),
+            localFilePath,
           });
+          if (result.canceled) {
+            toast.info("DOCX export canceled.");
+            return;
+          }
           toast.success(result.outputPath ? `Exported DOCX to ${result.outputPath}` : "Exported DOCX.");
         } else {
           const result = await exportMarkdownToPdf({
             markdown: text,
             suggestedFilename: pdfFilenameFromMarkdownName(baseName),
+            localFilePath,
           });
+          if (result.canceled) {
+            toast.info("PDF export canceled.");
+            return;
+          }
           toast.success(result.outputPath ? `Exported PDF to ${result.outputPath}` : "Exported PDF.");
         }
       } catch (err) {

@@ -279,7 +279,7 @@ export async function buildOperatorIngestFromFile(
   const base = {
     name: file.name,
     mimeType: file.type || "application/octet-stream",
-    size: file.size,
+    size: hints?.fileSize ?? file.size,
   };
 
   if (surface === "image") {
@@ -293,9 +293,11 @@ export async function buildOperatorIngestFromFile(
 
   if (surface === "pdf") {
     try {
-      const header = new Uint8Array(await file.slice(0, 4).arrayBuffer());
-      if (!hasPdfSignature(header) && !hints?.diskAbsolutePath) {
-        return { surface: "binary-unsafe", kind: "file", ...base };
+      if (file.size > 0) {
+        const header = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+        if (!hasPdfSignature(header) && !hints?.diskAbsolutePath) {
+          return { surface: "binary-unsafe", kind: "file", ...base };
+        }
       }
       const pdfSrc = resolveOperatorPdfPreviewUrl(file, hints);
       return { surface, kind: "pdf", ...base, pdfSrc };

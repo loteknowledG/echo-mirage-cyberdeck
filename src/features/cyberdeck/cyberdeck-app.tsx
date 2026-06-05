@@ -2735,19 +2735,23 @@ export default function CyberdeckApp() {
       toast.error("Operator document has no text.");
       return;
     }
-    if (normalizeOperatorDocumentKind(operatorDroppedAsset?.kind) !== "markdown") {
-      toast.error(`Export ${format.toUpperCase()} requires a markdown document.`);
-      return;
-    }
-
     const baseName = operatorDocNameDraft || operatorDroppedAsset?.name || "document.md";
+    const localFilePath = operatorDroppedAsset?.localFilePath ?? null;
     try {
       const { exportMarkdownToDocx, exportMarkdownToPdf } = await import(
         "@/lib/markdown-to-docx-export"
       );
       if (format === "docx") {
         const suggestedFilename = docxFilenameFromMarkdownName(baseName);
-        const result = await exportMarkdownToDocx({ markdown: text, suggestedFilename });
+        const result = await exportMarkdownToDocx({
+          markdown: text,
+          suggestedFilename,
+          localFilePath,
+        });
+        if (result.canceled) {
+          toast.info("DOCX export canceled.");
+          return;
+        }
         toast.success(
           result.outputPath
             ? `Exported as DOCX → ${result.outputPath}`
@@ -2755,19 +2759,30 @@ export default function CyberdeckApp() {
         );
       } else {
         const suggestedFilename = pdfFilenameFromMarkdownName(baseName);
-        const result = await exportMarkdownToPdf({ markdown: text, suggestedFilename });
+        const result = await exportMarkdownToPdf({
+          markdown: text,
+          suggestedFilename,
+          localFilePath,
+        });
+        if (result.canceled) {
+          toast.info("PDF export canceled.");
+          return;
+        }
         toast.success(
           result.outputPath
             ? `Exported as PDF → ${result.outputPath}`
             : `Exported as PDF: "${result.filename}".`,
         );
+        if (result.outputPath && window.echoMirageOpen?.openPath) {
+          void window.echoMirageOpen.openPath(result.outputPath);
+        }
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : `${format.toUpperCase()} export failed.`);
     }
   }, [
     operatorDocNameDraft,
-    operatorDroppedAsset?.kind,
+    operatorDroppedAsset?.localFilePath,
     operatorDroppedAsset?.name,
     operatorDroppedAsset?.text,
     operatorSurfaceIsDocument,
@@ -2917,6 +2932,7 @@ export default function CyberdeckApp() {
       if (!read) return;
       await loadOperatorAssetFromFile(read.file, {
         diskAbsolutePath: read.diskAbsolutePath,
+        fileSize: read.fileSize,
         pdfBase64: read.pdfBase64,
       });
     },
@@ -2933,6 +2949,7 @@ export default function CyberdeckApp() {
           if (fresh) {
             await loadOperatorAssetFromFile(fresh.file, {
               diskAbsolutePath: fresh.diskAbsolutePath,
+              fileSize: fresh.fileSize,
               pdfBase64: fresh.pdfBase64,
             });
           } else {

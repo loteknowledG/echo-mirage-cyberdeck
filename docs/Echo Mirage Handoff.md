@@ -26,6 +26,8 @@ Echo Mirage should act as the continuity vessel.
 
 Clean Architecture
 
+nice thats what up
+
 Echo Mirage Client
 
 ├─ Local Identity Kernel

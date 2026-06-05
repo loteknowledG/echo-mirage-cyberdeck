@@ -92,6 +92,9 @@ const OPERATOR_FOLDER_IGNORED_NAMES = new Set([
 
 const OPERATOR_FOLDER_LIST_MAX_ENTRIES = 400;
 
+/** Above this size, pass filePath only — do not base64 into the renderer (OOM). */
+const OPERATOR_MAX_INLINE_BINARY_BYTES = 8 * 1024 * 1024;
+
 /** Extensions that must never be read as UTF-8 text (L-13). */
 const OPERATOR_BINARY_PREVIEW_EXTENSIONS = new Set([
   '.pdf',
@@ -462,7 +465,7 @@ async function createWindow() {
   const origin = await getDevOrigin();
   win.loadURL(`${origin}/cyberdeck`);
 
-  if (!app.isPackaged) {
+  if (!app.isPackaged && process.env.CYBERDECK_ELECTRON_FORCE_RELOAD === '1') {
     setupDevRendererReload(win);
   }
 }
@@ -688,6 +691,16 @@ ipcMain.handle('echo-mirage-open:read-operator-file', async (_event, payload) =>
     const mimeType = operatorMimeTypeForFileName(name);
 
     if (OPERATOR_BINARY_PREVIEW_EXTENSIONS.has(ext)) {
+      if (stat.size > OPERATOR_MAX_INLINE_BINARY_BYTES) {
+        return {
+          ok: true,
+          name,
+          mimeType,
+          filePath,
+          size: stat.size,
+          largeBinary: true,
+        };
+      }
       const buffer = await fs.readFile(filePath);
       return {
         ok: true,
@@ -769,6 +782,62 @@ ipcMain.handle('echo-mirage-open:write-operator-file', async (_event, payload) =
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Could not save file.',
+    };
+  }
+});
+
+ipcMain.handle('echo-mirage-open:write-binary-file', async (_event, payload) => {
+  try {
+    const requestedPath = String(payload?.filePath || '');
+    const filePath = requestedPath ? path.resolve(requestedPath) : '';
+    const base64 = String(payload?.base64 || '');
+    if (!filePath || !base64) {
+      return { ok: false, error: 'Missing file path or content.' };
+    }
+    if (path.extname(filePath).toLowerCase() !== '.pdf') {
+      return { ok: false, error: 'Binary operator save currently supports PDF files only.' };
+    }
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, Buffer.from(base64, 'base64'));
+    return { ok: true, filePath };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not save binary file.',
+    };
+  }
+});
+
+ipcMain.handle('echo-mirage-save:show-binary-dialog', async (_event, options) => {
+  try {
+    const base64 = String(options?.base64 || '');
+    if (!base64) {
+      return { canceled: true, error: 'No file content to save.' };
+    }
+    const projectRoot = getEchoMirageProjectRoot();
+    const relative = String(options?.defaultRelativePath || 'docs/cadre/export.bin').replace(/\\/g, '/');
+    const defaultPath = options?.defaultPath
+      ? path.resolve(String(options.defaultPath))
+      : path.join(projectRoot, ...relative.split('/').filter(Boolean));
+    const ext = path.extname(defaultPath).replace(/^\./, '') || 'pdf';
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+    const result = await dialog.showSaveDialog(win, {
+      defaultPath,
+      filters: [
+        { name: ext.toUpperCase(), extensions: [ext] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+    if (result.canceled || !result.filePath) {
+      return { canceled: true };
+    }
+    await fs.mkdir(path.dirname(result.filePath), { recursive: true });
+    await fs.writeFile(result.filePath, Buffer.from(base64, 'base64'));
+    return { canceled: false, filePath: result.filePath };
+  } catch (error) {
+    return {
+      canceled: true,
+      error: error instanceof Error ? error.message : 'Save dialog failed',
     };
   }
 });

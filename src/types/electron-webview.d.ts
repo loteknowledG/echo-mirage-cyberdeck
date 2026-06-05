@@ -48,6 +48,11 @@ declare global {
       defaultRelativePath: string;
       content: string;
     }): Promise<{ canceled: boolean; filePath?: string; error?: string }>;
+    showBinaryDialog?(options: {
+      base64: string;
+      defaultRelativePath?: string;
+      defaultPath?: string;
+    }): Promise<{ canceled: boolean; filePath?: string; error?: string }>;
   }
 
   interface EchoMirageClipboardBridge {
@@ -88,6 +93,7 @@ declare global {
       text?: string;
       base64?: string;
       binaryMetadata?: boolean;
+      largeBinary?: boolean;
       filePath?: string;
       size?: number;
       error?: string;
@@ -96,6 +102,14 @@ declare global {
       rootPath: string,
       logicalPath: string,
       content: string,
+    ): Promise<{
+      ok: boolean;
+      filePath?: string;
+      error?: string;
+    }>;
+    writeBinaryFile?(
+      filePath: string,
+      base64: string,
     ): Promise<{
       ok: boolean;
       filePath?: string;

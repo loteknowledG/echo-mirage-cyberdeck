@@ -1,5 +1,8 @@
 /** Blob / custom-protocol URLs for operator PDF and image previews (L-13). */
 
+/** Max bytes to load into renderer as base64/data URLs (avoids OOM on large PDFs). */
+export const OPERATOR_MAX_INLINE_BINARY_BYTES = 8 * 1024 * 1024;
+
 const BINARY_PREVIEW_EXTENSIONS = [
   ".pdf",
   ".png",
@@ -56,30 +59,53 @@ export function revokeOperatorBlobUrl(url: string | null | undefined) {
 
 export type OperatorIngestHints = {
   diskAbsolutePath?: string;
-  /** Raw base64 from Echo Mirage desktop read-operator-file (avoids broken custom-protocol embeds). */
+  /** Byte length when File is a placeholder (large on-disk binary). */
+  fileSize?: number;
+  /** Raw base64 from desktop read — only for files under OPERATOR_MAX_INLINE_BINARY_BYTES. */
   pdfBase64?: string;
 };
 
 export function resolveOperatorPdfPreviewUrl(file: File, hints?: OperatorIngestHints): string {
   const mime = file.type || "application/pdf";
-  if (hints?.pdfBase64) {
+  const byteSize = hints?.fileSize ?? file.size;
+
+  if (
+    hints?.pdfBase64 &&
+    byteSize > 0 &&
+    byteSize <= OPERATOR_MAX_INLINE_BINARY_BYTES
+  ) {
     return `data:${mime};base64,${hints.pdfBase64}`;
   }
-  if (file.size > 0) {
-    return createOperatorBlobUrl(file);
-  }
+
   if (hints?.diskAbsolutePath && isElectronOperatorBridge()) {
     return toEchoMirageFileUrl(hints.diskAbsolutePath);
   }
+
+  if (file.size > 0 && file.size <= OPERATOR_MAX_INLINE_BINARY_BYTES) {
+    return createOperatorBlobUrl(file);
+  }
+
+  if (hints?.diskAbsolutePath && isElectronOperatorBridge()) {
+    return toEchoMirageFileUrl(hints.diskAbsolutePath);
+  }
+
   return createOperatorBlobUrl(file);
 }
 
 export function resolveOperatorImagePreviewUrl(file: File, hints?: OperatorIngestHints): string {
-  if (file.size > 0) {
-    return createOperatorBlobUrl(file);
-  }
+  const byteSize = hints?.fileSize ?? file.size;
+
   if (hints?.diskAbsolutePath && isElectronOperatorBridge()) {
     return toEchoMirageFileUrl(hints.diskAbsolutePath);
   }
+
+  if (file.size > 0 && byteSize <= OPERATOR_MAX_INLINE_BINARY_BYTES) {
+    return createOperatorBlobUrl(file);
+  }
+
+  if (hints?.diskAbsolutePath && isElectronOperatorBridge()) {
+    return toEchoMirageFileUrl(hints.diskAbsolutePath);
+  }
+
   return createOperatorBlobUrl(file);
 }

@@ -13,7 +13,6 @@ import {
   cdxIconRedo,
   cdxIconTrash,
   cdxIconUndo,
-  cdxIconUpload,
 } from "@wikimedia/codex-icons";
 import { LuPanelRightClose, LuPanelRightOpen, LuSave } from "react-icons/lu";
 import { isConvertibleDocumentPath } from "@/lib/muthur-document-conversion-intent";
@@ -24,10 +23,12 @@ import type { OperatorDocFolderRoot } from "@/lib/operator-folder-nav";
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderTitle } from "@/components/cyberdeck/pane-header";
 import { Switch } from "@/components/ui/switch";
 import { OperatorDocTypeMenu } from "@/components/cyberdeck/operator-doc-type-menu";
+import type { OperatorExportFormat } from "@/components/cyberdeck/operator-export-picker";
 import {
-  OperatorExportPicker,
-  type OperatorExportFormat,
-} from "@/components/cyberdeck/operator-export-picker";
+  OperatorConvertPicker,
+  type OperatorConvertFormat,
+  type OperatorConvertOption,
+} from "@/components/cyberdeck/operator-convert-picker";
 import {
   CyberdeckControlTooltip,
   CyberdeckPaneTooltip,
@@ -59,6 +60,14 @@ import {
 } from "@/lib/operator-file-surface";
 import { OperatorPdfPreview } from "@/components/cyberdeck/operator-pdf-preview";
 import { OperatorUnsupportedPreview } from "@/components/cyberdeck/operator-unsupported-preview";
+import {
+  exportMarkdownToDocx,
+  exportMarkdownToPdf,
+} from "@/lib/markdown-to-docx-export";
+import {
+  docxFilenameFromMarkdownName,
+  pdfFilenameFromMarkdownName,
+} from "@/lib/markdown-to-docx-intent";
 
 type DroppedOperatorAsset = {
   kind: string;
@@ -393,7 +402,10 @@ function OperatorDocumentHeaderControls({
 function OperatorDocumentToolStrip({
   operatorDocumentKind,
   textEditingEnabled,
-  showConvertImport = false,
+  editToolsEnabled,
+  convertOptions,
+  converting = false,
+  onConvert,
   canUndo,
   canRedo,
   canClear,
@@ -406,14 +418,14 @@ function OperatorDocumentToolStrip({
   onSaveOperatorDocInPlace,
   onSaveOperatorDocAsFile,
   operatorCanSaveInPlace = false,
-  onConvertDocumentToMarkdown,
-  onExportOperatorMarkdown,
 }: {
   operatorDocumentKind: OperatorDocumentPickerKind;
   /** Markdown/text/code editor tools (undo, export, save, …). */
   textEditingEnabled: boolean;
-  /** Import / convert control for PDF and other non-text previews. */
-  showConvertImport?: boolean;
+  editToolsEnabled: boolean;
+  convertOptions: OperatorConvertOption[];
+  converting?: boolean;
+  onConvert: (format: OperatorConvertFormat) => void | Promise<void>;
   canUndo: boolean;
   canRedo: boolean;
   canClear: boolean;
@@ -426,84 +438,21 @@ function OperatorDocumentToolStrip({
   onSaveOperatorDocInPlace?: () => void | Promise<void>;
   onSaveOperatorDocAsFile: () => void | Promise<void>;
   operatorCanSaveInPlace?: boolean;
-  onConvertDocumentToMarkdown: (filePath: string) => void | Promise<void>;
-  onExportOperatorMarkdown: (format: OperatorExportFormat) => void | Promise<void>;
 }) {
-  const [converting, setConverting] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const convertInputRef = useRef<HTMLInputElement>(null);
-
-  const runConvert = useCallback(
-    async (filePath: string) => {
-      setConverting(true);
-      try {
-        await onConvertDocumentToMarkdown(filePath);
-      } finally {
-        setConverting(false);
-      }
-    },
-    [onConvertDocumentToMarkdown],
-  );
-
-  const handlePickConvertDocument = useCallback(async () => {
-    const openBridge = window.echoMirageOpen;
-    if (openBridge?.pickConvertDocument) {
-      const result = await openBridge.pickConvertDocument();
-      if (result.error) {
-        toast.error(result.error);
-        return;
-      }
-      if (!result.canceled && result.filePath) {
-        await runConvert(result.filePath);
-      }
-      return;
-    }
-    convertInputRef.current?.click();
-  }, [runConvert]);
-
-  const handleConvertFileInput = useCallback(
-    async (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      event.target.value = "";
-      if (!file) return;
-
-      const filePath = (file as File & { path?: string }).path;
-      if (!filePath) {
-        toast.error("Could not read a local file path. Use the Echo Mirage desktop app.");
-        return;
-      }
-      if (!isConvertibleDocumentPath(filePath)) {
-        toast.error("Only .pdf and .docx files can be converted.");
-        return;
-      }
-      await runConvert(filePath);
-    },
-    [runConvert],
-  );
-
   return (
     <div
       data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
       className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
     >
-      <input
-        ref={convertInputRef}
-        type="file"
-        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        className="sr-only"
-        aria-hidden
-        tabIndex={-1}
-        onChange={(event) => void handleConvertFileInput(event)}
-      />
       {textEditingEnabled ? (
         <>
-          <OperatorToolbarIconButton label="Undo" onClick={onUndo} disabled={!canUndo}>
+          <OperatorToolbarIconButton label="Undo" onClick={onUndo} disabled={!editToolsEnabled || !canUndo}>
             <CodexIcon icon={cdxIconUndo} className="h-3.5 w-3.5" />
           </OperatorToolbarIconButton>
-          <OperatorToolbarIconButton label="Redo" onClick={onRedo} disabled={!canRedo}>
+          <OperatorToolbarIconButton label="Redo" onClick={onRedo} disabled={!editToolsEnabled || !canRedo}>
             <CodexIcon icon={cdxIconRedo} className="h-3.5 w-3.5" />
           </OperatorToolbarIconButton>
-          <OperatorToolbarIconButton label="Clear document" onClick={onClear} disabled={!canClear}>
+          <OperatorToolbarIconButton label="Clear document" onClick={onClear} disabled={!editToolsEnabled || !canClear}>
             <CodexIcon icon={cdxIconTrash} className="h-3.5 w-3.5" />
           </OperatorToolbarIconButton>
           <span className="mx-0.5 h-4 w-px shrink-0 bg-[#2d2d2d]" aria-hidden />
@@ -516,28 +465,13 @@ function OperatorDocumentToolStrip({
           onChange={onOperatorDocumentKindChange}
         />
       ) : null}
-      {showConvertImport ? (
-        <OperatorToolbarIconButton
-          label="Import MD"
-          onClick={() => void handlePickConvertDocument()}
-          disabled={converting}
-        >
-          <CodexIcon icon={cdxIconUpload} className="h-3.5 w-3.5" />
-        </OperatorToolbarIconButton>
-      ) : null}
+      <OperatorConvertPicker
+        disabled={converting || convertOptions.length === 0}
+        options={convertOptions}
+        onConvert={onConvert}
+      />
       {textEditingEnabled ? (
         <>
-          <OperatorExportPicker
-            disabled={exporting || normalizeOperatorDocumentKind(operatorDocumentKind) !== "markdown"}
-            onExport={async (format) => {
-              setExporting(true);
-              try {
-                await onExportOperatorMarkdown(format);
-              } finally {
-                setExporting(false);
-              }
-            }}
-          />
           <OperatorToolbarIconButton
             label="Copy"
             onClick={() => void onCopyOperatorDocToClipboard()}
@@ -547,19 +481,21 @@ function OperatorDocumentToolStrip({
           <OperatorToolbarIconButton
             label="Paste"
             onClick={() => void onPasteClipboardToOperator()}
+            disabled={!editToolsEnabled}
           >
             <CodexIcon icon={cdxIconPaste} className="h-3.5 w-3.5" />
           </OperatorToolbarIconButton>
           <OperatorToolbarIconButton
             label="Save"
             onClick={() => void (onSaveOperatorDocInPlace ?? onSaveOperatorDocAsFile)()}
-            disabled={!operatorCanSaveInPlace}
+            disabled={!editToolsEnabled || !operatorCanSaveInPlace}
           >
             <LuSave className="h-3.5 w-3.5" />
           </OperatorToolbarIconButton>
           <OperatorToolbarIconButton
             label="Save as"
             onClick={() => void onSaveOperatorDocAsFile()}
+            disabled={!editToolsEnabled}
           >
             <CodexIcon icon={cdxIconDownload} className="h-3.5 w-3.5" />
           </OperatorToolbarIconButton>
@@ -654,10 +590,33 @@ export function CyberdeckOperatorPaneBody({
       : false;
   const operatorShowsMarkdown =
     operatorTextDocument && normalizeOperatorDocumentKind(operatorDocumentKind) === "markdown";
-  const operatorShowsConvertImport =
-    operatorRenderSurface === "pdf" ||
-    operatorRenderSurface === "office-unsupported" ||
-    operatorRenderSurface === "binary-unsafe";
+  const operatorConvertOptions: OperatorConvertOption[] = (() => {
+    if (operatorShowsMarkdown) {
+      return [
+        { format: "markdown", disabled: true, disabledReason: "Already Markdown" },
+        { format: "docx" },
+        { format: "pdf" },
+      ];
+    }
+    if (operatorRenderSurface === "pdf") {
+      return [
+        { format: "pdf", disabled: true, disabledReason: "Already PDF" },
+        { format: "markdown" },
+        { format: "docx" },
+      ];
+    }
+    if (operatorRenderSurface === "office-unsupported") {
+      return [
+        { format: "docx", disabled: true, disabledReason: "Already DOCX" },
+        { format: "markdown" },
+        { format: "pdf" },
+      ];
+    }
+    if (operatorRenderSurface === "binary-unsafe") {
+      return [{ format: "markdown" }];
+    }
+    return [];
+  })();
   const [convertPickBusy, setConvertPickBusy] = useState(false);
   const convertInputRef = useRef<HTMLInputElement>(null);
 
@@ -672,6 +631,30 @@ export function CyberdeckOperatorPaneBody({
     },
     [onConvertDocumentToMarkdown],
   );
+
+  const convertDocumentPathToMarkdown = useCallback(async (filePath: string) => {
+    const res = await fetch("/api/convert-document-to-markdown", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath }),
+    });
+    const payload = (await res.json()) as {
+      ok?: boolean;
+      markdown?: string;
+      outputPath?: string;
+      error?: string;
+    };
+    if (!res.ok || !payload.ok || !payload.markdown) {
+      throw new Error(payload.error || "Conversion failed");
+    }
+    return {
+      markdown: payload.markdown,
+      outputName:
+        payload.outputPath?.split(/[/\\]/).pop() ||
+        filePath.replace(/\.(pdf|docx)$/i, ".md").split(/[/\\]/).pop() ||
+        "converted.md",
+    };
+  }, []);
 
   const handlePickConvertDocument = useCallback(async () => {
     const openBridge = window.echoMirageOpen;
@@ -697,6 +680,74 @@ export function CyberdeckOperatorPaneBody({
     }
     await handlePickConvertDocument();
   }, [handlePickConvertDocument, operatorActiveFilePath, runConvertFromPath]);
+
+  const handleConvertActiveDocumentFormat = useCallback(
+    async (format: OperatorConvertFormat) => {
+      if (format === "markdown") {
+        await handleConvertActiveDocument();
+        return;
+      }
+
+      const path = operatorDroppedAsset?.localFilePath?.trim() || operatorActiveFilePath?.trim();
+      if (!path || !isConvertibleDocumentPath(path)) {
+        toast.error("Open a local PDF or DOCX file first.");
+        return;
+      }
+
+      setConvertPickBusy(true);
+      try {
+        const converted = await convertDocumentPathToMarkdown(path);
+        const sourceName = operatorDroppedAsset?.name || converted.outputName;
+        if (format === "docx") {
+          const result = await exportMarkdownToDocx({
+            markdown: converted.markdown,
+            suggestedFilename: docxFilenameFromMarkdownName(sourceName),
+            localFilePath: path,
+          });
+          if (result.canceled) {
+            toast.info("DOCX conversion canceled.");
+            return;
+          }
+          toast.success(result.outputPath ? `Converted DOCX to ${result.outputPath}` : "Converted DOCX.");
+          return;
+        }
+
+        const result = await exportMarkdownToPdf({
+          markdown: converted.markdown,
+          suggestedFilename: pdfFilenameFromMarkdownName(sourceName),
+          localFilePath: path,
+        });
+        if (result.canceled) {
+          toast.info("PDF conversion canceled.");
+          return;
+        }
+        toast.success(result.outputPath ? `Converted PDF to ${result.outputPath}` : "Converted PDF.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Conversion failed.");
+      } finally {
+        setConvertPickBusy(false);
+      }
+    },
+    [
+      convertDocumentPathToMarkdown,
+      handleConvertActiveDocument,
+      operatorActiveFilePath,
+      operatorDroppedAsset?.localFilePath,
+      operatorDroppedAsset?.name,
+    ],
+  );
+
+  const handleSharedConvert = useCallback(
+    async (format: OperatorConvertFormat) => {
+      if (operatorShowsMarkdown) {
+        if (format === "markdown") return;
+        await onExportOperatorMarkdown(format);
+        return;
+      }
+      await handleConvertActiveDocumentFormat(format);
+    },
+    [handleConvertActiveDocumentFormat, onExportOperatorMarkdown, operatorShowsMarkdown],
+  );
 
   const operatorFileSizeLabel = operatorDroppedAsset
     ? `// ${Math.max(1, Math.round(operatorDroppedAsset.size / 1024))} KB`
@@ -1044,7 +1095,10 @@ export function CyberdeckOperatorPaneBody({
           <OperatorDocumentToolStrip
             operatorDocumentKind={operatorDocumentKind}
             textEditingEnabled={operatorTextDocument}
-            showConvertImport={operatorShowsConvertImport}
+            editToolsEnabled={operatorTextDocument && operatorDocMode === "edit"}
+            convertOptions={operatorConvertOptions}
+            converting={convertPickBusy}
+            onConvert={handleSharedConvert}
             canUndo={operatorCanUndo}
             canRedo={operatorCanRedo}
             canClear={Boolean(
@@ -1061,8 +1115,6 @@ export function CyberdeckOperatorPaneBody({
             onSaveOperatorDocInPlace={saveOperatorDocInPlaceAndMark}
             onSaveOperatorDocAsFile={onSaveOperatorDocAsFile}
             operatorCanSaveInPlace={operatorCanSaveInPlace}
-            onConvertDocumentToMarkdown={onConvertDocumentToMarkdown}
-            onExportOperatorMarkdown={onExportOperatorMarkdown}
           />
         ) : null}
         <div className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -1268,24 +1320,19 @@ export function CyberdeckOperatorPaneBody({
                 fileName={operatorDroppedAsset.name}
                 pdfSrc={operatorDroppedAsset.pdfSrc}
                 localFilePath={operatorDroppedAsset.localFilePath}
-                converting={convertPickBusy}
-                onConvertToMarkdown={() => void handleConvertActiveDocument()}
+                mode={operatorDocMode}
               />
             ) : operatorRenderSurface === "office-unsupported" ? (
               <OperatorUnsupportedPreview
                 title="UNSUPPORTED PREVIEW"
                 message="Office documents cannot be shown as plain text. Convert to Markdown to edit in the operator pane."
                 fileName={operatorDroppedAsset.name}
-                converting={convertPickBusy}
-                onConvertToMarkdown={() => void handleConvertActiveDocument()}
               />
             ) : operatorRenderSurface === "binary-unsafe" ? (
               <OperatorUnsupportedPreview
                 title="BINARY FILE DETECTED"
                 message="This file cannot be displayed in the text viewer."
                 fileName={operatorDroppedAsset.name}
-                converting={convertPickBusy}
-                onConvertToMarkdown={() => void handleConvertActiveDocument()}
               />
             ) : operatorTextDocument ? (
               operatorDocMode === "edit" ? (

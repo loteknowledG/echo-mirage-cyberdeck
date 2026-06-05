@@ -218,6 +218,7 @@ export function isOperatorFolderPaneFilePath(filePath: string | null | undefined
 export type OperatorFolderFileRead = {
   file: File;
   diskAbsolutePath?: string;
+  fileSize?: number;
   pdfBase64?: string;
 };
 
@@ -271,6 +272,20 @@ export async function readFileFromFolderRoot(
 
     const absolutePath = result.filePath || diskAbsolutePath;
 
+    const reportedSize = result.size ?? 0;
+
+    if (result.largeBinary && absolutePath) {
+      const file = new File([], result.name, {
+        type: result.mimeType || "application/octet-stream",
+        lastModified: Date.now(),
+      });
+      return {
+        file,
+        diskAbsolutePath: absolutePath,
+        fileSize: reportedSize,
+      };
+    }
+
     if (result.base64) {
       const binary = atob(result.base64);
       const bytes = new Uint8Array(binary.length);
@@ -290,6 +305,7 @@ export async function readFileFromFolderRoot(
       return {
         file,
         diskAbsolutePath: absolutePath,
+        fileSize: reportedSize || file.size,
         ...(isPdf ? { pdfBase64: result.base64 } : {}),
       };
     }

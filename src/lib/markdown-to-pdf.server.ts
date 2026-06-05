@@ -2,7 +2,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { mdToPdf } from "md-to-pdf";
+import puppeteer from "puppeteer";
 import { pdfFilenameFromMarkdownName } from "@/lib/markdown-to-docx-intent";
+
+function puppeteerLaunchOptions(): { args: string[]; executablePath?: string } {
+  const args = ["--no-sandbox", "--disable-setuid-sandbox"];
+  try {
+    return { args, executablePath: puppeteer.executablePath() };
+  } catch {
+    return { args };
+  }
+}
 
 export type ConvertMarkdownToPdfResult = {
   buffer: Buffer;
@@ -17,24 +27,33 @@ export async function convertMarkdownTextToPdfBuffer(markdown: string): Promise<
     throw new Error("Markdown content is empty.");
   }
 
-  const result = await mdToPdf(
-    { content: trimmed },
-    {
-      pdf_options: {
-        format: "a4",
-        margin: {
-          top: "20mm",
-          bottom: "20mm",
-          left: "20mm",
-          right: "20mm",
+  let result;
+  try {
+    result = await mdToPdf(
+      { content: trimmed },
+      {
+        pdf_options: {
+          format: "a4",
+          margin: {
+            top: "20mm",
+            bottom: "20mm",
+            left: "20mm",
+            right: "20mm",
+          },
+          printBackground: true,
         },
-        printBackground: true,
+        launch_options: puppeteerLaunchOptions(),
       },
-      launch_options: {
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      },
-    },
-  );
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/could not find chrome/i.test(message)) {
+      throw new Error(
+        "PDF export needs Chromium for md-to-pdf. Run: pnpm puppeteer:install (then restart the dev server).",
+      );
+    }
+    throw error instanceof Error ? error : new Error(message);
+  }
 
   if (!result?.content) {
     throw new Error("Conversion produced an empty PDF.");

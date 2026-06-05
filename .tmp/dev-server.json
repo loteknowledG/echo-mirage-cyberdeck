@@ -3,7 +3,7 @@
   "readyPort": 3051,
   "origin": "http://127.0.0.1:3050",
   "route": "http://127.0.0.1:3050/cyberdeck",
-  "pid": 33584,
+  "pid": 11920,
   "mode": "auto",
-  "updatedAt": "2026-06-04T12:33:21.676Z"
+  "updatedAt": "2026-06-05T01:29:19.995Z"
 }
