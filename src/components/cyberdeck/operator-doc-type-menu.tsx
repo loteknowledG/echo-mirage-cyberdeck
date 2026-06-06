@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import { LuChevronDown } from "react-icons/lu";
+import { CyberdeckControl } from "@/components/cyberdeck/cyberdeck-control-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useDeckMode } from "@/lib/deck-mode";
-import { LEGACY_TOOLBAR_ICON, realmorphismControlClass } from "@/lib/cyberdeck/realmorphism-control";
 import {
   OPERATOR_DOC_TYPE_ENTRIES,
   normalizeOperatorDocumentKind,
@@ -41,7 +40,6 @@ export function OperatorDocTypeMenu({
   trigger = "status",
   disabled = false,
 }: OperatorDocTypeMenuProps) {
-  const deckMode = useDeckMode();
   const [open, setOpen] = useState(false);
   const normalized = normalizeOperatorDocumentKind(value);
   const activeEntry =
@@ -57,20 +55,13 @@ export function OperatorDocTypeMenu({
     >
       <DropdownMenuTrigger asChild disabled={disabled}>
         {trigger === "toolbar" ? (
-          <button
-            type="button"
+          <CyberdeckControl
+            control={{ size: "toolbar", signal: open && !disabled }}
             aria-label="Document type"
             aria-haspopup="menu"
             aria-expanded={open}
             disabled={disabled}
-            className={cn(
-              realmorphismControlClass(deckMode, {
-                size: "toolbar",
-                legacyClassName: LEGACY_TOOLBAR_ICON,
-              }),
-              "disabled:cursor-not-allowed disabled:opacity-30",
-              open && !disabled && "is-signal",
-            )}
+            className="disabled:cursor-not-allowed disabled:opacity-30"
           >
             <img
               src={operatorIconSrc(operatorDocumentKindIcon(normalized))}
@@ -79,7 +70,7 @@ export function OperatorDocTypeMenu({
               draggable={false}
               className="h-3.5 w-3.5 object-contain"
             />
-          </button>
+          </CyberdeckControl>
         ) : (
           <button
             type="button"

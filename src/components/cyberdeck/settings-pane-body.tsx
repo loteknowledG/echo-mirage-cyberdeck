@@ -137,7 +137,7 @@ export function CyberdeckSettingsPaneBody({
                   <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">CONTENT MODE</div>
                   <div className="mt-0.5 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
                     {deckMode === "ascii"
-                      ? "Wireframe override — strip glow and rounded chrome in panes"
+                      ? "Asciimorphism — square mechanical depth on content controls"
                       : "Realmorphism — 3D shadow controls in panes"}
                   </div>
                 </div>
@@ -159,15 +159,37 @@ export function CyberdeckSettingsPaneBody({
               </div>
             </div>
           </section>
-          {deckMode === "realmorphism" ? (
-            <section className="flex flex-col gap-2">
-              <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">DEPTH PANEL LAB</div>
+          <section className="flex flex-col gap-2">
+            <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">DEPTH PANEL LAB</div>
+            {deckMode === "ascii" ? (
+              <div data-deck-mode="ascii" className="max-w-md">
+                <div className="cyberdeck-message-box rounded-sm border border-[#1c1c1c] bg-black p-0">
+                  <DepthPanel variant="module" depth={8} className="w-full">
+                    <div className="space-y-3 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em]">
+                      <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">MECHANICAL DEPTH PRIMITIVE</div>
+                      <p className="text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
+                        Asciimorphism — square mechanical depth (same as MUTHUR composer). Front face +
+                        right/bottom walls; press to latch.
+                      </p>
+                      <div className="flex flex-wrap items-end gap-4 pt-1">
+                        <DepthButton posture="signal" depth={4} asciiOverlay>
+                          CONNECT
+                        </DepthButton>
+                        <DepthPanel variant="inset" depth={6} className="min-w-[7rem]">
+                          <div className="px-2 py-1.5 text-[9px] tracking-[0.06em] text-[#8a8a8a]">INSET</div>
+                        </DepthPanel>
+                      </div>
+                    </div>
+                  </DepthPanel>
+                </div>
+              </div>
+            ) : (
               <DepthPanel variant="module" depth={8} className="w-full max-w-md">
                 <div className="space-y-3 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em]">
                   <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">MECHANICAL DEPTH PRIMITIVE</div>
                   <p className="text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
-                    Front face + right/bottom walls — no box-shadow extrusion. Press the control; walls
-                    drop away as the face moves down.
+                    Realmorphism — front face + right/bottom walls. Press the control; walls drop away as
+                    the face moves down.
                   </p>
                   <div className="flex flex-wrap items-end gap-4 pt-1">
                     <DepthButton posture="signal">CONNECT</DepthButton>
@@ -177,8 +199,8 @@ export function CyberdeckSettingsPaneBody({
                   </div>
                 </div>
               </DepthPanel>
-            </section>
-          ) : null}
+            )}
+          </section>
           <section className="flex flex-col gap-2">
             <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">OPERATOR IDENTITY</div>
             <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">

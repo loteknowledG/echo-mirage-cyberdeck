@@ -4,6 +4,8 @@ import { Bash, OverlayFs } from "just-bash";
 import { convertDocumentToMarkdown } from "@/lib/muthur-document-conversion.server";
 import { convertMarkdownFileToDocx } from "@/lib/markdown-to-docx.server";
 import { convertMarkdownFileToPdf } from "@/lib/markdown-to-pdf.server";
+import { getLatestMuthurObservation } from "@/lib/muthur/observation/observation-store.server";
+import { parseSuggestOperatorEditArgs } from "@/lib/muthur-core/suggest-operator-edit";
 import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
@@ -36,6 +38,13 @@ async function runJustBash(call: ToolCall): Promise<ToolResult> {
   const command = toCommand(call);
   if (!command) {
     return { ok: false, error: "No bash command provided." };
+  }
+  if (/\bfind\s+\/(?:\s|$)/.test(command) || /\bfind\s+\/\S/.test(command)) {
+    return {
+      ok: false,
+      error:
+        "Blocked: searching / is not allowed. The user's file is already open in the operator pane — use observe_operator_pane or convert_document_to_markdown with that file path.",
+    };
   }
 
   try {
@@ -286,9 +295,56 @@ async function runClock(call: ToolCall): Promise<ToolResult> {
   };
 }
 
+async function runObserveOperatorPane(call: ToolCall): Promise<ToolResult> {
+  const surfaceRaw = getStringArg(call, "surface");
+  const requestedSurface =
+    surfaceRaw === "property-manager" || surfaceRaw === "cyberdeck" ? surfaceRaw : undefined;
+  const observation = getLatestMuthurObservation(requestedSurface);
+  return {
+    ok: true,
+    output: {
+      authority: "READ_ONLY_OBSERVATION",
+      read_only: true,
+      observation: observation ?? { status: "NO_VISIBLE_OBSERVATION" },
+    },
+  };
+}
+
+async function runSuggestOperatorEdit(call: ToolCall): Promise<ToolResult> {
+  const parsed = parseSuggestOperatorEditArgs(call.args);
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error };
+  }
+
+  const observation = getLatestMuthurObservation("cyberdeck");
+  const editor = observation?.editor;
+  if (!editor?.active) {
+    return {
+      ok: false,
+      error: "No active operator editor. Open a markdown or code file in the operator pane first.",
+    };
+  }
+
+  return {
+    ok: true,
+    output: {
+      queued: true,
+      edit: parsed.edit,
+      fileName: editor.fileName ?? null,
+      filePath: editor.filePath ?? null,
+    },
+  };
+}
+
 export function createMuthurToolRegistry(): ToolRegistry {
   return {
     tools: {
+      observe_operator_pane: {
+        name: "observe_operator_pane",
+        description:
+          "Read the latest visible operator surface state (open file, cursor, excerpt). Read-only — no edits or actions.",
+        run: runObserveOperatorPane,
+      },
       justbash: {
         name: "justbash",
         description:
@@ -305,6 +361,12 @@ export function createMuthurToolRegistry(): ToolRegistry {
         name: "clock",
         description: "Reports the current local date and/or time from the server machine.",
         run: runClock,
+      },
+      suggest_operator_edit: {
+        name: "suggest_operator_edit",
+        description:
+          "Apply a typed edit in the operator Monaco editor (markdown/code/text). Auto-applies in the operator pane; Ctrl+Z to undo.",
+        run: runSuggestOperatorEdit,
       },
       convert_document_to_markdown: {
         name: "convert_document_to_markdown",

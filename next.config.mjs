@@ -49,7 +49,7 @@ function normalizeWebpackWatchIgnored(ignored) {
 const nextConfig = {
 	devIndicators: false,
 	distDir: process.env.CYBERDECK_NEXT_DIST_DIR || ".next",
-	transpilePackages: ["realmorphism"],
+	transpilePackages: ["realmorphism", "@eigenpal/docx-editor-react"],
 	allowedDevOrigins: ["127.0.0.1", "localhost"],
 	turbopack: {
 		resolveAlias: {

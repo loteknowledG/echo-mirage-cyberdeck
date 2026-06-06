@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo } from 'react';
 import { CyberdeckRollingPicker } from '@/components/cyberdeck/cyberdeck-rolling-picker';
-import { FigletFontPreviewSlide } from '@/components/cyberdeck/figlet-font-preview-slide';
 import { cn } from '@/lib/utils';
 import {
   resolveFigletPickerValue,
@@ -46,19 +45,12 @@ export function FigletFontPicker({
         label: font,
         ...(isShowroom
           ? {
-              renderSlide: (active: boolean) => (
-                <FigletFontPreviewSlide
-                  font={font}
-                  active={active}
-                  size="wheel"
-                  loadPreview={active}
-                />
-              ),
+              slide: fontSlide(font),
               renderLabelSlide: (active: boolean) => (
                 <span
                   className={cn(
-                    'block max-w-full truncate px-1 font-mono text-[9px] leading-none tracking-[0.04em]',
-                    active ? 'text-emerald-200/90' : 'text-[#4a524e]',
+                    'block max-w-full truncate px-1 font-mono text-[10px] leading-none tracking-[0.04em]',
+                    active ? 'text-emerald-200' : 'text-[#8ca39a]',
                   )}
                 >
                   {font}
@@ -100,6 +92,7 @@ export function FigletFontPicker({
       wheelNeighborCount={3}
       slideHeightPx={isShowroom ? 44 : 28}
       wheelScrollStep={1}
+      alwaysShowLabel={isShowroom}
       showTextWhileScrolling={false}
       wheelSettledShowsSlide={false}
       loop

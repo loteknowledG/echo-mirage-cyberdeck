@@ -98,6 +98,7 @@ const OPERATOR_MAX_INLINE_BINARY_BYTES = 8 * 1024 * 1024;
 /** Extensions that must never be read as UTF-8 text (L-13). */
 const OPERATOR_BINARY_PREVIEW_EXTENSIONS = new Set([
   '.pdf',
+  '.docx',
   '.png',
   '.jpg',
   '.jpeg',
@@ -109,13 +110,15 @@ const OPERATOR_BINARY_PREVIEW_EXTENSIONS = new Set([
 ]);
 
 const OPERATOR_BINARY_METADATA_EXTENSIONS = new Set([
-  '.docx',
   '.doc',
   '.pptx',
   '.ppt',
   '.xlsx',
   '.xls',
 ]);
+
+/** In-place binary writes from the operator pane (editable previews). */
+const OPERATOR_BINARY_SAVE_EXTENSIONS = new Set(['.pdf', '.docx']);
 
 function operatorMimeTypeForFileName(name) {
   const ext = path.extname(name).toLowerCase();
@@ -794,8 +797,11 @@ ipcMain.handle('echo-mirage-open:write-binary-file', async (_event, payload) => 
     if (!filePath || !base64) {
       return { ok: false, error: 'Missing file path or content.' };
     }
-    if (path.extname(filePath).toLowerCase() !== '.pdf') {
-      return { ok: false, error: 'Binary operator save currently supports PDF files only.' };
+    if (!OPERATOR_BINARY_SAVE_EXTENSIONS.has(path.extname(filePath).toLowerCase())) {
+      return {
+        ok: false,
+        error: 'Binary operator save supports PDF and DOCX files only.',
+      };
     }
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, Buffer.from(base64, 'base64'));

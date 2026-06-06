@@ -35,6 +35,43 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   {
     type: "function",
     function: {
+      name: "suggest_operator_edit",
+        description:
+          "Propose a typed edit to the markdown/code/text file open in the operator Monaco editor. Applies immediately in the operator pane (Ctrl+Z to undo; save when ready). Call observe_operator_pane first. Not for DOCX/PDF/image previews. Prefer replace_line_range for surgical edits; replace_content only when rewriting the whole file.",
+      parameters: {
+        type: "object",
+        properties: {
+          kind: {
+            type: "string",
+            enum: [
+              "replace_content",
+              "replace_line_range",
+              "insert_at_cursor",
+              "append_section",
+              "replace_selection",
+            ],
+            description: "How to apply the edit in the active Monaco editor.",
+          },
+          text: {
+            type: "string",
+            description: "Replacement or inserted UTF-8 text.",
+          },
+          startLine: {
+            type: "integer",
+            description: "replace_line_range only: first line to replace (1-based, inclusive).",
+          },
+          endLine: {
+            type: "integer",
+            description: "replace_line_range only: last line to replace (1-based, inclusive).",
+          },
+        },
+        required: ["kind", "text"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "justbash",
       description:
         "Runs a shell command in a copy-on-write workspace mirror of the Echo Mirage project (reads real files; writes are ephemeral). Use for rg/git/ls/cat inside the repo, quick inspection.",

@@ -5,6 +5,7 @@
 import type { OperatorIngestFileKind } from "@/lib/operator-file-ingest";
 import {
   hasPdfFileSignature,
+  resolveOperatorDocxPreviewUrl,
   resolveOperatorImagePreviewUrl,
   resolveOperatorPdfPreviewUrl,
   type OperatorIngestHints,
@@ -19,11 +20,13 @@ export type OperatorAssetSurface =
   | "text"
   | "image"
   | "pdf"
+  | "docx"
   | "office-unsupported"
   | "video"
   | "binary-unsafe";
 
-const OFFICE_EXTENSIONS = [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls"] as const;
+const DOCX_EXTENSIONS = [".docx"] as const;
+const OFFICE_UNSUPPORTED_EXTENSIONS = [".doc", ".pptx", ".ppt", ".xlsx", ".xls"] as const;
 
 const TEXT_EDITABLE_EXTENSIONS = [
   ".txt",
@@ -78,6 +81,7 @@ export type OperatorIngestedAsset = {
   text?: string;
   imageSrc?: string;
   pdfSrc?: string;
+  docxSrc?: string;
 };
 
 function fileExtension(name: string): string {
@@ -96,9 +100,15 @@ function detectSurfaceFromNameAndMime(file: File): OperatorAssetSurface | null {
   const mime = (file.type || "").toLowerCase();
 
   if (lowerName.endsWith(".pdf") || mime === "application/pdf") return "pdf";
+  if (
+    matchesExtension(lowerName, DOCX_EXTENSIONS) ||
+    mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
+    return "docx";
+  }
   if (mime.startsWith("image/") || matchesExtension(lowerName, IMAGE_EXTENSIONS)) return "image";
   if (mime.startsWith("video/")) return "video";
-  if (matchesExtension(lowerName, OFFICE_EXTENSIONS)) return "office-unsupported";
+  if (matchesExtension(lowerName, OFFICE_UNSUPPORTED_EXTENSIONS)) return "office-unsupported";
   if (
     lowerName.endsWith(".md") ||
     lowerName.endsWith(".markdown") ||
@@ -217,6 +227,7 @@ export function resolveOperatorAssetSurface(asset: {
   kind?: string;
   name?: string;
   pdfSrc?: string;
+  docxSrc?: string;
   imageSrc?: string;
   text?: string;
 }): OperatorAssetSurface {
@@ -235,6 +246,13 @@ export function resolveOperatorAssetSurface(asset: {
     }
   }
   if (asset.pdfSrc || asset.kind === "pdf") return "pdf";
+  if (
+    asset.docxSrc ||
+    asset.kind === "docx" ||
+    asset.name?.toLowerCase().endsWith(".docx")
+  ) {
+    return "docx";
+  }
   if (asset.imageSrc || asset.kind === "image") return "image";
   if (asset.kind === "video") return "video";
   if (asset.kind === "file" && !asset.text) return "binary-unsafe";
@@ -266,6 +284,7 @@ export function pickerKindForSurface(surface: OperatorAssetSurface): OperatorDoc
   if (surface === "markdown") return "markdown";
   if (surface === "text") return "text";
   if (surface === "pdf") return "pdf";
+  if (surface === "docx") return "docx";
   return "text";
 }
 
@@ -316,6 +335,15 @@ export async function buildOperatorIngestFromFile(
 
   if (surface === "video") {
     return { surface, kind: "video", ...base };
+  }
+
+  if (surface === "docx") {
+    try {
+      const docxSrc = resolveOperatorDocxPreviewUrl(file, hints);
+      return { surface, kind: "docx", ...base, docxSrc };
+    } catch {
+      return { surface, kind: "docx", ...base };
+    }
   }
 
   if (surface === "office-unsupported") {

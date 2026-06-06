@@ -6,19 +6,13 @@ import {
   CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
+import { CyberdeckControl } from "@/components/cyberdeck/cyberdeck-control-button";
 import { ATLAS_ENTITIES } from "@/lib/mock/atlas";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
-import { useDeckMode } from "@/lib/deck-mode";
-import {
-  LEGACY_TILE_NEUTRAL,
-  LEGACY_TILE_SELECTED,
-  realmorphismControlClass,
-} from "@/lib/cyberdeck/realmorphism-control";
 
 let lastSelectedEntityId = ATLAS_ENTITIES[0]?.id ?? "";
 
 export function CyberdeckMemoryAtlasPaneBody() {
-  const deckMode = useDeckMode();
   const [selectedEntityId, setSelectedEntityId] = useState<string>(lastSelectedEntityId);
   const selectedEntity = useMemo(
     () => ATLAS_ENTITIES.find((entity) => entity.id === selectedEntityId) ?? ATLAS_ENTITIES[0],
@@ -46,9 +40,12 @@ export function CyberdeckMemoryAtlasPaneBody() {
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-[0.95fr_1.05fr]">
             <div className="custom-scrollbar min-h-0 overflow-y-auto rounded-sm border border-[#1c1c1c] bg-black/80 p-2">
               {ATLAS_ENTITIES.map((entity) => (
-                <button
+                <CyberdeckControl
                   key={entity.id}
-                  type="button"
+                  control={{
+                    size: "tile",
+                    signal: selectedEntity?.id === entity.id,
+                  }}
                   onClick={() => {
                     setSelectedEntityId(entity.id);
                     lastSelectedEntityId = entity.id;
@@ -60,16 +57,10 @@ export function CyberdeckMemoryAtlasPaneBody() {
                     });
                   }}
                   aria-pressed={selectedEntity?.id === entity.id}
-                  className={realmorphismControlClass(deckMode, {
-                    size: "tile",
-                    signal: selectedEntity?.id === entity.id,
-                    legacyClassName:
-                      selectedEntity?.id === entity.id ? LEGACY_TILE_SELECTED : LEGACY_TILE_NEUTRAL,
-                  })}
                 >
                   <div>{entity.label.toUpperCase()}</div>
                   <div className="mt-1 text-[8px] text-[#818181]">ID :: {entity.id}</div>
-                </button>
+                </CyberdeckControl>
               ))}
             </div>
             {selectedEntity ? (

@@ -57,6 +57,8 @@ type TabAsset = {
   text?: string;
   imageSrc?: string;
   pdfSrc?: string;
+  docxSrc?: string;
+  localFilePath?: string;
   surface?: OperatorAssetSurface;
 };
 
@@ -86,7 +88,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
   });
 
   const [isDragOver, setIsDragOver] = useState(false);
-  const [docMode, setDocMode] = useState<"view" | "edit">("view");
+  const [docMode, setDocMode] = useState<"view" | "edit">("edit");
   const [nameDraft, setNameDraft] = useState(() => asset?.name ?? createBlankOperatorDocument().name);
   const [fileHistory, setFileHistory] = useState<string[]>([]);
   const [fileHistoryIndex, setFileHistoryIndex] = useState(-1);
@@ -167,6 +169,8 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
         ...(ingested.text !== undefined ? { text: ingested.text } : {}),
         ...(ingested.imageSrc ? { imageSrc: ingested.imageSrc } : {}),
         ...(ingested.pdfSrc ? { pdfSrc: ingested.pdfSrc } : {}),
+        ...(ingested.docxSrc ? { docxSrc: ingested.docxSrc } : {}),
+        ...(hints?.diskAbsolutePath ? { localFilePath: hints.diskAbsolutePath } : {}),
       };
 
       if (ingested.surface === "markdown" || ingested.surface === "text") {
@@ -175,6 +179,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
         const { text: _text, ...withoutText } = next;
         next = withoutText;
         if (next.pdfSrc?.startsWith("blob:")) previewBlobUrlRef.current = next.pdfSrc;
+        if (next.docxSrc?.startsWith("blob:")) previewBlobUrlRef.current = next.docxSrc;
         if (next.imageSrc?.startsWith("blob:")) previewBlobUrlRef.current = next.imageSrc;
         updateTabAsset(() => next);
         setNameDraft(next.name);
@@ -259,6 +264,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
               diskAbsolutePath: fresh.diskAbsolutePath,
               fileSize: fresh.fileSize,
               pdfBase64: fresh.pdfBase64,
+              inlineBase64: fresh.inlineBase64,
             });
           } else {
             await loadAssetFromFile(file);
@@ -553,6 +559,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
       onSetOperatorDocMode={setDocMode}
       onOperatorBrowserNavigate={() => {}}
       onOperatorBrowserUrlChange={() => {}}
+      onSetOperatorSurfaceMode={() => {}}
       onPasteClipboardToOperator={pasteFromClipboard}
       onSaveOperatorDocInPlace={saveDocInPlace}
       onSaveOperatorDocAsFile={saveDocAs}

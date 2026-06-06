@@ -6,10 +6,9 @@ import {
   CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
+import { CyberdeckFilterButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { getFlightLogEntries, subscribeFlightLog, type FlightLogEntry } from "@/lib/flight-log";
 import { useSignalHistory, type DeckSignal } from "@/lib/cyberdeck/signal-router";
-import { useDeckMode } from "@/lib/deck-mode";
-import { realmorphismFilterClass } from "@/lib/cyberdeck/realmorphism-control";
 
 type FlightLogView = "log" | "signals";
 
@@ -51,7 +50,6 @@ function severityTone(severity: DeckSignal["severity"]): string {
 }
 
 export function CyberdeckFlightLogPaneBody() {
-  const deckMode = useDeckMode();
   const [entries, setEntries] = useState<FlightLogEntry[]>(() => getFlightLogEntries());
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
   const [view, setView] = useState<FlightLogView>("log");
@@ -84,22 +82,12 @@ export function CyberdeckFlightLogPaneBody() {
           }
           right={
             <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setView("log")}
-                className={realmorphismFilterClass(deckMode, view === "log", "signal")}
-                aria-pressed={view === "log"}
-              >
+              <CyberdeckFilterButton active={view === "log"} tone="signal" onClick={() => setView("log")}>
                 [ LOG ]
-              </button>
-              <button
-                type="button"
-                onClick={() => setView("signals")}
-                className={realmorphismFilterClass(deckMode, view === "signals", "amber")}
-                aria-pressed={view === "signals"}
-              >
+              </CyberdeckFilterButton>
+              <CyberdeckFilterButton active={view === "signals"} tone="amber" onClick={() => setView("signals")}>
                 [ SIGNALS ]
-              </button>
+              </CyberdeckFilterButton>
             </div>
           }
         />

@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import EmblaCarousel, { EmblaCarouselType } from "embla-carousel";
+import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { type ExecutionCard, EXECUTION_CARD_REGISTRY, EXECUTION_HANDS } from "@/lib/computer-use/execution-card-registry";
-import { useDeckMode } from "@/lib/deck-mode";
-import { realmorphismActionClass } from "@/lib/cyberdeck/realmorphism-control";
 
 type RollADeckProps = {
   onPlayCard?: (cardId: string, deckIndex: number) => void;
@@ -61,7 +60,6 @@ function CardSlide({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const deckMode = useDeckMode();
   const riskColor = RISK_COLORS[card.risk] ?? "#8a8a8a";
   const categoryColor = CATEGORY_COLORS[card.category] ?? "#8a8a8a";
 
@@ -111,16 +109,15 @@ function CardSlide({
             </span>
           )}
           {!card.requiresConfirmation && <div />}
-          <button
-            type="button"
-            className={realmorphismActionClass(deckMode, "accent")}
+          <CyberdeckActionButton
+            variant="accent"
             onClick={(e) => {
               e.stopPropagation();
               onClick();
             }}
           >
             PLAY
-          </button>
+          </CyberdeckActionButton>
         </div>
       </div>
     </div>

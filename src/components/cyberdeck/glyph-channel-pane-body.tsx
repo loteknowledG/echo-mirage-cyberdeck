@@ -18,10 +18,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useDeckMode } from "@/lib/deck-mode";
-import {
-  LEGACY_SEND_CONTROL,
-  realmorphismControlClass,
-} from "@/lib/cyberdeck/realmorphism-control";
+import { CyberdeckControl } from "@/components/cyberdeck/cyberdeck-control-button";
 import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
@@ -59,12 +56,6 @@ import { isFigletAllFonts } from "@/lib/figlet-fonts";
 import { resolveGlyphCommand } from "@/lib/muthur-glyph-intent";
 import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
 import { get } from "idb-keyval";
-
-const HEADER_ICON_BTN =
-  "inline-flex h-7 w-7 items-center justify-center rounded border border-[#2d2d2d] bg-black text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200";
-
-const STATUS_BTN =
-  "rounded border border-[#2d2d2d] bg-black px-1.5 py-0.5 font-mono text-[9px] tracking-[0.06em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200";
 
 type EchoMirageClipboardApi = { readText?: () => Promise<string> };
 
@@ -505,9 +496,6 @@ export function CyberdeckGlyphChannelPaneBody() {
     }
   }, [applyOutput, setPaneModeWithFocus]);
 
-  const toolbarIconBtn = (disabled?: boolean) =>
-    `${HEADER_ICON_BTN}${disabled ? " disabled:opacity-40 disabled:pointer-events-none" : ""}`;
-
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-black">
@@ -525,21 +513,14 @@ export function CyberdeckGlyphChannelPaneBody() {
         right={
           <div className="flex items-center gap-1">
             <CyberdeckControlTooltip label="View">
-              <button
-                type="button"
+              <CyberdeckControl
+                control={{ size: "toolbar", signal: paneMode === "view" }}
                 onClick={() => setPaneModeWithFocus("view")}
                 aria-label="View mode"
                 aria-pressed={paneMode === "view"}
-                className={realmorphismControlClass(deckMode, {
-                  size: "toolbar",
-                  signal: paneMode === "view",
-                  legacyClassName: `${HEADER_ICON_BTN} ${
-                    paneMode === "view" ? "border-emerald-500/60 text-emerald-200" : ""
-                  }`,
-                })}
               >
                 <CodexIcon icon={cdxIconEye} className="h-3.5 w-3.5" />
-              </button>
+              </CyberdeckControl>
             </CyberdeckControlTooltip>
             <Switch
               checked={paneMode === "edit"}
@@ -552,21 +533,14 @@ export function CyberdeckGlyphChannelPaneBody() {
               )}
             />
             <CyberdeckControlTooltip label="Edit">
-              <button
-                type="button"
+              <CyberdeckControl
+                control={{ size: "toolbar", signal: paneMode === "edit" }}
                 onClick={() => setPaneModeWithFocus("edit")}
                 aria-label="Edit mode"
                 aria-pressed={paneMode === "edit"}
-                className={realmorphismControlClass(deckMode, {
-                  size: "toolbar",
-                  signal: paneMode === "edit",
-                  legacyClassName: `${HEADER_ICON_BTN} ${
-                    paneMode === "edit" ? "border-emerald-500/60 text-emerald-200" : ""
-                  }`,
-                })}
               >
                 <CodexIcon icon={cdxIconEdit} className="h-3.5 w-3.5" />
-              </button>
+              </CyberdeckControl>
             </CyberdeckControlTooltip>
           </div>
         }
@@ -577,77 +551,52 @@ export function CyberdeckGlyphChannelPaneBody() {
         className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
       >
         <CyberdeckControlTooltip label="Undo">
-          <button
-            type="button"
+          <CyberdeckControl
+            control={{ size: "toolbar", signal: true }}
             onClick={handleUndo}
             disabled={!canUndo || rendering}
             aria-label="Undo"
-            className={realmorphismControlClass(deckMode, {
-              size: "toolbar",
-              signal: true,
-              legacyClassName: toolbarIconBtn(!canUndo || rendering),
-            })}
           >
             <CodexIcon icon={cdxIconUndo} className="h-3.5 w-3.5" />
-          </button>
+          </CyberdeckControl>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Redo">
-          <button
-            type="button"
+          <CyberdeckControl
+            control={{ size: "toolbar", signal: true }}
             onClick={handleRedo}
             disabled={!canRedo || rendering}
             aria-label="Redo"
-            className={realmorphismControlClass(deckMode, {
-              size: "toolbar",
-              signal: true,
-              legacyClassName: toolbarIconBtn(!canRedo || rendering),
-            })}
           >
             <CodexIcon icon={cdxIconRedo} className="h-3.5 w-3.5" />
-          </button>
+          </CyberdeckControl>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Copy ASCII">
-          <button
-            type="button"
+          <CyberdeckControl
+            control={{ size: "toolbar", signal: true }}
             onClick={() => void handleCopy()}
             aria-label="Copy ASCII"
-            className={realmorphismControlClass(deckMode, {
-              size: "toolbar",
-              signal: true,
-              legacyClassName: HEADER_ICON_BTN,
-            })}
           >
             <CodexIcon icon={cdxIconCopy} className="h-3.5 w-3.5" />
-          </button>
+          </CyberdeckControl>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Clear ASCII channel">
-          <button
-            type="button"
+          <CyberdeckControl
+            control={{ size: "toolbar", signal: true }}
             onClick={handleClear}
             disabled={!text.trim() || rendering}
             aria-label="Clear ASCII channel"
-            className={realmorphismControlClass(deckMode, {
-              size: "toolbar",
-              signal: true,
-              legacyClassName: toolbarIconBtn(!text.trim() || rendering),
-            })}
           >
             <CodexIcon icon={cdxIconTrash} className="h-3.5 w-3.5" />
-          </button>
+          </CyberdeckControl>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Paste into ASCII">
-          <button
-            type="button"
+          <CyberdeckControl
+            control={{ size: "toolbar", signal: true }}
             onClick={() => void handlePasteClipboard()}
             aria-label="Paste into ASCII"
-            className={realmorphismControlClass(deckMode, {
-              size: "toolbar",
-              signal: true,
-              legacyClassName: HEADER_ICON_BTN,
-            })}
           >
             <CodexIcon icon={cdxIconPaste} className="h-3.5 w-3.5" />
-          </button>
+          </CyberdeckControl>
         </CyberdeckControlTooltip>
       </div>
 
@@ -826,13 +775,8 @@ export function CyberdeckGlyphChannelPaneBody() {
 
                 <div className="ml-auto flex shrink-0 items-center gap-1.5">
                   <CyberdeckControlTooltip label="Decrease display zoom">
-                    <button
-                      type="button"
-                      className={realmorphismControlClass(deckMode, {
-                        size: "compact",
-                        signal: true,
-                        legacyClassName: STATUS_BTN,
-                      })}
+                    <CyberdeckControl
+                      control={{ size: "compact", signal: true }}
                       onClick={() =>
                         setSettings((prev) => ({
                           ...prev,
@@ -842,17 +786,12 @@ export function CyberdeckGlyphChannelPaneBody() {
                       aria-label="Decrease display zoom"
                     >
                       −
-                    </button>
+                    </CyberdeckControl>
                   </CyberdeckControlTooltip>
                   <span className="font-mono text-[9px] text-[#6a6a6a]">{settings.zoomPercent}%</span>
                   <CyberdeckControlTooltip label="Increase display zoom">
-                    <button
-                      type="button"
-                      className={realmorphismControlClass(deckMode, {
-                        size: "compact",
-                        signal: true,
-                        legacyClassName: STATUS_BTN,
-                      })}
+                    <CyberdeckControl
+                      control={{ size: "compact", signal: true }}
                       onClick={() =>
                         setSettings((prev) => ({
                           ...prev,
@@ -862,23 +801,18 @@ export function CyberdeckGlyphChannelPaneBody() {
                       aria-label="Increase display zoom"
                     >
                       +
-                    </button>
+                    </CyberdeckControl>
                   </CyberdeckControlTooltip>
 
                   <CyberdeckControlTooltip
                     label="Render"
                     disabled={!composer.trim() || rendering}
                   >
-                    <button
-                      type="button"
+                    <CyberdeckControl
+                      control={{ size: "send", signal: true }}
                       onClick={() => void handleComposerSubmit()}
                       disabled={!composer.trim() || rendering}
                       aria-label="Render"
-                      className={realmorphismControlClass(deckMode, {
-                        size: "send",
-                        signal: true,
-                        legacyClassName: LEGACY_SEND_CONTROL,
-                      })}
                     >
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
                         <path
@@ -889,7 +823,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                           strokeLinejoin="round"
                         />
                       </svg>
-                    </button>
+                    </CyberdeckControl>
                   </CyberdeckControlTooltip>
                 </div>
               </div>

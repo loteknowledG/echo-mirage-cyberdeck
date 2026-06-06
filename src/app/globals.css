@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&display=swap');
 @import url("https://cdn.jsdelivr.net/npm/hack-font@3/build/web/hack.css");
 @import "../styles/cyberdeck-realmorphism.css";
+@import "../styles/cyberdeck-asciimorphism-depth.css";
 /* Import Mrs Saint Delafield from Google Fonts */
 /* If Google Fonts import is blocked, you can self-host a WOFF2 at /public/fonts/MrsSaintDelafield.woff2 */
 html,
@@ -891,4 +892,28 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
     animation: operator-dot-pulse 1.5s ease-in-out infinite;
     box-shadow: 0 0 8px currentColor;
   }
+}
+
+/* DOCX preview — fit page to operator pane width (docx-preview defaults to ~816px letter width). */
+.operator-docx-preview-body .operator-docx-preview-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+  align-items: stretch !important;
+  width: 100%;
+  min-width: 0;
+}
+
+.operator-docx-preview-body .operator-docx-preview-wrapper > section.operator-docx-preview {
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0 0 1rem !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+.operator-docx-preview-body .operator-docx-preview-wrapper section.operator-docx-preview article,
+.operator-docx-preview-body .operator-docx-preview-wrapper section.operator-docx-preview p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }

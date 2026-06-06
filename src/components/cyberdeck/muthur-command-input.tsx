@@ -12,13 +12,15 @@ import { playDeckMemorizeKeySound } from "@/features/cyberdeck/runtime/defer-dec
 
 const INPUT_STORAGE_KEY = "echo-mirage-chat-input-v1";
 const INPUT_PERSIST_MS = 400;
+const TEXTAREA_MIN_HEIGHT_PX = 44;
+const TEXTAREA_MAX_HEIGHT_PX = 200;
 
 export type MuthurCommandInputHandle = {
   focus: (options?: FocusOptions) => void;
   getValue: () => string;
   setValue: (value: string) => void;
   clear: () => void;
-  element: HTMLInputElement | null;
+  element: HTMLTextAreaElement | null;
 };
 
 type MuthurCommandInputProps = {
@@ -32,6 +34,14 @@ type MuthurCommandInputProps = {
   onFocusExtra?: () => void;
   onPasteImage?: (dataUrl: string) => void;
 };
+
+function isCaretAtStart(el: HTMLTextAreaElement): boolean {
+  return el.selectionStart === 0 && el.selectionEnd === 0;
+}
+
+function isCaretAtEnd(el: HTMLTextAreaElement): boolean {
+  return el.selectionStart === el.value.length && el.selectionEnd === el.value.length;
+}
 
 export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCommandInputProps>(
   function MuthurCommandInput(
@@ -48,12 +58,19 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
     },
     ref,
   ) {
-    const inputRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
     const persistTimerRef = useRef<number | null>(null);
     const canSendRef = useRef(false);
     const [value, setValue] = useState("");
     const [inputHistoryIndex, setInputHistoryIndex] = useState<number | null>(null);
     const [inputHistoryDraft, setInputHistoryDraft] = useState("");
+
+    const adjustHeight = useCallback(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = `${Math.min(Math.max(el.scrollHeight, TEXTAREA_MIN_HEIGHT_PX), TEXTAREA_MAX_HEIGHT_PX)}px`;
+    }, []);
 
     useImperativeHandle(
       ref,
@@ -64,15 +81,19 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
           setValue(next);
           if (inputRef.current) inputRef.current.value = next;
           notifyCanSend(next);
+          adjustHeight();
         },
         clear: () => {
           setValue("");
-          if (inputRef.current) inputRef.current.value = "";
+          if (inputRef.current) {
+            inputRef.current.value = "";
+            inputRef.current.style.height = `${TEXTAREA_MIN_HEIGHT_PX}px`;
+          }
           notifyCanSend("");
         },
         element: inputRef.current,
       }),
-      [value],
+      [adjustHeight, value],
     );
 
     const notifyCanSend = useCallback(
@@ -97,6 +118,10 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
         /* ignore */
       }
     }, [chatHydrated, notifyCanSend]);
+
+    useEffect(() => {
+      adjustHeight();
+    }, [value, adjustHeight]);
 
     useEffect(() => {
       if (!chatHydrated) return;
@@ -138,18 +163,22 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
       return () => inputEl.removeEventListener("paste", onPaste);
     }, [onPasteImage]);
 
-    const moveCaretToEnd = useCallback((nextValue: string) => {
-      requestAnimationFrame(() => {
-        const el = inputRef.current;
-        if (!el) return;
-        const end = nextValue.length;
-        el.focus({ preventScroll: true });
-        el.setSelectionRange(end, end);
-      });
-    }, []);
+    const moveCaretToEnd = useCallback(
+      (nextValue: string) => {
+        requestAnimationFrame(() => {
+          const el = inputRef.current;
+          if (!el) return;
+          const end = nextValue.length;
+          el.focus({ preventScroll: true });
+          el.setSelectionRange(end, end);
+          adjustHeight();
+        });
+      },
+      [adjustHeight],
+    );
 
     const handleChange = useCallback(
-      (e: React.ChangeEvent<HTMLInputElement>) => {
+      (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const next = e.target.value;
         setValue(next);
         notifyCanSend(next);
@@ -161,12 +190,13 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
     );
 
     const handleKeyDown = useCallback(
-      (e: React.KeyboardEvent<HTMLInputElement>) => {
+      (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (!e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
           playDeckMemorizeKeySound(e.key);
         }
 
-        if (e.key === "Enter") {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
           const text = (inputRef.current?.value ?? value).trim();
           if (text) onSubmit(text);
           return;
@@ -176,7 +206,11 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
           if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
           if (inputHistory.length === 0) return;
 
+          const el = inputRef.current;
+          if (!el) return;
+
           if (e.key === "ArrowUp") {
+            if (!isCaretAtStart(el)) return;
             e.preventDefault();
             const nextIndex =
               inputHistoryIndex === null ? inputHistory.length - 1 : Math.max(0, inputHistoryIndex - 1);
@@ -191,7 +225,7 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
             return;
           }
 
-          if (inputHistoryIndex !== null) {
+          if (inputHistoryIndex !== null && isCaretAtEnd(el)) {
             e.preventDefault();
             const nextIndex = inputHistoryIndex + 1;
             if (nextIndex >= inputHistory.length) {
@@ -221,8 +255,9 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
     );
 
     return (
-      <input
+      <textarea
         ref={inputRef}
+        rows={1}
         data-pointer-target="command-input"
         data-muthur-memorize-input=""
         value={value}
@@ -234,10 +269,11 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
             ? "ENTER GATEWAY KEY..."
             : glyphModeActive
               ? "⟁ Glyph mode on — compose on ⟁ tab; $ here is MUTHUR chat"
-              : "Enter command or message..."
+              : "Enter command or message... (Shift+Enter for new line)"
         }
-        className="w-full rounded-none border-0 bg-black py-3 pl-9 pr-3 font-mono text-sm text-green-400 placeholder:text-green-800 transition-all focus:outline-none"
+        className="max-h-[200px] min-h-[44px] w-full resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-9 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-all focus:outline-none"
         disabled={false}
+        aria-label="MUTHUR command input"
       />
     );
   },

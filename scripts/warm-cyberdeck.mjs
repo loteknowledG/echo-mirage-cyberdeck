@@ -2,43 +2,24 @@
  * Pre-compiles /cyberdeck (HTML + linked client chunks) before Electron opens,
  * so the first load does not race the dev bundler and blow the Node stack.
  */
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { cyberdeckRouteUrl, resolveDevOrigin } from './resolve-dev-origin.mjs';
 
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const devStatePath = path.join(root, '.tmp', 'dev-server.json');
-const DEFAULT_ORIGIN = 'http://127.0.0.1:3050';
 const DEADLINE_MS = 300_000;
 const FETCH_MS = 120_000;
 const RETRY_MS = 2_000;
 /** Let webpack finish writing before Electron opens a second browser session. */
 const SETTLE_MS = 4_000;
 
-async function resolveOrigin() {
-  if (process.env.ECHO_MIRAGE_DEV_ORIGIN) {
-    return process.env.ECHO_MIRAGE_DEV_ORIGIN;
-  }
-
-  try {
-    const state = JSON.parse(await fs.readFile(devStatePath, 'utf8'));
-    if (state?.origin) return String(state.origin);
-    if (state?.appPort) return `http://127.0.0.1:${state.appPort}`;
-  } catch {
-    /* fixed-port dev may not have written state yet */
-  }
-
-  return DEFAULT_ORIGIN;
-}
-
-/** @param {string} url */
-async function fetchWithDeadline(url) {
+/** @param {string} url @param {RequestInit} [init] */
+async function fetchWithDeadline(url, init = {}) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), FETCH_MS);
   try {
     return await fetch(url, {
+      ...init,
       signal: ac.signal,
-      headers: { Accept: '*/*' },
+      redirect: 'follow',
+      headers: { Accept: 'text/html,application/xhtml+xml,*/*', ...(init.headers ?? {}) },
     });
   } finally {
     clearTimeout(timer);
@@ -54,16 +35,38 @@ function scriptSrcsFromHtml(html) {
   return [...srcs];
 }
 
+/** @param {string} origin */
+async function wakeRouteDiscovery(origin) {
+  try {
+    await fetchWithDeadline(`${origin}/`, { redirect: 'follow' });
+  } catch {
+    /* best-effort — root redirect triggers app-router compile */
+  }
+}
+
 async function warmCyberdeck() {
-  const origin = await resolveOrigin();
-  const route = `${origin}/cyberdeck`;
   const deadline = Date.now() + DEADLINE_MS;
   let attempt = 0;
 
   while (Date.now() < deadline) {
     attempt += 1;
+    const origin = await resolveDevOrigin();
+    const route = cyberdeckRouteUrl(origin);
+
     try {
       process.stdout.write(`[warm] compiling ${route} (attempt ${attempt})...\n`);
+
+      if (attempt === 5 || attempt === 20) {
+        process.stdout.write('[warm] nudging route discovery via GET /\n');
+        await wakeRouteDiscovery(origin);
+      }
+
+      if (attempt === 20) {
+        process.stderr.write(
+          '[warm] /cyberdeck still missing — stale dev cache? try: pnpm dev:reset, delete .next and .next-dev, restart electron:dev\n',
+        );
+      }
+
       const res = await fetchWithDeadline(route);
       if (!res.ok) {
         process.stdout.write(`[warm] /cyberdeck HTTP ${res.status} - retrying\n`);
@@ -83,17 +86,38 @@ async function warmCyberdeck() {
         await chunkRes.arrayBuffer();
       }
 
-      process.stdout.write('[warm] /cyberdeck ready - compiling chat API\n');
+      process.stdout.write('[warm] /cyberdeck ready - compiling chat + observation APIs\n');
 
       try {
-        const chatWarm = await fetchWithDeadline(`${origin}/api/cyberdeck-chat`);
+        const chatWarm = await fetchWithDeadline(`${origin}/api/cyberdeck-chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ warm: true }),
+        });
         if (chatWarm.ok) {
-          process.stdout.write('[warm] chat API ready - opening Electron\n');
+          process.stdout.write('[warm] chat API ready\n');
         } else {
           process.stdout.write(`[warm] chat API HTTP ${chatWarm.status} (continuing)\n`);
         }
       } catch {
         process.stdout.write('[warm] chat API warm skipped (continuing)\n');
+      }
+
+      try {
+        const obsWarm = await fetchWithDeadline(`${origin}/api/muthur/observation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            snapshot: { route: '/cyberdeck', surface: 'cyberdeck', observing: false },
+          }),
+        });
+        if (obsWarm.ok) {
+          process.stdout.write('[warm] observation API ready - opening Electron\n');
+        } else {
+          process.stdout.write(`[warm] observation API HTTP ${obsWarm.status} (continuing)\n`);
+        }
+      } catch {
+        process.stdout.write('[warm] observation API warm skipped (continuing)\n');
       }
 
       if (SETTLE_MS > 0) {
@@ -109,6 +133,9 @@ async function warmCyberdeck() {
   }
 
   process.stderr.write('[warm] timed out waiting for /cyberdeck compile\n');
+  process.stderr.write(
+    '[warm] fix: pnpm dev:reset && Remove-Item -Recurse -Force .next,.next-dev -ErrorAction SilentlyContinue && pnpm electron:dev\n',
+  );
   process.exit(1);
 }
 

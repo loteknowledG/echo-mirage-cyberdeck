@@ -9,8 +9,10 @@ import {
   cdxIconExpand,
   cdxIconReload,
 } from "@wikimedia/codex-icons";
-import { useDeckMode } from "@/lib/deck-mode";
-import { realmorphismActionClass, realmorphismMenuItemClass } from "@/lib/cyberdeck/realmorphism-control";
+import {
+  CyberdeckControl,
+  CyberdeckMenuButton,
+} from "@/components/cyberdeck/cyberdeck-control-button";
 import { isOperatorBinaryPreviewPath } from "@/lib/operator-binary-preview";
 import { operatorFileIcon, operatorFolderIcon, operatorIconSrc } from "@/lib/operator-file-icon";
 import { cn } from "@/lib/utils";
@@ -181,7 +183,6 @@ function OperatorTreeIcon({
 }
 
 export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: OperatorDocFolderPaneProps) {
-  const deckMode = useDeckMode();
   const [roots, setRoots] = useState<OperatorDocFolderRoot[]>([]);
   const [tree, setTree] = useState<Record<string, OperatorFolderTreeNode[]>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -720,20 +721,15 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
         }}
       />
       <div className="border-b border-[#1c1c1c] p-2">
-        <button
-          type="button"
+        <CyberdeckControl
+          control={{ size: "wide" }}
           onClick={() => void handleAddFolder()}
           disabled={isPicking}
-          className={cn(
-            realmorphismActionClass(deckMode, "neutral"),
-            "w-full min-h-[44px] py-2.5 max-md:text-[11px] md:min-h-0 md:py-1.5",
-          )}
+          className="w-full"
         >
-          <span className="flex w-full items-center gap-1.5">
-            <CodexIcon icon={cdxIconAdd} className="h-3 w-3" />
-            {isPicking && !replacingRootId ? "PICKING…" : "ADD FOLDER"}
-          </span>
-        </button>
+          <CodexIcon icon={cdxIconAdd} className="h-3 w-3 shrink-0" />
+          {isPicking && !replacingRootId ? "PICKING…" : "ADD FOLDER"}
+        </CyberdeckControl>
       </div>
       <div ref={treeScrollRef} className="custom-scrollbar flex-1 overflow-y-auto py-1">
         {roots.length === 0 ? (
@@ -817,22 +813,20 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
             event.stopPropagation();
           }}
         >
-          <button
-            type="button"
+          <CyberdeckMenuButton
             role="menuitem"
+            danger={false}
             onClick={() => void copyContextMenuPath()}
-            className={realmorphismMenuItemClass(deckMode)}
           >
             {contextMenu.kind === "file" ? "COPY FILE PATH" : "COPY FOLDER PATH"}
-          </button>
-          <button
-            type="button"
+          </CyberdeckMenuButton>
+          <CyberdeckMenuButton
             role="menuitem"
+            danger={false}
             onClick={() => void refreshContextMenuFolder()}
-            className={realmorphismMenuItemClass(deckMode)}
           >
             REFRESH
-          </button>
+          </CyberdeckMenuButton>
         </div>
       ) : null}
     </aside>

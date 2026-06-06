@@ -7,6 +7,7 @@ import {
 
 export type OperatorDocumentPickerKind =
   | "css"
+  | "docx"
   | "html"
   | "javascript"
   | "json"
@@ -29,6 +30,7 @@ export function normalizeOperatorDocumentKind(
     kind === "javascript" ||
     kind === "json" ||
     kind === "markdown" ||
+    kind === "docx" ||
     kind === "pdf" ||
     kind === "python" ||
     kind === "text" ||
@@ -49,6 +51,11 @@ export const OPERATOR_DOC_TYPE_ENTRIES: Array<{
   { value: "javascript", label: "JavaScript", mimeType: "text/javascript" },
   { value: "json", label: "JSON", mimeType: "application/json" },
   { value: "markdown", label: "Markdown", mimeType: "text/markdown" },
+  {
+    value: "docx",
+    label: "DOCX",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  },
   { value: "pdf", label: "PDF", mimeType: "application/pdf" },
   { value: "python", label: "Python", mimeType: "text/x-python" },
   { value: "text", label: "Text", mimeType: "text/plain" },
@@ -105,6 +112,7 @@ export function inferOperatorPickerKindFromAsset(
   if (ext === "ts" || ext === "tsx") return "typescript";
   if (ext === "py") return "python";
   if (ext === "pdf") return "pdf";
+  if (ext === "docx") return "docx";
   if (hints?.fileKind === "code") return "javascript";
   if (hints?.fileKind && hints.fileKind !== "file" && hints.fileKind !== "image" && hints.fileKind !== "video") {
     return normalizeOperatorDocumentKind(hints.fileKind);
@@ -157,7 +165,9 @@ export function applyOperatorTextAutodetect<T extends {
 
 /** Text-editable operator documents (Monaco / markdown viewer). Excludes PDF (L-13). */
 export function isOperatorDocumentSurfaceKind(kind: string | undefined): boolean {
-  if (kind === "pdf" || kind === "image" || kind === "video" || kind === "file") return false;
+  if (kind === "pdf" || kind === "docx" || kind === "image" || kind === "video" || kind === "file") {
+    return false;
+  }
   const normalized = normalizeOperatorDocumentKind(kind);
   return (
     normalized === "markdown" ||

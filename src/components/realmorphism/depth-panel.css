@@ -115,6 +115,9 @@
 }
 
 .depth-panel--control .depth-panel__face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: transform 150ms ease-out, color 150ms ease-out, border-color 150ms ease-out;
 }
 
@@ -207,29 +210,26 @@
   text-shadow: var(--realmorphism-ink-glow-selected, 0 0 10px rgba(143, 255, 200, 0.7));
 }
 
-/* ── Wireframe fallback (ascii deck mode) ────────────────────────────────── */
+/* ── Wireframe flat opt-in (legacy ascii panels outside MUTHUR composer) ─── */
 
-[data-deck-mode="ascii"] .depth-panel--module,
-[data-deck-mode="ascii"] .depth-panel--control {
+[data-deck-mode="ascii"] .depth-panel.depth-panel--wireframe-flat.depth-panel--module,
+[data-deck-mode="ascii"] .depth-panel.depth-panel--wireframe-flat.depth-panel--control {
   padding: 0;
 }
 
-[data-deck-mode="ascii"] .depth-panel--module::before,
-[data-deck-mode="ascii"] .depth-panel--module::after,
-[data-deck-mode="ascii"] .depth-panel--control::before,
-[data-deck-mode="ascii"] .depth-panel--control::after,
-[data-deck-mode="ascii"] .depth-panel--inset::before,
-[data-deck-mode="ascii"] .depth-panel--inset::after {
+[data-deck-mode="ascii"] .depth-panel.depth-panel--wireframe-flat::before,
+[data-deck-mode="ascii"] .depth-panel.depth-panel--wireframe-flat::after {
   display: none;
 }
 
-[data-deck-mode="ascii"] .depth-panel__face {
+[data-deck-mode="ascii"] .depth-panel.depth-panel--wireframe-flat .depth-panel__face {
   border-color: #2d2d2d;
   background: #000;
   color: #8a8a8a;
+  border-radius: 0;
 }
 
-[data-deck-mode="ascii"] .depth-panel--control:active:not(:disabled) .depth-panel__face {
+[data-deck-mode="ascii"] .depth-panel.depth-panel--wireframe-flat.depth-panel--control:active:not(:disabled) .depth-panel__face {
   transform: translate(2px, 2px);
 }
 

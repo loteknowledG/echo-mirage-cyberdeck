@@ -5,12 +5,10 @@ import {
   CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
+import { CyberdeckControl } from "@/components/cyberdeck/cyberdeck-control-button";
 import { useOperators, type OperatorState } from "@/lib/operators";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
-import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
-import { useDeckMode } from "@/lib/deck-mode";
-import { LEGACY_OPERATOR_CARD, realmorphismControlClass } from "@/lib/cyberdeck/realmorphism-control";
-import { cn } from "@/lib/utils";
+import { type OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
 
 type CyberdeckOperatorsPaneBodyProps = {
   orchestration: OrchestrationBundle | null;
@@ -24,7 +22,6 @@ function statusTone(status: OperatorState) {
 }
 
 export function CyberdeckOperatorsPaneBody({ orchestration }: CyberdeckOperatorsPaneBodyProps) {
-  const deckMode = useDeckMode();
   const { operators, stateCounts } = useOperators();
   const activeTask = orchestration?.activeTask;
   const agentRoles = orchestration?.agentRoles;
@@ -52,9 +49,9 @@ export function CyberdeckOperatorsPaneBody({ orchestration }: CyberdeckOperators
             const status = operator.state;
             const callsignLabel = `${operator.callsign} // ${operator.role}`;
             return (
-              <button
+              <CyberdeckControl
                 key={operator.id}
-                type="button"
+                control={{ size: "tile" }}
                 onClick={() =>
                   emitSignal({
                     source: "operators",
@@ -67,13 +64,7 @@ export function CyberdeckOperatorsPaneBody({ orchestration }: CyberdeckOperators
                     severity: "info",
                   })
                 }
-                className={cn(
-                  realmorphismControlClass(deckMode, {
-                    size: "tile",
-                    legacyClassName: LEGACY_OPERATOR_CARD,
-                  }),
-                  statusTone(status),
-                )}
+                className={statusTone(status)}
               >
                 <div className="flex items-center justify-between text-[#d8d8d8]">
                   <span>{operator.callsign.toUpperCase()} // {operator.role.toUpperCase()}</span>
@@ -85,7 +76,7 @@ export function CyberdeckOperatorsPaneBody({ orchestration }: CyberdeckOperators
                 <div className="mt-2 border-t border-[#1c1c1c] pt-2 text-[9px] leading-relaxed text-[#a8a8a8]">
                   {operator.activityText}
                 </div>
-              </button>
+              </CyberdeckControl>
             );
           })}
         </div>

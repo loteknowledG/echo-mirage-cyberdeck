@@ -45,7 +45,18 @@ export function isElectronOperatorBridge(): boolean {
 /** Desktop-only URL scheme registered in electron/main.js. */
 export function toEchoMirageFileUrl(absolutePath: string): string {
   const normalized = absolutePath.replace(/\\/g, "/");
-  return `echo-mirage-file://${encodeURIComponent(normalized)}`;
+  const pathPart = normalized.startsWith("/") ? normalized : `/${normalized}`;
+  return `echo-mirage-file://${encodeURI(pathPart)}`;
+}
+
+export function decodeEchoMirageFileUrl(url: string): string | null {
+  const prefix = "echo-mirage-file://";
+  if (!url.startsWith(prefix)) return null;
+  let filePath = decodeURIComponent(url.slice(prefix.length));
+  if (filePath.startsWith("/") && /^\/[a-zA-Z]:\//.test(filePath)) {
+    filePath = filePath.slice(1);
+  }
+  return filePath;
 }
 
 export function createOperatorBlobUrl(file: Blob | File): string {
@@ -63,6 +74,8 @@ export type OperatorIngestHints = {
   fileSize?: number;
   /** Raw base64 from desktop read — only for files under OPERATOR_MAX_INLINE_BINARY_BYTES. */
   pdfBase64?: string;
+  /** Raw base64 for any inline binary (e.g. DOCX) when File is not populated yet. */
+  inlineBase64?: string;
 };
 
 export function resolveOperatorPdfPreviewUrl(file: File, hints?: OperatorIngestHints): string {
@@ -92,11 +105,17 @@ export function resolveOperatorPdfPreviewUrl(file: File, hints?: OperatorIngestH
   return createOperatorBlobUrl(file);
 }
 
-export function resolveOperatorImagePreviewUrl(file: File, hints?: OperatorIngestHints): string {
+export function resolveOperatorDocxPreviewUrl(file: File, hints?: OperatorIngestHints): string {
+  const mime =
+    file.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   const byteSize = hints?.fileSize ?? file.size;
 
-  if (hints?.diskAbsolutePath && isElectronOperatorBridge()) {
-    return toEchoMirageFileUrl(hints.diskAbsolutePath);
+  if (
+    hints?.inlineBase64 &&
+    byteSize > 0 &&
+    byteSize <= OPERATOR_MAX_INLINE_BINARY_BYTES
+  ) {
+    return `data:${mime};base64,${hints.inlineBase64}`;
   }
 
   if (file.size > 0 && byteSize <= OPERATOR_MAX_INLINE_BINARY_BYTES) {
@@ -108,4 +127,104 @@ export function resolveOperatorImagePreviewUrl(file: File, hints?: OperatorInges
   }
 
   return createOperatorBlobUrl(file);
+}
+
+export async function fetchOperatorDocxBlob(docxSrc: string): Promise<Blob> {
+  if (docxSrc.startsWith("data:")) {
+    const response = await fetch(docxSrc);
+    if (!response.ok) throw new Error(`Could not load DOCX (${response.status})`);
+    return response.blob();
+  }
+
+  if (docxSrc.startsWith("blob:")) {
+    const response = await fetch(docxSrc);
+    if (!response.ok) throw new Error(`Could not load DOCX (${response.status})`);
+    return response.blob();
+  }
+
+  if (docxSrc.startsWith("echo-mirage-file://")) {
+    const diskPath = decodeEchoMirageFileUrl(docxSrc);
+    const fixedSrc = diskPath ? toEchoMirageFileUrl(diskPath) : docxSrc;
+    try {
+      const response = await fetch(fixedSrc);
+      if (response.ok) return response.blob();
+    } catch {
+      /* fall through to legacy URL attempt */
+    }
+    try {
+      const response = await fetch(docxSrc);
+      if (response.ok) return response.blob();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not load DOCX from disk.";
+      throw new Error(message);
+    }
+  }
+
+  const response = await fetch(docxSrc);
+  if (!response.ok) {
+    throw new Error(`Could not load DOCX (${response.status})`);
+  }
+  return response.blob();
+}
+
+export function resolveOperatorImagePreviewUrl(file: File, hints?: OperatorIngestHints): string {
+  const mime = operatorImageMimeType(file);
+  const byteSize = hints?.fileSize ?? file.size;
+
+  if (
+    hints?.inlineBase64 &&
+    byteSize > 0 &&
+    byteSize <= OPERATOR_MAX_INLINE_BINARY_BYTES
+  ) {
+    return `data:${mime};base64,${hints.inlineBase64}`;
+  }
+
+  if (file.size > 0 && byteSize <= OPERATOR_MAX_INLINE_BINARY_BYTES) {
+    return createOperatorBlobUrl(file);
+  }
+
+  if (hints?.diskAbsolutePath && isElectronOperatorBridge()) {
+    return toEchoMirageFileUrl(hints.diskAbsolutePath);
+  }
+
+  return createOperatorBlobUrl(file);
+}
+
+function operatorImageMimeType(file: File): string {
+  if (file.type?.startsWith("image/")) return file.type;
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".svg")) return "image/svg+xml";
+  if (lower.endsWith(".bmp")) return "image/bmp";
+  if (lower.endsWith(".ico")) return "image/x-icon";
+  return "application/octet-stream";
+}
+
+export async function fetchOperatorBinaryBlob(src: string): Promise<Blob> {
+  if (src.startsWith("data:") || src.startsWith("blob:")) {
+    const response = await fetch(src);
+    if (!response.ok) throw new Error(`Could not load file (${response.status})`);
+    return response.blob();
+  }
+
+  if (src.startsWith("echo-mirage-file://")) {
+    const diskPath = decodeEchoMirageFileUrl(src);
+    const fixedSrc = diskPath ? toEchoMirageFileUrl(diskPath) : src;
+    try {
+      const response = await fetch(fixedSrc);
+      if (response.ok) return response.blob();
+    } catch {
+      /* try legacy URL */
+    }
+    const response = await fetch(src);
+    if (!response.ok) throw new Error(`Could not load file from disk (${response.status})`);
+    return response.blob();
+  }
+
+  const response = await fetch(src);
+  if (!response.ok) throw new Error(`Could not load file (${response.status})`);
+  return response.blob();
 }

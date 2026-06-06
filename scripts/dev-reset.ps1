@@ -6,7 +6,7 @@ Write-Host "MU / TH / RESET"
 Write-Host "================================="
 Write-Host ""
 
-$ports = @(3000, 3001, 3050, 3051)
+$ports = 3050..3059
 $killed = @{}
 
 foreach ($port in $ports) {
@@ -33,6 +33,10 @@ if ($killed.Count -eq 0) {
 } else {
     Write-Host "Killed $($killed.Count) process(es)."
 }
+
+Write-Host ""
+Write-Host "Clearing Next dev caches (.next, .next-dev)..."
+Remove-Item -Recurse -Force ".next", ".next-dev" -ErrorAction SilentlyContinue
 
 Write-Host ""
 Write-Host "MUTHUR RESET COMPLETE"

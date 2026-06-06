@@ -220,6 +220,7 @@ export type OperatorFolderFileRead = {
   diskAbsolutePath?: string;
   fileSize?: number;
   pdfBase64?: string;
+  inlineBase64?: string;
 };
 
 export function resolveOperatorDiskAbsolutePath(
@@ -299,14 +300,21 @@ export async function readFileFromFolderRoot(
         type: result.mimeType || "application/octet-stream",
         lastModified: Date.now(),
       });
-      const isPdf =
-        result.mimeType === "application/pdf" ||
-        result.name.toLowerCase().endsWith(".pdf");
+      const lowerName = result.name.toLowerCase();
+      const isPdf = result.mimeType === "application/pdf" || lowerName.endsWith(".pdf");
+      const isDocx =
+        result.mimeType ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        lowerName.endsWith(".docx");
+      const isImage =
+        result.mimeType?.startsWith("image/") ||
+        /\.(png|jpe?g|webp|gif|svg|bmp|ico)$/i.test(lowerName);
       return {
         file,
         diskAbsolutePath: absolutePath,
         fileSize: reportedSize || file.size,
         ...(isPdf ? { pdfBase64: result.base64 } : {}),
+        ...(isDocx || isImage ? { inlineBase64: result.base64 } : {}),
       };
     }
 

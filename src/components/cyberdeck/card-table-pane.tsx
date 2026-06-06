@@ -9,11 +9,12 @@ import {
 import { EXECUTION_CARD_REGISTRY, EXECUTION_HANDS, getHandCards, type ExecutionCard } from "@/lib/computer-use/execution-card-registry";
 import { useDeckMode } from "@/lib/deck-mode";
 import {
-  LEGACY_ACTION_DANGER,
-  LEGACY_ACTION_NEUTRAL,
-  realmorphismActionClass,
+  CyberdeckActionButton,
+  CyberdeckControl,
+  CyberdeckFilterButton,
+} from "@/components/cyberdeck/cyberdeck-control-button";
+import {
   realmorphismControlClass,
-  realmorphismFilterClass,
 } from "@/lib/cyberdeck/realmorphism-control";
 import { cn } from "@/lib/utils";
 
@@ -124,22 +125,19 @@ function HandSelector({
   activeHandId: string | null;
   onSelect: (handId: string) => void;
 }) {
-  const deckMode = useDeckMode();
-
   return (
     <div className="flex flex-wrap gap-1">
       {hands.map((hand) => {
         const isActive = hand.id === activeHandId;
         return (
-          <button
+          <CyberdeckFilterButton
             key={hand.id}
-            type="button"
+            active={isActive}
+            tone="signal"
             onClick={() => onSelect(hand.id)}
-            aria-pressed={isActive}
-            className={realmorphismFilterClass(deckMode, isActive, "signal")}
           >
             {hand.name}
-          </button>
+          </CyberdeckFilterButton>
         );
       })}
     </div>
@@ -191,7 +189,6 @@ export function CardTablePane({
   onStageCard,
   selectedCardIds,
 }: CardTablePaneProps) {
-  const deckMode = useDeckMode();
   const hasStack = stackDepth > 0;
   const hasStaged = selectedCardIds.length > 0 || stagedCardCount > 0;
   const canPush = hasStaged && !hasStack;
@@ -213,13 +210,9 @@ export function CardTablePane({
             </div>
           }
           right={
-            <button
-              type="button"
-              onClick={onClose}
-              className={realmorphismActionClass(deckMode, "danger")}
-            >
+            <CyberdeckActionButton variant="danger" onClick={onClose}>
               CLOSE
-            </button>
+            </CyberdeckActionButton>
           }
         />
         <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 font-mono text-[10px]">
@@ -353,52 +346,33 @@ export function CardTablePane({
 
           <div className="mt-auto flex flex-col gap-2 pt-2">
             <div className="flex gap-2">
-              <button
-                type="button"
+              <CyberdeckControl
+                control={{ size: "wide", off: !canPush }}
                 onClick={onPushHandToStack}
                 disabled={!canPush}
-                className={realmorphismControlClass(deckMode, {
-                  size: "wide",
-                  off: !canPush,
-                  legacyClassName: canPush
-                    ? LEGACY_ACTION_NEUTRAL
-                    : "cursor-not-allowed rounded border border-[#141414] bg-black/50 px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#3a3a3a]",
-                })}
               >
                 PUSH TO STACK
-              </button>
-              <button
-                type="button"
-                onClick={onClearDeck}
-                disabled={!hasStaged && !hasStack}
-                className={realmorphismControlClass(deckMode, {
+              </CyberdeckControl>
+              <CyberdeckControl
+                control={{
                   size: "wide",
                   danger: hasStaged || hasStack,
                   off: !hasStaged && !hasStack,
-                  legacyClassName:
-                    hasStaged || hasStack
-                      ? LEGACY_ACTION_DANGER
-                      : "cursor-not-allowed rounded border border-[#141414] bg-black/50 px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#3a3a3a]",
-                })}
+                }}
+                onClick={onClearDeck}
+                disabled={!hasStaged && !hasStack}
               >
                 CLEAR DECK
-              </button>
+              </CyberdeckControl>
             </div>
-            <button
-              type="button"
+            <CyberdeckControl
+              control={{ size: "wide", amber: canExecute, off: !canExecute }}
               onClick={onExecute}
               disabled={!canExecute}
-              className={realmorphismControlClass(deckMode, {
-                size: "wide",
-                amber: canExecute,
-                off: !canExecute,
-                legacyClassName: canExecute
-                  ? "w-full rounded border border-[#2d2d2d] bg-black px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] transition hover:border-amber-500/60 hover:text-amber-200"
-                  : "w-full cursor-not-allowed rounded border border-[#141414] bg-black/50 px-3 py-2 font-mono text-[9px] tracking-[0.08em] text-[#3a3a3a]",
-              })}
+              className="w-full"
             >
               EXECUTE
-            </button>
+            </CyberdeckControl>
           </div>
         </div>
       </div>

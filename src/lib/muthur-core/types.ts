@@ -1,4 +1,11 @@
+import type { OperatorEditorEdit } from "@/lib/operator-workbench";
+
 export type MuthurLoopAction = "respond" | "defer" | "tool";
+
+/** Per-request side effects collected while running OpenAI tool calls. */
+export type MuthurToolExecutionContext = {
+  operatorEdits: OperatorEditorEdit[];
+};
 
 export interface ToolCall {
   toolName: string;

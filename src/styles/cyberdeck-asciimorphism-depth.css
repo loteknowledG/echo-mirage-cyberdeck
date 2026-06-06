@@ -1,0 +1,183 @@
+/**
+ * Asciimorphism mechanical depth — content-zone controls in ascii deck mode.
+ * Square faces + right/bottom walls (DepthPanel primitive), not realmorphism box-shadow.
+ */
+
+[data-deck-mode="ascii"] {
+  --deck-depth-face: #000;
+  --deck-depth-border: #2d2d2d;
+  --deck-depth-wall: #222;
+  --deck-depth-wall-bottom: #1a1a1a;
+  --deck-depth-wall-signal: #2a6b56;
+  --deck-depth-wall-signal-bottom: #1f4f3f;
+  --deck-depth-wall-amber: #6b5428;
+  --deck-depth-wall-amber-bottom: #4a3a1c;
+  --deck-depth-wall-critical: #6b2828;
+  --deck-depth-wall-critical-bottom: #4a1c1c;
+  --deck-depth-ink: #8a8a8a;
+  --deck-depth-ink-signal: #36ff73;
+  --deck-depth-ink-amber: #fcd34d;
+  --deck-depth-ink-critical: #fca5a5;
+  --deck-depth-ink-disabled: #565656;
+}
+
+[data-deck-mode="ascii"] .cyberdeck-message-box {
+  --muthur-depth-face: var(--deck-depth-face);
+  --muthur-depth-border: var(--deck-depth-border);
+  --muthur-depth-wall: var(--deck-depth-wall);
+  --muthur-depth-wall-bottom: var(--deck-depth-wall-bottom);
+  --muthur-depth-wall-signal: var(--deck-depth-wall-signal);
+  --muthur-depth-wall-signal-bottom: var(--deck-depth-wall-signal-bottom);
+  --muthur-depth-wall-amber: var(--deck-depth-wall-amber);
+  --muthur-depth-wall-amber-bottom: var(--deck-depth-wall-amber-bottom);
+  --muthur-depth-wall-critical: var(--deck-depth-wall-critical);
+  --muthur-depth-wall-critical-bottom: var(--deck-depth-wall-critical-bottom);
+  --muthur-depth-ink: var(--deck-depth-ink);
+  --muthur-depth-ink-signal: var(--deck-depth-ink-signal);
+  --muthur-depth-ink-amber: var(--deck-depth-ink-amber);
+  --muthur-depth-ink-critical: var(--deck-depth-ink-critical);
+  --muthur-depth-ink-disabled: var(--deck-depth-ink-disabled);
+}
+
+[data-deck-mode="ascii"] .deck-depth-control,
+[data-deck-mode="ascii"] .muthur-depth-control {
+  flex-shrink: 0;
+  --panel-face: var(--deck-depth-face);
+  --panel-border: var(--deck-depth-border);
+  --panel-side: var(--deck-depth-wall);
+  --panel-bottom: var(--deck-depth-wall-bottom);
+  --panel-side-hover: #333;
+  --panel-bottom-hover: #242424;
+  --panel-ink: var(--deck-depth-ink);
+  color: var(--deck-depth-ink);
+  border-style: solid;
+}
+
+[data-deck-mode="ascii"] .deck-depth-control[data-posture="signal"],
+[data-deck-mode="ascii"] .muthur-depth-control[data-posture="signal"] {
+  --panel-side: var(--deck-depth-wall-signal);
+  --panel-bottom: var(--deck-depth-wall-signal-bottom);
+  --panel-side-hover: #3a9174;
+  --panel-bottom-hover: #2a6b56;
+}
+
+[data-deck-mode="ascii"] .deck-depth-control[data-posture="amber"],
+[data-deck-mode="ascii"] .muthur-depth-control[data-posture="amber"] {
+  --panel-side: var(--deck-depth-wall-amber);
+  --panel-bottom: var(--deck-depth-wall-amber-bottom);
+  --panel-side-hover: #8a6530;
+  --panel-bottom-hover: #6b5428;
+}
+
+[data-deck-mode="ascii"] .deck-depth-control[data-posture="critical"],
+[data-deck-mode="ascii"] .muthur-depth-control[data-posture="critical"] {
+  --panel-side: var(--deck-depth-wall-critical);
+  --panel-bottom: var(--deck-depth-wall-critical-bottom);
+  --panel-side-hover: #7a2a2a;
+  --panel-bottom-hover: #6b2828;
+}
+
+[data-deck-mode="ascii"] .deck-depth-control .depth-panel__face,
+[data-deck-mode="ascii"] .muthur-depth-control .depth-panel__face {
+  border-radius: 0;
+  border-style: solid;
+}
+
+[data-deck-mode="ascii"] .deck-depth-control:hover:not(:disabled) .depth-panel__face,
+[data-deck-mode="ascii"] .muthur-depth-control:hover:not(:disabled) .depth-panel__face {
+  color: var(--deck-depth-ink-signal);
+}
+
+[data-deck-mode="ascii"] .deck-depth-control[data-posture="amber"]:hover:not(:disabled) .depth-panel__face,
+[data-deck-mode="ascii"] .muthur-depth-control[data-posture="amber"]:hover:not(:disabled) .depth-panel__face {
+  color: var(--deck-depth-ink-amber);
+}
+
+[data-deck-mode="ascii"] .deck-depth-control[data-posture="critical"]:hover:not(:disabled) .depth-panel__face,
+[data-deck-mode="ascii"] .muthur-depth-control[data-posture="critical"]:hover:not(:disabled) .depth-panel__face {
+  color: var(--deck-depth-ink-critical);
+}
+
+[data-deck-mode="ascii"] .deck-depth-control[aria-pressed="true"] .depth-panel__face,
+[data-deck-mode="ascii"] .deck-depth-control.is-latched .depth-panel__face,
+[data-deck-mode="ascii"] .muthur-depth-control[aria-pressed="true"] .depth-panel__face,
+[data-deck-mode="ascii"] .muthur-depth-control.is-latched .depth-panel__face {
+  transform: translate(var(--panel-depth), var(--panel-depth));
+  color: var(--deck-depth-ink-signal);
+  text-shadow: 0 0 8px rgba(54, 255, 115, 0.38);
+}
+
+[data-deck-mode="ascii"] .deck-depth-control[aria-pressed="true"]::before,
+[data-deck-mode="ascii"] .deck-depth-control[aria-pressed="true"]::after,
+[data-deck-mode="ascii"] .deck-depth-control.is-latched::before,
+[data-deck-mode="ascii"] .deck-depth-control.is-latched::after,
+[data-deck-mode="ascii"] .muthur-depth-control[aria-pressed="true"]::before,
+[data-deck-mode="ascii"] .muthur-depth-control[aria-pressed="true"]::after,
+[data-deck-mode="ascii"] .muthur-depth-control.is-latched::before,
+[data-deck-mode="ascii"] .muthur-depth-control.is-latched::after {
+  opacity: 0;
+}
+
+[data-deck-mode="ascii"] .deck-depth-control.is-off:not(:hover) .depth-panel__face,
+[data-deck-mode="ascii"] .muthur-depth-control.is-off:not(:hover) .depth-panel__face {
+  color: var(--deck-depth-ink-disabled);
+}
+
+[data-deck-mode="ascii"] .deck-depth-control.block.w-full .depth-panel__face,
+[data-deck-mode="ascii"] .muthur-depth-control.block.w-full .depth-panel__face {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Settings depth lab + module panels in ascii content mode */
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] .depth-panel:not(.deck-depth-control):not(.muthur-depth-control),
+[data-deck-mode="ascii"] .cyberdeck-message-box .depth-panel:not(.deck-depth-control):not(.muthur-depth-control) {
+  --panel-face: var(--deck-depth-face);
+  --panel-border: var(--deck-depth-border);
+  --panel-side: var(--deck-depth-wall);
+  --panel-bottom: var(--deck-depth-wall-bottom);
+  --panel-side-hover: #333;
+  --panel-bottom-hover: #242424;
+  --panel-ink: var(--deck-depth-ink);
+  color: var(--deck-depth-ink);
+  border-style: solid;
+}
+
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] .depth-panel[data-posture="signal"]:not(.deck-depth-control):not(.muthur-depth-control),
+[data-deck-mode="ascii"] .cyberdeck-message-box .depth-panel[data-posture="signal"]:not(.deck-depth-control):not(.muthur-depth-control) {
+  --panel-side: var(--deck-depth-wall-signal);
+  --panel-bottom: var(--deck-depth-wall-signal-bottom);
+  --panel-side-hover: #3a9174;
+  --panel-bottom-hover: #2a6b56;
+}
+
+[data-deck-mode="ascii"] [data-morphism="realmorphism"] .depth-panel__face,
+[data-deck-mode="ascii"] .cyberdeck-message-box .depth-panel__face {
+  border-radius: 0;
+  border-style: solid;
+}
+
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-inset {
+  --panel-face: #050505;
+  --panel-border: #1a1a1a;
+  --panel-side: #222;
+  --panel-bottom: #181818;
+}
+
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-inset .depth-panel__face {
+  border-radius: 0;
+  background: #000;
+}
+
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-inset:focus-within .depth-panel__face {
+  border-color: rgba(57, 255, 136, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.22);
+}
+
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-inset .depth-panel__face > * {
+  border-radius: 0;
+}
+
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls {
+  overflow: visible;
+}

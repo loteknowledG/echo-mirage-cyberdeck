@@ -101,7 +101,6 @@ export function OperatorMonacoWorkbench({
   const stateRef = useRef<OperatorEditorState | null>(null);
   const [pendingDiff, setPendingDiff] = useState<OperatorEditorDiffProposal | null>(null);
   const pendingDiffRef = useRef<OperatorEditorDiffProposal | null>(null);
-  const [readOnly, setReadOnly] = useState(false);
   const [cursor, setCursor] = useState<IPosition>({ lineNumber: 1, column: 1 });
   const [selection, setSelection] = useState<ISelection | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -126,11 +125,11 @@ export function OperatorMonacoWorkbench({
       content: value,
       contentLength: value.length,
       dirty,
-      readOnly,
+      readOnly: false,
       lastUpdated: Date.now(),
     };
     setMonacoEditorContext(ctx);
-  }, [activeFilePath, fileName, value, language, dirty, readOnly]);
+  }, [activeFilePath, fileName, value, language, dirty]);
 
   // Publish cursor and selection changes
   useEffect(() => {
@@ -165,9 +164,9 @@ export function OperatorMonacoWorkbench({
       },
       cursor: position,
       dirty: model ? model.getValue() !== savedTextRef.current : dirty,
-      readOnly,
+      readOnly: false,
     };
-  }, [activeFilePath, cursor, dirty, fileName, language, readOnly, value]);
+  }, [activeFilePath, cursor, dirty, fileName, language, value]);
 
   stateRef.current = readState();
 
@@ -197,12 +196,42 @@ export function OperatorMonacoWorkbench({
     [],
   );
 
+  const applyEdit = useCallback(
+    (edit: OperatorEditorEdit): boolean => {
+      const instance = editorRef.current;
+      const model = instance?.getModel();
+      const currentSelection = instance?.getSelection();
+      if (!instance || !model || !currentSelection) return false;
+
+      const proposed = proposalContent(model, currentSelection, edit);
+      instance.pushUndoStop();
+      instance.executeEdits("muthur", [
+        {
+          range: model.getFullModelRange(),
+          text: proposed,
+          forceMoveMarkers: true,
+        },
+      ]);
+      instance.pushUndoStop();
+      setDirty(proposed !== savedTextRef.current);
+      onChange(proposed);
+      appendFlightLog({
+        actor: "MUTHUR",
+        action: `editor edit applied :: ${edit.kind}`,
+        result: "UNDOABLE // UNSAVED",
+        severity: "success",
+      });
+      return true;
+    },
+    [onChange],
+  );
+
   const applyPendingDiff = useCallback((approval: { approved: true }): boolean => {
     if (approval?.approved !== true) return false;
     const proposal = pendingDiffRef.current;
     const instance = editorRef.current;
     const model = instance?.getModel();
-    if (!proposal || !instance || !model || readOnly) return false;
+    if (!proposal || !instance || !model) return false;
     instance.pushUndoStop();
     instance.executeEdits("muthur", [
       {
@@ -212,6 +241,8 @@ export function OperatorMonacoWorkbench({
       },
     ]);
     instance.pushUndoStop();
+    setDirty(proposal.proposed !== savedTextRef.current);
+    onChange(proposal.proposed);
     pendingDiffRef.current = null;
     setPendingDiff(null);
     appendFlightLog({
@@ -221,7 +252,7 @@ export function OperatorMonacoWorkbench({
       severity: "success",
     });
     return true;
-  }, [readOnly]);
+  }, [onChange]);
 
   const cancelPendingDiff = useCallback(() => {
     if (!pendingDiffRef.current) return;
@@ -241,11 +272,12 @@ export function OperatorMonacoWorkbench({
         readActiveEditor: readState,
         readSelectedText: () => readState().selection,
         suggestEdit,
+        applyEdit,
         applyPendingDiff,
         cancelPendingDiff,
         getPendingDiff: () => pendingDiffRef.current,
       }),
-    [applyPendingDiff, cancelPendingDiff, readState, suggestEdit],
+    [applyEdit, applyPendingDiff, cancelPendingDiff, readState, suggestEdit],
   );
 
   useEffect(() => {
@@ -299,13 +331,6 @@ export function OperatorMonacoWorkbench({
           <span className={dirty ? "text-amber-300" : "text-emerald-300"}>
             {dirty ? "DIRTY" : "SAVED"}
           </span>
-          <button
-            type="button"
-            className={readOnly ? "text-amber-300" : "text-[#8a8a8a]"}
-            onClick={() => setReadOnly((current) => !current)}
-          >
-            {readOnly ? "READ ONLY" : "EDITABLE"}
-          </button>
         </span>
       </div>
       {pendingDiff ? (
@@ -348,7 +373,7 @@ export function OperatorMonacoWorkbench({
           fontSize: 12,
           lineNumbersMinChars: 3,
           minimap: { enabled: false },
-          readOnly,
+          readOnly: false,
           scrollBeyondLastLine: false,
           wordWrap: "off",
           contextmenu: true,

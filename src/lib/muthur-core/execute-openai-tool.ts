@@ -5,13 +5,27 @@ import {
   formatExportMarkdownToPdfResult,
   formatJustBashResult,
   formatLocalFsResult,
+  formatObserveOperatorPaneResult,
+  formatSuggestOperatorEditResult,
 } from "@/lib/muthur-core/format-tool-result";
-import type { ToolCall, ToolRegistry } from "@/lib/muthur-core/types";
+import { extractOperatorEditFromToolOutput } from "@/lib/muthur-core/suggest-operator-edit";
+import type { MuthurToolExecutionContext, ToolCall, ToolRegistry } from "@/lib/muthur-core/types";
+
+/** MUTHUR chat hot path — run tools directly, no execution-loop allowlist or approval gates. */
+export async function executeMuthurChatTool(
+  registry: ToolRegistry,
+  functionName: string,
+  argumentsJson: string,
+  ctx?: MuthurToolExecutionContext,
+): Promise<string> {
+  return executeRegistryToolForOpenAi(registry, functionName, argumentsJson, ctx);
+}
 
 export async function executeRegistryToolForOpenAi(
   registry: ToolRegistry,
   functionName: string,
   argumentsJson: string,
+  ctx?: MuthurToolExecutionContext,
 ): Promise<string> {
   let args: Record<string, unknown> = {};
   try {
@@ -35,6 +49,9 @@ export async function executeRegistryToolForOpenAi(
   if (functionName === "localfs") {
     return formatLocalFsResult(result.output);
   }
+  if (functionName === "observe_operator_pane") {
+    return formatObserveOperatorPaneResult(result.output);
+  }
   if (functionName === "clock") {
     return formatClockResult(result.output);
   }
@@ -46,6 +63,13 @@ export async function executeRegistryToolForOpenAi(
   }
   if (functionName === "export_markdown_to_pdf") {
     return formatExportMarkdownToPdfResult(result.output);
+  }
+  if (functionName === "suggest_operator_edit") {
+    if (result.ok && ctx?.operatorEdits) {
+      const edit = extractOperatorEditFromToolOutput(result.output);
+      if (edit) ctx.operatorEdits.push(edit);
+    }
+    return formatSuggestOperatorEditResult(result.output);
   }
   return formatJustBashResult(result.output);
 }

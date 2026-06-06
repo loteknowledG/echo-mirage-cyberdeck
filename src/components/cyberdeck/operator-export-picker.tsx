@@ -6,17 +6,15 @@ import { BsFileEarmarkWord } from "react-icons/bs";
 import { LuShare } from "react-icons/lu";
 import { CyberdeckControlTooltip } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
 import {
+  CyberdeckControl,
+  CyberdeckMenuButton,
+} from "@/components/cyberdeck/cyberdeck-control-button";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useDeckMode } from "@/lib/deck-mode";
-import {
-  LEGACY_TOOLBAR_ICON,
-  realmorphismControlClass,
-  realmorphismMenuItemClass,
-} from "@/lib/cyberdeck/realmorphism-control";
 import { cn } from "@/lib/utils";
 
 export type OperatorExportFormat = "docx" | "pdf";
@@ -31,7 +29,6 @@ type OperatorExportPickerProps = {
 
 /** Toolbar export control — icon opens a pop-in menu for DOCX / PDF. */
 export function OperatorExportPicker({ disabled = false, onExport }: OperatorExportPickerProps) {
-  const deckMode = useDeckMode();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -58,23 +55,16 @@ export function OperatorExportPicker({ disabled = false, onExport }: OperatorExp
     >
       <CyberdeckControlTooltip label="Export" disabled={disabled}>
         <DropdownMenuTrigger asChild disabled={disabled}>
-          <button
-            type="button"
+          <CyberdeckControl
+            control={{ size: "toolbar", signal: open && !disabled }}
             aria-label="Export"
             aria-haspopup="menu"
             aria-expanded={open}
             disabled={disabled}
-            className={cn(
-              realmorphismControlClass(deckMode, {
-                size: "toolbar",
-                legacyClassName: LEGACY_TOOLBAR_ICON,
-              }),
-              "disabled:cursor-not-allowed disabled:opacity-30",
-              open && !disabled && "is-signal",
-            )}
+            className="disabled:cursor-not-allowed disabled:opacity-30"
           >
             <LuShare className="h-3.5 w-3.5" aria-hidden />
-          </button>
+          </CyberdeckControl>
         </DropdownMenuTrigger>
       </CyberdeckControlTooltip>
       <DropdownMenuContent
@@ -93,32 +83,38 @@ export function OperatorExportPicker({ disabled = false, onExport }: OperatorExp
         </div>
         <div className="mx-0 my-1 h-px bg-[#2d2d2d]" role="separator" />
         <DropdownMenuItem
+          asChild
           disabled={busy}
-          className={cn(
-            realmorphismMenuItemClass(deckMode),
-            "cursor-pointer rounded-sm focus:bg-[#141414] focus:text-emerald-200 data-[disabled]:opacity-40",
-          )}
           onSelect={(event) => {
             event.preventDefault();
             void runExport("docx");
           }}
         >
-          <BsFileEarmarkWord className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          DOCX
+          <CyberdeckMenuButton
+            role="menuitem"
+            danger={false}
+            className="cursor-pointer rounded-sm focus:bg-[#141414] focus:text-emerald-200 data-[disabled]:opacity-40"
+          >
+            <BsFileEarmarkWord className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            DOCX
+          </CyberdeckMenuButton>
         </DropdownMenuItem>
         <DropdownMenuItem
+          asChild
           disabled={busy}
-          className={cn(
-            realmorphismMenuItemClass(deckMode),
-            "cursor-pointer rounded-sm focus:bg-[#141414] focus:text-emerald-200 data-[disabled]:opacity-40",
-          )}
           onSelect={(event) => {
             event.preventDefault();
             void runExport("pdf");
           }}
         >
-          <AiOutlineFilePdf className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          PDF
+          <CyberdeckMenuButton
+            role="menuitem"
+            danger={false}
+            className="cursor-pointer rounded-sm focus:bg-[#141414] focus:text-emerald-200 data-[disabled]:opacity-40"
+          >
+            <AiOutlineFilePdf className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            PDF
+          </CyberdeckMenuButton>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

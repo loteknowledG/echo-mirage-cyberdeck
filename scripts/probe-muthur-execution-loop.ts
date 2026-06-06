@@ -34,6 +34,8 @@ async function main() {
   loop.setMode("observe");
   const observeState = loop.getState();
   assert.equal(observeState.queue[0]?.status, "blocked");
+  await loop.waitForIdle(5_000);
+  assert.equal(loop.getState().queue_length, 1);
   loop.approve(blocked[0]!.id);
   await loop.waitForIdle(30_000);
   assert.equal(loop.getState().queue_length, 0);

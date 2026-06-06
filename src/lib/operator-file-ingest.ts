@@ -54,7 +54,8 @@ export type OperatorIngestFileKind =
   | "javascript"
   | "typescript"
   | "python"
-  | "pdf";
+  | "pdf"
+  | "docx";
 
 export function isEditableOperatorFile(file: File) {
   const lowerName = file.name.toLowerCase();
@@ -74,6 +75,12 @@ export function isEditableOperatorFile(file: File) {
 export function getOperatorFileKind(file: File): OperatorIngestFileKind {
   const lowerName = file.name.toLowerCase();
   if (lowerName.endsWith(".pdf") || file.type === "application/pdf") return "pdf";
+  if (
+    lowerName.endsWith(".docx") ||
+    file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
+    return "docx";
+  }
   if (lowerName.endsWith(".md") || lowerName.endsWith(".markdown") || file.type === "text/markdown") {
     return "markdown";
   }

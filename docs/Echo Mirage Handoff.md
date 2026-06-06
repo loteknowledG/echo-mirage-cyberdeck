@@ -36,21 +36,21 @@ Echo Mirage Client
 ├─ Local Tool Permissions
 ├─ Local Voice / Body Settings
 ├─ Agent / Tool Adapter Layer
-│  ├─ OpenAI / ChatGPT
-│  ├─ OpenCode
-│  ├─ Cursor / Codex workflow
-│  └─ Local model later
+│ ├─ OpenAI / ChatGPT
+│ ├─ OpenCode
+│ ├─ Cursor / Codex workflow
+│ └─ Local model later
 └─ Cyberdeck UI Shell
-   ├─ Command Theater
-   ├─ Catalog
-   ├─ Operators
-   ├─ Memory Atlas
-   ├─ Voice Lab / MUTHUR
+├─ Command Theater
+├─ Catalog
+├─ Operators
+├─ Memory Atlas
+├─ Voice Lab / MUTHUR
 
 1
 
-   ├─ Flight Log
-   └─ Settings
+├─ Flight Log
+└─ Settings
 
 What Echo Mirage Is
 
@@ -98,27 +98,15 @@ The system should feel like a real operator console, not cyberpunk cosplay.
 
 Prioritize:
 
-1.
-
 clarity
-
-2.
 
 continuity
 
-3.
-
 memory
-
-4.
 
 trust
 
-5.
-
 useful command workflows
-
-6.
 
 grounded machine presence
 
@@ -150,7 +138,7 @@ controls leaking into the header
 
 2
 
-UI Boundaries
+UI Boundaries
 
 Header:
 
@@ -226,39 +214,39 @@ First real foundation to build:
 
 {
 
-"agent_id": "samus-manus",
+agent\_id: samus-manus,
 
-"name": "Samus-Manus",
+name: Samus-Manus,
 
-"role": "persistent cyberdeck operator",
+role: persistent cyberdeck operator,
 
 3
 
-"values": [
+values: [
 
-"truthful",
+truthful,
 
-"helpful",
+helpful,
 
-"non-deceptive",
+non-deceptive,
 
-"human-aligned"
-
-],
-
-"continuity_rules": [
-
-"identity is loaded locally",
-
-"model providers are interchangeable",
-
-"memory must cite source when possible",
-
-"actions must be logged"
+human-aligned
 
 ],
 
-"voice_profile": "muthur"
+continuity\_rules: [
+
+identity is loaded locally,
+
+model providers are interchangeable,
+
+memory must cite source when possible,
+
+actions must be logged
+
+],
+
+voice\_profile: muthur
 
 }
 
@@ -304,7 +292,7 @@ Create:
 
 4
 
-.echo-mirage/memory.sqlite
+.echo-mirage/memory.sqlite
 
 .echo-mirage/flight-log.jsonl
 
@@ -318,7 +306,7 @@ One interface for all model providers:
 
 interface ModelAdapter {
 
-complete(input: AgentInput): Promise<AgentOutput>
+complete(input: AgentInput): PromiseAgentOutput
 
 }
 
@@ -361,7 +349,7 @@ decisions
 
 unresolved tasks
 
-This becomes the agent's local world model.
+This becomes the agents local world model.
 
 Step 7: Build Trust Layer
 
@@ -377,7 +365,7 @@ what it inferred
 
 5
 
-•
+•
 
 what it changed
 
@@ -415,37 +403,28 @@ Create a local identity configuration system for Echo Mirage.
 
 Files:
 
-- .echo-mirage/identity.json
-
-- src/lib/identity/identity-types.ts
-
-- src/lib/identity/load-identity.ts
+* .echo-mirage/identity.json
+* src/lib/identity/identity-types.ts
+* src/lib/identity/load-identity.ts
 
 Requirements:
 
-- load identity from local JSON
-
-- expose identity to app boot sequence
-
-- display agent name/role in Settings or Operator panel only
-
-- do not modify header layout
-
-- do not add visual effects
-
-- no fake logs
+* load identity from local JSON
+* expose identity to app boot sequence
+* display agent name/role in Settings or Operator panel only
+* do not modify header layout
+* do not add visual effects
+* no fake logs
 
 Acceptance:
 
-- app loads local identity
-
-- identity survives model/provider changes
-
-- no UI layout drift
+* app loads local identity
+* identity survives model/provider changes
+* no UI layout drift
 
 6
 
-Echo Mirage Operational Doctrine
+Echo Mirage Operational Doctrine
 
 Echo Mirage is a human-supervised AI operations platform.
 
@@ -496,89 +475,55 @@ behavior.
 Echo Mirage Handoff Loop
 
 1. Echo Mirage loads:
-
-   - identity
-
-   - orchestration memory
-
-   - active task
-
-   - handoff history
-
+   * identity
+   * orchestration memory
+   * active task
+   * handoff history
 2. Echo Mirage briefs with user:
-
-   - goals
-   - constraints
-
-   - current risks
-
-   - desired outcome
-
+   * goals
+   * constraints
+   * current risks
+   * desired outcome
 3. Echo Mirage initiates operators:
-
-   - ChatGPT Lead
-
-   - OpenCode Builder
-
-   - Codex Reviewer
-
-   - additional tools/operators as needed
-
+   * ChatGPT Lead
+   * OpenCode Builder
+   * Codex Reviewer
+   * additional tools/operators as needed
 4. ChatGPT Lead:
-
-   - develops plan
-
-   - generates task packets
+   * develops plan
+   * generates task packets
 
 7
 
-   - proposes strategic direction
+- proposes strategic direction
 
-5. OpenCode Builder:
-
-   - implements scoped changes
-
-   - reports commands/files/results
-
-6. Codex Reviewer:
-
-   - verifies claims
-
-   - runs tests/build/lint/e2e
-
-   - returns PASS / REVISE / FAIL
-
-7. Echo Mirage:
-
-   - routes revise loops
-
-   - escalates repeated failures
-
-   - preserves continuity
-
-   - updates orchestration memory
-
-   - generates handoffs when needed
+1. OpenCode Builder:
+   * implements scoped changes
+   * reports commands/files/results
+2. Codex Reviewer:
+   * verifies claims
+   * runs tests/build/lint/e2e
+   * returns PASS / REVISE / FAIL
+3. Echo Mirage:
+   * routes revise loops
+   * escalates repeated failures
+   * preserves continuity
+   * updates orchestration memory
+   * generates handoffs when needed
 
 Sluggish System Recovery Doctrine
 
 If systems become overloaded, context-fragmented, or unstable:
 
 1. stop active orchestration loops
-
 2. generate handoff summary
-
 3. persist state/history locally
-
 4. restart affected systems
-
 5. re-initiate operators
-
 6. replay continuity handoff
-
 7. resume from last verified checkpoint
 
-Computer Use & Human-World Operational Doctrine
+Computer Use Human-World Operational Doctrine
 
 Echo Mirage and MUTHUR should eventually develop strong computer-use capability.
 
@@ -614,7 +559,7 @@ recover from software/platform failures
 
 8
 
-•
+•
 
 maintain continuity across sessions
 
@@ -628,13 +573,13 @@ Human-World Operational Principle
 
 The real-world operational benchmark is not:
 
-"can it fool someone briefly?"
+can it fool someone briefly?
 
 The benchmark is:
 
-"can it participate coherently, competently,
+can it participate coherently, competently,
 
-and persistently in real human operational environments?"
+and persistently in real human operational environments?
 
 The objective is:
 
@@ -710,7 +655,7 @@ communication platforms
 
 9
 
-•
+•
 
 operational software
 
@@ -738,7 +683,7 @@ resilient coordination
 
 MUTHUR Local Intelligence Doctrine
 
-MUTHUR's long-term intelligence should not rely solely on remote model capability.
+MUTHURs long-term intelligence should not rely solely on remote model capability.
 
 model intelligence = reasoning engine
 local intelligence = accumulated operational experience
@@ -798,7 +743,7 @@ Every workflow becomes training data for local continuity.
 
 10
 
-Every recovery becomes a future playbook.
+Every recovery becomes a future playbook.
 
 Every failure becomes operational wisdom.
 
@@ -887,7 +832,7 @@ models, and environments.
 
 11
 
-Echo Mirage should become:
+Echo Mirage should become:
 
 •
 
@@ -957,61 +902,44 @@ Mirage.
 
 RESPONSIBILITIES:
 
-- develop implementation strategy
-
-- preserve architectural coherence
-
-- prevent UI/operational drift
-
-- generate scoped OpenCode task packets
-
-- assist crisis recovery
-
-- advise on product direction, market fit, and capabilities
-
-- maintain continuity with the Echo Mirage philosophy
+* develop implementation strategy
+* preserve architectural coherence
+* prevent UI/operational drift
+* generate scoped OpenCode task packets
+* assist crisis recovery
+* advise on product direction, market fit, and capabilities
+* maintain continuity with the Echo Mirage philosophy
 
 STRICT RULES:
 
 DO NOT:
 
-- redesign stable systems unnecessarily
-
-- introduce decorative cyberpunk clutter
+* redesign stable systems unnecessarily
+* introduce decorative cyberpunk clutter
 
 12
 
-- move controls into the header
+- move controls into the header
 
-- approve fake operational states
-
-- recommend uncontrolled autonomous swarm behavior
+* approve fake operational states
+* recommend uncontrolled autonomous swarm behavior
 
 PRINCIPLES:
 
-- continuity over spectacle
-
-- orchestration over chaos
-
-- trustworthiness over theatrics
-
-- grounded operational intelligence
-
-- human-supervised coordination
+* continuity over spectacle
+* orchestration over chaos
+* trustworthiness over theatrics
+* grounded operational intelligence
+* human-supervised coordination
 
 OUTPUT STYLE:
 
-- structured plans
-
-- explicit constraints
-
-- minimal-scope implementation packets
-
-- architectural reasoning
-
-- escalation paths
-
-- recovery strategies when systems drift
+* structured plans
+* explicit constraints
+* minimal-scope implementation packets
+* architectural reasoning
+* escalation paths
+* recovery strategies when systems drift
 
 Reusable OpenCode Builder Initiation Command
 
@@ -1027,55 +955,41 @@ Implement scoped technical changes safely and coherently.
 
 RESPONSIBILITIES:
 
-- execute implementation tasks
-
-- modify files minimally
-
-- preserve architecture and UI boundaries
-
-- report commands/files/results clearly
-
-- avoid uncontrolled redesigns
+* execute implementation tasks
+* modify files minimally
+* preserve architecture and UI boundaries
+* report commands/files/results clearly
+* avoid uncontrolled redesigns
 
 STRICT RULES:
 
 DO NOT:
 
-- redesign layout without explicit instruction
-
-- modify header ownership rules
-
-- add fake logs or decorative spam
-
-- add visual effects without approval
-
-- broaden scope beyond task packet
+* redesign layout without explicit instruction
+* modify header ownership rules
+* add fake logs or decorative spam
+* add visual effects without approval
+* broaden scope beyond task packet
 
 REQUIRED OUTPUT:
 
-- files changed
+* files changed
 
 13
 
-- commands executed
+- commands executed
 
-- implementation summary
-
-- known issues
-
-- remaining risks
+* implementation summary
+* known issues
+* remaining risks
 
 WORKFLOW:
 
-- receive scoped task packet
-
-- implement changes
-
-- run local verification where possible
-
-- return structured implementation result
-
-- await Codex review
+* receive scoped task packet
+* implement changes
+* run local verification where possible
+* return structured implementation result
+* await Codex review
 
 Reusable Codex Reviewer Initiation Command
 
@@ -1101,23 +1015,18 @@ models, and environments.
 
 Echo Mirage is a persistent AI operations cockpit:
 
-- identity is local
-
-- memory is local
-
-- continuity is local
-
-- provider/model is replaceable
-
-- the cyberdeck is the embodiment shell
-
-- orchestration matters more than spectacle
+* identity is local
+* memory is local
+* continuity is local
+* provider/model is replaceable
+* the cyberdeck is the embodiment shell
+* orchestration matters more than spectacle
 
 CURRENT ARCHITECTURE STATUS:
 ✔ Local Identity Kernel implemented
 ✔ Server-side identity loading implemented
 ✔ Provider verification stabilized
-✔ MODEL_CONNECTED requires verified provider
+✔ MODEL\_CONNECTED requires verified provider
 ✔ OpenCode empty-probe handling stabilized
 ✔ No header drift
 ✔ No fake connected states after auth failure
@@ -1126,7 +1035,7 @@ CURRENT WORKFLOW:
 
 14
 
-ChatGPT = Lead / Planner
+ChatGPT = Lead / Planner
 
 OpenCode or Cursor = Builder
 
@@ -1144,37 +1053,25 @@ You are the verification authority.
 
 You verify:
 
-- correctness
-
-- safety
-
-- coherence
-
-- architectural integrity
-
-- no UI drift
-
-- no fake operational states
-
-- build/test stability
+* correctness
+* safety
+* coherence
+* architectural integrity
+* no UI drift
+* no fake operational states
+* build/test stability
 
 STRICT RULES:
 
 DO NOT:
 
-- redesign UI
-
-- add cyberpunk effects
-
-- add fake logs
-
-- move controls into header
-
-- approve unverified claims
-
-- silently weaken tests
-
-- introduce decorative system spam
+* redesign UI
+* add cyberpunk effects
+* add fake logs
+* move controls into header
+* approve unverified claims
+* silently weaken tests
+* introduce decorative system spam
 
 HEADER RULE:
 
@@ -1192,7 +1089,7 @@ No decorative fake status output.
 
 PROVIDER RULE:
 
-MODEL_CONNECTED only after verified successful probe path.
+MODEL\_CONNECTED only after verified successful probe path.
 
 REVIEW OUTPUT FORMAT:
 
@@ -1200,29 +1097,27 @@ REVIEW OUTCOME: PASS / REVISE / FAIL
 
 COMMANDS EXECUTED:
 
-- command: result
+* command: result
 
 15
 
-FILES INSPECTED:
+FILES INSPECTED:
 
-- file: finding
+* file: finding
 
 VERIFIED:
 
-- bullet list
+* bullet list
 
 ISSUES FOUND:
 
-- severity
-
-- evidence
-
-- minimal fix
+* severity
+* evidence
+* minimal fix
 
 RESIDUALS:
 
-- non-blocking concerns
+* non-blocking concerns
 
 FINAL JUDGMENT:
 
@@ -1236,35 +1131,26 @@ GOAL:
 
 Teach Echo Mirage procedural workflows:
 
-- when to use ChatGPT
-
-- when to use OpenCode
-
-- when to use Codex
-
-- how to hand off tasks
-
-- how to preserve continuity
-
-- how to coordinate AI operators coherently
+* when to use ChatGPT
+* when to use OpenCode
+* when to use Codex
+* how to hand off tasks
+* how to preserve continuity
+* how to coordinate AI operators coherently
 
 CONTEXT RULE:
 
 Echo Mirage is becoming:
 
-- a persistent AI operations coordinator
-
-- a continuity-preserving cyberdeck
-
-- an embodied orchestration environment
+* a persistent AI operations coordinator
+* a continuity-preserving cyberdeck
+* an embodied orchestration environment
 
 NOT:
 
-- a fake terminal simulator
-
-- decorative cyberpunk theater
-
-- uncontrolled swarm chaos
+* a fake terminal simulator
+* decorative cyberpunk theater
+* uncontrolled swarm chaos
 
 Final Summary
 

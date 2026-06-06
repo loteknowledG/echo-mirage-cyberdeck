@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/tooltip";
 
 export const CYBERDECK_PANE_TOOLTIP_CLASS =
-  "z-50 rounded border border-[#2d2d2d] bg-black px-2 py-1 text-center font-mono text-[9px] tracking-[0.06em] text-emerald-200 shadow-md";
+  "z-[100] rounded border border-[#2d2d2d] bg-black px-2 py-1 text-center font-mono text-[9px] tracking-[0.06em] text-emerald-200 shadow-md";
 
 type CyberdeckPaneTooltipProps = {
   label: string;
@@ -20,7 +20,7 @@ type CyberdeckPaneTooltipProps = {
   contentClassName?: string;
 };
 
-/** Pane tooltip — prefers top so labels stay off adjacent toolbar controls. */
+/** Pane tooltip — prefers top so labels stay clear of the cursor. */
 export function CyberdeckPaneTooltip({
   label,
   children,
@@ -48,13 +48,23 @@ type CyberdeckControlTooltipProps = {
   label: string;
   children: ReactNode;
   disabled?: boolean;
+  side?: "top" | "right" | "bottom" | "left";
 };
 
 /** Icon/control tooltip — top by default; disabled controls skip pointer capture. */
-export function CyberdeckControlTooltip({ label, children, disabled = false }: CyberdeckControlTooltipProps) {
+export function CyberdeckControlTooltip({
+  label,
+  children,
+  disabled = false,
+  side = "top",
+}: CyberdeckControlTooltipProps) {
   const trigger = disabled ? <span className="inline-flex">{children}</span> : children;
 
-  return <CyberdeckPaneTooltip label={label}>{trigger}</CyberdeckPaneTooltip>;
+  return (
+    <CyberdeckPaneTooltip label={label} side={side}>
+      {trigger}
+    </CyberdeckPaneTooltip>
+  );
 }
 
 export { TooltipProvider as CyberdeckPaneTooltipProvider };

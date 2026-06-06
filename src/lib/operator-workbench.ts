@@ -46,6 +46,7 @@ export type OperatorWorkbenchController = {
   readActiveEditor(): OperatorEditorState;
   readSelectedText(): OperatorEditorState["selection"];
   suggestEdit(edit: OperatorEditorEdit): OperatorEditorDiffProposal;
+  applyEdit(edit: OperatorEditorEdit): boolean;
   applyPendingDiff(approval: { approved: true }): boolean;
   cancelPendingDiff(): void;
   getPendingDiff(): OperatorEditorDiffProposal | null;

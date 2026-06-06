@@ -15,6 +15,64 @@ import {
   buildGlyphContextPrompt,
   MUTHUR_GLYPH_DOCTRINE,
 } from "@/lib/muthur-glyph-doctrine";
+import {
+  formatOperatorChatContextPrompt,
+  isDocxFileName,
+  isDocumentEditIntent,
+  type OperatorChatContext,
+} from "@/lib/muthur/document-edit-intent";
+import {
+  messageNeedsOperatorContext,
+  shouldEnableMuthurTools,
+} from "@/lib/muthur-core/muthur-chat-intent";
+
+const MUTHUR_AVAILABLE_TOOLS_PROMPT =
+  "\n\nAVAILABLE TOOLS:" +
+  "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane (file name, language, cursor, dirty, content excerpt)." +
+  "\n- suggest_operator_edit: Propose typed edits to markdown/code/text open in the operator Monaco editor. Edits auto-apply in the operator pane (Ctrl+Z to undo). Not for DOCX/PDF previews." +
+  "\n- justbash: Run shell commands in the workspace (rg, git, ls, cat)." +
+  "\n- localfs: Read files, mkdir, write (workspace only)." +
+  "\n- clock: Server date/time." +
+  "\n\nIMPORTANT: When the user asks what is in the operator pane, call observe_operator_pane." +
+  "\nWhen they ask to edit/fix/rewrite/remove text from the open markdown or code file, call observe_operator_pane then suggest_operator_edit (prefer replace_line_range for targeted edits). Edits apply immediately — confirm what changed; mention Ctrl+Z if they want to undo." +
+  "\nNever use justbash/find to locate the user's open document — use observe_operator_pane for the file already open in the operator pane.";
+
+function buildDocumentEditHint(message: string, operatorContext?: OperatorChatContext | null): string {
+  if (!isDocumentEditIntent(message)) return "";
+
+  const ctxPath = operatorContext?.localFilePath?.trim() ?? "";
+  const ctxName = operatorContext?.fileName?.trim() ?? "";
+  const ctxSurface = operatorContext?.previewSurface ?? "";
+
+  if (isDocxFileName(ctxName) || ctxSurface === "docx") {
+    return (
+      "\n\nOPERATOR HINT: User wants to edit a DOCX open in the operator pane. " +
+      "Do NOT use justbash or localfs to search the filesystem. " +
+      (ctxPath
+        ? `Call convert_document_to_markdown with filePath "${ctxPath}", then suggest_operator_edit to remove/replace the requested text in the markdown.`
+        : "Call convert_document_to_markdown on the open DOCX path, then suggest_operator_edit.") +
+      " Tell the operator they can export back to DOCX when done."
+    );
+  }
+
+  const obs = getLatestMuthurObservation("cyberdeck");
+  if (!obs?.editor?.active) {
+    if (isDocxFileName(obs?.visibleDocument ?? null)) {
+      return buildDocumentEditHint(message, {
+        fileName: obs?.visibleDocument ?? undefined,
+        previewSurface: "docx",
+        localFilePath: obs?.editor?.filePath ?? undefined,
+      });
+    }
+    return "\n\nOPERATOR HINT: User wants a document edit but no text editor is active. Open the file in the operator pane. For DOCX, convert to markdown first.";
+  }
+  return (
+    "\n\nOPERATOR HINT: User wants an in-pane edit on the open operator document. " +
+    "Call observe_operator_pane, then suggest_operator_edit to remove/replace the requested text. " +
+    "Edits apply immediately — confirm what changed; Ctrl+Z undoes in the operator pane. " +
+    "Do NOT search the filesystem with justbash."
+  );
+}
 
 async function chatWithModelTools(
   ...args: Parameters<(typeof import("@/lib/muthur-core/muthur-provider-chat"))["muthurChatWithModelTools"]>
@@ -99,6 +157,40 @@ function buildEditorContextPrompt(): string {
   } catch {
     return "";
   }
+}
+
+function buildMuthurSystemContent(args: {
+  message: string;
+  operatorContext: OperatorChatContext | null;
+  memoryPrompt: string;
+  browserPrompt: string;
+  glyphPrompt: string;
+  glyphDoctrine: string;
+}): { systemContent: string; toolsEnabled: boolean } {
+  const toolsEnabled = shouldEnableMuthurTools(args.message);
+  const needsOperator = messageNeedsOperatorContext(args.message);
+
+  let systemContent =
+    "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful.";
+
+  if (toolsEnabled) {
+    systemContent += MUTHUR_AVAILABLE_TOOLS_PROMPT;
+    systemContent += buildDocumentEditHint(args.message, args.operatorContext);
+    if (needsOperator) {
+      systemContent += formatOperatorChatContextPrompt(args.operatorContext);
+      systemContent += buildEditorContextPrompt();
+    } else {
+      systemContent +=
+        "\n\nOnly call tools when the user asks for an action (edit a file, run a command, read the operator pane, convert a document, etc.). Do not probe the workspace or operator pane unprompted.";
+    }
+  } else {
+    systemContent +=
+      "\n\nReply conversationally in plain text. Do not call any tools for greetings or small talk.";
+  }
+
+  systemContent += args.glyphDoctrine + args.memoryPrompt + args.browserPrompt + args.glyphPrompt;
+
+  return { systemContent, toolsEnabled };
 }
 
 async function getMuthurMemoryContext(message: string): Promise<string> {
@@ -186,6 +278,17 @@ function defaultModelForProvider(provider: string): string {
   return "trinity-large-preview-free";
 }
 
+function parseOperatorChatContext(raw: unknown): OperatorChatContext | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  return {
+    previewSurface: typeof o.previewSurface === "string" ? o.previewSurface : null,
+    fileName: typeof o.fileName === "string" ? o.fileName : null,
+    localFilePath: typeof o.localFilePath === "string" ? o.localFilePath : null,
+    docMode: o.docMode === "view" || o.docMode === "edit" ? o.docMode : null,
+  };
+}
+
 /** Dev-only compile warm — avoids first chat waiting on route bundling. */
 export async function GET() {
   if (process.env.NODE_ENV === "production") {
@@ -208,12 +311,20 @@ export async function POST(request: Request) {
       browserContext,
       glyphContext,
       history,
+      operatorContext: operatorContextRaw,
     } = body;
+    const operatorContext = parseOperatorChatContext(operatorContextRaw);
     const chatHistory = normalizeChatHistory(history);
     const clientHasMemory =
       typeof memoryContext === "string" && memoryContext.trim().length > 0;
     /** Cyberdeck always ships client memory — skip boot_muthur on the hot path. */
     const clientSentMemoryField = typeof memoryContext === "string";
+
+    if (body.warm === true && process.env.NODE_ENV !== "production") {
+      await resolveToolRegistry();
+      await import("@/lib/muthur-core/muthur-provider-chat");
+      return NextResponse.json({ ok: true, route: "cyberdeck-chat", warmed: true });
+    }
 
     // Always refresh cached observation at the start of each request
     updateCachedObservation();
@@ -367,21 +478,15 @@ export async function POST(request: Request) {
         const serverMemoryCtx =
           clientSentMemoryField || clientHasMemory ? "" : await getMuthurMemoryContext(message);
         const memoryPrompt = buildMemoryPrompt(memoryContext, serverMemoryCtx);
-        const editorCtxPrompt = buildEditorContextPrompt();
 
-        const systemContent =
-          "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
-          "\n\nAVAILABLE TOOLS:" +
-          "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane. Returns: file name, language, cursor line/column, dirty state, and content excerpt (up to 200 chars)." +
-          "\n- justbash: Run shell commands in the workspace (rg, git, ls, cat)." +
-          "\n- localfs: Read files, mkdir, write (workspace only)." +
-          "\n- clock: Server date/time." +
-          "\n\nIMPORTANT: When the user asks what is visible in the Operator pane or what file is open, call observe_operator_pane immediately. It provides the Monaco editor content and metadata." +
-          editorCtxPrompt +
-          glyphDoctrine +
-          memoryPrompt +
-          browserPrompt +
-          glyphPrompt;
+        const { systemContent, toolsEnabled } = buildMuthurSystemContent({
+          message,
+          operatorContext,
+          memoryPrompt,
+          browserPrompt,
+          glyphPrompt,
+          glyphDoctrine,
+        });
 
         const baseMessages: Record<string, unknown>[] = [
           { role: "system", content: systemContent },
@@ -394,7 +499,8 @@ export async function POST(request: Request) {
           apiKey: resolvedApiKey,
           model,
           baseMessages,
-          registry: await resolveToolRegistry(),
+          registry: toolsEnabled ? await resolveToolRegistry() : EMPTY_TOOL_REGISTRY,
+          toolsEnabled,
         });
       }
     }
@@ -451,26 +557,21 @@ export async function POST(request: Request) {
         ? ""
         : await getMuthurMemoryContext(typeof message === "string" ? message : "");
     const fallbackMemoryPrompt = buildMemoryPrompt(memoryContext, fallbackMemoryCtx);
-    const editorCtxPrompt = buildEditorContextPrompt();
 
-    const systemContent =
-      "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful." +
-      "\n\nAVAILABLE TOOLS:" +
-      "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane. Returns: file name, language, cursor line/column, dirty state, and content excerpt (up to 200 chars)." +
-      "\n- justbash: Run shell commands in the workspace (rg, git, ls, cat)." +
-      "\n- localfs: Read files, mkdir, write (workspace only)." +
-      "\n- clock: Server date/time." +
-      "\n\nIMPORTANT: When the user asks what is visible in the Operator pane or what file is open, call observe_operator_pane immediately. It provides the Monaco editor content and metadata." +
-      editorCtxPrompt +
-      glyphDoctrine +
-      fallbackMemoryPrompt +
-      browserPrompt +
-      glyphPrompt;
+    const userMessage = typeof message === "string" ? message : "";
+    const { systemContent, toolsEnabled } = buildMuthurSystemContent({
+      message: userMessage,
+      operatorContext,
+      memoryPrompt: fallbackMemoryPrompt,
+      browserPrompt,
+      glyphPrompt,
+      glyphDoctrine,
+    });
 
     const baseMessages: Record<string, unknown>[] = [
       { role: "system", content: systemContent },
       ...chatHistory.map((m) => ({ role: m.role, content: m.content })),
-      { role: "user", content: typeof message === "string" ? message : "" },
+      { role: "user", content: userMessage },
     ];
 
     if (envApiKey.trim()) {
@@ -479,7 +580,8 @@ export async function POST(request: Request) {
         apiKey: envApiKey.trim(),
         model: envModel,
         baseMessages,
-        registry: await resolveToolRegistry(),
+        registry: toolsEnabled ? await resolveToolRegistry() : EMPTY_TOOL_REGISTRY,
+        toolsEnabled,
       });
     }
 

@@ -118,21 +118,40 @@ export class MuthurExecutionLoop {
     recordExecutionLoopHealth({ state: "waiting", activeJobId: actionId ?? null, activeToolName: toolName ?? null, activeSince: started });
     console.log(`[execution-loop] waitForIdle started: timeout=${timeoutMs}ms, active_action=${actionId ?? "null"}, tool=${toolName ?? "null"}, queue_length=${snapshot.queue_length}`);
 
-    if (!snapshot.active_action && snapshot.queue_length === 0) {
-      console.log(`[execution-loop] waitForIdle early exit: already idle (no active_action, queue=0), elapsed=${Date.now() - started}ms`);
+    if (this.isQuiescent(snapshot)) {
+      console.log(`[execution-loop] waitForIdle early exit: already quiescent, elapsed=${Date.now() - started}ms`);
       recordExecutionLoopHealth({ status: "healthy", state: "idle", activeJobId: null, activeToolName: null, activeSince: null });
       return;
     }
 
     while (Date.now() - started < timeoutMs) {
       const snap = this.store.getSnapshot();
-      if (snap.loop_status !== "running" && snap.queue_length === 0 && !snap.active_action) {
-        console.log(`[execution-loop] waitForIdle complete: idle restored, elapsed=${Date.now() - started}ms, queue_length=${snap.queue_length}`);
+      if (this.isQuiescent(snap)) {
+        const blocked = snap.queue_length;
+        if (blocked > 0) {
+          console.log(
+            `[execution-loop] waitForIdle complete: quiescent with ${blocked} blocked item(s) awaiting approval, elapsed=${Date.now() - started}ms`,
+          );
+        } else {
+          console.log(`[execution-loop] waitForIdle complete: idle restored, elapsed=${Date.now() - started}ms, queue_length=${snap.queue_length}`);
+        }
         recordExecutionLoopHealth({ status: "healthy", state: "idle", activeJobId: null, activeToolName: null, activeSince: null });
         return;
       }
-      if (snap.queue_length > 0) {
-        console.log(`[execution-loop] waitForIdle polling: loop_status=${snap.loop_status}, queue_length=${snap.queue_length}, active_action=${snap.active_action?.id ?? "null"}, elapsed=${Date.now() - started}ms`);
+
+      if (
+        snap.loop_status === "idle" &&
+        !snap.active_action &&
+        this.store.hasRunnableQueuedActions()
+      ) {
+        console.warn("[execution-loop] waitForIdle: queued work while idle — restarting pump");
+        this.ensurePump();
+      }
+
+      if (snap.queue_length > 0 || snap.active_action) {
+        console.log(
+          `[execution-loop] waitForIdle polling: loop_status=${snap.loop_status}, queue_length=${snap.queue_length}, runnable=${this.store.hasRunnableQueuedActions()}, blocked=${this.store.hasAwaitingApprovalActions()}, active_action=${snap.active_action?.id ?? "null"}, elapsed=${Date.now() - started}ms`,
+        );
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
@@ -191,6 +210,13 @@ export class MuthurExecutionLoop {
     this.abortController = null;
     recordExecutionLoopHealth({ status: "degraded", state: "idle", activeJobId: null, activeToolName: null, activeSince: null, lastError: "Force recovered after timeout" });
     console.warn(`[execution-loop] forceRecover complete: loop_status=${this.store.getSnapshot().loop_status}`);
+  }
+
+  private isQuiescent(snapshot: ReturnType<MuthurExecutionStore["getSnapshot"]>): boolean {
+    if (snapshot.active_action) return false;
+    if (snapshot.loop_status === "running") return false;
+    if (this.store.hasRunnableQueuedActions()) return false;
+    return true;
   }
 
   private ensurePump(): void {

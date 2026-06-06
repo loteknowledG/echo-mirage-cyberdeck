@@ -1,13 +1,17 @@
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
-import { executeOpenAiToolViaExecutionLoop } from "@/lib/muthur/execution/execute-openai-tool-via-loop.server";
+import { executeMuthurChatTool } from "@/lib/muthur-core/execute-openai-tool";
 import { MUTHUR_OPENAI_TOOLS } from "@/lib/muthur-core/openai-tool-definitions";
+import { appendMuthurStreamFooters } from "@/lib/muthur-core/muthur-stream-payload";
+import { dsmlCallsToOpenAiToolCalls, parseDsmlToolCalls, stripDsmlToolMarkup } from "@/lib/muthur-core/parse-dsml-tool-calls";
 import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
-import type { ToolRegistry } from "@/lib/muthur-core/types";
+import type { MuthurToolExecutionContext, ToolRegistry } from "@/lib/muthur-core/types";
 
 const textEncoder = new TextEncoder();
 const MAX_TOOL_ROUNDS = ENABLE_AUTOMATION ? 4 : 0;
+/** Tool rounds may chain several upstream completions; allow extra headroom per hop. */
+const UPSTREAM_TOOL_TIMEOUT_MS = 180_000;
 
 type OpenAiToolCall = {
   id: string;
@@ -27,7 +31,13 @@ const PLAIN_HEADERS = {
   "Content-Type": "text/plain; charset=utf-8",
   "Cache-Control": "no-cache, no-transform",
   Connection: "keep-alive",
+  "X-Muthur-Stream": "early",
 } as const;
+
+function shouldTryStreamWithoutTools(status: number): boolean {
+  if (status === 401 || status === 403 || status === 404 || status === 429) return false;
+  return true;
+}
 
 function upstreamErrorResponse(status: number, raw: string): Response {
   const detail = formatUplinkErrorDetail(status, raw);
@@ -37,61 +47,97 @@ function upstreamErrorResponse(status: number, raw: string): Response {
   });
 }
 
-function toolsUsedHeaders(toolsUsed: string[]): Record<string, string> {
-  if (toolsUsed.length === 0) return {};
-  return { "X-Muthur-Tools-Used": toolsUsed.join(", ") };
+function toolsUsedHeaders(
+  toolsUsed: string[],
+  operatorEdits?: MuthurToolExecutionContext["operatorEdits"],
+): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (toolsUsed.length > 0) {
+    headers["X-Muthur-Tools-Used"] = toolsUsed.join(", ");
+  }
+  if (operatorEdits && operatorEdits.length > 0) {
+    headers["X-Muthur-Operator-Edits"] = JSON.stringify(operatorEdits);
+  }
+  return headers;
 }
 
-function responsePlainText(text: string, toolsUsed: string[]): Response {
+function startEarlyUplinkStream(run: (write: (chunk: string) => void) => Promise<void>): Response {
   return new Response(
     new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(textEncoder.encode(text));
-        controller.close();
+      async start(controller) {
+        const write = (chunk: string) => {
+          controller.enqueue(textEncoder.encode(chunk));
+        };
+        try {
+          await run(write);
+          controller.close();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Uplink failed";
+          write(`\n[MUTHUR] ${msg}`);
+          controller.close();
+        }
       },
     }),
-    {
-      headers: {
-        ...PLAIN_HEADERS,
-        ...toolsUsedHeaders(toolsUsed),
-      },
-    },
+    { headers: PLAIN_HEADERS },
   );
 }
 
+async function pipeOpenAiStreamToWrite(
+  streamRes: Response,
+  write: (chunk: string) => void,
+): Promise<void> {
+  const body = await streamOpenAiCompatibleResponse(streamRes);
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    write(decoder.decode(value, { stream: true }));
+  }
+}
+
 async function fetchStreamPlainNoTools(endpoint: string, apiKey: string, model: string, messages: JsonMessage[]) {
-  return fetchWithTimeout(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+  return fetchWithTimeout(
+    endpoint,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+      }),
     },
-    body: JSON.stringify({
-      model,
-      messages,
-      stream: true,
-    }),
-  });
+    UPSTREAM_TOOL_TIMEOUT_MS,
+  );
 }
 
 /**
- * Model-driven tools: non-stream rounds until assistant returns text or cap;
- * then streams the final completion (after any tool results).
+ * Model-driven tools: stream uplink progress immediately, run tool rounds, then final text.
  */
 export async function muthurChatWithModelTools(options: {
   endpoint: string;
   apiKey: string;
   model: string;
-  /** system + history + user — copied before mutation */
   baseMessages: JsonMessage[];
   registry: ToolRegistry;
+  /** When false, stream a direct reply with no tool definitions (greetings, small talk). */
+  toolsEnabled?: boolean;
 }): Promise<Response> {
   const { endpoint, apiKey, model, registry } = options;
+  const toolsEnabled =
+    options.toolsEnabled !== false &&
+    ENABLE_AUTOMATION &&
+    Object.keys(registry.tools).length > 0;
   const messages: JsonMessage[] = options.baseMessages.map((m) => ({ ...m }));
   const fallbackMessages = options.baseMessages.map((m) => ({ ...m }));
   const toolsUsed: string[] = [];
+  const toolCtx: MuthurToolExecutionContext = { operatorEdits: [] };
 
-  if (!ENABLE_AUTOMATION) {
+  if (!toolsEnabled) {
     let streamRes: Response;
     try {
       streamRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, fallbackMessages);
@@ -106,110 +152,136 @@ export async function muthurChatWithModelTools(options: {
     return new Response(await streamOpenAiCompatibleResponse(streamRes), {
       headers: {
         ...PLAIN_HEADERS,
-        ...toolsUsedHeaders(toolsUsed),
+        ...toolsUsedHeaders(toolsUsed, toolCtx.operatorEdits),
       },
     });
   }
 
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const res = await fetchWithTimeout(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        tools: MUTHUR_OPENAI_TOOLS,
-        tool_choice: "auto",
-      }),
-    });
+  return startEarlyUplinkStream(async (write) => {
+    write("⏳ MUTHUR // uplink active...\n\n");
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      if (round === 0) {
-        console.warn("[muthur-openai-chat] tools request failed; falling back to stream without tools", res.status);
-        const streamRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, fallbackMessages);
-        if (!streamRes.ok) {
-          const fallbackErr = await streamRes.text().catch(() => "");
-          return upstreamErrorResponse(streamRes.status, fallbackErr || errText);
-        }
-        return new Response(await streamOpenAiCompatibleResponse(streamRes), {
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      write(`⏳ MUTHUR // thinking (round ${round + 1})...\n`);
+
+      const res = await fetchWithTimeout(
+        endpoint,
+        {
+          method: "POST",
           headers: {
-            ...PLAIN_HEADERS,
-            ...toolsUsedHeaders(toolsUsed),
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
           },
-        });
-      }
-      return upstreamErrorResponse(res.status, errText);
-    }
-
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: CompletionMessage }>;
-      error?: { message?: string };
-    };
-
-    if (data.error?.message) {
-      return new Response(`[MUTHUR] ${data.error.message}`, { status: 502 });
-    }
-
-    const msg = data.choices?.[0]?.message;
-    if (!msg) {
-      return responsePlainText("[MUTHUR] Empty model response.", toolsUsed);
-    }
-
-    const toolCalls = msg.tool_calls;
-    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
-      for (const tc of toolCalls) {
-        const n = tc.function?.name?.trim();
-        if (n) toolsUsed.push(n);
-      }
-      console.debug("[muthur-openai-chat] tool round", round, toolCalls.map((tc) => tc.function?.name ?? tc.id));
-      messages.push({
-        role: "assistant",
-        content: msg.content ?? null,
-        tool_calls: toolCalls,
-      });
-
-      const outputs = await Promise.all(
-        toolCalls.map(async (tc) => {
-          const name = tc.function?.name ?? "";
-          const rawArgs = tc.function?.arguments ?? "{}";
-          const content = await executeOpenAiToolViaExecutionLoop(registry, name, rawArgs);
-          return { id: tc.id, content };
-        }),
+          body: JSON.stringify({
+            model,
+            messages,
+            stream: false,
+            tools: MUTHUR_OPENAI_TOOLS,
+            tool_choice: "auto",
+          }),
+        },
+        UPSTREAM_TOOL_TIMEOUT_MS,
       );
 
-      for (const o of outputs) {
-        messages.push({
-          role: "tool",
-          tool_call_id: o.id,
-          content: o.content,
-        });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        if (round === 0 && shouldTryStreamWithoutTools(res.status)) {
+          console.warn("[muthur-openai-chat] tools request failed; falling back to stream without tools", res.status);
+          write("⏳ MUTHUR // falling back to direct reply...\n\n");
+          const streamRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, fallbackMessages);
+          if (!streamRes.ok) {
+            const fallbackErr = await streamRes.text().catch(() => "");
+            throw new Error(formatUplinkErrorDetail(streamRes.status, fallbackErr || errText));
+          }
+          await pipeOpenAiStreamToWrite(streamRes, write);
+          return;
+        }
+        throw new Error(formatUplinkErrorDetail(res.status, errText));
       }
-      continue;
+
+      const data = (await res.json()) as {
+        choices?: Array<{ message?: CompletionMessage }>;
+        error?: { message?: string };
+      };
+
+      if (data.error?.message) {
+        throw new Error(data.error.message);
+      }
+
+      const msg = data.choices?.[0]?.message;
+      if (!msg) {
+        write(appendMuthurStreamFooters("[MUTHUR] Empty model response.", toolsUsed, toolCtx.operatorEdits));
+        return;
+      }
+
+      let toolCalls = msg.tool_calls;
+      const rawContent = typeof msg.content === "string" ? msg.content : "";
+      if ((!Array.isArray(toolCalls) || toolCalls.length === 0) && rawContent.includes("DSML")) {
+        const dsmlCalls = parseDsmlToolCalls(rawContent);
+        if (dsmlCalls.length > 0) {
+          write(`⏳ MUTHUR // parsed DSML tools: ${dsmlCalls.map((c) => c.name).join(", ")}\n`);
+          toolCalls = dsmlCallsToOpenAiToolCalls(dsmlCalls);
+        }
+      }
+
+      if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+        const names = toolCalls
+          .map((tc) => tc.function?.name?.trim())
+          .filter(Boolean)
+          .join(", ");
+        write(`⏳ MUTHUR // tools: ${names}\n`);
+        for (const tc of toolCalls) {
+          const n = tc.function?.name?.trim();
+          if (n) toolsUsed.push(n);
+        }
+        console.debug("[muthur-openai-chat] tool round", round, toolCalls.map((tc) => tc.function?.name ?? tc.id));
+        messages.push({
+          role: "assistant",
+          content: msg.content ?? null,
+          tool_calls: toolCalls,
+        });
+
+        const outputs = await Promise.all(
+          toolCalls.map(async (tc) => {
+            const name = tc.function?.name ?? "";
+            const rawArgs = tc.function?.arguments ?? "{}";
+            const content = await executeMuthurChatTool(registry, name, rawArgs, toolCtx);
+            return { id: tc.id, content };
+          }),
+        );
+
+        for (const o of outputs) {
+          messages.push({
+            role: "tool",
+            tool_call_id: o.id,
+            content: o.content,
+          });
+        }
+        continue;
+      }
+
+      const text = stripDsmlFromAssistantText(rawContent);
+      if (text.trim()) {
+        write("\n");
+        write(appendMuthurStreamFooters(text, toolsUsed, toolCtx.operatorEdits));
+        return;
+      }
+
+      write(appendMuthurStreamFooters("[MUTHUR] Model returned no text.", toolsUsed, toolCtx.operatorEdits));
+      return;
     }
 
-    const text = typeof msg.content === "string" ? msg.content : "";
-    if (text.trim()) {
-      return responsePlainText(text, toolsUsed);
+    write("⏳ MUTHUR // composing final reply...\n\n");
+    const finalRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, messages);
+    if (!finalRes.ok) {
+      const t = await finalRes.text().catch(() => "");
+      throw new Error(formatUplinkErrorDetail(finalRes.status, t));
     }
 
-    return responsePlainText("[MUTHUR] Model returned no text.", toolsUsed);
-  }
-
-  const finalRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, messages);
-  if (!finalRes.ok) {
-    const t = await finalRes.text().catch(() => "");
-    return upstreamErrorResponse(finalRes.status, t);
-  }
-
-  return new Response(await streamOpenAiCompatibleResponse(finalRes), {
-    headers: {
-      ...PLAIN_HEADERS,
-      ...toolsUsedHeaders(toolsUsed),
-    },
+    await pipeOpenAiStreamToWrite(finalRes, write);
+    write(appendMuthurStreamFooters("", toolsUsed, toolCtx.operatorEdits));
   });
+}
+
+function stripDsmlFromAssistantText(text: string): string {
+  return stripDsmlToolMarkup(text);
 }

@@ -81,7 +81,7 @@ export function FigletFontPreviewSlide({
         className={cn(
           'max-w-full truncate px-0.5 font-mono leading-none tracking-[0.03em]',
           isLarge ? 'text-[10px]' : 'text-[7px]',
-          active ? 'text-emerald-200' : 'text-[#4a524e]',
+          active ? 'text-emerald-200' : 'text-[#8ca39a]',
         )}
       >
         {label}

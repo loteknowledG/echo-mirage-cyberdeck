@@ -14,8 +14,9 @@ import {
   cdxIconTrash,
   cdxIconUndo,
 } from "@wikimedia/codex-icons";
-import { LuPanelRightClose, LuPanelRightOpen, LuSave } from "react-icons/lu";
+import { LuExternalLink, LuFileText, LuPanelRightClose, LuPanelRightOpen, LuSave } from "react-icons/lu";
 import { isConvertibleDocumentPath } from "@/lib/muthur-document-conversion-intent";
+import { publishMuthurObservation } from "@/lib/muthur/observation/publish-observation";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { OperatorDocFolderPane } from "@/components/cyberdeck/operator-doc-folder-pane";
@@ -39,13 +40,11 @@ import {
   type OperatorDocumentPickerKind,
 } from "@/lib/operator-document-types";
 import { cn } from "@/lib/utils";
-import { useDeckMode } from "@/lib/deck-mode";
 import {
-  LEGACY_SWITCH_EMERALD,
-  LEGACY_TOOLBAR_ICON,
-  realmorphismActionClass,
-  realmorphismControlClass,
-} from "@/lib/cyberdeck/realmorphism-control";
+  CyberdeckActionButton,
+  CyberdeckControl,
+} from "@/components/cyberdeck/cyberdeck-control-button";
+import { LEGACY_SWITCH_EMERALD } from "@/lib/cyberdeck/realmorphism-control";
 import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
 import { CodexIcon } from "@/components/codex-icon";
@@ -58,6 +57,8 @@ import {
   resolveOperatorAssetSurface,
   type OperatorAssetSurface,
 } from "@/lib/operator-file-surface";
+import { OperatorImagePreview } from "@/components/cyberdeck/operator-image-preview";
+import dynamic from "next/dynamic";
 import { OperatorPdfPreview } from "@/components/cyberdeck/operator-pdf-preview";
 import { OperatorUnsupportedPreview } from "@/components/cyberdeck/operator-unsupported-preview";
 import {
@@ -69,6 +70,14 @@ import {
   pdfFilenameFromMarkdownName,
 } from "@/lib/markdown-to-docx-intent";
 
+const OperatorDocxWorkbench = dynamic(
+  () =>
+    import("@/components/cyberdeck/operator-docx-workbench").then(
+      (mod) => mod.OperatorDocxWorkbench,
+    ),
+  { ssr: false },
+);
+
 type DroppedOperatorAsset = {
   kind: string;
   name: string;
@@ -77,6 +86,7 @@ type DroppedOperatorAsset = {
   text?: string;
   imageSrc?: string;
   pdfSrc?: string;
+  docxSrc?: string;
   localFilePath?: string;
   surface?: OperatorAssetSurface;
 };
@@ -102,6 +112,7 @@ type OperatorPaneBodyProps = {
   onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
   onOperatorBrowserNavigate: (nextUrl: string) => void;
   onOperatorBrowserUrlChange: (nextUrl: string) => void;
+  onSetOperatorSurfaceMode: (mode: "workspace" | "browser") => void;
   onPasteClipboardToOperator: () => void | Promise<void>;
   onSaveOperatorDocInPlace?: () => void | Promise<void>;
   onSaveOperatorDocAsFile: () => void | Promise<void>;
@@ -117,9 +128,24 @@ type OperatorPaneBodyProps = {
   operatorCanNavigateFileForward: boolean;
   onOperatorFileHistoryBack: () => void;
   onOperatorFileHistoryForward: () => void;
-  onConvertDocumentToMarkdown: (filePath: string) => void | Promise<void>;
+  onConvertDocumentToMarkdown: (
+    filePath: string,
+    options?: { edit?: boolean },
+  ) => void | Promise<void>;
   onExportOperatorMarkdown: (format: OperatorExportFormat) => void | Promise<void>;
 };
+
+function readWebviewNavigationState(view: HTMLWebViewElement | null): {
+  canGoBack: boolean;
+  canGoForward: boolean;
+} {
+  if (!view) return { canGoBack: false, canGoForward: false };
+  try {
+    return { canGoBack: view.canGoBack(), canGoForward: view.canGoForward() };
+  } catch {
+    return { canGoBack: false, canGoForward: false };
+  }
+}
 
 const ZOOM_LEVELS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const;
 
@@ -130,7 +156,6 @@ const OPERATOR_DOC_SURFACE_CLASS =
 const OPERATOR_MARKDOWN_VIEW_CLASS =
   "max-w-none font-mono text-[12px] leading-snug text-green-200 [&_h1]:my-2 [&_h1]:font-mono [&_h1]:text-[12px] [&_h1]:font-normal [&_h2]:my-2 [&_h2]:font-mono [&_h2]:text-[12px] [&_h3]:font-mono [&_h3]:text-[12px] [&_p]:my-1 [&_li]:my-0 [&_pre]:my-2 [&_pre]:bg-black [&_pre]:text-green-300";
 
-const OPERATOR_HEADER_ICON_BTN = LEGACY_TOOLBAR_ICON;
 const OPERATOR_FOLDER_PANE_OPEN_KEY = "echo-mirage-operator-folder-pane-open-v1";
 const OPERATOR_FOLDER_PANE_WIDTH_KEY = "echo-mirage-operator-folder-pane-width-v1";
 const OPERATOR_FOLDER_PANE_DEFAULT_WIDTH = 176;
@@ -175,30 +200,24 @@ function OperatorToolbarIconButton({
   pressed?: boolean;
   children: ReactNode;
 }) {
-  const deckMode = useDeckMode();
   const button = (
-    <button
-      type="button"
+    <CyberdeckControl
+      control={{ size: "toolbar", signal: pressed }}
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
       aria-pressed={pressed}
       className={cn(
-        realmorphismControlClass(deckMode, {
-          size: "toolbar",
-          signal: pressed,
-          legacyClassName: OPERATOR_HEADER_ICON_BTN,
-        }),
         disabled && "disabled:cursor-not-allowed disabled:opacity-30",
         className,
       )}
     >
       {children}
-    </button>
+    </CyberdeckControl>
   );
 
   return (
-    <CyberdeckPaneTooltip label={label}>
+    <CyberdeckPaneTooltip label={label} side="top">
       {disabled ? <span className="inline-flex">{button}</span> : button}
     </CyberdeckPaneTooltip>
   );
@@ -222,57 +241,6 @@ function OperatorFileHistoryNav({
       </OperatorToolbarIconButton>
       <OperatorToolbarIconButton label="Next file" onClick={onForward} disabled={!canForward}>
         <CodexIcon icon={cdxIconArrowNext} className="h-3.5 w-3.5" />
-      </OperatorToolbarIconButton>
-    </div>
-  );
-}
-
-function OperatorViewEditControls({
-  operatorDocMode,
-  onCommitOperatorDocName,
-  onSetOperatorDocMode,
-}: {
-  operatorDocMode: "view" | "edit";
-  onCommitOperatorDocName: () => void;
-  onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
-}) {
-  const deckMode = useDeckMode();
-
-  return (
-    <div className="flex shrink-0 items-center gap-1">
-      <OperatorToolbarIconButton
-        label="View"
-        pressed={operatorDocMode === "view"}
-        onClick={() => {
-          onCommitOperatorDocName();
-          onSetOperatorDocMode("view");
-        }}
-      >
-        <CodexIcon icon={cdxIconEye} className="h-3.5 w-3.5" />
-      </OperatorToolbarIconButton>
-      <CyberdeckPaneTooltip label={operatorDocMode === "edit" ? "Switch to view" : "Switch to edit"}>
-        <span className="inline-flex">
-          <Switch
-            checked={operatorDocMode === "edit"}
-            onCheckedChange={(checked) => {
-              if (!checked) {
-                onCommitOperatorDocName();
-                onSetOperatorDocMode("view");
-                return;
-              }
-              onSetOperatorDocMode("edit");
-            }}
-            aria-label="Toggle operator view edit mode"
-            className={cn("realmorphism-switch shrink-0", deckMode === "ascii" && LEGACY_SWITCH_EMERALD)}
-          />
-        </span>
-      </CyberdeckPaneTooltip>
-      <OperatorToolbarIconButton
-        label="Edit"
-        pressed={operatorDocMode === "edit"}
-        onClick={() => onSetOperatorDocMode("edit")}
-      >
-        <CodexIcon icon={cdxIconEdit} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
     </div>
   );
@@ -314,48 +282,32 @@ function OperatorDocumentTitleRow({
         onBack={onOperatorFileHistoryBack}
         onForward={onOperatorFileHistoryForward}
       />
-      {operatorDocMode === "edit" ? (
-        <input
-          ref={operatorNameInputRef}
-          value={operatorDocNameDraft}
-          onChange={(event) => onOperatorDocNameDraftChange(event.target.value)}
-          onFocus={() => setNameFocused(true)}
-          onBlur={() => {
-            setNameFocused(false);
-            onCommitOperatorDocName();
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            onCommitOperatorDocName();
-            operatorNameInputRef.current?.blur();
-          }}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoComplete="off"
-          autoCorrect="off"
-          aria-label="Rename operator document"
-          className={cn(
-            "min-w-0 w-full max-w-[min(100%,28rem)] flex-1 border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]",
-            nameFocused && "ring-1 ring-emerald-500/35 ring-offset-0 ring-offset-black",
-          )}
-          style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-        />
-      ) : (
-        <CyberdeckPaneTooltip
-          label={displayName}
-          contentClassName="max-w-[90vw] whitespace-nowrap text-left"
-        >
-          <span className="min-w-0 flex-1 cursor-default overflow-hidden">
-            <CyberdeckPaneHeaderTitle
-              className="block truncate"
-              style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-            >
-              {displayName}
-            </CyberdeckPaneHeaderTitle>
-          </span>
-        </CyberdeckPaneTooltip>
-      )}
+      <input
+        ref={operatorNameInputRef}
+        value={operatorDocNameDraft}
+        onChange={(event) => onOperatorDocNameDraftChange(event.target.value)}
+        onFocus={() => setNameFocused(true)}
+        onBlur={() => {
+          setNameFocused(false);
+          onCommitOperatorDocName();
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          onCommitOperatorDocName();
+          operatorNameInputRef.current?.blur();
+        }}
+        spellCheck={false}
+        autoCapitalize="off"
+        autoComplete="off"
+        autoCorrect="off"
+        aria-label="Rename operator document"
+        className={cn(
+          "min-w-0 w-full max-w-[min(100%,28rem)] flex-1 border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]",
+          nameFocused && "ring-1 ring-emerald-500/35 ring-offset-0 ring-offset-black",
+        )}
+        style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
+      />
       {operatorFileSizeLabel ? (
         <span className="shrink-0 font-mono text-[9px] tracking-[0.04em] text-[#5a5a5a]">
           {operatorFileSizeLabel}
@@ -365,26 +317,23 @@ function OperatorDocumentTitleRow({
   );
 }
 
+function OperatorReturnToDocumentButton({ onClick }: { onClick: () => void }) {
+  return (
+    <OperatorToolbarIconButton label="Return to document mode" onClick={onClick}>
+      <LuFileText className="h-3.5 w-3.5" />
+    </OperatorToolbarIconButton>
+  );
+}
+
 function OperatorDocumentHeaderControls({
-  operatorDocMode,
   folderPaneOpen,
-  onCommitOperatorDocName,
-  onSetOperatorDocMode,
   onToggleFolderPane,
 }: {
-  operatorDocMode: "view" | "edit";
   folderPaneOpen: boolean;
-  onCommitOperatorDocName: () => void;
-  onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
   onToggleFolderPane: () => void;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1">
-      <OperatorViewEditControls
-        operatorDocMode={operatorDocMode}
-        onCommitOperatorDocName={onCommitOperatorDocName}
-        onSetOperatorDocMode={onSetOperatorDocMode}
-      />
       <OperatorToolbarIconButton
         label={folderPaneOpen ? "Close folders" : "Open folders"}
         onClick={onToggleFolderPane}
@@ -401,6 +350,8 @@ function OperatorDocumentHeaderControls({
 
 function OperatorDocumentToolStrip({
   operatorDocumentKind,
+  previewSurface,
+  localFilePath,
   textEditingEnabled,
   editToolsEnabled,
   convertOptions,
@@ -418,8 +369,13 @@ function OperatorDocumentToolStrip({
   onSaveOperatorDocInPlace,
   onSaveOperatorDocAsFile,
   operatorCanSaveInPlace = false,
+  docxEditActive = false,
+  onSaveOperatorDocx,
+  onSaveOperatorDocxAs,
 }: {
   operatorDocumentKind: OperatorDocumentPickerKind;
+  previewSurface: OperatorAssetSurface | null;
+  localFilePath: string | null;
   /** Markdown/text/code editor tools (undo, export, save, …). */
   textEditingEnabled: boolean;
   editToolsEnabled: boolean;
@@ -438,12 +394,108 @@ function OperatorDocumentToolStrip({
   onSaveOperatorDocInPlace?: () => void | Promise<void>;
   onSaveOperatorDocAsFile: () => void | Promise<void>;
   operatorCanSaveInPlace?: boolean;
+  docxEditActive?: boolean;
+  onSaveOperatorDocx?: () => void | Promise<void>;
+  onSaveOperatorDocxAs?: () => void | Promise<void>;
 }) {
+  const binaryPreview =
+    previewSurface != null && !isOperatorTextEditableSurface(previewSurface);
+  const resolvedPath = localFilePath?.trim() ?? "";
+  const showSaveControls =
+    (textEditingEnabled && editToolsEnabled) || (docxEditActive && Boolean(onSaveOperatorDocx));
+  const saveInPlaceDisabled = docxEditActive
+    ? !resolvedPath
+    : !editToolsEnabled || !operatorCanSaveInPlace;
+  const saveAsDisabled = docxEditActive ? false : !editToolsEnabled;
+
+  const handleSave = useCallback(() => {
+    if (docxEditActive && onSaveOperatorDocx) {
+      void onSaveOperatorDocx();
+      return;
+    }
+    void (onSaveOperatorDocInPlace ?? onSaveOperatorDocAsFile)();
+  }, [
+    docxEditActive,
+    onSaveOperatorDocInPlace,
+    onSaveOperatorDocAsFile,
+    onSaveOperatorDocx,
+  ]);
+
+  const handleSaveAs = useCallback(() => {
+    if (docxEditActive && onSaveOperatorDocxAs) {
+      void onSaveOperatorDocxAs();
+      return;
+    }
+    void onSaveOperatorDocAsFile();
+  }, [docxEditActive, onSaveOperatorDocAsFile, onSaveOperatorDocxAs]);
+
+  const copyLocalFilePath = useCallback(async () => {
+    if (!resolvedPath) {
+      toast.error("No file path available.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(resolvedPath);
+      toast.success("File path copied.");
+    } catch {
+      toast.error("Could not copy file path.");
+    }
+  }, [resolvedPath]);
+
+  const openLocalFileInSystem = useCallback(async () => {
+    if (!resolvedPath) {
+      toast.error("No file path available.");
+      return;
+    }
+    const bridge = window.echoMirageOpen;
+    if (!bridge?.openPath) {
+      toast.error("Open in viewer requires the Echo Mirage desktop app.");
+      return;
+    }
+    const result = await bridge.openPath(resolvedPath);
+    if (!result.ok) {
+      toast.error(result.error || "Could not open file.");
+    }
+  }, [resolvedPath]);
+
   return (
     <div
       data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
-      className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
+      className="z-10 flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
     >
+      {binaryPreview ? (
+        <>
+          <span className="mr-auto font-mono text-[9px] tracking-[0.08em] text-[#5a5a5a]">
+            {previewSurface.toUpperCase()} PREVIEW
+          </span>
+          <OperatorDocTypeMenu
+            trigger="toolbar"
+            value={normalizeOperatorDocumentKind(operatorDocumentKind)}
+            onChange={onOperatorDocumentKindChange}
+          />
+          <OperatorConvertPicker
+            disabled={converting || convertOptions.length === 0}
+            options={convertOptions}
+            onConvert={onConvert}
+          />
+          <span className="mx-0.5 h-4 w-px shrink-0 bg-[#2d2d2d]" aria-hidden />
+          <OperatorToolbarIconButton
+            label="Copy file path"
+            onClick={() => void copyLocalFilePath()}
+            disabled={!resolvedPath}
+          >
+            <CodexIcon icon={cdxIconCopy} className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+          <OperatorToolbarIconButton
+            label="Open in system viewer"
+            onClick={() => void openLocalFileInSystem()}
+            disabled={!resolvedPath}
+          >
+            <LuExternalLink className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+        </>
+      ) : (
+        <>
       {textEditingEnabled ? (
         <>
           <OperatorToolbarIconButton label="Undo" onClick={onUndo} disabled={!editToolsEnabled || !canUndo}>
@@ -485,17 +537,24 @@ function OperatorDocumentToolStrip({
           >
             <CodexIcon icon={cdxIconPaste} className="h-3.5 w-3.5" />
           </OperatorToolbarIconButton>
+        </>
+      ) : null}
+        </>
+      )}
+      {showSaveControls ? (
+        <>
+          <span className="mx-0.5 h-4 w-px shrink-0 bg-[#2d2d2d]" aria-hidden />
           <OperatorToolbarIconButton
             label="Save"
-            onClick={() => void (onSaveOperatorDocInPlace ?? onSaveOperatorDocAsFile)()}
-            disabled={!editToolsEnabled || !operatorCanSaveInPlace}
+            onClick={handleSave}
+            disabled={saveInPlaceDisabled}
           >
             <LuSave className="h-3.5 w-3.5" />
           </OperatorToolbarIconButton>
           <OperatorToolbarIconButton
             label="Save as"
-            onClick={() => void onSaveOperatorDocAsFile()}
-            disabled={!editToolsEnabled}
+            onClick={handleSaveAs}
+            disabled={saveAsDisabled}
           >
             <CodexIcon icon={cdxIconDownload} className="h-3.5 w-3.5" />
           </OperatorToolbarIconButton>
@@ -525,6 +584,7 @@ export function CyberdeckOperatorPaneBody({
   onSetOperatorDocMode,
   onOperatorBrowserNavigate,
   onOperatorBrowserUrlChange,
+  onSetOperatorSurfaceMode,
   onPasteClipboardToOperator,
   onSaveOperatorDocInPlace,
   onSaveOperatorDocAsFile,
@@ -543,8 +603,9 @@ export function CyberdeckOperatorPaneBody({
   onConvertDocumentToMarkdown,
   onExportOperatorMarkdown,
 }: OperatorPaneBodyProps) {
-  const deckMode = useDeckMode();
   const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
+  const [browserCanGoBack, setBrowserCanGoBack] = useState(false);
+  const [browserCanGoForward, setBrowserCanGoForward] = useState(false);
   const [folderPaneOpen, setFolderPaneOpen] = useState(readPersistedFolderPaneOpen);
   const [folderPaneWidth, setFolderPaneWidth] = useState(readPersistedFolderPaneWidth);
   const [imageZoom, setImageZoom] = useState<number>(1);
@@ -605,12 +666,15 @@ export function CyberdeckOperatorPaneBody({
         { format: "docx" },
       ];
     }
-    if (operatorRenderSurface === "office-unsupported") {
+    if (operatorRenderSurface === "docx") {
       return [
         { format: "docx", disabled: true, disabledReason: "Already DOCX" },
         { format: "markdown" },
         { format: "pdf" },
       ];
+    }
+    if (operatorRenderSurface === "office-unsupported") {
+      return [{ format: "markdown" }];
     }
     if (operatorRenderSurface === "binary-unsafe") {
       return [{ format: "markdown" }];
@@ -619,12 +683,14 @@ export function CyberdeckOperatorPaneBody({
   })();
   const [convertPickBusy, setConvertPickBusy] = useState(false);
   const convertInputRef = useRef<HTMLInputElement>(null);
+  const docxSaveHandlerRef = useRef<(() => Promise<void>) | null>(null);
+  const docxSaveAsHandlerRef = useRef<(() => Promise<void>) | null>(null);
 
   const runConvertFromPath = useCallback(
-    async (filePath: string) => {
+    async (filePath: string, options?: { edit?: boolean }) => {
       setConvertPickBusy(true);
       try {
-        await onConvertDocumentToMarkdown(filePath);
+        await onConvertDocumentToMarkdown(filePath, options);
       } finally {
         setConvertPickBusy(false);
       }
@@ -881,7 +947,11 @@ export function CyberdeckOperatorPaneBody({
   }, [onSaveOperatorDocInPlace]);
 
   useEffect(() => {
-    if (operatorSurfaceMode !== "browser") return;
+    if (operatorSurfaceMode !== "browser") {
+      setBrowserCanGoBack(false);
+      setBrowserCanGoForward(false);
+      return;
+    }
     const view = operatorBrowserRef.current;
     if (!view) return;
 
@@ -890,6 +960,12 @@ export function CyberdeckOperatorPaneBody({
     const blockDrop = (event: Event) => {
       event.preventDefault();
       event.stopPropagation();
+    };
+
+    const syncNavState = () => {
+      const nav = readWebviewNavigationState(view);
+      setBrowserCanGoBack(nav.canGoBack);
+      setBrowserCanGoForward(nav.canGoForward);
     };
 
     const syncUrl = () => {
@@ -902,8 +978,10 @@ export function CyberdeckOperatorPaneBody({
       } catch {
         /* ignore */
       }
+      syncNavState();
     };
 
+    view.addEventListener("dom-ready", syncNavState as EventListener);
     view.addEventListener("did-navigate", syncUrl as EventListener);
     view.addEventListener("did-navigate-in-page", syncUrl as EventListener);
     view.addEventListener("page-title-updated", syncUrl as EventListener);
@@ -911,6 +989,7 @@ export function CyberdeckOperatorPaneBody({
     view.addEventListener("drop", blockDrop);
 
     return () => {
+      view.removeEventListener("dom-ready", syncNavState as EventListener);
       view.removeEventListener("did-navigate", syncUrl as EventListener);
       view.removeEventListener("did-navigate-in-page", syncUrl as EventListener);
       view.removeEventListener("page-title-updated", syncUrl as EventListener);
@@ -931,10 +1010,9 @@ export function CyberdeckOperatorPaneBody({
     const dirty = ctx.dirty ?? (operatorDocText !== operatorDocHistoryTextRef.current);
     const filePath = operatorActiveFilePath ?? ctx.filePath ?? null;
 
-    const observation = {
-      observedAt: Date.now(),
+    void publishMuthurObservation({
       route: typeof window !== "undefined" ? window.location.pathname : "/",
-      surface: "cyberdeck" as const,
+      surface: "cyberdeck",
       observing: true,
       observingPanelId: "operator",
       observingSubsystem: "monaco-editor",
@@ -944,12 +1022,12 @@ export function CyberdeckOperatorPaneBody({
       documentExcerpt: content.slice(0, 200) + (content.length > 200 ? "..." : ""),
       selectedProperty: null,
       selectedUnit: null,
-      visibleLogs: [] as string[],
-      activeTickets: [] as Record<string, unknown>[],
-      operationalMode: "OBSERVE" as const,
+      visibleLogs: [],
+      activeTickets: [],
+      operationalMode: "OBSERVE",
       transcriptState: null,
-      operationalWarnings: [] as string[],
-      continuityIndicators: [] as string[],
+      operationalWarnings: [],
+      continuityIndicators: [],
       editor: {
         active: ctx.active ?? true,
         filePath,
@@ -962,26 +1040,95 @@ export function CyberdeckOperatorPaneBody({
         cursorLine: ctx.cursorLine ?? null,
         cursorColumn: ctx.cursorColumn ?? null,
         dirty,
-        readOnly: operatorDocMode !== "edit",
+        readOnly: false,
       },
-    };
-
-    const payload = JSON.stringify({ snapshot: observation });
-    fetch("/api/muthur/observation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: payload,
-      keepalive: true,
-    }).catch((err) => {
-      console.warn("[operator-pane] observation send failed:", err);
     });
-  }, [operatorTextDocument, operatorDroppedAsset, operatorActiveFilePath, operatorDocText, operatorDocMode]);
+  }, [operatorTextDocument, operatorDroppedAsset, operatorActiveFilePath, operatorDocText]);
+
+  // Tell MUTHUR when a DOCX (not Monaco) is open in the operator pane
+  useEffect(() => {
+    if (operatorRenderSurface !== "docx" || !operatorDroppedAsset) return;
+
+    const filePath = operatorActiveFilePath ?? operatorDroppedAsset.localFilePath ?? null;
+
+    void publishMuthurObservation({
+      route: typeof window !== "undefined" ? window.location.pathname : "/",
+      surface: "cyberdeck",
+      observing: true,
+      observingPanelId: "operator",
+      observingSubsystem: "docx-editor",
+      activeTab: null,
+      activePane: "operator",
+      visibleDocument: operatorDroppedAsset.name,
+      documentExcerpt: `DOCX // EDIT // ${operatorDroppedAsset.name}`,
+      selectedProperty: null,
+      selectedUnit: null,
+      visibleLogs: [],
+      activeTickets: [],
+      operationalMode: "OBSERVE",
+      transcriptState: null,
+      operationalWarnings: [],
+      continuityIndicators: [],
+      editor: {
+        active: false,
+        filePath,
+        fileName: operatorDroppedAsset.name,
+        fileExtension: "docx",
+        language: "docx",
+        content: null,
+        contentExcerpt:
+          "(DOCX WYSIWYG — MUTHUR cannot type here directly; convert to markdown for text edits)",
+        selectionText: null,
+        cursorLine: null,
+        cursorColumn: null,
+        dirty: false,
+        readOnly: false,
+      },
+    });
+  }, [
+    operatorActiveFilePath,
+    operatorDroppedAsset,
+    operatorRenderSurface,
+  ]);
 
   const navigateBrowser = () => {
     const nextUrl = browserDraft.trim();
     if (!nextUrl) return;
     onOperatorBrowserNavigate(nextUrl);
   };
+
+  const returnToDocumentMode = useCallback(() => {
+    onSetOperatorSurfaceMode("workspace");
+    setFolderPaneOpen(true);
+  }, [onSetOperatorSurfaceMode]);
+
+  const folderPaneRail =
+    operatorSurfaceMode === "workspace" && folderPaneOpen ? (
+      <>
+        <button
+          type="button"
+          role="separator"
+          aria-label="Resize folder pane"
+          aria-orientation="vertical"
+          title="Resize folder pane"
+          onPointerDown={beginFolderPaneResize}
+          onDoubleClick={() => setFolderPaneWidth(OPERATOR_FOLDER_PANE_DEFAULT_WIDTH)}
+          className="group relative z-10 w-2 shrink-0 cursor-col-resize border-l border-[#141414] bg-black transition hover:border-emerald-500/50 focus:outline-none focus-visible:border-emerald-400/80"
+        >
+          <span className="absolute left-1/2 top-1/2 h-10 w-px -translate-x-1/2 -translate-y-1/2 bg-[#2d2d2d] transition group-hover:bg-emerald-400/70" />
+        </button>
+        <div
+          className="min-w-0 shrink-0 border-l border-[#1c1c1c]"
+          style={{ width: `${folderPaneWidth}px` }}
+        >
+          <OperatorDocFolderPane
+            className="w-full"
+            onOpenFile={onOpenOperatorFolderFile}
+            onRootsChange={onOperatorFolderRootsChange}
+          />
+        </div>
+      </>
+    ) : null;
 
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
@@ -1056,26 +1203,18 @@ export function CyberdeckOperatorPaneBody({
           right={
             operatorSurfaceMode === "browser" ? (
               <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em]">
+                <OperatorReturnToDocumentButton onClick={returnToDocumentMode} />
                 <span className="text-emerald-200">LIVE WEB</span>
                 <span className="rounded border border-[#2d2d2d] px-2 py-0.5 text-[#8a8a8a]">
                   ENGINE: {operatorBrowserEngine}
                 </span>
               </div>
-            ) : operatorDroppedAsset && operatorSurfaceMode === "workspace" ? (
+            ) : operatorSurfaceMode === "workspace" ? (
               <OperatorDocumentHeaderControls
-                operatorDocMode={operatorDocMode}
                 folderPaneOpen={folderPaneOpen}
-                onCommitOperatorDocName={onCommitOperatorDocName}
-                onSetOperatorDocMode={onSetOperatorDocMode}
                 onToggleFolderPane={() => setFolderPaneOpen((open) => !open)}
               />
-            ) : operatorDroppedAsset ? (
-              <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                <span>{(operatorRenderSurface ?? operatorDroppedAsset.kind).toUpperCase()}</span>
-              </div>
-            ) : (
-              null
-            )
+            ) : null
           }
         />
         {operatorSurfaceMode === "browser" ? (
@@ -1083,6 +1222,7 @@ export function CyberdeckOperatorPaneBody({
             data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
             className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
           >
+            <OperatorReturnToDocumentButton onClick={returnToDocumentMode} />
             <OperatorToolbarIconButton
               label="Paste"
               onClick={() => void onPasteClipboardToOperator()}
@@ -1094,8 +1234,10 @@ export function CyberdeckOperatorPaneBody({
         {operatorDroppedAsset && operatorSurfaceMode === "workspace" ? (
           <OperatorDocumentToolStrip
             operatorDocumentKind={operatorDocumentKind}
+            previewSurface={operatorRenderSurface}
+            localFilePath={operatorActiveFilePath ?? operatorDroppedAsset.localFilePath ?? null}
             textEditingEnabled={operatorTextDocument}
-            editToolsEnabled={operatorTextDocument && operatorDocMode === "edit"}
+            editToolsEnabled={operatorTextDocument}
             convertOptions={operatorConvertOptions}
             converting={convertPickBusy}
             onConvert={handleSharedConvert}
@@ -1115,6 +1257,13 @@ export function CyberdeckOperatorPaneBody({
             onSaveOperatorDocInPlace={saveOperatorDocInPlaceAndMark}
             onSaveOperatorDocAsFile={onSaveOperatorDocAsFile}
             operatorCanSaveInPlace={operatorCanSaveInPlace}
+            docxEditActive={operatorRenderSurface === "docx"}
+            onSaveOperatorDocx={async () => {
+              await docxSaveHandlerRef.current?.();
+            }}
+            onSaveOperatorDocxAs={async () => {
+              await docxSaveAsHandlerRef.current?.();
+            }}
           />
         ) : null}
         <div className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -1131,29 +1280,44 @@ export function CyberdeckOperatorPaneBody({
             }}
           >
             <div className="flex items-center gap-2 rounded-sm border border-[#1c1c1c] bg-black/80 p-2">
-              <button
-                type="button"
-                onClick={() => operatorBrowserRef.current?.goBack()}
-                disabled={!operatorBrowserRef.current?.canGoBack()}
-                className={realmorphismActionClass(deckMode, "neutral")}
+              <CyberdeckActionButton
+                variant="neutral"
+                onClick={() => {
+                  try {
+                    operatorBrowserRef.current?.goBack();
+                  } catch {
+                    /* webview not ready */
+                  }
+                }}
+                disabled={!browserCanGoBack}
               >
                 BACK
-              </button>
-              <button
-                type="button"
-                onClick={() => operatorBrowserRef.current?.goForward()}
-                disabled={!operatorBrowserRef.current?.canGoForward()}
-                className={realmorphismActionClass(deckMode, "neutral")}
+              </CyberdeckActionButton>
+              <CyberdeckActionButton
+                variant="neutral"
+                onClick={() => {
+                  try {
+                    operatorBrowserRef.current?.goForward();
+                  } catch {
+                    /* webview not ready */
+                  }
+                }}
+                disabled={!browserCanGoForward}
               >
                 FORWARD
-              </button>
-              <button
-                type="button"
-                onClick={() => operatorBrowserRef.current?.reload()}
-                className={realmorphismActionClass(deckMode, "neutral")}
+              </CyberdeckActionButton>
+              <CyberdeckActionButton
+                variant="neutral"
+                onClick={() => {
+                  try {
+                    operatorBrowserRef.current?.reload();
+                  } catch {
+                    /* webview not ready */
+                  }
+                }}
               >
                 RELOAD
-              </button>
+              </CyberdeckActionButton>
               <input
                 value={browserDraft}
                 onChange={(event) => setBrowserDraft(event.target.value)}
@@ -1170,13 +1334,9 @@ export function CyberdeckOperatorPaneBody({
                 className="min-w-0 flex-1 border-0 bg-transparent font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none placeholder:text-[#5a5a5a]"
                 style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
               />
-              <button
-                type="button"
-                onClick={navigateBrowser}
-                className={realmorphismActionClass(deckMode, "accent")}
-              >
+              <CyberdeckActionButton variant="accent" onClick={navigateBrowser}>
                 GO
-              </button>
+              </CyberdeckActionButton>
             </div>
             <div className="min-h-0 flex-1 overflow-hidden rounded-sm border border-[#1c1c1c] bg-black">
               <webview
@@ -1226,8 +1386,8 @@ export function CyberdeckOperatorPaneBody({
                       label="Zoom out"
                       disabled={imageZoomIndexRef.current === 0}
                     >
-                      <button
-                        type="button"
+                      <CyberdeckControl
+                        control={{ size: "micro" }}
                         onClick={() => {
                           const idx = imageZoomIndexRef.current;
                           if (idx > 0) {
@@ -1237,14 +1397,9 @@ export function CyberdeckOperatorPaneBody({
                         }}
                         disabled={imageZoomIndexRef.current === 0}
                         aria-label="Zoom out"
-                        className={realmorphismControlClass(deckMode, {
-                          size: "micro",
-                          legacyClassName:
-                            "flex h-5 w-5 items-center justify-center rounded border border-[#2d2d2d] bg-black font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-30",
-                        })}
                       >
                         −
-                      </button>
+                      </CyberdeckControl>
                     </CyberdeckControlTooltip>
                     <span className="w-10 text-center font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
                       {Math.round(imageZoom * 100)}%
@@ -1253,8 +1408,8 @@ export function CyberdeckOperatorPaneBody({
                       label="Zoom in"
                       disabled={imageZoomIndexRef.current === ZOOM_LEVELS.length - 1}
                     >
-                      <button
-                        type="button"
+                      <CyberdeckControl
+                        control={{ size: "micro" }}
                         onClick={() => {
                           const idx = imageZoomIndexRef.current;
                           if (idx < ZOOM_LEVELS.length - 1) {
@@ -1264,51 +1419,33 @@ export function CyberdeckOperatorPaneBody({
                         }}
                         disabled={imageZoomIndexRef.current === ZOOM_LEVELS.length - 1}
                         aria-label="Zoom in"
-                        className={realmorphismControlClass(deckMode, {
-                          size: "micro",
-                          legacyClassName:
-                            "flex h-5 w-5 items-center justify-center rounded border border-[#2d2d2d] bg-black font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-30",
-                        })}
                       >
                         +
-                      </button>
+                      </CyberdeckControl>
                     </CyberdeckControlTooltip>
                     <CyberdeckControlTooltip label="Reset zoom">
-                      <button
-                        type="button"
+                      <CyberdeckControl
+                        control={{ size: "compact" }}
                         onClick={() => {
                           imageZoomIndexRef.current = 3;
                           setImageZoom(1);
                         }}
                         aria-label="Reset zoom"
-                        className={realmorphismControlClass(deckMode, {
-                          size: "compact",
-                          legacyClassName:
-                            "ml-1 flex h-5 items-center justify-center rounded border border-[#2d2d2d] bg-black px-1.5 font-mono text-[8px] tracking-[0.04em] text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200",
-                        })}
+                        className="ml-1"
                       >
                         FIT
-                      </button>
+                      </CyberdeckControl>
                     </CyberdeckControlTooltip>
                   </div>
                 </div>
-                {operatorDroppedAsset.imageSrc ? (
-                  <div
-                    className="overflow-auto rounded-sm border border-[#1c1c1c] bg-black"
-                    style={{ maxHeight: "65vh" }}
-                  >
-                    <img
-                      src={operatorDroppedAsset.imageSrc}
-                      alt={operatorDroppedAsset.name}
-                      style={{
-                        transform: `scale(${imageZoom})`,
-                        transformOrigin: "top left",
-                        maxWidth: "none",
-                      }}
-                      className="block w-full rounded-sm object-contain"
-                      draggable={false}
-                    />
-                  </div>
+                {operatorDroppedAsset.imageSrc || operatorDroppedAsset.localFilePath ? (
+                  <OperatorImagePreview
+                    src={operatorDroppedAsset.imageSrc}
+                    localFilePath={operatorDroppedAsset.localFilePath}
+                    alt={operatorDroppedAsset.name}
+                    zoom={imageZoom}
+                    className="block w-full rounded-sm object-contain"
+                  />
                 ) : (
                   <div className="rounded-sm border border-dashed border-[#1c1c1c] bg-black p-4 font-mono text-[10px] leading-snug text-[#8a8a8a]">
                     Could not load image preview.
@@ -1320,7 +1457,26 @@ export function CyberdeckOperatorPaneBody({
                 fileName={operatorDroppedAsset.name}
                 pdfSrc={operatorDroppedAsset.pdfSrc}
                 localFilePath={operatorDroppedAsset.localFilePath}
-                mode={operatorDocMode}
+                mode="edit"
+              />
+            ) : operatorRenderSurface === "docx" ? (
+              <OperatorDocxWorkbench
+                fileName={operatorDroppedAsset.name}
+                docxSrc={operatorDroppedAsset.docxSrc}
+                localFilePath={operatorDroppedAsset.localFilePath}
+                mode="edit"
+                onBindDocxSave={(handler) => {
+                  docxSaveHandlerRef.current = handler;
+                }}
+                onBindDocxSaveAs={(handler) => {
+                  docxSaveAsHandlerRef.current = handler;
+                }}
+                onConvertToMarkdown={
+                  operatorDroppedAsset.localFilePath
+                    ? () =>
+                        runConvertFromPath(operatorDroppedAsset.localFilePath!, { edit: true })
+                    : undefined
+                }
               />
             ) : operatorRenderSurface === "office-unsupported" ? (
               <OperatorUnsupportedPreview
@@ -1335,55 +1491,21 @@ export function CyberdeckOperatorPaneBody({
                 fileName={operatorDroppedAsset.name}
               />
             ) : operatorTextDocument ? (
-              operatorDocMode === "edit" ? (
-                <OperatorMonacoWorkbench
-                  activeFilePath={operatorActiveFilePath}
-                  fileName={operatorDroppedAsset.name}
-                  documentKind={operatorDocumentKind}
-                  onDocumentKindChange={onOperatorDocumentKindChange}
-                  value={operatorDocText}
-                  onChange={(next) => applyOperatorDocText(next, "debounced")}
-                  onSave={async () => {
-                    if (operatorCanSaveInPlace && onSaveOperatorDocInPlace) {
-                      await saveOperatorDocInPlaceAndMark();
-                    } else {
-                      await onSaveOperatorDocAsFile();
-                    }
-                  }}
-                />
-              ) : operatorShowsMarkdown ? (
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-sm border border-[#1c1c1c] bg-black">
-                  <div className="flex items-center gap-1 border-b border-[#1c1c1c] px-2 py-1 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
-                    <OperatorDocTypeMenu
-                      value={normalizeOperatorDocumentKind(operatorDocumentKind)}
-                      onChange={onOperatorDocumentKindChange}
-                      trigger="status"
-                    />
-                    <span>// VIEW</span>
-                  </div>
-                  <div className={`min-h-0 flex-1 overflow-auto ${OPERATOR_DOC_SURFACE_CLASS}`}>
-                    <Streamdown className={OPERATOR_MARKDOWN_VIEW_CLASS}>
-                      {operatorDocText}
-                    </Streamdown>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-sm border border-[#1c1c1c] bg-black">
-                  <div className="flex items-center gap-1 border-b border-[#1c1c1c] px-2 py-1 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
-                    <OperatorDocTypeMenu
-                      value={normalizeOperatorDocumentKind(operatorDocumentKind)}
-                      onChange={onOperatorDocumentKindChange}
-                      trigger="status"
-                    />
-                    <span>// VIEW</span>
-                  </div>
-                  <pre
-                    className={`min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words ${OPERATOR_DOC_SURFACE_CLASS}`}
-                  >
-                    {operatorDocText}
-                  </pre>
-                </div>
-              )
+              <OperatorMonacoWorkbench
+                activeFilePath={operatorActiveFilePath}
+                fileName={operatorDroppedAsset.name}
+                documentKind={operatorDocumentKind}
+                onDocumentKindChange={onOperatorDocumentKindChange}
+                value={operatorDocText}
+                onChange={(next) => applyOperatorDocText(next, "debounced")}
+                onSave={async () => {
+                  if (operatorCanSaveInPlace && onSaveOperatorDocInPlace) {
+                    await saveOperatorDocInPlaceAndMark();
+                  } else {
+                    await onSaveOperatorDocAsFile();
+                  }
+                }}
+              />
             ) : (
               <div className="rounded-sm border border-dashed border-amber-700/60 bg-black p-4 font-mono text-[10px] leading-snug text-amber-300/90">
                 {operatorDroppedAsset.kind === "video"
@@ -1392,38 +1514,14 @@ export function CyberdeckOperatorPaneBody({
               </div>
             )}
             </div>
-            {operatorDroppedAsset && operatorSurfaceMode === "workspace" ? (
-              folderPaneOpen ? (
-                <>
-                  <button
-                    type="button"
-                    role="separator"
-                    aria-label="Resize folder pane"
-                    aria-orientation="vertical"
-                    title="Resize folder pane"
-                    onPointerDown={beginFolderPaneResize}
-                    onDoubleClick={() => setFolderPaneWidth(OPERATOR_FOLDER_PANE_DEFAULT_WIDTH)}
-                    className="group relative z-10 w-2 shrink-0 cursor-col-resize border-l border-[#141414] bg-black transition hover:border-emerald-500/50 focus:outline-none focus-visible:border-emerald-400/80"
-                  >
-                    <span className="absolute left-1/2 top-1/2 h-10 w-px -translate-x-1/2 -translate-y-1/2 bg-[#2d2d2d] transition group-hover:bg-emerald-400/70" />
-                  </button>
-                  <div
-                    className="min-w-0 shrink-0 border-l border-[#1c1c1c]"
-                    style={{ width: `${folderPaneWidth}px` }}
-                  >
-                    <OperatorDocFolderPane
-                      className="w-full"
-                      onOpenFile={onOpenOperatorFolderFile}
-                      onRootsChange={onOperatorFolderRootsChange}
-                    />
-                  </div>
-                </>
-              ) : null
-            ) : null}
+            {folderPaneRail}
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center p-6 text-center font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-            DROP OR PASTE CODE, TEXT, MARKDOWN, OR IMAGE FILES HERE TO VIEW AND EDIT THEM.
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <div className="flex flex-1 items-center justify-center p-6 text-center font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
+              DROP OR PASTE CODE, TEXT, MARKDOWN, OR IMAGE FILES HERE TO VIEW AND EDIT THEM.
+            </div>
+            {folderPaneRail}
           </div>
         )}
         </div>

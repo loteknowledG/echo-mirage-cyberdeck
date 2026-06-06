@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
-import { useDeckMode } from "@/lib/deck-mode";
-import { realmorphismActionClass } from "@/lib/cyberdeck/realmorphism-control";
 
 const BOOT_KEY = "echo-mirage-boot-completed-v1";
 
@@ -20,7 +19,6 @@ const BOOT_LINES = [
 ];
 
 export function CyberdeckBootSequence() {
-  const deckMode = useDeckMode();
   const [visibleCount, setVisibleCount] = useState(0);
   const [rendered, setRendered] = useState(false);
   const [fadingOut, setFadingOut] = useState(false);
@@ -68,8 +66,9 @@ export function CyberdeckBootSequence() {
     <div
       className={`fixed inset-0 z-[110] bg-black px-4 py-6 font-mono text-[11px] text-emerald-300 transition-opacity duration-300 ${fadingOut ? "opacity-0" : "opacity-100"}`}
     >
-      <button
-        type="button"
+      <CyberdeckActionButton
+        variant="neutral"
+        className="absolute right-3 top-2"
         onClick={() => {
           if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
             window.localStorage.setItem(BOOT_KEY, "1");
@@ -77,10 +76,9 @@ export function CyberdeckBootSequence() {
           setFadingOut(true);
           window.setTimeout(() => setRendered(false), 220);
         }}
-        className={`absolute right-3 top-2 ${realmorphismActionClass(deckMode, "neutral")}`}
       >
         Skip
-      </button>
+      </CyberdeckActionButton>
       <div className="mx-auto mt-12 max-w-2xl space-y-1 border border-[#1b1b1b] bg-black/90 p-4">
         {BOOT_LINES.slice(0, visibleCount).map((line) => (
           <div key={line}>{line}</div>

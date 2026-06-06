@@ -48,7 +48,15 @@ function main() {
   );
 
   assert.equal(
-    resolveOperatorAssetSurface({ surface: "office-unsupported", kind: "file", name: "brief.docx" }),
+    resolveOperatorAssetSurface({
+      kind: "docx",
+      name: "brief.docx",
+      docxSrc: "blob:docx",
+    }),
+    "docx",
+  );
+  assert.equal(
+    resolveOperatorAssetSurface({ surface: "office-unsupported", kind: "file", name: "legacy.doc" }),
     "office-unsupported",
   );
 

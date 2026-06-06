@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from "react";
+import type { CSSProperties, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, SetStateAction } from "react";
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, startTransition } from "react";
 import { flushSync } from "react-dom";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
@@ -93,6 +93,12 @@ import {
   operatorMarkdownWasHousekept,
 } from "@/lib/operator-markdown-housekeeping";
 import { parseConvertDocumentIntent } from "@/lib/muthur-document-conversion-intent";
+import { isDocumentEditIntent } from "@/lib/muthur/document-edit-intent";
+import {
+  applyMuthurOperatorEdits,
+  parseOperatorEditsHeader,
+} from "@/lib/operator-muthur-edit";
+import { splitMuthurStreamPayload } from "@/lib/muthur-core/muthur-stream-payload";
 import {
   parseExportMarkdownToDocxIntent,
   parseExportMarkdownToPdfIntent,
@@ -123,6 +129,12 @@ import {
   operatorFileHistoryForwardIndex,
   pushOperatorFileHistory,
 } from "@/lib/operator-file-history";
+import {
+  isPersistableOperatorWorkspace,
+  loadOperatorWorkspace,
+  operatorFilePathNeedsFolderReload,
+  restoredAssetFromPersistence,
+} from "@/lib/operator-workspace-persistence";
 import {
   readFileFromFolderRoot,
   type OperatorDocFolderRoot,
@@ -157,18 +169,15 @@ import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { loadDeckMode, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
+import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
 import { MORPHISM_ZONE_REALMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import {
-  LEGACY_COMPACT_AMBER,
-  LEGACY_COMPACT_CONTROL,
-  LEGACY_SEND_CONTROL,
-  LEGACY_STOP_CONTROL,
-  realmorphismActionClass,
-  realmorphismControlClass,
-  realmorphismMenuItemClass,
-  voiceControlClass,
-} from "@/lib/cyberdeck/realmorphism-control";
+  CyberdeckControlButton,
+  CyberdeckMenuButton,
+  MuthurControlButton,
+} from "@/components/cyberdeck/cyberdeck-control-button";
+import { muthurVoiceControlOptions } from "@/lib/cyberdeck/muthur-depth-control";
+import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
 import { isMuted, playBeep, setMuted } from "@/lib/deck-audio";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
 import { useDebouncedEffect } from "@/lib/use-debounced-effect";
@@ -176,6 +185,7 @@ import { cn } from "@/lib/utils";
 import { useCyberdeckTabStore, getCyberdeckSelectedRailTabId, type CyberdeckServerId } from "@/lib/cyberdeck-tab-store";
 import { CyberdeckServerRail } from "@/components/cyberdeck/cyberdeck-server-rail";
 import { CyberdeckTabPersistence } from "@/components/cyberdeck/cyberdeck-tab-persistence";
+import { OperatorWorkspacePersistence } from "@/components/cyberdeck/operator-workspace-persistence";
 import {
   CyberdeckCustomTabPanes,
   CyberdeckFixedServerPane,
@@ -203,7 +213,7 @@ import {
 } from "@/lib/muthur/execution/parse-legacy-tool-json";
 import { enqueueMuthurActions } from "@/lib/muthur/execution/use-muthur-execution-runtime";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
-import { publishMuthurObservation } from "@/lib/muthur/observation/publish-observation";
+import { publishMuthurObservation, flushMuthurObservation } from "@/lib/muthur/observation/publish-observation";
 import { OBSERVE_TRANSCRIPT_PREFIX } from "@/components/muthur/observe-presence-glyph";
 import {
   getMuthurHelpText,
@@ -315,7 +325,7 @@ const fixedServers = [
 const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
 const CHAT_STORAGE_KEY = "echo-mirage-chat-messages-v1";
 const CHAT_STREAM_STORAGE_KEY = "echo-mirage-chat-stream-text-v1";
-const CHAT_UPLINK_TIMEOUT_MS = 120_000;
+const CHAT_UPLINK_TIMEOUT_MS = 300_000;
 const MODEL_PROBE_MIN_INTERVAL_MS = 15_000;
 const PROVIDER_RATE_LIMIT_COOLDOWN_MS = 90_000;
 const INPUT_HISTORY_KEY = "echo-mirage-chat-history-v1";
@@ -408,6 +418,7 @@ type DroppedOperatorAsset = {
     | "json"
     | "markdown"
     | "pdf"
+    | "docx"
     | "python"
     | "text"
     | "typescript"
@@ -421,6 +432,7 @@ type DroppedOperatorAsset = {
   text?: string;
   imageSrc?: string;
   pdfSrc?: string;
+  docxSrc?: string;
   localFilePath?: string;
   surface?: OperatorAssetSurface;
 };
@@ -954,6 +966,10 @@ export default function CyberdeckApp() {
   const [operatorFolderRootsCount, setOperatorFolderRootsCount] = useState(0);
   const operatorFileHistoryLoadersRef = useRef<Map<string, () => Promise<void>>>(new Map());
   const operatorPreviewBlobUrlRef = useRef<string | null>(null);
+  const operatorWorkspaceHydratedRef = useRef(false);
+  const operatorWorkspaceRestoreRef = useRef<{ activeFilePath: string; docMode: "view" | "edit" } | null>(
+    null,
+  );
   const [operatorBrowserUrl, setOperatorBrowserUrl] = useState(OPERATOR_BROWSER_HOME_URL);
   const [operatorBrowserSnapshot, setOperatorBrowserSnapshot] = useState("");
   const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
@@ -1004,7 +1020,7 @@ export default function CyberdeckApp() {
   const [heapNameDraft, setHeapNameDraft] = useState("");
   const [heapTextDraft, setHeapTextDraft] = useState("");
   const [heapHydrated, setHeapHydrated] = useState(false);
-  const [deckMode, setDeckMode] = useState<DeckMode>("realmorphism");
+  const [deckMode, setDeckMode] = useState<DeckMode>(() => loadDeckMode());
   const [audioMuted, setAudioMutedState] = useState<boolean>(() => isMuted());
   const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -1911,12 +1927,17 @@ export default function CyberdeckApp() {
   }, [muthurMemory, muthurMemoryHydrated]);
 
   useEffect(() => {
-    setDeckMode(loadDeckMode());
-  }, []);
+    saveDeckMode(deckMode);
+    notifyDeckModeChange(deckMode);
+  }, [deckMode]);
 
   useEffect(() => {
-    saveDeckMode(deckMode);
-  }, [deckMode]);
+    const onRequestEditMode = () => setOperatorDocMode("edit");
+    window.addEventListener("echo-mirage-operator-request-edit-mode", onRequestEditMode);
+    return () => {
+      window.removeEventListener("echo-mirage-operator-request-edit-mode", onRequestEditMode);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2098,6 +2119,38 @@ export default function CyberdeckApp() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!deckUiHydrated || operatorWorkspaceHydratedRef.current) return;
+    operatorWorkspaceHydratedRef.current = true;
+
+    const persisted = loadOperatorWorkspace();
+    if (!persisted || !isPersistableOperatorWorkspace(persisted.asset, persisted.activeFilePath)) {
+      return;
+    }
+
+    setOperatorDocMode("edit");
+    operatorFileHistoryRef.current = persisted.fileHistory;
+    operatorFileHistoryIndexRef.current = persisted.fileHistoryIndex;
+    setOperatorFileHistory(persisted.fileHistory);
+    setOperatorFileHistoryIndex(persisted.fileHistoryIndex);
+    setOperatorDocNameDraft(persisted.asset.name);
+
+    const logicalPath = persisted.activeFilePath;
+    const restoredAsset = restoredAssetFromPersistence(persisted.asset) as DroppedOperatorAsset;
+    setOperatorDroppedAsset(restoredAsset);
+
+    if (logicalPath && operatorFilePathNeedsFolderReload(logicalPath)) {
+      operatorWorkspaceRestoreRef.current = {
+        activeFilePath: logicalPath,
+        docMode: persisted.docMode,
+      };
+      setOperatorActiveFilePath(logicalPath);
+      return;
+    }
+
+    setOperatorActiveFilePath(logicalPath);
+  }, [deckUiHydrated]);
+
   const buildCyberdeckUiPayload = useCallback(
     (): CyberdeckUiState => {
       const { server, customTabs, activeCustomTabId } = useCyberdeckTabStore.getState();
@@ -2182,7 +2235,11 @@ export default function CyberdeckApp() {
 
   useEffect(() => {
     publishOperatorObservation();
-    return useCyberdeckTabStore.subscribe(() => publishOperatorObservation());
+    const unsubscribe = useCyberdeckTabStore.subscribe(() => publishOperatorObservation());
+    return () => {
+      unsubscribe();
+      flushMuthurObservation();
+    };
   }, [publishOperatorObservation]);
 
   useEffect(() => {
@@ -2278,7 +2335,7 @@ export default function CyberdeckApp() {
   );
 
   const openConvertedMarkdownInOperator = useCallback(
-    async (filePath: string) => {
+    async (filePath: string, options?: { edit?: boolean }): Promise<boolean> => {
       const convertHints = {
         activeFilePath: operatorActiveFilePath,
         localFilePath: operatorDroppedAsset?.localFilePath ?? null,
@@ -2287,6 +2344,10 @@ export default function CyberdeckApp() {
           diskPath: root.diskPath,
         })),
       };
+      const toastId =
+        options?.edit === true
+          ? toast.loading("Converting DOCX for editing…")
+          : undefined;
       setMessages((prev) => [
         ...prev,
         { role: "system", text: `MUTHUR_CONVERT // ${filePath}` },
@@ -2320,6 +2381,7 @@ export default function CyberdeckApp() {
           filePath.replace(/\.(pdf|docx)$/i, ".md").split(/[/\\]/).pop() ||
           "converted.md";
         const convertHistoryPath = `convert://${filePath}`;
+        const openInEditMode = options?.edit === true;
         await openOperatorFile(convertHistoryPath, async () => {
           operatorKindManualRef.current = false;
           setOperatorTextAsset({
@@ -2332,23 +2394,38 @@ export default function CyberdeckApp() {
           useCyberdeckTabStore.getState().setServer("m");
           setNavRailContext("gateway");
           setOperatorSurfaceMode("workspace");
-          setOperatorDocMode("view");
+          setOperatorDocMode("edit");
         });
-        toast.success(`Converted ${filePath} → markdown in operator.`);
+        const successMessage = openInEditMode
+          ? `Editing ${outputName} (converted from DOCX). Export to DOCX when done.`
+          : `Converted ${filePath} → markdown in operator.`;
+        if (toastId !== undefined) {
+          toast.success(successMessage, { id: toastId });
+        } else {
+          toast.success(successMessage);
+        }
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            text: `Converted **${filePath}** to markdown.\n\nOutput: \`${payload.outputPath || outputName}\`\n\nOpened in OperatorMarkdownViewer as \`text/markdown\`.`,
+            text: openInEditMode
+              ? `Opened **${outputName}** for editing (converted from \`${filePath}\`).\n\nUse export to DOCX when you are done.`
+              : `Converted **${filePath}** to markdown.\n\nOutput: \`${payload.outputPath || outputName}\`\n\nOpened in OperatorMarkdownViewer as \`text/markdown\`.`,
           },
         ]);
+        return true;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Document conversion failed.";
-        toast.error(message);
+        if (toastId !== undefined) {
+          toast.error(message, { id: toastId });
+        } else {
+          toast.error(message);
+        }
         setMessages((prev) => [
           ...prev,
           { role: "system", text: `MUTHUR_CONVERT // FAILED // ${message}` },
         ]);
+        return false;
       }
     },
     [
@@ -2358,6 +2435,10 @@ export default function CyberdeckApp() {
       setOperatorTextAsset,
     ],
   );
+
+  const handleSetOperatorDocMode = useCallback((_next: SetStateAction<"view" | "edit">) => {
+    setOperatorDocMode("edit");
+  }, []);
 
   const handleOperatorDocumentKindChange = useCallback((nextKind: OperatorDocumentPickerKind) => {
     operatorKindManualRef.current = true;
@@ -2384,6 +2465,26 @@ export default function CyberdeckApp() {
           surface: "pdf",
         };
       }
+      if (nextKind === "docx") {
+        const hasDocxPreview = Boolean(
+          prev.docxSrc ||
+            prev.surface === "docx" ||
+            prev.name.toLowerCase().endsWith(".docx") ||
+            prev.localFilePath?.toLowerCase().endsWith(".docx"),
+        );
+        if (!hasDocxPreview) {
+          toast.error("Open a DOCX file before switching document type to DOCX.");
+          return prev;
+        }
+        const { text: _text, imageSrc: _imageSrc, pdfSrc: _pdfSrc, ...rest } = prev;
+        return {
+          ...rest,
+          kind: nextKind,
+          mimeType: operatorMimeTypeForKind(nextKind),
+          name,
+          surface: "docx",
+        };
+      }
       return {
         ...prev,
         kind: nextKind,
@@ -2391,6 +2492,7 @@ export default function CyberdeckApp() {
         name,
         surface: undefined,
         pdfSrc: undefined,
+        docxSrc: undefined,
         text: prev.text ?? "",
       };
     });
@@ -2461,7 +2563,7 @@ export default function CyberdeckApp() {
       text: "",
     });
     setOperatorDocNameDraft("");
-    setOperatorDocMode("view");
+    setOperatorDocMode("edit");
   }, [setOperatorTextAsset]);
 
   useEffect(() => {
@@ -2903,6 +3005,7 @@ export default function CyberdeckApp() {
       ...(ingested.text !== undefined ? { text: ingested.text } : {}),
       ...(ingested.imageSrc ? { imageSrc: ingested.imageSrc } : {}),
       ...(ingested.pdfSrc ? { pdfSrc: ingested.pdfSrc } : {}),
+      ...(ingested.docxSrc ? { docxSrc: ingested.docxSrc } : {}),
       ...(hints?.diskAbsolutePath ? { localFilePath: hints.diskAbsolutePath } : {}),
     };
 
@@ -2913,6 +3016,9 @@ export default function CyberdeckApp() {
       if (binarySafe.pdfSrc?.startsWith("blob:")) {
         operatorPreviewBlobUrlRef.current = binarySafe.pdfSrc;
       }
+      if (binarySafe.docxSrc?.startsWith("blob:")) {
+        operatorPreviewBlobUrlRef.current = binarySafe.docxSrc;
+      }
       if (binarySafe.imageSrc?.startsWith("blob:")) {
         operatorPreviewBlobUrlRef.current = binarySafe.imageSrc;
       }
@@ -2920,7 +3026,7 @@ export default function CyberdeckApp() {
       setOperatorDocNameDraft(asset.name);
     }
     setOperatorSurfaceMode("workspace");
-    setOperatorDocMode("view");
+    setOperatorDocMode("edit");
   }, [setOperatorTextAsset]);
 
   const reloadOperatorFolderFile = useCallback(
@@ -2934,10 +3040,27 @@ export default function CyberdeckApp() {
         diskAbsolutePath: read.diskAbsolutePath,
         fileSize: read.fileSize,
         pdfBase64: read.pdfBase64,
+        inlineBase64: read.inlineBase64,
       });
     },
     [loadOperatorAssetFromFile],
   );
+
+  useEffect(() => {
+    if (!deckUiHydrated) return;
+    const pending = operatorWorkspaceRestoreRef.current;
+    if (!pending) return;
+    if (operatorFolderRootsRef.current.length === 0) return;
+
+    operatorWorkspaceRestoreRef.current = null;
+    void openOperatorFile(
+      pending.activeFilePath,
+      () => reloadOperatorFolderFile(pending.activeFilePath),
+      true,
+    ).finally(() => {
+      setOperatorDocMode(pending.docMode);
+    });
+  }, [deckUiHydrated, openOperatorFile, operatorFolderRootsCount, reloadOperatorFolderFile]);
 
   const openOperatorFolderFile = useCallback(
     async (filePath: string, file: File) => {
@@ -2951,6 +3074,7 @@ export default function CyberdeckApp() {
               diskAbsolutePath: fresh.diskAbsolutePath,
               fileSize: fresh.fileSize,
               pdfBase64: fresh.pdfBase64,
+              inlineBase64: fresh.inlineBase64,
             });
           } else {
             await loadOperatorAssetFromFile(file);
@@ -2991,7 +3115,7 @@ export default function CyberdeckApp() {
           text,
         });
         setOperatorSurfaceMode("workspace");
-        setOperatorDocMode("view");
+        setOperatorDocMode("edit");
         useCyberdeckTabStore.getState().setServer("m");
         setNavRailContext("gateway");
       });
@@ -5114,6 +5238,17 @@ const resolved = resolveUiTarget(userMessage);
     const browserCommand =
       parseBrowserCommand(userMessage) ||
       (operatorSurfaceMode === "browser" ? parseBrowserUseModeCommand(userMessage) : null);
+
+    if (/^(document|document mode|operator|operator pane|close browser|exit browser|workspace)$/i.test(userMessage.trim())) {
+      setOperatorSurfaceMode("workspace");
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: "OPERATOR // DOCUMENT MODE — use the folder icon (top right) to browse files." },
+      ]);
+      setIsStreaming(false);
+      return;
+    }
+
     if (browserCommand) {
       const actionResult = await performBrowserCommand(browserCommand);
       const engineMatch = actionResult.match(/ENGINE:\s*([A-Z0-9_ -]+)/i);
@@ -5174,6 +5309,37 @@ const resolved = resolveUiTarget(userMessage);
         `URL: ${operatorBrowserUrl}`;
     }
 
+    const operatorAssetSurface = operatorDroppedAsset
+      ? resolveOperatorAssetSurface(operatorDroppedAsset)
+      : null;
+    const operatorLocalPath =
+      operatorDroppedAsset?.localFilePath?.trim() || operatorActiveFilePath?.trim() || "";
+
+    let messageForApi = userMessage;
+    let autoConvertedDocx = false;
+    if (
+      isDocumentEditIntent(userMessage) &&
+      operatorAssetSurface === "docx" &&
+      operatorLocalPath &&
+      operatorSurfaceMode === "workspace"
+    ) {
+      setStreamText("⏳ Converting DOCX to markdown for MUTHUR…");
+      const converted = await openConvertedMarkdownInOperator(operatorLocalPath, { edit: true });
+      if (converted) {
+        autoConvertedDocx = true;
+        flushMuthurObservation();
+        await new Promise((resolve) => window.setTimeout(resolve, 450));
+        messageForApi = `${userMessage}\n\n[System: The open DOCX was converted to markdown in the operator pane. Use observe_operator_pane then suggest_operator_edit to apply the requested text change.]`;
+      }
+    }
+
+    const operatorContext = {
+      previewSurface: autoConvertedDocx ? "markdown" : operatorAssetSurface,
+      fileName: operatorDroppedAsset?.name ?? null,
+      localFilePath: operatorLocalPath || null,
+      docMode: operatorDocMode,
+    };
+
     let uplinkTimedOut = false;
     try {
       const abortCtl = new AbortController();
@@ -5194,7 +5360,7 @@ const resolved = resolveUiTarget(userMessage);
           headers: { "Content-Type": "application/json" },
           signal: abortCtl.signal,
           body: JSON.stringify({
-            message: userMessage,
+            message: messageForApi,
             provider: activeProvider,
             apiKey: providerKeys[activeProvider] || "",
             model: modelID,
@@ -5202,6 +5368,7 @@ const resolved = resolveUiTarget(userMessage);
             browserContext: browserContextForRequest,
             glyphContext,
             history,
+            operatorContext,
           }),
         });
       } finally {
@@ -5227,6 +5394,7 @@ const resolved = resolveUiTarget(userMessage);
       }
 
       const muthurToolsHeader = res.headers.get("x-muthur-tools-used")?.trim() ?? "";
+      const operatorEdits = parseOperatorEditsHeader(res.headers.get("x-muthur-operator-edits"));
       setStreamToolTrace(muthurToolsHeader);
 
       const reader = res.body?.getReader();
@@ -5289,7 +5457,12 @@ const resolved = resolveUiTarget(userMessage);
       }
 
       // Clean up fullText - remove excessive === lines and trim
-      const glyphResponse = parseGlyphResponseActions(fullText);
+      const streamPayload = splitMuthurStreamPayload(fullText);
+      if (streamPayload.toolsUsed) {
+        setStreamToolTrace(streamPayload.toolsUsed);
+      }
+      const operatorEditsFromStream = streamPayload.operatorEdits;
+      const glyphResponse = parseGlyphResponseActions(streamPayload.displayText);
       const cleanedText = glyphResponse.displayText
         .replace(/^=+$\n?/g, "")
         .trim();
@@ -5407,6 +5580,21 @@ const resolved = resolveUiTarget(userMessage);
       
       setMessages((prev) => [...prev, { role: "assistant", text: cleanedText }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
+
+      const editsToApply =
+        operatorEditsFromStream.length > 0 ? operatorEditsFromStream : operatorEdits;
+      if (editsToApply.length > 0) {
+        const editResult = await applyMuthurOperatorEdits(editsToApply);
+        if (editResult === "applied") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: "OPERATOR EDIT // MUTHUR applied — Ctrl+Z to undo in the operator pane.",
+            },
+          ]);
+        }
+      }
 
       if (glyphResponse.actions.length > 0) {
         try {
@@ -5826,7 +6014,7 @@ const resolved = resolveUiTarget(userMessage);
             setOperatorDroppedAsset(sourceAsset);
             setOperatorDocNameDraft(sourceAsset.name);
             setOperatorSurfaceMode("workspace");
-            setOperatorDocMode("view");
+            setOperatorDocMode("edit");
           }
           const store = useCyberdeckTabStore.getState();
           store.setActiveCustomTabId(null);
@@ -5904,6 +6092,7 @@ const resolved = resolveUiTarget(userMessage);
         ...(ingested.text !== undefined ? { text: ingested.text } : {}),
         ...(ingested.imageSrc ? { imageSrc: ingested.imageSrc } : {}),
         ...(ingested.pdfSrc ? { pdfSrc: ingested.pdfSrc } : {}),
+        ...(ingested.docxSrc ? { docxSrc: ingested.docxSrc } : {}),
       };
       if (ingested.surface !== "markdown" && ingested.surface !== "text") {
         const { text: _text, ...withoutText } = nextAsset;
@@ -5943,7 +6132,7 @@ const resolved = resolveUiTarget(userMessage);
       closeMirageContextMenu();
       closeGatewayPaneContextMenu();
 
-      const menuWidth = 176;
+      const menuWidth = 140;
       const menuHeight = isFixedServerTabId(tabId) ? 132 : 520;
       const padding = 8;
       const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
@@ -5964,7 +6153,7 @@ const resolved = resolveUiTarget(userMessage);
       closeMirageContextMenu();
       closeGatewayPaneContextMenu();
 
-      const menuWidth = 176;
+      const menuWidth = 140;
       const menuHeight = 520;
       const padding = 8;
       const x = Math.min(event.clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
@@ -6560,6 +6749,7 @@ const resolved = resolveUiTarget(userMessage);
       data-deck-mode={deckMode}
       className="terminal-window box-border flex h-full min-h-0 w-full flex-1 overflow-hidden bg-background font-mono text-green-500 max-md:min-h-0 max-md:flex-col md:h-screen"
     >
+      <DeckModeProvider mode={deckMode}>
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence
         uiStateStorageKey={UI_STATE_STORAGE_KEY}
@@ -6571,6 +6761,14 @@ const resolved = resolveUiTarget(userMessage);
         operatorSurfaceMode={operatorSurfaceMode}
         operatorBrowserUrl={operatorBrowserUrl}
         buildUiPayload={buildCyberdeckUiPayload}
+      />
+      <OperatorWorkspacePersistence
+        deckUiHydrated={deckUiHydrated}
+        operatorDroppedAsset={operatorDroppedAsset}
+        operatorActiveFilePath={operatorActiveFilePath}
+        operatorDocMode={operatorDocMode}
+        operatorFileHistory={operatorFileHistory}
+        operatorFileHistoryIndex={operatorFileHistoryIndex}
       />
       <CyberdeckCustomTabBrowserSync
         operatorBrowserRef={operatorBrowserRef}
@@ -6603,7 +6801,7 @@ const resolved = resolveUiTarget(userMessage);
                   ? "Choose new tab type"
                   : "Tab actions"
             }
-            className="absolute max-h-[70vh] min-w-44 overflow-y-auto rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
+            className="absolute w-fit min-w-[8.75rem] max-h-[70vh] overflow-y-auto rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)] [&_[role=menuitem]]:whitespace-nowrap"
             style={{ left: railTabContextMenu.x, top: railTabContextMenu.y }}
             onPointerDown={(event) => event.stopPropagation()}
             onContextMenu={(event) => {
@@ -6613,7 +6811,7 @@ const resolved = resolveUiTarget(userMessage);
           >
             {railTabContextMenu.variant === "fixed" ? (
               <>
-                <button
+                <CyberdeckMenuButton
                   type="button"
                   role="menuitem"
                   onClick={() => {
@@ -6621,7 +6819,6 @@ const resolved = resolveUiTarget(userMessage);
                     closeRailTabContextMenu();
                     focusFixedServerPanel(id);
                   }}
-                  className={realmorphismMenuItemClass(deckMode)}
                 >
                   {railTabContextMenu.serverId === "m"
                     ? "Focus operator panel"
@@ -6630,8 +6827,8 @@ const resolved = resolveUiTarget(userMessage);
                       : railTabContextMenu.serverId === "ct"
                         ? "Focus card table"
                         : "Focus settings panel"}
-                </button>
-                <button
+                </CyberdeckMenuButton>
+                <CyberdeckMenuButton
                   type="button"
                   role="menuitem"
                   onClick={() => {
@@ -6642,49 +6839,46 @@ const resolved = resolveUiTarget(userMessage);
                       .then(() => toast.success(`Copied server id: ${id}`))
                       .catch(() => toast.error("Could not copy."));
                   }}
-                  className={realmorphismMenuItemClass(deckMode)}
                 >
                   Copy server id
-                </button>
+                </CyberdeckMenuButton>
               </>
             ) : railTabContextMenu.variant === "new" ? (
               <>
                 {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
-                  <button
+                  <CyberdeckMenuButton
                     key={action.label}
                     type="button"
                     role="menuitem"
                     onClick={() => applyTabMenuAction(action)}
-                    className={realmorphismMenuItemClass(deckMode)}
                   >
                     {action.label}
-                  </button>
+                  </CyberdeckMenuButton>
                 ))}
               </>
             ) : (
               <>
                 {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
-                  <button
+                  <CyberdeckMenuButton
                     key={`convert-${action.label}`}
                     type="button"
                     role="menuitem"
                     onClick={() => applyTabMenuAction(action, railTabContextMenu.tabId)}
-                    className={realmorphismMenuItemClass(deckMode)}
                   >
                     {action.label}
-                  </button>
+                  </CyberdeckMenuButton>
                 ))}
-                <button
+                <CyberdeckMenuButton
                   type="button"
                   role="menuitem"
+                  danger
                   onClick={() => {
                     deleteActiveTab();
                     closeRailTabContextMenu();
                   }}
-                  className={realmorphismMenuItemClass(deckMode, true)}
                 >
                   Delete
-                </button>
+                </CyberdeckMenuButton>
               </>
             )}
           </div>
@@ -6700,61 +6894,56 @@ const resolved = resolveUiTarget(userMessage);
                 event.stopPropagation();
               }}
             >
-              <button
+              <CyberdeckMenuButton
                 type="button"
                 role="menuitem"
                 onClick={() => {
                   closeMirageContextMenu();
                   replayFullLastAssistant();
                 }}
-                className={realmorphismMenuItemClass(deckMode)}
               >
                 Speak last message
-              </button>
-              <button
+              </CyberdeckMenuButton>
+              <CyberdeckMenuButton
                 type="button"
                 role="menuitem"
                 onClick={() => {
                   closeMirageContextMenu();
                   void copyMirageLastAssistant();
                 }}
-                className={realmorphismMenuItemClass(deckMode)}
               >
                 Copy last assistant message
-              </button>
-              <button
+              </CyberdeckMenuButton>
+              <CyberdeckMenuButton
                 type="button"
                 role="menuitem"
                 onClick={() => {
                   closeMirageContextMenu();
                   void copyMirageSelectionOrLastMessage();
                 }}
-                className={realmorphismMenuItemClass(deckMode)}
               >
                 Copy selection or last message
-              </button>
-              <button
+              </CyberdeckMenuButton>
+              <CyberdeckMenuButton
                 type="button"
                 role="menuitem"
                 onClick={() => {
                   closeMirageContextMenu();
                   handleModelLabelClick("b");
                 }}
-                className={realmorphismMenuItemClass(deckMode)}
               >
                 Open Settings
-              </button>
-              <button
+              </CyberdeckMenuButton>
+              <CyberdeckMenuButton
                 type="button"
                 role="menuitem"
                 onClick={() => {
                   closeMirageContextMenu();
                   handleModelLabelClick("s");
                 }}
-                className={realmorphismMenuItemClass(deckMode)}
               >
                 Open connection panel
-              </button>
+              </CyberdeckMenuButton>
             </div>
           ) : gatewayPaneContextMenu ? (
             <div
@@ -6768,50 +6957,46 @@ const resolved = resolveUiTarget(userMessage);
                 event.stopPropagation();
               }}
             >
-              <button
+              <CyberdeckMenuButton
                 type="button"
                 role="menuitem"
                 onClick={() => {
                   closeGatewayPaneContextMenu();
                   void copyMirageSelectionOrLastMessage();
                 }}
-                className={realmorphismMenuItemClass(deckMode)}
               >
                 Copy selection or last message
-              </button>
-              <button
+              </CyberdeckMenuButton>
+              <CyberdeckMenuButton
                 type="button"
                 role="menuitem"
                 onClick={() => {
                   closeGatewayPaneContextMenu();
                   handleModelLabelClick("b");
                 }}
-                className={realmorphismMenuItemClass(deckMode)}
               >
                 Open Settings
-              </button>
-              <button
+              </CyberdeckMenuButton>
+              <CyberdeckMenuButton
                 type="button"
                 role="menuitem"
                 onClick={() => {
                   closeGatewayPaneContextMenu();
                   handleModelLabelClick("s");
                 }}
-                className={realmorphismMenuItemClass(deckMode)}
               >
                 Open connection panel
-              </button>
-              <button
+              </CyberdeckMenuButton>
+              <CyberdeckMenuButton
                 type="button"
                 role="menuitem"
                 onClick={() => {
                   closeGatewayPaneContextMenu();
                   openOrFocusDiagnosticsTab();
                 }}
-                className={realmorphismMenuItemClass(deckMode)}
               >
                 Open Diagnostics tab
-              </button>
+              </CyberdeckMenuButton>
             </div>
 ) : null
             }
@@ -6913,7 +7098,7 @@ const resolved = resolveUiTarget(userMessage);
                       {m.role === "user"
                         ? "USR"
                         : m.role === "assistant"
-                          ? "AI"
+                          ? "MUTHUR"
                           : m.role === "system"
                             ? "SYS"
                             : "ERR"}
@@ -6968,7 +7153,7 @@ const resolved = resolveUiTarget(userMessage);
                       chatKeyboardHighlightIndex === messages.length ? "nav-row-kb-hover" : ""
                     }`}
                   >
-                    <span className="text-green-400">[AI] </span>
+                    <span className="text-green-400">[MUTHUR] </span>
                     <span className="text-gray-300">
                       {streamToolTrace ? (
                         <span className="mb-0.5 block font-mono text-[10px] leading-snug text-amber-500/90">
@@ -7008,23 +7193,27 @@ const resolved = resolveUiTarget(userMessage);
             </div>
 
             <footer className="cyberdeck-message-box realmorphism-host-surface shrink-0 border-t bg-black p-0">
-              <div className="m-2 rounded-sm border border-green-900/70 bg-black transition-colors transition-shadow focus-within:border-green-500/80 focus-within:shadow-[0_0_0_1px_rgba(34,197,94,0.45),0_0_18px_rgba(34,197,94,0.2)]">
-                <div className="relative flex items-center px-2 py-2">
-                  <span className="pointer-events-none absolute left-3 text-lg font-bold text-green-500">$</span>
-                  <MuthurCommandInput
-                    ref={messageInputRef}
-                    inputHistory={inputHistory}
-                    hasProviderAuth={hasProviderAuth}
-                    glyphModeActive={glyphModeActive}
-                    isStreaming={isStreaming}
-                    chatHydrated={chatHydrated}
-                    onSubmit={(text) => void handleSend(text)}
-                    onCanSendChange={handleCanSendInputChange}
-                    onFocusExtra={() => setChatKeyboardHighlightIndex(null)}
-                    onPasteImage={handlePasteImageToChat}
-                  />
-                </div>
-                <div className="flex items-center justify-between px-3 py-2">
+              <div className="mx-2 mb-2 mt-2 flex flex-col gap-2">
+                <MuthurComposerShell deckMode={deckMode}>
+                  <div className="relative flex items-end px-2 py-2">
+                    <span className="pointer-events-none absolute left-3 top-3 text-lg font-bold leading-none text-green-500">
+                      $
+                    </span>
+                    <MuthurCommandInput
+                      ref={messageInputRef}
+                      inputHistory={inputHistory}
+                      hasProviderAuth={hasProviderAuth}
+                      glyphModeActive={glyphModeActive}
+                      isStreaming={isStreaming}
+                      chatHydrated={chatHydrated}
+                      onSubmit={(text) => void handleSend(text)}
+                      onCanSendChange={handleCanSendInputChange}
+                      onFocusExtra={() => setChatKeyboardHighlightIndex(null)}
+                      onPasteImage={handlePasteImageToChat}
+                    />
+                  </div>
+                </MuthurComposerShell>
+                <div className="muthur-composer-controls flex items-end justify-between gap-2 px-1">
                   <button
                     type="button"
                     onClick={() => handleModelLabelClick("s")}
@@ -7042,15 +7231,16 @@ const resolved = resolveUiTarget(userMessage);
                       : "NO_MODEL"}{" "}
                     {isStreaming ? "STREAMING" : ""}
                   </button>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-end gap-2">
                     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
                     <CyberdeckControlTooltip label={voiceEnabled ? "Voice on" : "Voice off"}>
-                    <button
-                      type="button"
+                    <MuthurControlButton
+                      deckMode={deckMode}
+                      control={muthurVoiceControlOptions(voiceEnabled, voiceHealth)}
+                      glow={voiceEnabled && voiceHealth === "backend"}
                       onClick={toggleVoiceEnabled}
                       aria-label={voiceEnabled ? "Voice on" : "Voice off"}
                       aria-pressed={voiceEnabled && voiceHealth === "backend"}
-                      className={voiceControlClass(deckMode, voiceEnabled, voiceHealth)}
                     >
                       {voiceEnabled ? (
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
@@ -7087,7 +7277,7 @@ const resolved = resolveUiTarget(userMessage);
                           <path d="M21 9L15 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                           </svg>
                         )}
-                      </button>
+                    </MuthurControlButton>
                     </CyberdeckControlTooltip>
                     {voiceEnabled && voiceBlockTotal > 0 ? (
                       <>
@@ -7098,26 +7288,23 @@ const resolved = resolveUiTarget(userMessage);
                           {voiceBlockTotal > 1 ? `${voiceBlockFocusIndex + 1}/${voiceBlockTotal}` : `${voiceBlockTotal}`}
                         </span>
                         <CyberdeckControlTooltip label="Stop speech (Esc)" disabled={!voicePlaybackBusy}>
-                        <button
-                          type="button"
+                        <MuthurControlButton
+                          deckMode={deckMode}
+                          control={{ size: "compact", amber: true }}
                           onClick={() => abortMotherSpeech()}
                           disabled={!voicePlaybackBusy}
                           aria-label="Stop speech"
-                          className={realmorphismControlClass(deckMode, {
-                            size: "compact",
-                            amber: true,
-                            legacyClassName: LEGACY_COMPACT_AMBER,
-                          })}
                         >
                           ‖
-                        </button>
+                        </MuthurControlButton>
                         </CyberdeckControlTooltip>
                         <CyberdeckControlTooltip
                           label="Earlier paragraph (more context)"
                           disabled={voiceBlockFocusIndex <= 0}
                         >
-                        <button
-                          type="button"
+                        <MuthurControlButton
+                          deckMode={deckMode}
+                          control={{ size: "compact", signal: true }}
                           onClick={() => {
                             if (voiceBlockFocusIndex <= 0) return;
                             const next = voiceBlockFocusIndex - 1;
@@ -7126,46 +7313,33 @@ const resolved = resolveUiTarget(userMessage);
                           }}
                           disabled={voiceBlockFocusIndex <= 0}
                           aria-label="Speak earlier paragraph"
-                          className={realmorphismControlClass(deckMode, {
-                            size: "compact",
-                            signal: true,
-                            legacyClassName: LEGACY_COMPACT_CONTROL,
-                          })}
                         >
                           ◀
-                        </button>
+                        </MuthurControlButton>
                         </CyberdeckControlTooltip>
                         <CyberdeckControlTooltip label="Replay entire last reply">
-                        <button
-                          type="button"
+                        <MuthurControlButton
+                          deckMode={deckMode}
+                          control={{ size: "compact", signal: true }}
                           onClick={() => {
                             abortMotherSpeech();
                             replayFullLastAssistant();
                           }}
                           aria-label="Replay full response"
-                          className={realmorphismControlClass(deckMode, {
-                            size: "compact",
-                            signal: true,
-                            legacyClassName: LEGACY_COMPACT_CONTROL,
-                          })}
                         >
                           ↻
-                        </button>
+                        </MuthurControlButton>
                         </CyberdeckControlTooltip>
                       </>
                     ) : null}
                     {!isStreaming ? (
                       <CyberdeckControlTooltip label="Send" disabled={!canSendInput}>
-                      <button
-                        type="button"
+                      <MuthurControlButton
+                        deckMode={deckMode}
+                        control={{ size: "send", signal: true }}
                         onClick={() => void handleSend()}
                         disabled={!canSendInput}
                         aria-label="Send"
-                        className={realmorphismControlClass(deckMode, {
-                          size: "send",
-                          signal: true,
-                          legacyClassName: LEGACY_SEND_CONTROL,
-                        })}
                       >
                         <svg
                           viewBox="0 0 24 24"
@@ -7184,25 +7358,25 @@ const resolved = resolveUiTarget(userMessage);
                           />
                           <path d="M11.3 13.7L20.4 3.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                         </svg>
-                      </button>
+                      </MuthurControlButton>
                       </CyberdeckControlTooltip>
                     ) : (
                       <CyberdeckControlTooltip label="Stop">
-                      <button
-                        type="button"
+                      <MuthurControlButton
+                        deckMode={deckMode}
+                        control={{
+                          size: "icon",
+                          amber: true,
+                        }}
+                        className={deckMode === "ascii" ? "is-latched" : undefined}
                         onClick={handleStop}
                         aria-label="Stop"
                         aria-pressed
-                        className={realmorphismControlClass(deckMode, {
-                          size: "icon",
-                          amber: true,
-                          legacyClassName: LEGACY_STOP_CONTROL,
-                        })}
                       >
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
                           <rect x="6.5" y="6.5" width="11" height="11" rx="1.2" />
                         </svg>
-                      </button>
+                      </MuthurControlButton>
                       </CyberdeckControlTooltip>
                     )}
                     </CyberdeckPaneTooltipProvider>
@@ -7258,21 +7432,16 @@ const resolved = resolveUiTarget(userMessage);
                         <div className="truncate font-mono text-[10px] text-amber-300">
                           MARKDOWN: {droppedMarkdownName || "dropped.md"}
                         </div>
-                        <button
-                          type="button"
-                          className={realmorphismControlClass(deckMode, {
-                            size: "action",
-                            amber: true,
-                            legacyClassName:
-                              "rounded border border-amber-700 px-2 py-[2px] font-mono text-[10px] text-amber-300 hover:border-amber-500",
-                          })}
+                        <CyberdeckControlButton
+                          deckMode={deckMode}
+                          control={{ size: "action", amber: true }}
                           onClick={() => {
                             setDroppedMarkdown(null);
                             setDroppedMarkdownName("");
                           }}
                         >
                           CLEAR
-                        </button>
+                        </CyberdeckControlButton>
                       </div>
                       <CyberdeckMarkdownPreview className="prose prose-invert prose-pre:bg-black prose-pre:text-green-300 max-w-none text-[12px] leading-snug text-green-200">
                         {droppedMarkdown}
@@ -7379,21 +7548,18 @@ const resolved = resolveUiTarget(userMessage);
                             className="min-h-[44px] w-full flex-1 rounded border border-[#2d2d2d] bg-black px-3 py-2 font-mono text-base text-green-300 outline-none focus:border-green-700 max-md:text-[16px] md:min-h-0 md:px-2 md:py-1 md:text-[10px]"
                             placeholder={`${activeProvider.toUpperCase()} API KEY`}
                           />
-                          <button
-                            type="button"
+                          <CyberdeckControlButton
+                            deckMode={deckMode}
+                            control={{ size: "action", signal: true }}
                             disabled={
                               !gatewayKeyDraft.trim() ||
                               providerModelFetchStatus === "retrieving"
                             }
+                            className="min-h-[44px] shrink-0 md:min-h-0"
                             onClick={() => void submitGatewayKey()}
-                            className={realmorphismControlClass(deckMode, {
-                              size: "action",
-                              legacyClassName:
-                                "min-h-[44px] shrink-0 rounded border border-green-800/80 px-4 font-mono text-[11px] tracking-[0.06em] text-green-300 hover:border-green-600 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:px-3 md:py-1 md:text-[10px]",
-                            })}
                           >
                             {providerModelFetchStatus === "retrieving" ? "LINKING…" : "CONNECT"}
-                          </button>
+                          </CyberdeckControlButton>
                         </div>
                       </div>
                     ) : null}
@@ -7521,9 +7687,10 @@ const resolved = resolveUiTarget(userMessage);
                   onOperatorDrop={handleOperatorDrop}
                   onOperatorDocNameDraftChange={setOperatorDocNameDraft}
                   onCommitOperatorDocName={commitOperatorDocName}
-                  onSetOperatorDocMode={setOperatorDocMode}
+                  onSetOperatorDocMode={handleSetOperatorDocMode}
                   onOperatorBrowserNavigate={openOperatorBrowser}
                   onOperatorBrowserUrlChange={setOperatorBrowserUrl}
+                  onSetOperatorSurfaceMode={setOperatorSurfaceMode}
                   onPasteClipboardToOperator={pasteClipboardToOperator}
                   onSaveOperatorDocInPlace={saveOperatorDocInPlace}
                   onSaveOperatorDocAsFile={saveOperatorDocAsFile}
@@ -7573,6 +7740,7 @@ const resolved = resolveUiTarget(userMessage);
         </ResizablePanel>
       </ResizablePanelGroup>
         </div>
+      </DeckModeProvider>
     </div>
   );
 }

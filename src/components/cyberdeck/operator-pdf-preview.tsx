@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -15,12 +16,11 @@ import {
 } from "@wikimedia/codex-icons";
 import { motion } from "motion/react";
 import { CodexIcon } from "@/components/codex-icon";
-import { useDeckMode } from "@/lib/deck-mode";
-import { isElectronOperatorBridge } from "@/lib/operator-binary-preview";
 import {
-  realmorphismActionClass,
-  realmorphismControlClass,
-} from "@/lib/cyberdeck/realmorphism-control";
+  CyberdeckActionButton,
+  CyberdeckControl,
+} from "@/components/cyberdeck/cyberdeck-control-button";
+import { isElectronOperatorBridge } from "@/lib/operator-binary-preview";
 import { toast } from "sonner";
 
 type OperatorPdfPreviewProps = {
@@ -57,6 +57,12 @@ type PdfPageMetrics = {
 const TEXT_BOX_PADDING = 8;
 const DEFAULT_TEXT_BOX_WIDTH = 240;
 const DEFAULT_TEXT_BOX_HEIGHT = 72;
+function buildPdfIframeSrc(src: string, page: number, zoom: number, singlePage: boolean): string {
+  const base = src.split("#")[0] ?? src;
+  if (!singlePage) return src;
+  const zoomToken = zoom === 1 ? "page-width" : String(Math.round(zoom * 100));
+  return `${base}#page=${page}&zoom=${zoomToken}`;
+}
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -250,7 +256,6 @@ export function OperatorPdfPreview({
   localFilePath,
   mode = "view",
 }: OperatorPdfPreviewProps) {
-  const deckMode = useDeckMode();
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editedBytes, setEditedBytes] = useState<Uint8Array | null>(null);
@@ -265,13 +270,16 @@ export function OperatorPdfPreview({
   });
   const [boxes, setBoxes] = useState<PdfTextBox[]>([]);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const pageLayerRef = useRef<HTMLDivElement>(null);
   const renderHostRef = useRef<HTMLDivElement>(null);
   const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewSrc = editedBytes
     ? `data:application/pdf;base64,${bytesToBase64(editedBytes)}`
     : pdfSrc;
+  const pdfIframeSrc = useMemo(() => {
+    if (!previewSrc) return null;
+    return buildPdfIframeSrc(previewSrc, activePage, zoom, mode === "edit");
+  }, [activePage, mode, previewSrc, zoom]);
   const selectedBox = boxes.find((box) => box.id === selectedBoxId) ?? null;
 
   useEffect(() => {
@@ -285,9 +293,9 @@ export function OperatorPdfPreview({
   }, [pdfSrc]);
 
   useEffect(() => {
-    if (!previewSrc || !canvasRef.current || !pageLayerRef.current) return;
+    if (mode !== "edit") return;
+    if (!previewSrc || !pageLayerRef.current) return;
     let canceled = false;
-    let renderTask: { cancel(): void; promise: Promise<unknown> } | null = null;
 
     void (async () => {
       try {
@@ -309,43 +317,28 @@ export function OperatorPdfPreview({
         const hostWidth = renderHostRef.current?.clientWidth ?? baseViewport.width;
         const fitScale = Math.max(0.25, Math.min(2.5, (hostWidth - 24) / baseViewport.width));
         const viewport = page.getViewport({ scale: fitScale * zoom });
-        const canvas = canvasRef.current;
         const pageLayer = pageLayerRef.current;
-        const context = canvas?.getContext("2d");
-        if (!canvas || !context || !pageLayer) return;
+        if (!pageLayer) return;
 
-        canvas.width = Math.floor(viewport.width);
-        canvas.height = Math.floor(viewport.height);
-        canvas.style.width = `${Math.floor(viewport.width)}px`;
-        canvas.style.height = `${Math.floor(viewport.height)}px`;
-        pageLayer.style.width = `${Math.floor(viewport.width)}px`;
-        pageLayer.style.height = `${Math.floor(viewport.height)}px`;
+        const width = Math.floor(viewport.width);
+        const height = Math.floor(viewport.height);
+        pageLayer.style.width = `${width}px`;
+        pageLayer.style.height = `${height}px`;
         setMetrics({
           pageWidth: baseViewport.width,
           pageHeight: baseViewport.height,
           canvasWidth: viewport.width,
           canvasHeight: viewport.height,
         });
-
-        renderTask = page.render({
-          canvas,
-          canvasContext: context,
-          intent: "display",
-          viewport,
-        });
-        await renderTask.promise;
-      } catch (error) {
-        if (!canceled && (error instanceof Error ? error.name !== "RenderingCancelledException" : true)) {
-          setLoadError(true);
-        }
+      } catch {
+        if (!canceled) setLoadError(true);
       }
     })();
 
     return () => {
       canceled = true;
-      renderTask?.cancel();
     };
-  }, [activePage, previewSrc, zoom]);
+  }, [activePage, mode, previewSrc, zoom]);
 
   const openInSystemViewer = useCallback(async () => {
     if (!localFilePath) return;
@@ -542,82 +535,66 @@ export function OperatorPdfPreview({
           {mode === "edit" ? "PDF EDIT" : "PDF VIEW"}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={activePage <= 1}
-            onClick={() => updateActivePage(activePage - 1)}
-            aria-label="Previous page"
-            className={realmorphismControlClass(deckMode, {
-              size: "compact",
-              legacyClassName:
-                "inline-flex h-8 items-center justify-center rounded border border-[#2d2d2d] bg-black px-2 text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40",
-            })}
-          >
-            <CodexIcon icon={cdxIconArrowPrevious} className="h-3.5 w-3.5" />
-          </button>
-          <label className="flex h-8 items-center gap-1 border border-[#2d2d2d] bg-black px-2 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
-            PAGE
-            <input
-              type="number"
-              min={1}
-              max={pageCount}
-              value={activePage}
-              onChange={(event) => updateActivePage(Number(event.target.value) || 1)}
-              className="h-5 w-10 border border-[#2d2d2d] bg-black px-1 text-green-200 outline-none"
-            />
-            / {pageCount}
-          </label>
-          <button
-            type="button"
-            disabled={activePage >= pageCount}
-            onClick={() => updateActivePage(activePage + 1)}
-            aria-label="Next page"
-            className={realmorphismControlClass(deckMode, {
-              size: "compact",
-              legacyClassName:
-                "inline-flex h-8 items-center justify-center rounded border border-[#2d2d2d] bg-black px-2 text-[#8a8a8a] transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40",
-            })}
-          >
-            <CodexIcon icon={cdxIconArrowNext} className="h-3.5 w-3.5" />
-          </button>
-          <button type="button" onClick={() => setZoom((current) => Math.max(0.5, current - 0.1))} className={realmorphismActionClass(deckMode, "neutral")}>
-            -
-          </button>
-          <span className="font-mono text-[9px] text-[#8a8a8a]">{Math.round(zoom * 100)}%</span>
-          <button type="button" onClick={() => setZoom((current) => Math.min(2.5, current + 0.1))} className={realmorphismActionClass(deckMode, "neutral")}>
-            +
-          </button>
           {mode === "edit" ? (
             <>
-              <button
-                type="button"
+              <CyberdeckControl
+                control={{ size: "compact" }}
+                disabled={activePage <= 1}
+                onClick={() => updateActivePage(activePage - 1)}
+                aria-label="Previous page"
+              >
+                <CodexIcon icon={cdxIconArrowPrevious} className="h-3.5 w-3.5" />
+              </CyberdeckControl>
+              <label className="flex h-8 items-center gap-1 border border-[#2d2d2d] bg-black px-2 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
+                PAGE
+                <input
+                  type="number"
+                  min={1}
+                  max={pageCount}
+                  value={activePage}
+                  onChange={(event) => updateActivePage(Number(event.target.value) || 1)}
+                  className="h-5 w-10 border border-[#2d2d2d] bg-black px-1 text-green-200 outline-none"
+                />
+                / {pageCount}
+              </label>
+              <CyberdeckControl
+                control={{ size: "compact" }}
+                disabled={activePage >= pageCount}
+                onClick={() => updateActivePage(activePage + 1)}
+                aria-label="Next page"
+              >
+                <CodexIcon icon={cdxIconArrowNext} className="h-3.5 w-3.5" />
+              </CyberdeckControl>
+              <CyberdeckActionButton variant="neutral" onClick={() => setZoom((current) => Math.max(0.5, current - 0.1))}>
+                -
+              </CyberdeckActionButton>
+              <span className="font-mono text-[9px] text-[#8a8a8a]">{Math.round(zoom * 100)}%</span>
+              <CyberdeckActionButton variant="neutral" onClick={() => setZoom((current) => Math.min(2.5, current + 0.1))}>
+                +
+              </CyberdeckActionButton>
+            </>
+          ) : null}
+          {mode === "edit" ? (
+            <>
+              <CyberdeckControl
+                control={{ size: "compact", signal: true }}
                 onClick={addTextBox}
                 aria-label="Add text box"
-                className={realmorphismControlClass(deckMode, {
-                  size: "compact",
-                  legacyClassName:
-                    "inline-flex h-8 items-center justify-center gap-1 rounded border border-emerald-500/50 bg-black px-2 font-mono text-[9px] tracking-[0.06em] text-emerald-200 transition hover:border-emerald-300",
-                })}
               >
                 <CodexIcon icon={cdxIconAdd} className="h-3.5 w-3.5" />
                 TEXT
-              </button>
-              <button
-                type="button"
+              </CyberdeckControl>
+              <CyberdeckControl
+                control={{ size: "compact" }}
                 disabled={!selectedBox}
                 onClick={deleteSelectedBox}
                 aria-label="Delete selected text box"
-                className={realmorphismControlClass(deckMode, {
-                  size: "compact",
-                  legacyClassName:
-                    "inline-flex h-8 items-center justify-center rounded border border-[#2d2d2d] bg-black px-2 text-[#8a8a8a] transition hover:border-rose-500/60 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-40",
-                })}
               >
                 <CodexIcon icon={cdxIconTrash} className="h-3.5 w-3.5" />
-              </button>
-              <button type="button" disabled={busy || boxes.length === 0} onClick={() => void applyTextBoxes()} className={realmorphismActionClass(deckMode, "accent")}>
+              </CyberdeckControl>
+              <CyberdeckActionButton variant="accent" disabled={busy || boxes.length === 0} onClick={() => void applyTextBoxes()}>
                 APPLY
-              </button>
+              </CyberdeckActionButton>
               {selectedBox ? (
                 <>
                   <label className="flex h-8 items-center gap-1 border border-[#2d2d2d] bg-black px-2 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
@@ -641,45 +618,53 @@ export function OperatorPdfPreview({
             </>
           ) : null}
           {localFilePath && isElectronOperatorBridge() ? (
-            <button type="button" onClick={() => void openInSystemViewer()} className={realmorphismActionClass(deckMode, "neutral")}>
+            <CyberdeckActionButton variant="neutral" onClick={() => void openInSystemViewer()}>
               OPEN IN VIEWER
-            </button>
+            </CyberdeckActionButton>
           ) : null}
           {mode === "edit" && editedBytes ? (
-            <button type="button" disabled={busy} onClick={() => void saveEditedPdf("as")} className={realmorphismActionClass(deckMode, "accent")}>
+            <CyberdeckActionButton variant="accent" disabled={busy} onClick={() => void saveEditedPdf("as")}>
               SAVE PDF
-            </button>
+            </CyberdeckActionButton>
           ) : null}
         </div>
       </div>
-      {!loadError ? (
-        <div ref={renderHostRef} className="custom-scrollbar max-h-[70vh] overflow-auto rounded-sm border border-[#1c1c1c] bg-[#101010] p-3">
-          <div
-            ref={pageLayerRef}
-            className="relative mx-auto bg-white shadow-[0_0_20px_rgba(255,255,255,0.12)]"
-          >
-            {mode === "edit"
-              ? visibleBoxes.map((box) => (
-                  <PdfTextBoxOverlay
-                    key={box.id}
-                    box={box}
-                    selected={box.id === selectedBoxId}
-                    boundsRef={pageLayerRef}
-                    onSelect={() => setSelectedBoxId(box.id)}
-                    onChange={updateBox}
-                    onDelete={() => {
-                      setBoxes((current) => current.filter((entry) => entry.id !== box.id));
-                      if (selectedBoxId === box.id) setSelectedBoxId(null);
-                    }}
-                  />
-                ))
-              : null}
-            <canvas
-              ref={canvasRef}
-              className="block [color-scheme:light] [filter:none]"
-            />
+      {!loadError && pdfIframeSrc ? (
+        mode === "view" ? (
+          <iframe
+            src={pdfIframeSrc}
+            title={fileName}
+            className="block h-[70vh] w-full rounded-sm border border-[#1c1c1c] bg-white"
+          />
+        ) : (
+          <div ref={renderHostRef} className="custom-scrollbar max-h-[70vh] overflow-auto rounded-sm border border-[#1c1c1c] bg-[#101010] p-3">
+            <div
+              ref={pageLayerRef}
+              className="relative mx-auto overflow-hidden bg-white shadow-[0_0_20px_rgba(255,255,255,0.12)]"
+            >
+              <iframe
+                key={pdfIframeSrc}
+                src={pdfIframeSrc}
+                title={fileName}
+                className="pointer-events-none absolute inset-0 z-0 block h-full w-full border-0 bg-white"
+              />
+              {visibleBoxes.map((box) => (
+                <PdfTextBoxOverlay
+                  key={box.id}
+                  box={box}
+                  selected={box.id === selectedBoxId}
+                  boundsRef={pageLayerRef}
+                  onSelect={() => setSelectedBoxId(box.id)}
+                  onChange={updateBox}
+                  onDelete={() => {
+                    setBoxes((current) => current.filter((entry) => entry.id !== box.id));
+                    if (selectedBoxId === box.id) setSelectedBoxId(null);
+                  }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )
       ) : (
         <div className="rounded-sm border border-dashed border-[#1c1c1c] bg-black p-4 font-mono text-[10px] leading-snug text-[#8a8a8a]">
           PDF preview could not render in-pane. Use Open in Viewer or Convert.

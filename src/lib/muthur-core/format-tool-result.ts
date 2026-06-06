@@ -1,5 +1,7 @@
 /** Formatting for tool outputs (MUTHUR / cyberdeck-chat). */
 
+export { formatSuggestOperatorEditResult } from "@/lib/muthur-core/suggest-operator-edit";
+
 export function formatJustBashResult(result: unknown): string {
   if (!result || typeof result !== "object") {
     return "[TOOL] justbash returned no output.";
@@ -23,6 +25,19 @@ export function formatJustBashResult(result: unknown): string {
   ].filter(Boolean);
 
   return parts.join("\n\n");
+}
+
+export function formatObserveOperatorPaneResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] observe_operator_pane returned no output.";
+  }
+
+  const payload = result as {
+    observation?: unknown;
+    authority?: string;
+  };
+
+  return `[TOOL OK] observe_operator_pane // READ_ONLY\n\n${JSON.stringify(payload.observation ?? { status: "NO_VISIBLE_OBSERVATION" }, null, 2)}`;
 }
 
 export function formatLocalFsResult(result: unknown): string {

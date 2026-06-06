@@ -103,6 +103,14 @@ export class MuthurExecutionStore {
     return this.state.queue.find((action) => action.status === "queued") ?? null;
   }
 
+  hasRunnableQueuedActions(): boolean {
+    return this.state.queue.some((action) => action.status === "queued");
+  }
+
+  hasAwaitingApprovalActions(): boolean {
+    return this.state.queue.some((action) => action.status === "blocked");
+  }
+
   findBlockedAction(id: string): MuthurAction | undefined {
     return this.state.queue.find((action) => action.id === id && action.status === "blocked");
   }
