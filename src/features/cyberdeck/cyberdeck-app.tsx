@@ -2436,8 +2436,8 @@ export default function CyberdeckApp() {
     ],
   );
 
-  const handleSetOperatorDocMode = useCallback((_next: SetStateAction<"view" | "edit">) => {
-    setOperatorDocMode("edit");
+  const handleSetOperatorDocMode = useCallback((next: SetStateAction<"view" | "edit">) => {
+    setOperatorDocMode(next);
   }, []);
 
   const handleOperatorDocumentKindChange = useCallback((nextKind: OperatorDocumentPickerKind) => {
