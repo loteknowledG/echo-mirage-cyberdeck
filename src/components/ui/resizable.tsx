@@ -178,7 +178,11 @@ export function ResizablePanelGroup({
         });
         setHandleSpan(span);
       } else {
-        setHandleSpan(0);
+        let span = 0;
+        el.querySelectorAll('[role="separator"]').forEach((node) => {
+          span += node.getBoundingClientRect().width;
+        });
+        setHandleSpan(span);
       }
     };
 
@@ -272,9 +276,7 @@ export function ResizablePanelGroup({
   }, []);
 
   const updateSizes = (index: number, deltaPx: number) => {
-    const trackSize = isHorizontal
-      ? containerSize
-      : Math.max(containerSize - handleSpan, 1);
+    const trackSize = Math.max(containerSize - handleSpan, 1);
     if (trackSize <= 0) return;
 
     const deltaFraction = deltaPx / trackSize;
@@ -376,21 +378,30 @@ export function ResizablePanelGroup({
 
   const useStackedGrid =
     !isHorizontal && panelCount === 2 && handles.length === 1 && sizes.length === 2;
-  const leadingFraction = useStackedGrid ? getPanelFraction(0) : 0;
-  const trailingFraction = useStackedGrid ? getPanelFraction(1) : 0;
+  const useSplitGrid =
+    panelCount === 2 && handles.length === 1 && sizes.length === 2;
+  const leadingFraction = useSplitGrid ? getPanelFraction(0) : 0;
+  const trailingFraction = useSplitGrid ? getPanelFraction(1) : 0;
 
   return (
     <div
       ref={containerRef}
       className={cn('h-full w-full', className)}
       style={
-        useStackedGrid
-          ? {
-              display: 'grid',
-              gridTemplateRows: `minmax(0, ${leadingFraction}fr) auto minmax(0, ${trailingFraction}fr)`,
-              height: '100%',
-              width: '100%',
-            }
+        useSplitGrid
+          ? useStackedGrid
+            ? {
+                display: 'grid',
+                gridTemplateRows: `minmax(0, ${leadingFraction}fr) auto minmax(0, ${trailingFraction}fr)`,
+                height: '100%',
+                width: '100%',
+              }
+            : {
+                display: 'grid',
+                gridTemplateColumns: `minmax(0, ${leadingFraction}fr) auto minmax(0, ${trailingFraction}fr)`,
+                height: '100%',
+                width: '100%',
+              }
           : {
               display: 'flex',
               flexDirection: isHorizontal ? 'row' : 'column',
@@ -403,6 +414,18 @@ export function ResizablePanelGroup({
         if (getResizableRole(child) === 'panel') {
           const panelIndex = panels.indexOf(child);
           const panel = child as React.ReactElement<ResizablePanelProps>;
+
+          if (useSplitGrid) {
+            return React.cloneElement(panel, {
+              style: {
+                minWidth: 0,
+                minHeight: 0,
+                overflow: 'hidden',
+                ...panel.props.style,
+              },
+            });
+          }
+
           const size = getPanelFraction(panelIndex) * 100;
 
           const minFraction = parseFraction(panel.props.minSize) ?? 0;

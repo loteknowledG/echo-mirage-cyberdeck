@@ -540,7 +540,7 @@ function OperatorDocumentToolStrip({
   return (
     <div
       data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
-      className="z-10 flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
+      className="z-10 flex w-full min-w-0 shrink-0 flex-wrap items-center justify-end gap-1.5 overflow-hidden border-b border-[#141414] bg-black px-3 py-2"
     >
       {binaryPreview ? (
         <>
@@ -1235,7 +1235,7 @@ export function CyberdeckOperatorPaneBody({
         data-observing="true"
       >
         <CyberdeckPaneHeader
-          className="z-20 shrink-0 bg-black py-2"
+          className="z-20 shrink-0 overflow-hidden bg-black py-2"
           left={
             operatorSurfaceMode === "browser" ? (
               <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>

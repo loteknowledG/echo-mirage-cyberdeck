@@ -277,6 +277,25 @@ body,
   border-top: 1px solid rgba(57, 255, 136, 0.2);
 }
 
+.cyberdeck-chat-resizer {
+  position: relative;
+  z-index: 55;
+  flex-shrink: 0;
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.cyberdeck-chat-resizer > div {
+  background: #2d2d2d !important;
+  box-shadow: none !important;
+}
+
+.cyberdeck-chat-resizer:hover > div,
+.cyberdeck-chat-resizer:focus-visible > div {
+  background: rgba(52, 211, 153, 0.72) !important;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.28) !important;
+}
+
 /* ⟁ Glyph composer — match ECHO m-2 inset; mirage-pane-body adds pane padding. */
 .glyph-channel-composer {
   box-sizing: border-box;

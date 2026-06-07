@@ -7025,22 +7025,23 @@ const resolved = resolveUiTarget(userMessage);
         <ResizablePanelGroup
           key={isMobileLayout ? "mobile-vertical" : "desktop-horizontal"}
           orientation={isMobileLayout ? "vertical" : "horizontal"}
-          memoryKey="cyberdeck-content-split"
+          memoryKey="cyberdeck-content-split-v2"
           className="h-full min-h-0 min-w-0 flex-1"
           onSizesChange={handleContentSplitSizesChange}
         >
           {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
           <ResizablePanel
             defaultSize={isMobileLayout ? 58 : 55}
-            minSize={isMobileLayout ? 2 : 0}
+            minSize={0}
             className="h-full min-h-0 overflow-hidden"
           >
           <div
             ref={chatColumnRef}
             onContextMenu={handleMiragePaneContextMenu}
-            className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full max-h-full min-h-0 flex-col overflow-hidden bg-black max-md:min-h-0 md:min-w-0 md:border-b-0 ${
+            className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full max-h-full min-h-0 flex-col overflow-hidden bg-black max-md:min-h-0 md:min-w-0 md:border-b-0 md:border-r md:border-[#141414] ${
               networkActivityActive ? "is-net-active" : ""
             }`}
+            data-cyberdeck-pane="muthur-chat"
           >
             {!isMobileLayout ? (
               <div className="border-b border-[#1a1a1a] px-2 py-1">
@@ -7387,13 +7388,22 @@ const resolved = resolveUiTarget(userMessage);
           </div>
         </ResizablePanel>
 
-        <ResizableHandle withHandle stacked={isMobileLayout} />
+        <ResizableHandle
+          withHandle
+          stacked={isMobileLayout}
+          aria-label="Resize MUTHUR chat pane"
+          className={
+            isMobileLayout
+              ? "cyberdeck-chat-resizer !h-2 !min-h-2 !border-x-0 !border-y !border-[#141414] !bg-black hover:!border-emerald-500/50"
+              : "cyberdeck-chat-resizer !w-2 !min-w-2 !border-x-0 !border-l !border-[#141414] !bg-black hover:!border-emerald-500/50 before:absolute before:-inset-x-3 before:inset-y-0 before:content-['']"
+          }
+        />
 
         {/* COL 3 (flipped): gateway nav — Weyland col2 */}
         <ResizablePanel
           defaultSize={isMobileLayout ? 42 : 45}
-          minSize={isMobileLayout ? 2 : 0.01}
-          className="h-full min-h-0"
+          minSize={0}
+          className="h-full min-h-0 overflow-hidden"
         >
           <div
             ref={gatewayColumnRef}
@@ -7403,7 +7413,7 @@ const resolved = resolveUiTarget(userMessage);
             onDragOver={handleThirdColumnDragOver}
             onDragLeave={handleThirdColumnDragLeave}
             onDrop={handleThirdColumnDrop}
-            className={`cyberdeck-net-pane right flex h-full min-w-0 flex-col border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
+            className={`cyberdeck-net-pane right flex h-full min-w-0 flex-col overflow-hidden border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
               networkActivityActive ? "is-net-active" : ""
             } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
           >
