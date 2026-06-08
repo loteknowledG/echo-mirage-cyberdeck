@@ -1,6 +1,7 @@
 "use client";
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { AsciiMorphButton } from "@/components/cyberdeck/ascii-morph-button";
 import { DepthButton } from "@/components/realmorphism";
 import { useDeckMode, type DeckMode } from "@/lib/deck-mode";
 import {
@@ -31,6 +32,76 @@ export type CyberdeckControlButtonProps = ButtonHTMLAttributes<HTMLButtonElement
   depth?: number;
   glow?: boolean;
 };
+
+function asciimorphismControlClass(
+  {
+    signal,
+    amber,
+    critical,
+    danger,
+    off,
+  }: RealmorphismControlOptions,
+  className?: string,
+): string {
+  return cn(
+    signal && "is-signal",
+    amber && "is-amber",
+    (critical || danger) && "is-critical",
+    off && "is-off",
+    className,
+  );
+}
+
+/** Pane toolbar — asciimorphism ASCII buttons in ascii deck mode, realmorphism otherwise. */
+export function CyberdeckPaneToolbarControl({
+  control,
+  children,
+  className,
+  type = "button",
+  ...props
+}: Omit<CyberdeckControlButtonProps, "deckMode" | "depth" | "glow">) {
+  const deckMode = useDeckMode();
+  if (deckMode === "ascii") {
+    return (
+      <CyberdeckAsciimorphismControl
+        control={control}
+        className={className}
+        type={type}
+        {...props}
+      >
+        {children}
+      </CyberdeckAsciimorphismControl>
+    );
+  }
+  return (
+    <CyberdeckControl control={control} className={className} type={type} {...props}>
+      {children}
+    </CyberdeckControl>
+  );
+}
+
+/** Fixed asciimorphism chrome — ASCII ▓ ground + lifting face (rail only). */
+export function CyberdeckAsciimorphismControl({
+  control,
+  children,
+  className,
+  type = "button",
+  ...props
+}: Omit<CyberdeckControlButtonProps, "deckMode">) {
+  const isPushed =
+    props["aria-pressed"] === true || props["aria-pressed"] === "true";
+  return (
+    <AsciiMorphButton
+      type={type}
+      size={control.size ?? "toolbar"}
+      isPushed={isPushed}
+      className={asciimorphismControlClass(control, className)}
+      {...props}
+    >
+      {children}
+    </AsciiMorphButton>
+  );
+}
 
 /** Content-zone control — realmorphism shadow face, or ascii mechanical depth. */
 export function CyberdeckControlButton({

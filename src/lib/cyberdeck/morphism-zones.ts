@@ -1,3 +1,5 @@
+import type { DeckMode } from "@/lib/deck-mode";
+
 /**
  * Cyberdeck morphism zones — asciimorphism and realmorphism do not mix.
  *
@@ -15,3 +17,10 @@ export const MORPHISM_ZONE_REALMORPHISM = "realmorphism" as const;
 export type MorphismZone =
   | typeof MORPHISM_ZONE_ASCIIMORPHISM
   | typeof MORPHISM_ZONE_REALMORPHISM;
+
+/** Pane toolbars follow deck mode — ASCII art buttons in ascii, realmorphism controls otherwise. */
+export function paneToolbarMorphismZone(deckMode: DeckMode): MorphismZone {
+  return deckMode === "ascii"
+    ? MORPHISM_ZONE_ASCIIMORPHISM
+    : MORPHISM_ZONE_REALMORPHISM;
+}

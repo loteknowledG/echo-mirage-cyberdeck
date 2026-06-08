@@ -18,8 +18,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useDeckMode } from "@/lib/deck-mode";
-import { CyberdeckControl } from "@/components/cyberdeck/cyberdeck-control-button";
-import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
+import {
+  CyberdeckControl,
+  CyberdeckPaneToolbarControl,
+} from "@/components/cyberdeck/cyberdeck-control-button";
+import { paneToolbarMorphismZone } from "@/lib/cyberdeck/morphism-zones";
 import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { GlyphEnginePicker } from "@/components/cyberdeck/glyph-engine-picker";
@@ -513,14 +516,14 @@ export function CyberdeckGlyphChannelPaneBody() {
         right={
           <div className="flex items-center gap-1">
             <CyberdeckControlTooltip label="View">
-              <CyberdeckControl
+              <CyberdeckPaneToolbarControl
                 control={{ size: "toolbar", signal: paneMode === "view" }}
                 onClick={() => setPaneModeWithFocus("view")}
                 aria-label="View mode"
                 aria-pressed={paneMode === "view"}
               >
                 <CodexIcon icon={cdxIconEye} className="h-3.5 w-3.5" />
-              </CyberdeckControl>
+              </CyberdeckPaneToolbarControl>
             </CyberdeckControlTooltip>
             <Switch
               checked={paneMode === "edit"}
@@ -533,70 +536,70 @@ export function CyberdeckGlyphChannelPaneBody() {
               )}
             />
             <CyberdeckControlTooltip label="Edit">
-              <CyberdeckControl
+              <CyberdeckPaneToolbarControl
                 control={{ size: "toolbar", signal: paneMode === "edit" }}
                 onClick={() => setPaneModeWithFocus("edit")}
                 aria-label="Edit mode"
                 aria-pressed={paneMode === "edit"}
               >
                 <CodexIcon icon={cdxIconEdit} className="h-3.5 w-3.5" />
-              </CyberdeckControl>
+              </CyberdeckPaneToolbarControl>
             </CyberdeckControlTooltip>
           </div>
         }
       />
 
       <div
-        data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
+        data-morphism={paneToolbarMorphismZone(deckMode)}
         className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
       >
         <CyberdeckControlTooltip label="Undo">
-          <CyberdeckControl
+          <CyberdeckPaneToolbarControl
             control={{ size: "toolbar", signal: true }}
             onClick={handleUndo}
             disabled={!canUndo || rendering}
             aria-label="Undo"
           >
             <CodexIcon icon={cdxIconUndo} className="h-3.5 w-3.5" />
-          </CyberdeckControl>
+          </CyberdeckPaneToolbarControl>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Redo">
-          <CyberdeckControl
+          <CyberdeckPaneToolbarControl
             control={{ size: "toolbar", signal: true }}
             onClick={handleRedo}
             disabled={!canRedo || rendering}
             aria-label="Redo"
           >
             <CodexIcon icon={cdxIconRedo} className="h-3.5 w-3.5" />
-          </CyberdeckControl>
+          </CyberdeckPaneToolbarControl>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Copy ASCII">
-          <CyberdeckControl
+          <CyberdeckPaneToolbarControl
             control={{ size: "toolbar", signal: true }}
             onClick={() => void handleCopy()}
             aria-label="Copy ASCII"
           >
             <CodexIcon icon={cdxIconCopy} className="h-3.5 w-3.5" />
-          </CyberdeckControl>
+          </CyberdeckPaneToolbarControl>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Clear ASCII channel">
-          <CyberdeckControl
+          <CyberdeckPaneToolbarControl
             control={{ size: "toolbar", signal: true }}
             onClick={handleClear}
             disabled={!text.trim() || rendering}
             aria-label="Clear ASCII channel"
           >
             <CodexIcon icon={cdxIconTrash} className="h-3.5 w-3.5" />
-          </CyberdeckControl>
+          </CyberdeckPaneToolbarControl>
         </CyberdeckControlTooltip>
         <CyberdeckControlTooltip label="Paste into ASCII">
-          <CyberdeckControl
+          <CyberdeckPaneToolbarControl
             control={{ size: "toolbar", signal: true }}
             onClick={() => void handlePasteClipboard()}
             aria-label="Paste into ASCII"
           >
             <CodexIcon icon={cdxIconPaste} className="h-3.5 w-3.5" />
-          </CyberdeckControl>
+          </CyberdeckPaneToolbarControl>
         </CyberdeckControlTooltip>
       </div>
 

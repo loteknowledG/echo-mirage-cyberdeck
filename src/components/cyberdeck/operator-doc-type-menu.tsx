@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { LuChevronDown } from "react-icons/lu";
-import { CyberdeckControl } from "@/components/cyberdeck/cyberdeck-control-button";
+import { CyberdeckPaneToolbarControl } from "@/components/cyberdeck/cyberdeck-control-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,7 +55,7 @@ export function OperatorDocTypeMenu({
     >
       <DropdownMenuTrigger asChild disabled={disabled}>
         {trigger === "toolbar" ? (
-          <CyberdeckControl
+          <CyberdeckPaneToolbarControl
             control={{ size: "toolbar", signal: open && !disabled }}
             aria-label="Document type"
             aria-haspopup="menu"
@@ -68,9 +68,9 @@ export function OperatorDocTypeMenu({
               alt=""
               aria-hidden
               draggable={false}
-              className="h-3.5 w-3.5 object-contain"
+              className="h-2.5 w-2.5 object-contain"
             />
-          </CyberdeckControl>
+          </CyberdeckPaneToolbarControl>
         ) : (
           <button
             type="button"

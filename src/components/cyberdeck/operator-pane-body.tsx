@@ -43,9 +43,10 @@ import { cn } from "@/lib/utils";
 import {
   CyberdeckActionButton,
   CyberdeckControl,
+  CyberdeckPaneToolbarControl,
 } from "@/components/cyberdeck/cyberdeck-control-button";
 import { LEGACY_SWITCH_EMERALD } from "@/lib/cyberdeck/realmorphism-control";
-import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
+import { paneToolbarMorphismZone } from "@/lib/cyberdeck/morphism-zones";
 import { useDeckMode } from "@/lib/deck-mode";
 import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
 import { CodexIcon } from "@/components/codex-icon";
@@ -202,7 +203,7 @@ function OperatorToolbarIconButton({
   children: ReactNode;
 }) {
   const button = (
-    <CyberdeckControl
+    <CyberdeckPaneToolbarControl
       control={{ size: "toolbar", signal: pressed }}
       onClick={onClick}
       disabled={disabled}
@@ -214,7 +215,7 @@ function OperatorToolbarIconButton({
       )}
     >
       {children}
-    </CyberdeckControl>
+    </CyberdeckPaneToolbarControl>
   );
 
   return (
@@ -477,6 +478,7 @@ function OperatorDocumentToolStrip({
   onSaveOperatorDocx?: () => void | Promise<void>;
   onSaveOperatorDocxAs?: () => void | Promise<void>;
 }) {
+  const deckMode = useDeckMode();
   const binaryPreview =
     previewSurface != null && !isOperatorTextEditableSurface(previewSurface);
   const resolvedPath = localFilePath?.trim() ?? "";
@@ -539,7 +541,7 @@ function OperatorDocumentToolStrip({
 
   return (
     <div
-      data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
+      data-morphism={paneToolbarMorphismZone(deckMode)}
       className="z-10 flex w-full min-w-0 shrink-0 flex-wrap items-center justify-end gap-1.5 overflow-hidden border-b border-[#141414] bg-black px-3 py-2"
     >
       {binaryPreview ? (
@@ -682,6 +684,7 @@ export function CyberdeckOperatorPaneBody({
   onConvertDocumentToMarkdown,
   onExportOperatorMarkdown,
 }: OperatorPaneBodyProps) {
+  const deckMode = useDeckMode();
   const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
   const [browserCanGoBack, setBrowserCanGoBack] = useState(false);
   const [browserCanGoForward, setBrowserCanGoForward] = useState(false);
@@ -1285,7 +1288,7 @@ export function CyberdeckOperatorPaneBody({
         />
         {operatorSurfaceMode === "browser" ? (
           <div
-            data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
+            data-morphism={paneToolbarMorphismZone(deckMode)}
             className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
           >
             <OperatorReturnToDocumentButton onClick={returnToDocumentMode} />
