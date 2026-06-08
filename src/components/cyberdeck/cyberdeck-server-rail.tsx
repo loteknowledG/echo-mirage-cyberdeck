@@ -2,7 +2,7 @@
 
 import { useEffect, type MouseEvent, type RefObject, type WheelEvent } from "react";
 import { motion, useMotionValue, type PanInfo } from "motion/react";
-import { art } from "@/lib/TerminalArt";
+import { RailAsciiButton } from "@/components/cyberdeck/rail-ascii-button";
 import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import {
   railPaneLabelForCustomTab,
@@ -136,7 +136,9 @@ export function CyberdeckServerRail({
           onContextMenu={(event) => onRailContextMenu(btn.id, event)}
           {...createRailTabLongPressHandlers(btn.id)}
         >
-          <pre
+          <RailAsciiButton
+            glyph={railGlyphForServer(btn)}
+            isPushed={selectedRailTabId === btn.id}
             className={`ascii-btn${selectedRailTabId === btn.id ? " is-pushed" : ""}${
               navRailContext === "tabs" && serverKeyboardHighlightId === btn.id
                 ? " server-rail-kb-hover"
@@ -153,11 +155,7 @@ export function CyberdeckServerRail({
               width: "100%",
               height: "100%",
             }}
-          >
-            {selectedRailTabId === btn.id
-              ? art.pushed(railGlyphForServer(btn))
-              : art.popped(railGlyphForServer(btn))}
-          </pre>
+          />
         </cyberdeck-rail-tab>
         </CyberdeckRailTabTooltip>
       ))}
@@ -168,7 +166,9 @@ export function CyberdeckServerRail({
           onContextMenu={(event) => onRailContextMenu(tab.id, event)}
           {...createRailTabLongPressHandlers(tab.id)}
         >
-          <pre
+          <RailAsciiButton
+            glyph={railGlyphForCustomTab(tab)}
+            isPushed={selectedRailTabId === tab.id}
             className={`ascii-btn${selectedRailTabId === tab.id ? " is-pushed" : ""}${
               navRailContext === "tabs" && serverKeyboardHighlightId === tab.id
                 ? " server-rail-kb-hover"
@@ -185,11 +185,7 @@ export function CyberdeckServerRail({
               width: "100%",
               height: "100%",
             }}
-          >
-            {selectedRailTabId === tab.id
-              ? art.pushed(railGlyphForCustomTab(tab))
-              : art.popped(railGlyphForCustomTab(tab))}
-          </pre>
+          />
         </cyberdeck-rail-tab>
         </CyberdeckRailTabTooltip>
       ))}
