@@ -3,10 +3,6 @@
 export {
   detectSelfStatusIntent,
   detectInspectIntent,
-  detectObserveIntent,
-  detectStopObserveIntent,
-  detectPauseObserveIntent,
-  detectResumeObserveIntent,
   detectExecDeckShowIntent,
   detectExecDeckPrepareIntent,
   detectExecDeckClearIntent,
@@ -14,18 +10,6 @@ export {
   detectExecDeckExecuteIntent,
   detectExecDeckDescribeStagedIntent,
 } from "@/lib/computer-use/intent-detect";
-
-export {
-  startObservation,
-  stopObservation,
-  pauseObservation,
-  resumeObservation,
-  recordEvent,
-  getNextPendingQuestion,
-  answerQuestion,
-  getEventCount,
-  isObserving,
-} from "@/lib/computer-use/workflow-observation";
 
 export { formatStatusText } from "@/lib/computer-use/introspection";
 

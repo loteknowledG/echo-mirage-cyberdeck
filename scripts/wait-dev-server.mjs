@@ -7,6 +7,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEADLINE_MS = 300_000;
 const RETRY_MS = 1_000;
 const ROUTE_FETCH_MS = 120_000;
+const waitStartedAt = Date.now();
 
 async function readState() {
   const raw = await fs.readFile(devStatePath, 'utf8');
@@ -32,14 +33,34 @@ async function fetchCyberdeckRoute(url) {
   }
 }
 
+function isFreshSession(state) {
+  const updatedAt = Date.parse(String(state?.updatedAt ?? ''));
+  if (!Number.isFinite(updatedAt)) return false;
+  return updatedAt >= waitStartedAt - 2_000;
+}
+
 async function waitForDevServer() {
   const deadline = Date.now() + DEADLINE_MS;
   let lastMessage = 'waiting for dev-server.json';
   let sidecarReady = false;
+  let announcedPorts = false;
 
   while (Date.now() < deadline) {
     try {
       const state = await readState();
+
+      if (!isFreshSession(state)) {
+        lastMessage = 'stale dev-server.json - waiting for new dev session';
+        await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
+        continue;
+      }
+
+      if (!announcedPorts) {
+        announcedPorts = true;
+        process.stdout.write(
+          `[wait] tracking app=:${state.appPort} sidecar=:${state.readyPort}\n`,
+        );
+      }
 
       if (!sidecarReady) {
         const healthUrl = `http://127.0.0.1:${state.readyPort}/health`;

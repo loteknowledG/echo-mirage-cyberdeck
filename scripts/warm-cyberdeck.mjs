@@ -2,7 +2,8 @@
  * Pre-compiles /cyberdeck (HTML + linked client chunks) before Electron opens,
  * so the first load does not race the dev bundler and blow the Node stack.
  */
-import { cyberdeckRouteUrl, resolveDevOrigin } from './resolve-dev-origin.mjs';
+import fs from 'node:fs/promises';
+import { cyberdeckRouteUrl, devStatePath, resolveDevOrigin } from './resolve-dev-origin.mjs';
 
 const DEADLINE_MS = 300_000;
 const FETCH_MS = 120_000;
@@ -44,17 +45,45 @@ async function wakeRouteDiscovery(origin) {
   }
 }
 
+async function waitForSidecarReady() {
+  let readyPort;
+  try {
+    const state = JSON.parse(await fs.readFile(devStatePath, 'utf8'));
+    readyPort = Number(state?.readyPort);
+  } catch {
+    return;
+  }
+  if (!Number.isFinite(readyPort)) return;
+
+  const healthUrl = `http://127.0.0.1:${readyPort}/health`;
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(healthUrl);
+      if (res.ok) return;
+    } catch {
+      /* Next still booting */
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
 async function warmCyberdeck() {
+  const origin = await resolveDevOrigin();
+  process.stdout.write(`[warm] waiting for sidecar before compile (${origin})...\n`);
+  await waitForSidecarReady();
+
   const deadline = Date.now() + DEADLINE_MS;
   let attempt = 0;
 
   while (Date.now() < deadline) {
     attempt += 1;
-    const origin = await resolveDevOrigin();
     const route = cyberdeckRouteUrl(origin);
 
     try {
-      process.stdout.write(`[warm] compiling ${route} (attempt ${attempt})...\n`);
+      if (attempt === 1 || attempt % 5 === 0) {
+        process.stdout.write(`[warm] compiling ${route} (attempt ${attempt})...\n`);
+      }
 
       if (attempt === 5 || attempt === 20) {
         process.stdout.write('[warm] nudging route discovery via GET /\n');

@@ -207,14 +207,8 @@ import type { Identity } from "@/lib/identity/identity-types";
 import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration";
 import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
 import { ENABLE_AUTOMATION, ENABLE_MODEL_PROBE } from "@/lib/cyberdeck/automation-config";
-import {
-  formatActionResultForChat,
-  parseLegacyToolJson,
-} from "@/lib/muthur/execution/parse-legacy-tool-json";
-import { enqueueMuthurActions } from "@/lib/muthur/execution/use-muthur-execution-runtime";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import { publishMuthurObservation, flushMuthurObservation } from "@/lib/muthur/observation/publish-observation";
-import { OBSERVE_TRANSCRIPT_PREFIX } from "@/components/muthur/observe-presence-glyph";
 import {
   getMuthurHelpText,
   getMuthurHelpUnknownTopicText,
@@ -2201,34 +2195,13 @@ export default function CyberdeckApp() {
     void publishMuthurObservation({
       route: "/cyberdeck",
       surface: "cyberdeck",
-      observing: true,
-      observingPanelId: activeCustomTab?.id ?? server,
-      observingSubsystem: activeCustomTab?.kind ?? server,
       activeTab: activeCustomTab?.label ?? server,
       activePane: activeCustomTab?.kind ?? server,
       visibleDocument: visibleAsset?.name ?? null,
       documentExcerpt: typeof visibleAsset?.text === "string" ? visibleAsset.text.slice(0, 800) : null,
-      selectedProperty: null,
-      selectedUnit: null,
-      visibleLogs: messages.slice(-6).map((message) => `${message.role.toUpperCase()} // ${message.text.slice(0, 300)}`),
-      activeTickets: [],
-      operationalMode: "OBSERVE",
-      transcriptState: isStreaming ? "STREAMING" : "STANDBY",
-      operationalWarnings: [],
-      continuityIndicators: [
-        `SURFACE // ${operatorSurfaceMode.toUpperCase()}`,
-        `DOCUMENT // ${operatorDocMode.toUpperCase()}`,
-        ...(operatorActiveFilePath ? [`PATH // ${operatorActiveFilePath}`] : []),
-        ...(operatorSurfaceMode === "browser" ? [`URL // ${operatorBrowserUrl}`] : []),
-      ],
     });
   }, [
     deckUiHydrated,
-    isStreaming,
-    messages,
-    operatorActiveFilePath,
-    operatorBrowserUrl,
-    operatorDocMode,
     operatorDroppedAsset,
     operatorSurfaceMode,
   ]);
@@ -4868,10 +4841,6 @@ Last Messages: ${messages.slice(-3).map(m => `[${m.role.substring(0,3)}] ${m.tex
       const {
         detectSelfStatusIntent,
         detectInspectIntent,
-        detectObserveIntent,
-        detectStopObserveIntent,
-        detectPauseObserveIntent,
-        detectResumeObserveIntent,
         detectExecDeckShowIntent,
         detectExecDeckPrepareIntent,
         detectExecDeckClearIntent,
@@ -4881,16 +4850,7 @@ Last Messages: ${messages.slice(-3).map(m => `[${m.role.substring(0,3)}] ${m.tex
         formatStatusText,
         getLastSurfaceClassification,
         formatSurfaceResponse,
-        stopObservation,
-        getEventCount,
-        pauseObservation,
-        resumeObservation,
-        startObservation,
-        getNextPendingQuestion,
-        answerQuestion,
         openDeck,
-        isObserving,
-        recordEvent,
         isDeckOpen,
         describeDeck,
         buildReviewerHand,
@@ -4933,85 +4893,8 @@ Last Messages: ${messages.slice(-3).map(m => `[${m.role.substring(0,3)}] ${m.tex
       return;
     }
 
-    if (detectStopObserveIntent(userMessage)) {
-      const session = stopObservation();
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: `Workflow observation stopped. ${getEventCount()} events recorded.`,
-        },
-      ]);
-      setIsStreaming(false);
-      return;
-    }
-
-    if (detectPauseObserveIntent(userMessage)) {
-      pauseObservation();
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: "Workflow observation paused." },
-      ]);
-      setIsStreaming(false);
-      return;
-    }
-
-    if (detectResumeObserveIntent(userMessage)) {
-      resumeObservation();
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: "Workflow observation resumed." },
-      ]);
-      setIsStreaming(false);
-      return;
-    }
-
-    if (detectObserveIntent(userMessage)) {
-      const session = startObservation();
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: "Workflow observation started. Say 'MUTHUR, pause workflow observation' to pause, or 'MUTHUR, stop workflow observation' to end.",
-        },
-      ]);
-      setIsStreaming(false);
-      return;
-    }
-
-    const answerMap: Record<string, string> = {
-      yes: "yes",
-      no: "no",
-      skip: "skip",
-      "record this": "record_this",
-      "ignore this": "ignore_this",
-      optional: "optional",
-      recovery: "recovery",
-      "mark as recovery": "recovery",
-      "yes record": "record_this",
-      "no skip": "skip",
-    };
-    const lower = userMessage.toLowerCase().trim();
-    for (const [trigger, answer] of Object.entries(answerMap)) {
-      if (lower === trigger || lower === `muthur, ${trigger}`) {
-        const pending = getNextPendingQuestion();
-        if (pending) {
-          answerQuestion(pending.id, answer as "yes" | "no" | "skip" | "record_this" | "ignore_this" | "optional" | "recovery");
-          const questionsLeft = getNextPendingQuestion();
-          let response = `Recorded.`;
-          if (questionsLeft) {
-            response += ` Next: ${questionsLeft.question}`;
-          }
-          setMessages((prev) => [...prev, { role: "assistant", text: response }]);
-          setIsStreaming(false);
-          return;
-        }
-      }
-    }
-
     if (detectExecDeckShowIntent(userMessage)) {
       openDeck();
-      if (isObserving()) recordEvent("execution_deck_opened", "Deck Opened", userMessage);
       useCyberdeckTabStore.getState().setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
       useCyberdeckTabStore.getState().setActiveCustomTabId(null);
       if (isDeckOpen()) {
@@ -5030,7 +4913,6 @@ if (detectExecDeckPrepareIntent(userMessage)) {
       useCyberdeckTabStore.getState().setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
       useCyberdeckTabStore.getState().setActiveCustomTabId(null);
       const desc = describeDeck();
-      if (isObserving()) recordEvent("hand_prepared", "Reviewer Hand", `${cards.length} cards staged: ${cards.map((c) => c.title).join(", ")}`);
       narrate("HAND_PREPARED");
       setMessages((prev) => [...prev, { role: "assistant", text: desc }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, desc));
@@ -5064,7 +4946,6 @@ if (detectExecDeckPrepareIntent(userMessage)) {
 
     if (detectExecDeckClearIntent(userMessage)) {
       clearDeck();
-      if (isObserving()) recordEvent("stack_cleared", "Card Table", userMessage);
       narrate("CARD_TABLE_CLEARED");
       useCyberdeckTabStore.getState().setServer(safeServerId("s") as (typeof SERVER_IDS)[number]);
       setMessages((prev) => [
@@ -5083,7 +4964,6 @@ if (detectExecDeckPrepareIntent(userMessage)) {
         useCyberdeckTabStore.getState().setActiveCustomTabId(null);
       }
       if (result.pushed > 0) {
-        if (isObserving()) recordEvent("hand_pushed_to_stack", "Hand Pushed", `${result.pushed} cards pushed to stack, depth now ${result.stackDepth}`);
         narrate("HAND_PUSHED_TO_STACK");
       }
       const desc = describeDeck();
@@ -5098,9 +4978,6 @@ if (detectExecDeckPrepareIntent(userMessage)) {
       const result = attemptExecute();
       useCyberdeckTabStore.getState().setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
       useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-      if (!result.success && isObserving()) {
-        recordEvent("execution_attempt_blocked", "Execute Blocked", result.reason);
-      }
       narrate("EXECUTION_DISABLED");
       setMessages((prev) => [
         ...prev,
@@ -5130,9 +5007,6 @@ if (detectExecDeckPrepareIntent(userMessage)) {
 
       if (wantsClear) {
         const result = await runComputerUseBridgeAction({ name: "clear_indicators" });
-        if (result.success) {
-          recordEvent("clear_indicators", "Indicators cleared", userMessage);
-        }
         setMessages((prev) => [
           ...prev,
           {
@@ -5213,10 +5087,6 @@ const resolved = resolveUiTarget(userMessage);
           ttlMs: 30_000,
         },
       });
-      if (result.success) {
-        const actionType = wantsHighlight ? "indicate_highlight" : "indicate_point";
-        recordEvent(actionType, resolved.target, userMessage);
-      }
       setMessages((prev) => [
         ...prev,
         {
@@ -5466,117 +5336,6 @@ const resolved = resolveUiTarget(userMessage);
       const cleanedText = glyphResponse.displayText
         .replace(/^=+$\n?/g, "")
         .trim();
-
-      const legacyAction = parseLegacyToolJson(cleanedText);
-      if (legacyAction && !cleanedText.includes("[EXEC:")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: `⚡ EXECUTION // ${legacyAction.type.toUpperCase()} // QUEUED`,
-          },
-        ]);
-        setIsStreaming(true);
-        setStreamText("⚡ Running execution loop…");
-
-        try {
-          const execData = await enqueueMuthurActions([legacyAction], {
-            wait: true,
-            mode: "execute",
-            taskLabel: "legacy-json-tool",
-          });
-          const results = Array.isArray(execData.results) ? execData.results : [];
-          const first = results[0] as
-            | {
-                status?: string;
-                type?: string;
-                payload?: Record<string, unknown>;
-                result?: {
-                  success: boolean;
-                  stdout?: string;
-                  stderr?: string;
-                  exit_code?: number;
-                  duration_ms: number;
-                };
-                error?: string;
-              }
-            | undefined;
-
-          if (!first) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "assistant",
-                text: "EXECUTION BLOCKED // Action requires operator approval.",
-              },
-            ]);
-            setStreamText("");
-            setIsStreaming(false);
-            return;
-          }
-
-          const toolResultMessage = formatActionResultForChat({
-            type: first.type ?? legacyAction.type,
-            payload: first.payload ?? legacyAction.payload,
-            status: first.status ?? "unknown",
-            result: first.result,
-            error: first.error,
-          });
-
-          if (!ENABLE_AUTOMATION) {
-            setMessages((prev) => [
-              ...prev,
-              { role: "assistant", text: toolResultMessage },
-            ]);
-          } else {
-            const reviewRes = await fetch("/api/cyberdeck-chat", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                message: `A tool was executed via the MUTHUR execution loop. Give a brief summary.\n\n${toolResultMessage}`,
-                provider: activeProvider,
-                apiKey: providerKeys[activeProvider] || "",
-                model: modelID,
-                memoryContext: "",
-                browserContext: "",
-                history: [],
-              }),
-            });
-
-            if (reviewRes.ok) {
-              const reader = reviewRes.body?.getReader();
-              if (reader) {
-                const decoder = new TextDecoder();
-                let finalSummary = "";
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  finalSummary += decoder.decode(value, { stream: true });
-                }
-                const cleanSummary = finalSummary.replace(/^=+\s*$/gm, "").replace(/^=+$\n?/g, "").trim();
-                setMessages((prev) => [
-                  ...prev,
-                  { role: "assistant", text: cleanSummary },
-                ]);
-              }
-            } else {
-              setMessages((prev) => [
-                ...prev,
-                { role: "assistant", text: toolResultMessage },
-              ]);
-            }
-          }
-        } catch (e) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", text: `EXECUTION FAILED: ${(e as Error).message}` },
-          ]);
-        }
-
-        setStreamText("");
-        setIsStreaming(false);
-        return;
-      }
       
       setMessages((prev) => [...prev, { role: "assistant", text: cleanedText }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
@@ -7068,10 +6827,6 @@ const resolved = resolveUiTarget(userMessage);
                     /(failure|failuer|failed|invalid_key|auth_rejected|uplink_error|api\s*error|http_[45]\d{2}|empty_response|rate_limit)/i.test(
                       m.text,
                     );
-                  const isObserveResponse =
-                    m.role === "assistant" &&
-                    (m.toolTrace?.includes("observe_operator_pane") ||
-                      /observe_operator_pane|READ_ONLY_OBSERVATION|Operator panel observed/i.test(m.text));
                   return (
                     <div
                       key={i}
@@ -7135,11 +6890,6 @@ const resolved = resolveUiTarget(userMessage);
                                 .join(" · ")}
                             </span>
                           ) : null}
-                          {isObserveResponse ? (
-                            <span className="mb-0.5 block font-mono text-[10px] leading-snug text-cyan-300">
-                              {OBSERVE_TRANSCRIPT_PREFIX}
-                            </span>
-                          ) : null}
                           <span className="whitespace-pre-wrap">{m.text}</span>
                         </>
                       )}
@@ -7164,11 +6914,6 @@ const resolved = resolveUiTarget(userMessage);
                             .map((t) => t.trim())
                             .filter(Boolean)
                             .join(" · ")}
-                        </span>
-                      ) : null}
-                      {streamToolTrace?.includes("observe_operator_pane") ? (
-                        <span className="mb-0.5 block font-mono text-[10px] leading-snug text-cyan-300">
-                          {OBSERVE_TRANSCRIPT_PREFIX}
                         </span>
                       ) : null}
                       <span className="text-green-300">{streamText}</span>

@@ -448,7 +448,8 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 }
 
 .cyberdeck-server-rail cyberdeck-rail-tab:hover .ascii-btn {
-  transform: translate(1px, 1px) scale(1.02);
+  transform: translateY(-4px) translateX(-2px);
+  box-shadow: 4px 4px 0 0 #222;
   color: #9aa7ff;
   text-shadow: 0 0 10px rgba(114, 137, 218, 0.35);
 }
@@ -475,7 +476,8 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
     color 60ms ease,
     text-shadow 60ms ease,
     opacity 60ms ease,
-    box-shadow 60ms ease;
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .cyberdeck-server-rail .ascii-btn.is-pushed {
@@ -486,7 +488,8 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 
 /* Keyboard focus on tab rail (after .ascii-btn / .is-pushed so it wins the cascade) */
 .cyberdeck-server-rail cyberdeck-rail-tab .ascii-btn.server-rail-kb-hover {
-  transform: translate(1px, 1px) scale(1.02);
+  transform: translateY(-4px) translateX(-2px);
+  box-shadow: 4px 4px 0 0 #222;
   color: #9aa7ff;
   text-shadow: 0 0 10px rgba(114, 137, 218, 0.35);
   opacity: 1;
@@ -498,8 +501,9 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 }
 
 .cyberdeck-server-rail .ascii-btn:active {
-  transform: translate(2px, 2px);
+  transform: translateY(4px) translateX(2px);
   box-shadow: none !important;
+  transition-duration: 80ms;
 }
 
 /* Custom Scrollbar for Cyberdeck */

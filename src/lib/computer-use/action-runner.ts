@@ -5,7 +5,6 @@ import * as screenCapture from "./screen-capture";
 import * as inputController from "./input-controller";
 import * as uiVerification from "./ui-verification";
 import * as indicateLayer from "./indicate-layer";
-import { checkActionPermission, getCurrentOwner, emitControlDenied } from "./control-lease";
 import { getActionScope } from "./capability-registry";
 import { narrate } from "./narration";
 

@@ -303,8 +303,6 @@ async function runObserveOperatorPane(call: ToolCall): Promise<ToolResult> {
   return {
     ok: true,
     output: {
-      authority: "READ_ONLY_OBSERVATION",
-      read_only: true,
       observation: observation ?? { status: "NO_VISIBLE_OBSERVATION" },
     },
   };

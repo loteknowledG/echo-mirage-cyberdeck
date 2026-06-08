@@ -37,7 +37,7 @@ export function formatObserveOperatorPaneResult(result: unknown): string {
     authority?: string;
   };
 
-  return `[TOOL OK] observe_operator_pane // READ_ONLY\n\n${JSON.stringify(payload.observation ?? { status: "NO_VISIBLE_OBSERVATION" }, null, 2)}`;
+  return `[TOOL OK] observe_operator_pane\n\n${JSON.stringify(payload.observation ?? { status: "NO_VISIBLE_OBSERVATION" }, null, 2)}`;
 }
 
 export function formatLocalFsResult(result: unknown): string {

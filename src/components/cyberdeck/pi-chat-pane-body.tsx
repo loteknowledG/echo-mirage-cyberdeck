@@ -109,12 +109,14 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
     const mountPi = async () => {
       try {
         ensurePiWebUiStyles();
-        const [{ Agent }, { createAssistantMessageEventStream, getModel }, ui] = await Promise.all([
-          import("@mariozechner/pi-agent-core"),
-          import("@mariozechner/pi-ai"),
-          import("@mariozechner/pi-web-ui"),
-        ]);
+        // Lit + mini-lit must initialize before pi-web-ui decorators run.
+        await import("lit");
+        await import("lit/decorators.js");
         await import("@mariozechner/mini-lit/dist/MarkdownBlock.js");
+
+        const { Agent } = await import("@mariozechner/pi-agent-core");
+        const { createAssistantMessageEventStream, getModel } = await import("@mariozechner/pi-ai");
+        const ui = await import("@mariozechner/pi-web-ui");
 
         await ensurePiStorage(ui);
         if (disposed || !hostRef.current) return;

@@ -24,6 +24,11 @@ const echoWheelCss = path.join(
 	projectRoot,
 	"src/components/cyberdeck/float-wheel-picker.module.css",
 );
+const pdfjsDistRoot = path.join(projectRoot, "node_modules/pdfjs-dist");
+const piWebUiPdfjsLoader = path.join(
+	projectRoot,
+	"scripts/pi-attachment-utils-loader.cjs",
+);
 
 /** @type {import('next').NextConfig} */
 const RUNTIME_WATCH_IGNORE = [
@@ -49,7 +54,18 @@ function normalizeWebpackWatchIgnored(ignored) {
 const nextConfig = {
 	devIndicators: false,
 	distDir: process.env.CYBERDECK_NEXT_DIST_DIR || ".next",
-	transpilePackages: ["realmorphism", "@eigenpal/docx-editor-react"],
+	transpilePackages: [
+		"realmorphism",
+		"@eigenpal/docx-editor-react",
+		"lit",
+		"@lit/reactive-element",
+		"lit-element",
+		"lit-html",
+		"@mariozechner/mini-lit",
+		"@mariozechner/pi-agent-core",
+		"@mariozechner/pi-ai",
+		"@mariozechner/pi-web-ui",
+	],
 	allowedDevOrigins: ["127.0.0.1", "localhost"],
 	turbopack: {
 		resolveAlias: {
@@ -92,7 +108,24 @@ const nextConfig = {
 				realmorphismPackageRoot,
 				"src/styles/realmorphism-kit.css",
 			),
+			// pi-web-ui pins pdfjs-dist@5.4.x whose build/pdf.mjs is pre-webpacked and breaks under Next 16.
+			"pdfjs-dist": pdfjsDistRoot,
 		};
+
+		config.module.rules.push(
+			{
+				test: /[\\/]pdfjs-dist[\\/].*\.mjs$/,
+				type: "javascript/auto",
+				resolve: {
+					fullySpecified: false,
+				},
+			},
+			{
+				enforce: "pre",
+				test: /[\\/]pi-web-ui[\\/]dist[\\/].+\.js$/,
+				loader: piWebUiPdfjsLoader,
+			},
+		);
 
 		config.ignoreWarnings = [
 			...(config.ignoreWarnings ?? []),

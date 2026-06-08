@@ -63,8 +63,39 @@ async function choosePorts() {
 }
 
 const { appPort, readyPort } = await choosePorts();
+const sessionStartedAt = new Date().toISOString();
 const nextDistDir =
   useAutoPort && appPort !== DEFAULT_APP_PORT ? `.next-dev/${appPort}` : '.next';
+
+async function writeDevState(ready) {
+  await fs.mkdir(devStateDir, { recursive: true });
+  await fs.writeFile(
+    devStatePath,
+    JSON.stringify(
+      {
+        appPort,
+        readyPort,
+        origin: `http://127.0.0.1:${appPort}`,
+        route: `http://127.0.0.1:${appPort}/cyberdeck`,
+        pid: process.pid,
+        mode: useAutoPort ? 'auto' : 'fixed',
+        ready,
+        startedAt: sessionStartedAt,
+        updatedAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  );
+}
+
+try {
+  await fs.unlink(devStatePath);
+} catch {
+  /* no previous session file */
+}
+await writeDevState(false);
 const nextEnvPath = path.join(root, 'next-env.d.ts');
 const tsconfigPath = path.join(root, 'tsconfig.json');
 
@@ -118,25 +149,6 @@ readyServer.on('error', (err) => {
 });
 
 readyServer.listen(readyPort, '127.0.0.1', async () => {
-  await fs.mkdir(devStateDir, { recursive: true });
-  await fs.writeFile(
-    devStatePath,
-    JSON.stringify(
-      {
-        appPort,
-        readyPort,
-        origin: `http://127.0.0.1:${appPort}`,
-        route: `http://127.0.0.1:${appPort}/cyberdeck`,
-        pid: process.pid,
-        mode: useAutoPort ? 'auto' : 'fixed',
-        updatedAt: new Date().toISOString(),
-      },
-      null,
-      2,
-    ),
-    'utf8',
-  );
-
   if (bundler === 'turbopack') {
     process.stdout.write('[dev] turbopack mode - if PostCSS panics on Windows, use: pnpm dev (webpack)\n');
   }
@@ -171,6 +183,7 @@ function noteNextReady(line) {
   if (/\bReady in\b/.test(line) || /✓ Ready\b/.test(line)) {
     nextReady = true;
     process.stdout.write(`[dev] Next ready - sidecar :${readyPort}/health open\n`);
+    void writeDevState(true);
     void normalizeGeneratedTypePaths();
   }
 }

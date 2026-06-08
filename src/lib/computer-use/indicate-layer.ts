@@ -1,5 +1,4 @@
 import type { IndicateMarker, IndicatePosition, ComputerUseResult } from "./computer-use-types";
-import { emit } from "./control-lease";
 import { narrate } from "./narration";
 
 const DEBUG = process.env.NODE_ENV !== "production";
