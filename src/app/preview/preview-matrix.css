@@ -236,6 +236,15 @@
   align-content: stretch;
   padding: 8px 16px 10px;
   gap: 6px;
+  transition: opacity 200ms ease;
+}
+
+.powerfist-preview-root .deckSlide:not(.is-selected) {
+  opacity: 0.55;
+}
+
+.powerfist-preview-root .deckSlide.is-selected {
+  opacity: 1;
 }
 
 .powerfist-preview-root .deckHeader {
@@ -1010,12 +1019,18 @@
   box-sizing: border-box;
   padding-right: 0;
   max-width: none !important;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   overflow-x: hidden;
   overflow-y: hidden;
   position: relative;
+}
+
+.cyberdeck-rola-dex-pane .powerfist-preview-root .powerfistSplitLayout {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
 }
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root .status,

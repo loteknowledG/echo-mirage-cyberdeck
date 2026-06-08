@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 export type SignalSource =
+  | "apps"
   | "command"
   | "catalog"
   | "operators"

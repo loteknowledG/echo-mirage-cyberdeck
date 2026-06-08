@@ -149,6 +149,7 @@ export function MatrixCarousel() {
       activeRowRef.current,
       activeColRef.current,
       MATRIX_DATA.length,
+      { jump: true },
     );
     setActiveFocus(next.deckIndex, next.cardIndex);
   }, [setActiveFocus]);
@@ -198,7 +199,7 @@ export function MatrixCarousel() {
     });
 
     deckEmblaRef.current = deckEmbla;
-    deckEmbla.on("select", syncFromEmbla);
+    deckEmbla.on("settle", syncFromEmbla);
 
     const next = scrollMatrixTo(
       deckEmbla,
@@ -206,6 +207,7 @@ export function MatrixCarousel() {
       activeRowRef.current,
       activeColRef.current,
       MATRIX_DATA.length,
+      { jump: true },
     );
     setActiveFocus(next.deckIndex, next.cardIndex);
 

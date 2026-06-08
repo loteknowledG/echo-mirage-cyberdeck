@@ -160,6 +160,7 @@ export function PreviewMatrix() {
       activeDeckIndexRef.current,
       activeCardIndexRef.current,
       deckCount,
+      { jump: true },
     );
     setActiveFocus(next.deckIndex, next.cardIndex);
   }, [activeDecks, setActiveFocus]);
@@ -212,17 +213,19 @@ export function PreviewMatrix() {
       align: "center",
       dragFree: false,
       containScroll: false,
-      duration: 28,
+      duration: 30,
     });
 
     deckEmblaRef.current = deckEmbla;
-    deckEmbla.on("select", syncFromEmbla);
+    // Defer focus until scroll settles so deck bands slide before selection updates.
+    deckEmbla.on("settle", syncFromEmbla);
     const next = scrollMatrixTo(
       deckEmbla,
       handEmblaRefs.current,
       activeDeckIndexRef.current,
       activeCardIndexRef.current,
       activeDecks.length,
+      { jump: true },
     );
     setActiveFocus(next.deckIndex, next.cardIndex);
 
@@ -335,8 +338,8 @@ export function PreviewMatrix() {
       if (armedCardKey) return;
       const deckEmbla = deckEmblaRef.current;
       if (!deckEmbla) return;
-      if (direction < 0) deckEmbla.scrollPrev();
-      else deckEmbla.scrollNext();
+      if (direction < 0) deckEmbla.scrollNext();
+      else deckEmbla.scrollPrev();
     },
     [armedCardKey],
   );
@@ -599,7 +602,7 @@ export function PreviewMatrix() {
                 {activeDecks.map((deck, deckIndex) => (
                   <section
                     key={deck.name}
-                    className="deckSlide"
+                    className={`deckSlide${deckIndex === activeDeckIndex ? " is-selected" : ""}`}
                     data-deck-index={deckIndex}
                   >
                     <div

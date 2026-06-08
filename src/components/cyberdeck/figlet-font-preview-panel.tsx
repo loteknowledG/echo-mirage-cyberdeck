@@ -68,14 +68,11 @@ export function FigletFontPreviewPanel({
     <div
       className={cn(
         variant === 'toolbar'
-          ? 'realmorphism-panel flex h-[8.25rem] min-w-0 flex-col overflow-x-auto overflow-y-hidden px-3 pb-4 pt-2'
+          ? 'realmorphism-panel flex h-[8.25rem] min-w-0 flex-col overflow-x-auto overflow-y-hidden p-2'
           : 'realmorphism-panel flex min-h-[12rem] flex-col justify-center overflow-x-auto overflow-y-hidden p-4',
         className,
       )}
     >
-      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#6f7a75]">
-        Preview
-      </div>
       {loading ? (
         <div className="font-mono text-xs text-[#6f7a75]">Rendering…</div>
       ) : (

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { LuChevronDown } from "react-icons/lu";
 import { CyberdeckPaneToolbarControl } from "@/components/cyberdeck/cyberdeck-control-button";
+import { CyberdeckControlTooltip } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,25 +54,32 @@ export function OperatorDocTypeMenu({
         if (!disabled) setOpen(next);
       }}
     >
-      <DropdownMenuTrigger asChild disabled={disabled}>
-        {trigger === "toolbar" ? (
-          <CyberdeckPaneToolbarControl
-            control={{ size: "toolbar", signal: open && !disabled }}
-            aria-label="Document type"
-            aria-haspopup="menu"
-            aria-expanded={open}
-            disabled={disabled}
-            className="disabled:cursor-not-allowed disabled:opacity-30"
-          >
-            <img
-              src={operatorIconSrc(operatorDocumentKindIcon(normalized))}
-              alt=""
-              aria-hidden
-              draggable={false}
-              className="h-2.5 w-2.5 object-contain"
-            />
-          </CyberdeckPaneToolbarControl>
-        ) : (
+      {trigger === "toolbar" ? (
+        <CyberdeckControlTooltip
+          label={`Document type: ${activeEntry.label}`}
+          disabled={disabled}
+        >
+          <DropdownMenuTrigger asChild disabled={disabled}>
+            <CyberdeckPaneToolbarControl
+              control={{ size: "toolbar", signal: open && !disabled }}
+              aria-label={`Document type: ${activeEntry.label}`}
+              aria-haspopup="menu"
+              aria-expanded={open}
+              disabled={disabled}
+              className="disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <img
+                src={operatorIconSrc(operatorDocumentKindIcon(normalized))}
+                alt=""
+                aria-hidden
+                draggable={false}
+                className="h-2.5 w-2.5 object-contain"
+              />
+            </CyberdeckPaneToolbarControl>
+          </DropdownMenuTrigger>
+        </CyberdeckControlTooltip>
+      ) : (
+        <DropdownMenuTrigger asChild disabled={disabled}>
           <button
             type="button"
             aria-label={`Document type: ${activeEntry.label}. Change document type`}
@@ -88,8 +96,8 @@ export function OperatorDocTypeMenu({
             {activeEntry.label}
             <LuChevronDown className="h-2.5 w-2.5 shrink-0 opacity-70" aria-hidden />
           </button>
-        )}
-      </DropdownMenuTrigger>
+        </DropdownMenuTrigger>
+      )}
       <DropdownMenuContent
         align={trigger === "toolbar" ? "end" : "start"}
         sideOffset={6}

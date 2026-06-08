@@ -11,12 +11,14 @@ export function scrollMatrixTo(
   deckIndex: number,
   cardIndex: number,
   deckCount: number,
+  options?: { jump?: boolean },
 ): { deckIndex: number; cardIndex: number } {
+  const jump = options?.jump ?? false;
   const deck = wrapIndex(deckIndex, deckCount);
-  deckEmbla.scrollTo(deck, true);
+  deckEmbla.scrollTo(deck, jump);
   const hand = handEmblas[deck];
   const cardCount = hand?.scrollSnapList().length ?? 0;
   const card = wrapIndex(cardIndex, cardCount);
-  hand?.scrollTo(card, true);
+  hand?.scrollTo(card, jump);
   return { deckIndex: deck, cardIndex: card };
 }

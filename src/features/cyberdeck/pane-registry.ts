@@ -16,6 +16,7 @@ export const CYBERDECK_PANE_KINDS = [
   "rola-dex",
   "sound-profile",
   "test-pane",
+  "apps",
 ] as const;
 
 export type CyberdeckPaneKind = (typeof CYBERDECK_PANE_KINDS)[number];
@@ -54,6 +55,7 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   "rola-dex": { label: "ROLA-DEX", fetchHints: ["DEX", "CAROUSEL"] },
   "sound-profile": { label: "SOUND PROFILE", fetchHints: ["PROFILE", "SFX"] },
   "test-pane": { label: "TEST", fetchHints: ["EMBLA", "4-WAY"] },
+  apps: { label: "APPS", fetchHints: ["REGISTRY", "APP PROFILE", "OPERATOR TARGET"] },
 };
 
 const TAB_KIND_ALIASES: Record<string, CyberdeckPaneKind> = {

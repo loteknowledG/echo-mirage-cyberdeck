@@ -301,8 +301,7 @@ body,
   box-sizing: border-box;
   margin: 8px;
   min-width: 0;
-  /* Allow figlet wheel neighbors + status line; clip only the command input band. */
-  overflow: visible;
+  overflow: hidden;
 }
 
 .glyph-channel-composer__input-band {

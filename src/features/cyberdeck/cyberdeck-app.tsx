@@ -169,6 +169,13 @@ import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import {
+  DeckAppProvider,
+  loadDeckApp,
+  notifyDeckAppChange,
+  saveDeckApp,
+  type DeckAppId,
+} from "@/lib/deck-app";
 import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
 import { MORPHISM_ZONE_REALMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import {
@@ -358,6 +365,7 @@ const CUSTOM_TAB_KINDS = [
   "sound-profile",
   "test-pane",
   "realmorphism-kit",
+  "apps",
   "catelog",
 ] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -453,6 +461,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Voice Lab", kind: "voice-lab", action: "convert" },
   { label: "Flight Log", kind: "flight-log", action: "convert" },
   { label: "Drop Bay", kind: "drop-bay", action: "convert" },
+  { label: "Apps", kind: "apps", action: "convert" },
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Kit", action: "kit-pane" },
   { label: "Powerfist", kind: "rola-dex", action: "convert" },
@@ -849,6 +858,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "rola-dex") return "#";
   if (kind === "sound-profile") return "♪";
   if (kind === "test-pane") return "T";
+  if (kind === "apps") return "A";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
@@ -862,6 +872,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "rola-dex") return "Rola Dex";
   if (kind === "sound-profile") return "Sound Profile";
   if (kind === "test-pane") return "Test";
+  if (kind === "apps") return "APPS";
   return kind.toUpperCase();
 }
 
@@ -904,7 +915,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test|apps)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -1015,6 +1026,7 @@ export default function CyberdeckApp() {
   const [heapTextDraft, setHeapTextDraft] = useState("");
   const [heapHydrated, setHeapHydrated] = useState(false);
   const [deckMode, setDeckMode] = useState<DeckMode>(() => loadDeckMode());
+  const [deckApp, setDeckApp] = useState<DeckAppId>(() => loadDeckApp());
   const [audioMuted, setAudioMutedState] = useState<boolean>(() => isMuted());
   const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -1924,6 +1936,11 @@ export default function CyberdeckApp() {
     saveDeckMode(deckMode);
     notifyDeckModeChange(deckMode);
   }, [deckMode]);
+
+  useEffect(() => {
+    saveDeckApp(deckApp);
+    notifyDeckAppChange(deckApp);
+  }, [deckApp]);
 
   useEffect(() => {
     const onRequestEditMode = () => setOperatorDocMode("edit");
@@ -6472,6 +6489,16 @@ const resolved = resolveUiTarget(userMessage);
         );
       }
 
+      if (tab.kind === "apps") {
+        return shell(
+          <ActivatedCyberdeckPane
+            kind="apps"
+            deckApp={deckApp}
+            onDeckAppChange={setDeckApp}
+          />,
+        );
+      }
+
       return shell(
         <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
           BLANK TAB // RIGHT-CLICK TAB RAIL TO PICK A TYPE, OR USE CHAT /tab COMMANDS.
@@ -6482,6 +6509,8 @@ const resolved = resolveUiTarget(userMessage);
       activeProvider,
       connectionState,
       customTabBrowserNavigate,
+      deckApp,
+      deckMode,
       handleCustomTabDrop,
       heapEntries.length,
       messages,
@@ -6506,8 +6535,10 @@ const resolved = resolveUiTarget(userMessage);
     <div
       ref={cyberdeckRootRef}
       data-deck-mode={deckMode}
+      data-deck-app={deckApp}
       className="terminal-window box-border flex h-full min-h-0 w-full flex-1 overflow-hidden bg-background font-mono text-green-500 max-md:min-h-0 max-md:flex-col md:h-screen"
     >
+      <DeckAppProvider appId={deckApp}>
       <DeckModeProvider mode={deckMode}>
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence
@@ -7496,6 +7527,7 @@ const resolved = resolveUiTarget(userMessage);
       </ResizablePanelGroup>
         </div>
       </DeckModeProvider>
+      </DeckAppProvider>
     </div>
   );
 }

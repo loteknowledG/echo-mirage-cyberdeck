@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -68,6 +69,11 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
     const adjustHeight = useCallback(() => {
       const el = inputRef.current;
       if (!el) return;
+      // Empty input: ignore placeholder wrap (long placeholder was inflating scrollHeight on load).
+      if (!el.value.trim()) {
+        el.style.height = `${TEXTAREA_MIN_HEIGHT_PX}px`;
+        return;
+      }
       el.style.height = "auto";
       el.style.height = `${Math.min(Math.max(el.scrollHeight, TEXTAREA_MIN_HEIGHT_PX), TEXTAREA_MAX_HEIGHT_PX)}px`;
     }, []);
@@ -119,7 +125,7 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
       }
     }, [chatHydrated, notifyCanSend]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
       adjustHeight();
     }, [value, adjustHeight]);
 
@@ -271,7 +277,8 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
               ? "⟁ Glyph mode on — compose on ⟁ tab; $ here is MUTHUR chat"
               : "Enter command or message... (Shift+Enter for new line)"
         }
-        className="max-h-[200px] min-h-[44px] w-full resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-9 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-all focus:outline-none"
+        style={{ height: TEXTAREA_MIN_HEIGHT_PX }}
+        className="max-h-[200px] min-h-[44px] w-full resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-9 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"
         disabled={false}
         aria-label="MUTHUR command input"
       />

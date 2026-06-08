@@ -591,13 +591,11 @@ function OperatorDocumentToolStrip({
           <span className="mx-0.5 h-4 w-px shrink-0 bg-[#2d2d2d]" aria-hidden />
         </>
       ) : null}
-      {!textEditingEnabled ? (
-        <OperatorDocTypeMenu
-          trigger="toolbar"
-          value={normalizeOperatorDocumentKind(operatorDocumentKind)}
-          onChange={onOperatorDocumentKindChange}
-        />
-      ) : null}
+      <OperatorDocTypeMenu
+        trigger="toolbar"
+        value={normalizeOperatorDocumentKind(operatorDocumentKind)}
+        onChange={onOperatorDocumentKindChange}
+      />
       <OperatorConvertPicker
         disabled={converting || convertOptions.length === 0}
         options={convertOptions}

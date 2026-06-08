@@ -15,6 +15,7 @@ import type {
   DepartmentRailItem,
   PropertyManagementDepartmentId,
 } from "@/extensions/property-management/types";
+import { cn } from "@/lib/utils";
 
 const DEPARTMENT_RAIL: readonly DepartmentRailItem[] = [
   { id: "overview", label: "OVERVIEW", hint: "Portfolio snapshot" },
@@ -62,7 +63,7 @@ export function PropertyManagementWorkspace({ className }: PropertyManagementWor
     <div
       data-extension={propertyManagementExtension.id}
       data-testid="property-management-workspace"
-      className={`flex min-h-[100dvh] flex-col bg-black text-[#d2ddd7] ${className ?? ""}`.trim()}
+      className={cn("flex min-h-0 flex-1 flex-col bg-black text-[#d2ddd7]", className)}
     >
       <header className="shrink-0 border-b border-[#25352c] px-4 py-3">
         <pre className="overflow-x-auto font-mono text-[10px] leading-tight tracking-[0.04em] text-emerald-300/90">

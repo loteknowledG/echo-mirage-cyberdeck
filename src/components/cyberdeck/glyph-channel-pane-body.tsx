@@ -26,7 +26,7 @@ import { paneToolbarMorphismZone } from "@/lib/cyberdeck/morphism-zones";
 import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { GlyphEnginePicker } from "@/components/cyberdeck/glyph-engine-picker";
-import { FigletFontPicker } from "@/components/cyberdeck/figlet-font-picker";
+import { FigletFontListPicker } from "@/components/cyberdeck/figlet-font-list-picker";
 import { FigletFontPreviewPanel } from "@/components/cyberdeck/figlet-font-preview-panel";
 import { OnelineArtPicker } from "@/components/cyberdeck/oneline-art-picker";
 import {
@@ -723,7 +723,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                 className={cn(
                   "flex min-w-0 flex-nowrap items-end gap-1.5 px-2 py-1.5",
                   settings.engine === "figlet"
-                    ? "min-h-[8.25rem] overflow-visible"
+                    ? "min-h-[8.25rem] overflow-hidden"
                     : "min-h-7 overflow-hidden",
                 )}
               >
@@ -735,17 +735,15 @@ export function CyberdeckGlyphChannelPaneBody() {
                   }}
                 />
                 {settings.engine === "figlet" ? (
-                  <div className="relative z-10 flex min-w-0 flex-1 items-stretch gap-2 overflow-visible">
-                    <div className="w-[10.5rem] shrink-0">
-                      <FigletFontPicker
-                        variant="showroom"
-                        value={settings.figletFont}
-                        onChange={(figletFont) =>
-                          setSettings((prev) => ({ ...prev, figletFont }))
-                        }
-                        onWheelSettled={focusComposer}
-                      />
-                    </div>
+                  <div className="flex min-w-0 flex-1 items-stretch gap-2 overflow-hidden">
+                    <FigletFontListPicker
+                      className="w-[10.5rem] shrink-0"
+                      value={settings.figletFont}
+                      onChange={(figletFont) =>
+                        setSettings((prev) => ({ ...prev, figletFont }))
+                      }
+                      onSelect={focusComposer}
+                    />
                     <FigletFontPreviewPanel
                       variant="toolbar"
                       font={settings.figletFont}
@@ -775,8 +773,18 @@ export function CyberdeckGlyphChannelPaneBody() {
                     />
                   </div>
                 ) : null}
+              </div>
 
-                <div className="ml-auto flex shrink-0 items-center gap-1.5">
+              <div className="glyph-channel-composer-controls flex items-end justify-between gap-2 px-2 pb-2 pt-1">
+                <p
+                  className={`min-w-0 flex-1 truncate font-mono text-[10px] leading-normal ${
+                    rendering ? "text-amber-300" : "text-green-300"
+                  }`}
+                  title={statusLine}
+                >
+                  {statusLine}
+                </p>
+                <div className="flex shrink-0 items-center gap-1.5">
                   <CyberdeckControlTooltip label="Decrease display zoom">
                     <CyberdeckControl
                       control={{ size: "compact", signal: true }}
@@ -830,15 +838,6 @@ export function CyberdeckGlyphChannelPaneBody() {
                   </CyberdeckControlTooltip>
                 </div>
               </div>
-
-              <p
-                className={`min-h-[1.125rem] truncate px-2 pb-2 pt-1 font-mono text-[10px] leading-normal ${
-                  rendering ? "text-amber-300" : "text-green-300"
-                }`}
-                title={statusLine}
-              >
-                {statusLine}
-              </p>
             </div>
           </div>
         </footer>
