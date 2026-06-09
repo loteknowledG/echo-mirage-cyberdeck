@@ -127,7 +127,9 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
 
     useLayoutEffect(() => {
       adjustHeight();
-    }, [value, adjustHeight]);
+      const frame = requestAnimationFrame(() => adjustHeight());
+      return () => cancelAnimationFrame(frame);
+    }, [value, adjustHeight, chatHydrated, hasProviderAuth, glyphModeActive]);
 
     useEffect(() => {
       if (!chatHydrated) return;
@@ -278,7 +280,7 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
               : "Enter command or message... (Shift+Enter for new line)"
         }
         style={{ height: TEXTAREA_MIN_HEIGHT_PX }}
-        className="max-h-[200px] min-h-[44px] w-full resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-9 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"
+        className="muthur-command-input max-h-[200px] min-h-[44px] w-full resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-9 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"
         disabled={false}
         aria-label="MUTHUR command input"
       />

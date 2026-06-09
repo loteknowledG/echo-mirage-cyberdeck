@@ -309,11 +309,33 @@ body,
   border-radius: 2px 2px 0 0;
 }
 
+/* MUTHUR ECHO composer — lock empty height so long placeholders cannot inflate startup layout. */
+textarea.muthur-command-input:placeholder-shown {
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  overflow: hidden;
+}
+
 .pi-pane-host message-editor > div {
+  display: flex !important;
+  flex-direction: column !important;
   background: rgba(5, 7, 8, 0.9) !important;
   border-color: rgba(57, 255, 136, 0.16) !important;
   box-shadow: none !important;
   transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+/* Pi message-editor textarea uses height:auto inside flex; empty state must not fill the pane. */
+.pi-pane-host message-editor textarea {
+  flex: 0 0 auto !important;
+}
+
+.pi-pane-host message-editor textarea:placeholder-shown {
+  height: 2.75rem !important;
+  min-height: 2.75rem !important;
+  max-height: 2.75rem !important;
+  overflow: hidden;
 }
 
 .pi-pane-host message-editor > div:focus-within {

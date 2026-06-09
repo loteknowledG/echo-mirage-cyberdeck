@@ -5,7 +5,7 @@
   "route": "http://127.0.0.1:3050/cyberdeck",
   "pid": 24072,
   "mode": "auto",
-  "ready": false,
+  "ready": true,
   "startedAt": "2026-06-09T01:19:35.280Z",
-  "updatedAt": "2026-06-09T01:19:35.297Z"
+  "updatedAt": "2026-06-09T01:20:18.136Z"
 }

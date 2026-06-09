@@ -1,6 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from "react";
+import {
+  normalizePiComposerHeight,
+  schedulePiComposerHeightSync,
+} from "@/lib/pi-composer-layout";
 
 type PiChatPaneBodyProps = {
   server: string;
@@ -276,6 +280,22 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
 
         panel = chatPanel;
         hostRef.current.replaceChildren(chatPanel);
+        const host = hostRef.current;
+        const cancelComposerSync = schedulePiComposerHeightSync(host, 120);
+        const composerObserver = new MutationObserver(() => normalizePiComposerHeight(host));
+        composerObserver.observe(host, { childList: true, subtree: true });
+        const onComposerInput = (event: Event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLTextAreaElement)) return;
+          if (!target.closest("message-editor")) return;
+          normalizePiComposerHeight(host);
+        };
+        host.addEventListener("input", onComposerInput);
+        (panel as HTMLElement & { __echoMirageCleanup?: () => void }).__echoMirageCleanup = () => {
+          cancelComposerSync();
+          composerObserver.disconnect();
+          host.removeEventListener("input", onComposerInput);
+        };
         setStatus("PI READY");
       } catch (error) {
         console.error("[pi-tab] failed to mount Pi chat", error);
@@ -287,6 +307,9 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
 
     return () => {
       disposed = true;
+      const cleanup = (panel as (HTMLElement & { __echoMirageCleanup?: () => void }) | null)
+        ?.__echoMirageCleanup;
+      cleanup?.();
       panel?.remove();
       hostRef.current?.replaceChildren();
     };
