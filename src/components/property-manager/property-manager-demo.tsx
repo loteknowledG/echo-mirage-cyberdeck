@@ -139,21 +139,12 @@ export function PropertyManagerDemo() {
       void publishMuthurObservation({
         route: "/property-manager",
         surface: "property-manager",
-        observing: true,
-        observingPanelId: "property-manager-live-intake",
-        observingSubsystem: "property-manager",
         activeTab: "property-manager",
         activePane: "live-intake",
         visibleDocument: null,
-        documentExcerpt: null,
-        selectedProperty: null,
-        selectedUnit: result.ticket?.unit || null,
-        visibleLogs: completedTurns.slice(-6).map((turn) => `${turn.role.toUpperCase()} // ${turn.text}`),
-        activeTickets: result.ticket ? [{ ...result.ticket }] : [],
-        operationalMode: "OBSERVE",
-        transcriptState: `PROCESSING // ${result.classification}`,
-        operationalWarnings: result.classification === "EMERGENCY" ? ["EMERGENCY ESCALATION"] : [],
-        continuityIndicators: [result.escalation, "NO DISPATCH REQUESTED"],
+        documentExcerpt: result.ticket
+          ? `${result.classification} // unit ${result.ticket.unit}`
+          : null,
       });
       void speakReply(result.reply);
       setDraft("");
@@ -167,30 +158,22 @@ export function PropertyManagerDemo() {
 
   useEffect(() => {
     if (!hydrated) return;
-    const warnings = [
-      ...(classification === "EMERGENCY" ? ["EMERGENCY ESCALATION"] : []),
-      ...(micMessage.startsWith("AUTH_REQUIRED") ? [micMessage] : []),
-    ];
     void publishMuthurObservation({
       route: "/property-manager",
       surface: "property-manager",
-      observing: true,
-      observingPanelId: "property-manager-live-intake",
-      observingSubsystem: "property-manager",
       activeTab: "property-manager",
       activePane: "live-intake",
       visibleDocument: null,
-      documentExcerpt: null,
-      selectedProperty: null,
-      selectedUnit: ticket?.unit || null,
-      visibleLogs: turns.slice(-6).map((turn) => `${turn.role.toUpperCase()} // ${turn.text}`),
-      activeTickets: ticket ? [{ ...ticket }] : [],
-      operationalMode: "OBSERVE",
-      transcriptState: `${state.toUpperCase()} // ${classification}`,
-      operationalWarnings: warnings,
-      continuityIndicators: [escalation, dispatchStatus],
+      documentExcerpt: ticket
+        ? `${classification} // unit ${ticket.unit} // ${dispatchStatus}`
+        : turns.length > 0
+          ? turns
+              .slice(-2)
+              .map((turn) => `${turn.role.toUpperCase()} // ${turn.text}`)
+              .join("\n")
+          : null,
     });
-  }, [classification, dispatchStatus, escalation, hydrated, micMessage, state, ticket, turns]);
+  }, [classification, dispatchStatus, hydrated, ticket, turns]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

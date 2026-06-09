@@ -6,6 +6,7 @@ import * as inputController from "./input-controller";
 import * as uiVerification from "./ui-verification";
 import * as indicateLayer from "./indicate-layer";
 import { getActionScope } from "./capability-registry";
+import { getCurrentOwner, checkActionPermission, emitControlDenied } from "./control-lease";
 import { narrate } from "./narration";
 
 const safetyGuard = createSafetyGuard();
