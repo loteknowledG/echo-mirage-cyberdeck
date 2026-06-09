@@ -96,9 +96,12 @@ import { parseConvertDocumentIntent } from "@/lib/muthur-document-conversion-int
 import { isDocumentEditIntent } from "@/lib/muthur/document-edit-intent";
 import {
   applyMuthurOperatorEdits,
+  OPERATOR_APPLY_DOCUMENT_TEXT_EVENT,
   parseOperatorEditsHeader,
+  waitForOperatorDocumentReady,
 } from "@/lib/operator-muthur-edit";
 import { splitMuthurStreamPayload } from "@/lib/muthur-core/muthur-stream-payload";
+import { parseOperatorConversionJson } from "@/lib/muthur-core/operator-conversion-ref";
 import {
   parseExportMarkdownToDocxIntent,
   parseExportMarkdownToPdfIntent,
@@ -148,6 +151,7 @@ import {
   saveViaCadreApi,
   type OperatorSaveIntent,
 } from "@/lib/operator-save";
+import { readOperatorPaneSaveText } from "@/lib/operator-workbench";
 import { get, set } from "idb-keyval";
 import {
   CyberdeckPaneHeader,
@@ -2510,6 +2514,28 @@ export default function CyberdeckApp() {
     });
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.echoMirageOperatorDocumentText = () => operatorDroppedAsset?.text ?? "";
+    return () => {
+      delete window.echoMirageOperatorDocumentText;
+    };
+  }, [operatorDroppedAsset?.text]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onApplyDocumentText = (event: Event) => {
+      const text = (event as CustomEvent<{ text?: string }>).detail?.text;
+      if (typeof text !== "string") return;
+      setOperatorDocMode("edit");
+      handleOperatorDocumentTextChange(text);
+    };
+    window.addEventListener(OPERATOR_APPLY_DOCUMENT_TEXT_EVENT, onApplyDocumentText);
+    return () => {
+      window.removeEventListener(OPERATOR_APPLY_DOCUMENT_TEXT_EVENT, onApplyDocumentText);
+    };
+  }, [handleOperatorDocumentTextChange]);
+
   useLayoutEffect(() => {
     if (!operatorSurfaceIsDocument || operatorDocMode !== "edit") return;
     const el = operatorEditorRef.current;
@@ -2733,11 +2759,14 @@ export default function CyberdeckApp() {
     [],
   );
 
-  const saveOperatorDocAsFile = useCallback(() => {
-    const text = operatorDroppedAsset?.text || "";
+  const saveOperatorDocAsFile = useCallback(async () => {
+    const text = readOperatorPaneSaveText(operatorDroppedAsset?.text || "");
     if (!operatorSurfaceIsDocument || !text.trim()) {
       toast.error("Operator document has no text.");
       return;
+    }
+    if (text !== (operatorDroppedAsset?.text || "")) {
+      handleOperatorDocumentTextChange(text);
     }
 
     const intent = buildOperatorSaveIntent({
@@ -2762,19 +2791,16 @@ export default function CyberdeckApp() {
           types: intent.fileTypes,
           excludeAcceptAllOption: false,
         });
-      } catch (pickerErr) {
-        void completeOperatorSave(intent, { pickerPromise: null }).catch((err) => {
-          toast.error(err instanceof Error ? err.message : "Could not save operator document.");
-        });
+      } catch {
+        await completeOperatorSave(intent, { pickerPromise: null });
         return;
       }
     }
 
-    void completeOperatorSave(intent, { pickerPromise }).catch((err) => {
-      toast.error(err instanceof Error ? err.message : "Could not save operator document.");
-    });
+    await completeOperatorSave(intent, { pickerPromise });
   }, [
     completeOperatorSave,
+    handleOperatorDocumentTextChange,
     operatorActiveFilePath,
     operatorDocNameDraft,
     operatorDroppedAsset?.kind,
@@ -2785,7 +2811,7 @@ export default function CyberdeckApp() {
   ]);
 
   const saveOperatorDocInPlace = useCallback(async () => {
-    const text = operatorDroppedAsset?.text || "";
+    const text = readOperatorPaneSaveText(operatorDroppedAsset?.text || "");
     if (!operatorSurfaceIsDocument || !text.trim()) {
       toast.error("Operator document has no text.");
       return;
@@ -2793,6 +2819,14 @@ export default function CyberdeckApp() {
     if (!operatorActiveFilePath) {
       toast.error("No open file to save.");
       return;
+    }
+    if (!canSaveOperatorFileInPlace(operatorActiveFilePath, operatorFolderRootsRef.current)) {
+      toast.info("This document has no folder path — use Save as or pick a location.");
+      await saveOperatorDocAsFile();
+      return;
+    }
+    if (text !== (operatorDroppedAsset?.text || "")) {
+      handleOperatorDocumentTextChange(text);
     }
 
     const result = await saveOperatorFileInPlace(
@@ -2804,11 +2838,14 @@ export default function CyberdeckApp() {
       toast.error(result.error || "Could not save file.");
       return;
     }
+    window.dispatchEvent(new CustomEvent("echo-mirage-operator-file-saved"));
     toast.success(`Saved "${operatorActiveFilePath.split("/").pop()}".`);
   }, [
+    handleOperatorDocumentTextChange,
     operatorActiveFilePath,
     operatorDroppedAsset?.text,
     operatorSurfaceIsDocument,
+    saveOperatorDocAsFile,
   ]);
 
   const saveOperatorDocument = useCallback(() => {
@@ -5227,6 +5264,10 @@ const resolved = resolveUiTarget(userMessage);
       docMode: operatorDocMode,
     };
 
+    if (isDocumentEditIntent(userMessage) && operatorSurfaceIsDocument) {
+      flushMuthurObservation();
+    }
+
     let uplinkTimedOut = false;
     try {
       const abortCtl = new AbortController();
@@ -5357,9 +5398,35 @@ const resolved = resolveUiTarget(userMessage);
       setMessages((prev) => [...prev, { role: "assistant", text: cleanedText }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
 
+      if (!autoConvertedDocx) {
+        const operatorConversionRef =
+          streamPayload.operatorConversion ??
+          parseOperatorConversionJson(res.headers.get("x-muthur-operator-conversion"));
+        const convertPath =
+          operatorConversionRef?.sourcePath ||
+          (streamPayload.toolsUsed.includes("convert_document_to_markdown") && operatorLocalPath
+            ? operatorLocalPath
+            : "");
+        if (convertPath) {
+          const converted = await openConvertedMarkdownInOperator(convertPath, { edit: true });
+          if (converted) {
+            flushMuthurObservation();
+            await waitForOperatorDocumentReady(3000);
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                text: `OPERATOR CONVERT // Opened markdown from ${convertPath} in the operator pane.`,
+              },
+            ]);
+          }
+        }
+      }
+
       const editsToApply =
         operatorEditsFromStream.length > 0 ? operatorEditsFromStream : operatorEdits;
       if (editsToApply.length > 0) {
+        setOperatorDocMode("edit");
         const editResult = await applyMuthurOperatorEdits(editsToApply);
         if (editResult === "applied") {
           setMessages((prev) => [
@@ -7505,6 +7572,7 @@ const resolved = resolveUiTarget(userMessage);
                   )}
                   onOperatorFileHistoryBack={() => navigateOperatorFileHistory("back")}
                   onOperatorFileHistoryForward={() => navigateOperatorFileHistory("forward")}
+                  onReloadOperatorFile={reloadOperatorFolderFile}
                 />
             </CyberdeckFixedServerPane>
             <CyberdeckFixedServerPane serverId="b" className="flex min-h-0 flex-1 flex-col">

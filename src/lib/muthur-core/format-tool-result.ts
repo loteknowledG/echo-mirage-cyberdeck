@@ -116,7 +116,8 @@ export function formatConvertDocumentResult(result: unknown): string {
   };
 
   const parts = [
-    "[TOOL] CONVERT_DOCUMENT_TO_MARKDOWN // MARKITDOWN",
+    "[TOOL OK] CONVERT_DOCUMENT_TO_MARKDOWN // MARKITDOWN",
+    "The converted markdown will open in the operator pane for editing.",
     payload.sourcePath ? `SOURCE // ${payload.sourcePath}` : null,
     payload.outputPath ? `OUTPUT // ${payload.outputPath}` : null,
     payload.format ? `FORMAT // ${payload.format}` : null,

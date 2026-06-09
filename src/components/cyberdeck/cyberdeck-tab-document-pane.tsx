@@ -277,6 +277,23 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
     [loadAssetFromFile, openFilePath],
   );
 
+  const reloadOperatorFolderFile = useCallback(
+    async (filePath: string) => {
+      const rootName = filePath.split("/")[0];
+      const root = folderRootsRef.current.find((entry) => entry.name === rootName);
+      if (!root) return;
+      const read = await readFileFromFolderRoot(root, filePath);
+      if (!read) return;
+      await loadAssetFromFile(read.file, {
+        diskAbsolutePath: read.diskAbsolutePath,
+        fileSize: read.fileSize,
+        pdfBase64: read.pdfBase64,
+        inlineBase64: read.inlineBase64,
+      });
+    },
+    [loadAssetFromFile],
+  );
+
   const navigateFileHistory = useCallback((direction: "back" | "forward") => {
     const history = fileHistoryRef.current;
     const idx = fileHistoryIndexRef.current;
@@ -585,6 +602,7 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
       onOperatorFileHistoryForward={() => navigateFileHistory("forward")}
       onConvertDocumentToMarkdown={convertToMarkdown}
       onExportOperatorMarkdown={exportMarkdown}
+      onReloadOperatorFile={reloadOperatorFolderFile}
     />
   );
 }

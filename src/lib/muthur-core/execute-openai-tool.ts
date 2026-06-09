@@ -9,6 +9,7 @@ import {
   formatSuggestOperatorEditResult,
 } from "@/lib/muthur-core/format-tool-result";
 import { extractOperatorEditFromToolOutput } from "@/lib/muthur-core/suggest-operator-edit";
+import { extractOperatorConversionRef } from "@/lib/muthur-core/operator-conversion-ref";
 import type { MuthurToolExecutionContext, ToolCall, ToolRegistry } from "@/lib/muthur-core/types";
 
 /** MUTHUR chat hot path — run tools directly, no execution-loop allowlist or approval gates. */
@@ -56,6 +57,10 @@ export async function executeRegistryToolForOpenAi(
     return formatClockResult(result.output);
   }
   if (functionName === "convert_document_to_markdown") {
+    if (result.ok && ctx) {
+      const conversion = extractOperatorConversionRef(result.output);
+      if (conversion) ctx.operatorConversion = conversion;
+    }
     return formatConvertDocumentResult(result.output);
   }
   if (functionName === "export_markdown_to_docx") {

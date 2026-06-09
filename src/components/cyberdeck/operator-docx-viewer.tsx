@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchOperatorDocxBlob } from "@/lib/operator-binary-preview";
 import { sanitizeDocxBlobForPreview } from "@/lib/operator-docx-sanitize";
+import {
+  fitOperatorDocxPreview,
+  scheduleOperatorDocxPreviewFit,
+} from "@/lib/operator-docx-preview-layout";
 
 type OperatorDocxViewerProps = {
   uri: string;
@@ -23,10 +27,17 @@ export function OperatorDocxViewer({ uri, fileName, className }: OperatorDocxVie
     if (!body || !style) return;
 
     let cancelled = false;
+    let cancelFit = () => {};
     body.replaceChildren();
     style.replaceChildren();
     setLoading(true);
     setError(null);
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => fitOperatorDocxPreview(body))
+        : null;
+    resizeObserver?.observe(body);
 
     void (async () => {
       try {
@@ -39,10 +50,13 @@ export function OperatorDocxViewer({ uri, fileName, className }: OperatorDocxVie
         await renderAsync(safeBlob, body, style, {
           className: "operator-docx-preview",
           inWrapper: true,
-          ignoreWidth: true,
+          ignoreWidth: false,
           ignoreHeight: true,
           useBase64URL: true,
+          experimental: true,
         });
+        if (cancelled) return;
+        cancelFit = scheduleOperatorDocxPreviewFit(body);
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : "Could not render DOCX preview.");
@@ -53,6 +67,8 @@ export function OperatorDocxViewer({ uri, fileName, className }: OperatorDocxVie
 
     return () => {
       cancelled = true;
+      cancelFit();
+      resizeObserver?.disconnect();
     };
   }, [uri, fileName]);
 

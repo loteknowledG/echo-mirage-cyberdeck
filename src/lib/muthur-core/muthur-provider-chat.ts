@@ -49,14 +49,17 @@ function upstreamErrorResponse(status: number, raw: string): Response {
 
 function toolsUsedHeaders(
   toolsUsed: string[],
-  operatorEdits?: MuthurToolExecutionContext["operatorEdits"],
+  toolCtx: MuthurToolExecutionContext,
 ): Record<string, string> {
   const headers: Record<string, string> = {};
   if (toolsUsed.length > 0) {
     headers["X-Muthur-Tools-Used"] = toolsUsed.join(", ");
   }
-  if (operatorEdits && operatorEdits.length > 0) {
-    headers["X-Muthur-Operator-Edits"] = JSON.stringify(operatorEdits);
+  if (toolCtx.operatorEdits.length > 0) {
+    headers["X-Muthur-Operator-Edits"] = JSON.stringify(toolCtx.operatorEdits);
+  }
+  if (toolCtx.operatorConversion) {
+    headers["X-Muthur-Operator-Conversion"] = JSON.stringify(toolCtx.operatorConversion);
   }
   return headers;
 }
@@ -135,7 +138,7 @@ export async function muthurChatWithModelTools(options: {
   const messages: JsonMessage[] = options.baseMessages.map((m) => ({ ...m }));
   const fallbackMessages = options.baseMessages.map((m) => ({ ...m }));
   const toolsUsed: string[] = [];
-  const toolCtx: MuthurToolExecutionContext = { operatorEdits: [] };
+  const toolCtx: MuthurToolExecutionContext = { operatorEdits: [], operatorConversion: null };
 
   if (!toolsEnabled) {
     let streamRes: Response;
@@ -152,7 +155,7 @@ export async function muthurChatWithModelTools(options: {
     return new Response(await streamOpenAiCompatibleResponse(streamRes), {
       headers: {
         ...PLAIN_HEADERS,
-        ...toolsUsedHeaders(toolsUsed, toolCtx.operatorEdits),
+        ...toolsUsedHeaders(toolsUsed, toolCtx),
       },
     });
   }
@@ -209,7 +212,7 @@ export async function muthurChatWithModelTools(options: {
 
       const msg = data.choices?.[0]?.message;
       if (!msg) {
-        write(appendMuthurStreamFooters("[MUTHUR] Empty model response.", toolsUsed, toolCtx.operatorEdits));
+        write(appendMuthurStreamFooters("[MUTHUR] Empty model response.", toolsUsed, toolCtx.operatorEdits, toolCtx.operatorConversion));
         return;
       }
 
@@ -262,11 +265,11 @@ export async function muthurChatWithModelTools(options: {
       const text = stripDsmlFromAssistantText(rawContent);
       if (text.trim()) {
         write("\n");
-        write(appendMuthurStreamFooters(text, toolsUsed, toolCtx.operatorEdits));
+        write(appendMuthurStreamFooters(text, toolsUsed, toolCtx.operatorEdits, toolCtx.operatorConversion));
         return;
       }
 
-      write(appendMuthurStreamFooters("[MUTHUR] Model returned no text.", toolsUsed, toolCtx.operatorEdits));
+      write(appendMuthurStreamFooters("[MUTHUR] Model returned no text.", toolsUsed, toolCtx.operatorEdits, toolCtx.operatorConversion));
       return;
     }
 
@@ -278,7 +281,7 @@ export async function muthurChatWithModelTools(options: {
     }
 
     await pipeOpenAiStreamToWrite(finalRes, write);
-    write(appendMuthurStreamFooters("", toolsUsed, toolCtx.operatorEdits));
+    write(appendMuthurStreamFooters("", toolsUsed, toolCtx.operatorEdits, toolCtx.operatorConversion));
   });
 }
 

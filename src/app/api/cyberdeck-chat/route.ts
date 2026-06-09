@@ -56,7 +56,11 @@ function buildDocumentEditHint(message: string, operatorContext?: OperatorChatCo
   }
 
   const obs = getLatestMuthurObservation("cyberdeck");
-  if (!obs?.editor?.active) {
+  const hasOpenDocument = Boolean(obs?.visibleDocument?.trim());
+  const hasTextContext = Boolean(
+    obs?.editor?.content?.trim() || obs?.documentExcerpt?.trim(),
+  );
+  if (!obs?.editor?.active && !(hasOpenDocument && hasTextContext)) {
     if (isDocxFileName(obs?.visibleDocument ?? null)) {
       return buildDocumentEditHint(message, {
         fileName: obs?.visibleDocument ?? undefined,

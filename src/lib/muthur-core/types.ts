@@ -1,10 +1,17 @@
 import type { OperatorEditorEdit } from "@/lib/operator-workbench";
 
+export type MuthurOperatorConversionRef = {
+  sourcePath: string;
+  outputPath: string;
+  outputName: string;
+};
+
 export type MuthurLoopAction = "respond" | "defer" | "tool";
 
 /** Per-request side effects collected while running OpenAI tool calls. */
 export type MuthurToolExecutionContext = {
   operatorEdits: OperatorEditorEdit[];
+  operatorConversion: MuthurOperatorConversionRef | null;
 };
 
 export interface ToolCall {

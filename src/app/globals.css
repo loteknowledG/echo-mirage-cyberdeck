@@ -1091,26 +1091,49 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   }
 }
 
-/* DOCX preview — fit page to operator pane width (docx-preview defaults to ~816px letter width). */
+/* DOCX preview — keep native page layout; scale-to-fit is applied in JS after tab stops settle. */
+.operator-docx-preview-body {
+  overflow-x: auto;
+}
+
 .operator-docx-preview-body .operator-docx-preview-wrapper {
   background: transparent !important;
   padding: 0 !important;
-  align-items: stretch !important;
+  align-items: center !important;
   width: 100%;
   min-width: 0;
 }
 
 .operator-docx-preview-body .operator-docx-preview-wrapper > section.operator-docx-preview {
-  width: 100% !important;
-  max-width: 100%;
-  min-width: 0;
   box-sizing: border-box;
-  margin: 0 0 1rem !important;
+  margin: 0 auto 1rem !important;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  overflow: visible !important;
 }
 
-.operator-docx-preview-body .operator-docx-preview-wrapper section.operator-docx-preview article,
+.operator-docx-preview-body .operator-docx-preview-wrapper section.operator-docx-preview article {
+  overflow: visible;
+}
+
 .operator-docx-preview-body .operator-docx-preview-wrapper section.operator-docx-preview p {
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow: visible;
+  overflow-wrap: break-word;
+  word-break: normal;
+  line-height: 1.35;
+  min-height: 1.2em;
+}
+
+.operator-docx-preview-body .operator-docx-preview-wrapper section.operator-docx-preview a {
+  display: inline !important;
+  position: static !important;
+  vertical-align: baseline !important;
+  color: #0563c1 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.operator-docx-preview-body .operator-docx-preview-wrapper section.operator-docx-preview span {
+  vertical-align: baseline;
 }

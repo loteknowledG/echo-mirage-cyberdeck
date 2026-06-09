@@ -11,6 +11,7 @@ import {
   cdxIconEye,
   cdxIconPaste,
   cdxIconRedo,
+  cdxIconReload,
   cdxIconTrash,
   cdxIconUndo,
 } from "@wikimedia/codex-icons";
@@ -52,6 +53,7 @@ import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
 import { CodexIcon } from "@/components/codex-icon";
 import { OperatorMonacoWorkbench } from "@/components/cyberdeck/operator-monaco-workbench";
 import { getMonacoEditorContext } from "@/lib/monaco-editor-context";
+import { OPERATOR_APPLY_DOCUMENT_TEXT_EVENT } from "@/lib/operator-muthur-edit";
 import { detectOperatorEditorLanguage } from "@/lib/operator-workbench";
 import {
   analyzeTextForBinaryDisplay,
@@ -135,6 +137,7 @@ type OperatorPaneBodyProps = {
     options?: { edit?: boolean },
   ) => void | Promise<void>;
   onExportOperatorMarkdown: (format: OperatorExportFormat) => void | Promise<void>;
+  onReloadOperatorFile?: (filePath: string) => void | Promise<void>;
 };
 
 function readWebviewNavigationState(view: HTMLWebViewElement | null): {
@@ -452,6 +455,8 @@ function OperatorDocumentToolStrip({
   docxEditActive = false,
   onSaveOperatorDocx,
   onSaveOperatorDocxAs,
+  refreshing = false,
+  onRefresh,
 }: {
   operatorDocumentKind: OperatorDocumentPickerKind;
   previewSurface: OperatorAssetSurface | null;
@@ -477,38 +482,84 @@ function OperatorDocumentToolStrip({
   docxEditActive?: boolean;
   onSaveOperatorDocx?: () => void | Promise<void>;
   onSaveOperatorDocxAs?: () => void | Promise<void>;
+  refreshing?: boolean;
+  onRefresh?: () => void | Promise<void>;
 }) {
   const deckMode = useDeckMode();
   const binaryPreview =
     previewSurface != null && !isOperatorTextEditableSurface(previewSurface);
   const resolvedPath = localFilePath?.trim() ?? "";
   const showSaveControls =
-    (textEditingEnabled && editToolsEnabled) || (docxEditActive && Boolean(onSaveOperatorDocx));
-  const saveInPlaceDisabled = docxEditActive
-    ? !resolvedPath
-    : !editToolsEnabled || !operatorCanSaveInPlace;
-  const saveAsDisabled = docxEditActive ? false : !editToolsEnabled;
+    textEditingEnabled || (docxEditActive && Boolean(onSaveOperatorDocx));
+  const saveDisabled = docxEditActive ? !resolvedPath : !textEditingEnabled;
+  const saveAsDisabled = docxEditActive ? false : !textEditingEnabled;
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (docxEditActive && onSaveOperatorDocx) {
-      void onSaveOperatorDocx();
+      const toastId = toast.loading("Saving DOCX…");
+      try {
+        await onSaveOperatorDocx();
+        toast.success("DOCX saved.", { id: toastId });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not save DOCX.", { id: toastId });
+      }
       return;
     }
-    void (onSaveOperatorDocInPlace ?? onSaveOperatorDocAsFile)();
+    if (!textEditingEnabled) {
+      toast.error("Switch to edit mode to save this document.");
+      return;
+    }
+
+    const toastId = toast.loading(
+      operatorCanSaveInPlace ? "Saving to open file…" : "Opening save dialog…",
+    );
+    try {
+      if (operatorCanSaveInPlace && onSaveOperatorDocInPlace) {
+        await onSaveOperatorDocInPlace();
+        toast.dismiss(toastId);
+        return;
+      }
+      if (!onSaveOperatorDocAsFile) {
+        toast.error("Save is not available for this document.", { id: toastId });
+        return;
+      }
+      toast.info("Choose where to save your document.", { id: toastId });
+      await onSaveOperatorDocAsFile();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save document.", { id: toastId });
+    }
   }, [
     docxEditActive,
-    onSaveOperatorDocInPlace,
     onSaveOperatorDocAsFile,
+    onSaveOperatorDocInPlace,
     onSaveOperatorDocx,
+    operatorCanSaveInPlace,
+    textEditingEnabled,
   ]);
 
-  const handleSaveAs = useCallback(() => {
+  const handleSaveAs = useCallback(async () => {
     if (docxEditActive && onSaveOperatorDocxAs) {
-      void onSaveOperatorDocxAs();
+      const toastId = toast.loading("Saving DOCX as…");
+      try {
+        await onSaveOperatorDocxAs();
+        toast.success("DOCX saved.", { id: toastId });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not save DOCX.", { id: toastId });
+      }
       return;
     }
-    void onSaveOperatorDocAsFile();
-  }, [docxEditActive, onSaveOperatorDocAsFile, onSaveOperatorDocxAs]);
+    if (!textEditingEnabled) {
+      toast.error("Switch to edit mode to save this document.");
+      return;
+    }
+    const toastId = toast.loading("Opening save dialog…");
+    try {
+      await onSaveOperatorDocAsFile();
+      toast.dismiss(toastId);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save document.", { id: toastId });
+    }
+  }, [docxEditActive, onSaveOperatorDocAsFile, onSaveOperatorDocxAs, textEditingEnabled]);
 
   const copyLocalFilePath = useCallback(async () => {
     if (!resolvedPath) {
@@ -561,6 +612,14 @@ function OperatorDocumentToolStrip({
           />
           <span className="mx-0.5 h-4 w-px shrink-0 bg-[#2d2d2d]" aria-hidden />
           <OperatorToolbarIconButton
+            label="Refresh document"
+            onClick={() => void onRefresh?.()}
+            disabled={refreshing || !onRefresh}
+          >
+            <CodexIcon icon={cdxIconReload} className="h-3.5 w-3.5" />
+          </OperatorToolbarIconButton>
+          <span className="mx-0.5 h-4 w-px shrink-0 bg-[#2d2d2d]" aria-hidden />
+          <OperatorToolbarIconButton
             label="Copy file path"
             onClick={() => void copyLocalFilePath()}
             disabled={!resolvedPath}
@@ -601,6 +660,13 @@ function OperatorDocumentToolStrip({
         options={convertOptions}
         onConvert={onConvert}
       />
+      <OperatorToolbarIconButton
+        label="Refresh document"
+        onClick={() => void onRefresh?.()}
+        disabled={refreshing || !onRefresh}
+      >
+        <CodexIcon icon={cdxIconReload} className="h-3.5 w-3.5" />
+      </OperatorToolbarIconButton>
       {textEditingEnabled ? (
         <>
           <OperatorToolbarIconButton
@@ -624,15 +690,15 @@ function OperatorDocumentToolStrip({
         <>
           <span className="mx-0.5 h-4 w-px shrink-0 bg-[#2d2d2d]" aria-hidden />
           <OperatorToolbarIconButton
-            label="Save"
-            onClick={handleSave}
-            disabled={saveInPlaceDisabled}
+            label={operatorCanSaveInPlace ? "Save" : "Save document"}
+            onClick={() => void handleSave()}
+            disabled={saveDisabled}
           >
             <LuSave className="h-3.5 w-3.5" />
           </OperatorToolbarIconButton>
           <OperatorToolbarIconButton
             label="Save as"
-            onClick={handleSaveAs}
+            onClick={() => void handleSaveAs()}
             disabled={saveAsDisabled}
           >
             <CodexIcon icon={cdxIconDownload} className="h-3.5 w-3.5" />
@@ -681,6 +747,7 @@ export function CyberdeckOperatorPaneBody({
   onOperatorFileHistoryForward,
   onConvertDocumentToMarkdown,
   onExportOperatorMarkdown,
+  onReloadOperatorFile,
 }: OperatorPaneBodyProps) {
   const deckMode = useDeckMode();
   const [browserDraft, setBrowserDraft] = useState(operatorBrowserUrl);
@@ -762,6 +829,11 @@ export function CyberdeckOperatorPaneBody({
     return [];
   })();
   const [convertPickBusy, setConvertPickBusy] = useState(false);
+  const [operatorRefreshing, setOperatorRefreshing] = useState(false);
+  const [surfaceRefreshKey, setSurfaceRefreshKey] = useState(0);
+  const [editorMountKey, setEditorMountKey] = useState(0);
+  const [editorSeedText, setEditorSeedText] = useState<string | null>(null);
+  const operatorRefreshingRef = useRef(false);
   const convertInputRef = useRef<HTMLInputElement>(null);
   const docxSaveHandlerRef = useRef<(() => Promise<void>) | null>(null);
   const docxSaveAsHandlerRef = useRef<(() => Promise<void>) | null>(null);
@@ -968,6 +1040,106 @@ export function CyberdeckOperatorPaneBody({
     [onOperatorDocumentTextChange, setOperatorDocHistoryText],
   );
 
+  const handleRefreshOperatorDocument = useCallback(async () => {
+    if (!operatorDroppedAsset || operatorRefreshingRef.current) return;
+    operatorRefreshingRef.current = true;
+    setOperatorRefreshing(true);
+    try {
+      const path =
+        operatorActiveFilePath?.trim() ||
+        operatorDroppedAsset.localFilePath?.trim() ||
+        "";
+      const binaryPreview =
+        operatorRenderSurface != null && !isOperatorTextEditableSurface(operatorRenderSurface);
+      const canReloadFromDisk =
+        Boolean(path) &&
+        !path.startsWith("drop://") &&
+        !path.startsWith("convert://") &&
+        Boolean(onReloadOperatorFile);
+
+      if (path.startsWith("convert://")) {
+        const sourcePath = path.slice("convert://".length);
+        if (sourcePath && isConvertibleDocumentPath(sourcePath)) {
+          await onConvertDocumentToMarkdown(sourcePath, { edit: true });
+          toast.success("Reconverted document in operator pane.");
+          return;
+        }
+      }
+
+      if (binaryPreview && canReloadFromDisk && onReloadOperatorFile) {
+        await onReloadOperatorFile(path);
+        setSurfaceRefreshKey((key) => key + 1);
+        toast.success("Reloaded preview from disk.");
+        return;
+      }
+
+      const editorState = window.echoMirageOperatorWorkbench?.readActiveEditor?.();
+      const monacoCtx = getMonacoEditorContext();
+      const editorText = editorState?.content || monacoCtx.content || "";
+      const parentText = operatorDocText;
+      const canonical =
+        parentText.length >= editorText.length ? parentText : editorText || parentText;
+
+      setEditorSeedText(canonical);
+      applyOperatorDocText(canonical, "immediate");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent(OPERATOR_APPLY_DOCUMENT_TEXT_EVENT, {
+            detail: { text: canonical },
+          }),
+        );
+      }
+
+      setEditorMountKey((key) => key + 1);
+      setSurfaceRefreshKey((key) => key + 1);
+
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 100);
+      });
+
+      const workbench = window.echoMirageOperatorWorkbench;
+      if (workbench?.forceDocumentText?.(canonical)) {
+        toast.success("Operator pane refreshed.");
+        return;
+      }
+      if (workbench?.setDocumentText?.(canonical)) {
+        toast.success("Operator pane refreshed.");
+        return;
+      }
+
+      if (canReloadFromDisk && onReloadOperatorFile && !canonical.trim()) {
+        await onReloadOperatorFile(path);
+        toast.success("Reloaded document from disk.");
+        return;
+      }
+
+      toast.success("Operator pane refreshed.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not refresh document.");
+    } finally {
+      operatorRefreshingRef.current = false;
+      setOperatorRefreshing(false);
+    }
+  }, [
+    applyOperatorDocText,
+    onConvertDocumentToMarkdown,
+    onReloadOperatorFile,
+    operatorActiveFilePath,
+    operatorDocText,
+    operatorDroppedAsset,
+    operatorRenderSurface,
+  ]);
+
+  useEffect(() => {
+    if (editorSeedText === null) return;
+    if (operatorDocText === editorSeedText) {
+      setEditorSeedText(null);
+    }
+  }, [editorSeedText, operatorDocText]);
+
+  const operatorEditorText = editorSeedText ?? operatorDocText;
+  const operatorViewText = editorSeedText ?? operatorDocText;
+
   useEffect(() => {
     if (!operatorTextDocument || !operatorDroppedAsset) return;
     const key = `${operatorDroppedAsset.kind}::${operatorDroppedAsset.name}`;
@@ -1098,7 +1270,7 @@ export function CyberdeckOperatorPaneBody({
       visibleDocument: operatorDroppedAsset.name,
       documentExcerpt: content.slice(0, 200) + (content.length > 200 ? "..." : ""),
       editor: {
-        active: ctx.active ?? true,
+        active: true,
         filePath,
         fileName: operatorDroppedAsset.name,
         fileExtension: filePath?.includes(".") ? filePath.split(".").pop() ?? null : null,
@@ -1331,6 +1503,8 @@ export function CyberdeckOperatorPaneBody({
             onSaveOperatorDocxAs={async () => {
               await docxSaveAsHandlerRef.current?.();
             }}
+            refreshing={operatorRefreshing}
+            onRefresh={handleRefreshOperatorDocument}
           />
         ) : null}
         <div className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -1560,12 +1734,14 @@ export function CyberdeckOperatorPaneBody({
             ) : operatorTextDocument ? (
               operatorDocMode === "edit" ? (
                 <OperatorMonacoWorkbench
+                  key={`${operatorDroppedAsset.name}:${editorMountKey}`}
                   activeFilePath={operatorActiveFilePath}
                   fileName={operatorDroppedAsset.name}
                   documentKind={operatorDocumentKind}
                   onDocumentKindChange={onOperatorDocumentKindChange}
-                  value={operatorDocText}
+                  value={operatorEditorText}
                   onChange={(next) => applyOperatorDocText(next, "debounced")}
+                  onImmediateChange={(next) => applyOperatorDocText(next, "immediate")}
                   onSave={async () => {
                     if (operatorCanSaveInPlace && onSaveOperatorDocInPlace) {
                       await saveOperatorDocInPlaceAndMark();
@@ -1584,9 +1760,12 @@ export function CyberdeckOperatorPaneBody({
                     />
                     <span>// VIEW</span>
                   </div>
-                  <div className={`min-h-0 flex-1 overflow-auto ${OPERATOR_DOC_SURFACE_CLASS}`}>
+                  <div
+                    key={surfaceRefreshKey}
+                    className={`min-h-0 flex-1 overflow-auto ${OPERATOR_DOC_SURFACE_CLASS}`}
+                  >
                     <Streamdown className={OPERATOR_MARKDOWN_VIEW_CLASS}>
-                      {operatorDocText}
+                      {operatorViewText}
                     </Streamdown>
                   </div>
                 </div>
@@ -1601,9 +1780,10 @@ export function CyberdeckOperatorPaneBody({
                     <span>// VIEW</span>
                   </div>
                   <pre
+                    key={surfaceRefreshKey}
                     className={`min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words ${OPERATOR_DOC_SURFACE_CLASS}`}
                   >
-                    {operatorDocText}
+                    {operatorViewText}
                   </pre>
                 </div>
               )

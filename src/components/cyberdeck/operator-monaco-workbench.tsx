@@ -24,6 +24,7 @@ type OperatorMonacoWorkbenchProps = {
   onDocumentKindChange?: (kind: OperatorDocumentPickerKind) => void;
   value: string;
   onChange: (value: string) => void;
+  onImmediateChange?: (value: string) => void;
   onSave: () => void | Promise<void>;
 };
 
@@ -94,6 +95,7 @@ export function OperatorMonacoWorkbench({
   onDocumentKindChange,
   value,
   onChange,
+  onImmediateChange,
   onSave,
 }: OperatorMonacoWorkbenchProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -196,6 +198,69 @@ export function OperatorMonacoWorkbench({
     [],
   );
 
+  const publishDocumentChange = useCallback(
+    (text: string, immediate = false) => {
+      if (immediate) {
+        (onImmediateChange ?? onChange)(text);
+        return;
+      }
+      onChange(text);
+    },
+    [onChange, onImmediateChange],
+  );
+
+  const setDocumentTextInternal = useCallback(
+    (text: string, immediate = true): boolean => {
+      const instance = editorRef.current;
+      const model = instance?.getModel();
+      if (!instance || !model) return false;
+      if (model.getValue() === text) {
+        setDirty(text !== savedTextRef.current);
+        publishDocumentChange(text, immediate);
+        return true;
+      }
+      instance.pushUndoStop();
+      instance.executeEdits("muthur", [
+        {
+          range: model.getFullModelRange(),
+          text,
+          forceMoveMarkers: true,
+        },
+      ]);
+      instance.pushUndoStop();
+      setDirty(text !== savedTextRef.current);
+      publishDocumentChange(text, immediate);
+      appendFlightLog({
+        actor: "MUTHUR",
+        action: "editor document synced",
+        result: "UNDOABLE // UNSAVED",
+        severity: "success",
+      });
+      return true;
+    },
+    [publishDocumentChange],
+  );
+
+  const setDocumentText = useCallback(
+    (text: string): boolean => setDocumentTextInternal(text),
+    [setDocumentTextInternal],
+  );
+
+  const forceDocumentText = useCallback(
+    (text: string): boolean => {
+      const instance = editorRef.current;
+      const model = instance?.getModel();
+      if (!instance || !model) return false;
+      instance.pushUndoStop();
+      model.setValue(text);
+      instance.pushUndoStop();
+      setDirty(text !== savedTextRef.current);
+      publishDocumentChange(text, true);
+      return true;
+    },
+    [publishDocumentChange],
+  );
+
   const applyEdit = useCallback(
     (edit: OperatorEditorEdit): boolean => {
       const instance = editorRef.current;
@@ -204,45 +269,17 @@ export function OperatorMonacoWorkbench({
       if (!instance || !model || !currentSelection) return false;
 
       const proposed = proposalContent(model, currentSelection, edit);
-      instance.pushUndoStop();
-      instance.executeEdits("muthur", [
-        {
-          range: model.getFullModelRange(),
-          text: proposed,
-          forceMoveMarkers: true,
-        },
-      ]);
-      instance.pushUndoStop();
-      setDirty(proposed !== savedTextRef.current);
-      onChange(proposed);
-      appendFlightLog({
-        actor: "MUTHUR",
-        action: `editor edit applied :: ${edit.kind}`,
-        result: "UNDOABLE // UNSAVED",
-        severity: "success",
-      });
-      return true;
+      return setDocumentTextInternal(proposed);
     },
-    [onChange],
+    [setDocumentTextInternal],
   );
 
   const applyPendingDiff = useCallback((approval: { approved: true }): boolean => {
     if (approval?.approved !== true) return false;
     const proposal = pendingDiffRef.current;
-    const instance = editorRef.current;
-    const model = instance?.getModel();
-    if (!proposal || !instance || !model) return false;
-    instance.pushUndoStop();
-    instance.executeEdits("muthur", [
-      {
-        range: model.getFullModelRange(),
-        text: proposal.proposed,
-        forceMoveMarkers: true,
-      },
-    ]);
-    instance.pushUndoStop();
-    setDirty(proposal.proposed !== savedTextRef.current);
-    onChange(proposal.proposed);
+    if (!proposal) return false;
+    const applied = setDocumentTextInternal(proposal.proposed);
+    if (!applied) return false;
     pendingDiffRef.current = null;
     setPendingDiff(null);
     appendFlightLog({
@@ -252,7 +289,7 @@ export function OperatorMonacoWorkbench({
       severity: "success",
     });
     return true;
-  }, [onChange]);
+  }, [setDocumentTextInternal]);
 
   const cancelPendingDiff = useCallback(() => {
     if (!pendingDiffRef.current) return;
@@ -266,6 +303,13 @@ export function OperatorMonacoWorkbench({
     });
   }, []);
 
+  useEffect(() => {
+    const instance = editorRef.current;
+    const model = instance?.getModel();
+    if (!instance || !model || model.getValue() === value) return;
+    setDocumentTextInternal(value, true);
+  }, [setDocumentTextInternal, value]);
+
   useEffect(
     () =>
       exposeOperatorWorkbench({
@@ -273,11 +317,13 @@ export function OperatorMonacoWorkbench({
         readSelectedText: () => readState().selection,
         suggestEdit,
         applyEdit,
+        setDocumentText,
+        forceDocumentText,
         applyPendingDiff,
         cancelPendingDiff,
         getPendingDiff: () => pendingDiffRef.current,
       }),
-    [applyEdit, applyPendingDiff, cancelPendingDiff, readState, suggestEdit],
+    [applyEdit, applyPendingDiff, cancelPendingDiff, forceDocumentText, readState, setDocumentText, suggestEdit],
   );
 
   useEffect(() => {

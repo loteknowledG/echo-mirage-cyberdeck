@@ -316,10 +316,16 @@ async function runSuggestOperatorEdit(call: ToolCall): Promise<ToolResult> {
 
   const observation = getLatestMuthurObservation("cyberdeck");
   const editor = observation?.editor;
-  if (!editor?.active) {
+  const hasOpenDocument = Boolean(observation?.visibleDocument?.trim());
+  const hasTextContext = Boolean(
+    editor?.content?.trim() || observation?.documentExcerpt?.trim(),
+  );
+
+  if (!editor?.active && !(hasOpenDocument && hasTextContext)) {
     return {
       ok: false,
-      error: "No active operator editor. Open a markdown or code file in the operator pane first.",
+      error:
+        "No active operator document. Open a markdown or code file in the operator pane first (convert DOCX to markdown if needed).",
     };
   }
 
@@ -328,8 +334,8 @@ async function runSuggestOperatorEdit(call: ToolCall): Promise<ToolResult> {
     output: {
       queued: true,
       edit: parsed.edit,
-      fileName: editor.fileName ?? null,
-      filePath: editor.filePath ?? null,
+      fileName: editor?.fileName ?? observation?.visibleDocument ?? null,
+      filePath: editor?.filePath ?? null,
     },
   };
 }
