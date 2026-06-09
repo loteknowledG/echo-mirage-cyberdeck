@@ -8,11 +8,14 @@ import {
   formatJustBashResult,
   formatLocalFsResult,
   formatObserveOperatorPaneResult,
+  formatOpenOperatorFileResult,
   formatSuggestOperatorEditResult,
   formatWorkspaceExecResult,
 } from "@/lib/muthur-core/format-tool-result";
 import { extractOperatorEditFromToolOutput } from "@/lib/muthur-core/suggest-operator-edit";
+import { recordCodingTouch } from "@/lib/muthur-core/coding-touch";
 import { extractOperatorConversionRef } from "@/lib/muthur-core/operator-conversion-ref";
+import { extractOperatorOpenRef } from "@/lib/muthur-core/operator-open-file-ref";
 import type { MuthurToolExecutionContext, ToolCall, ToolRegistry } from "@/lib/muthur-core/types";
 
 /** MUTHUR chat hot path — run tools directly, no execution-loop allowlist or approval gates. */
@@ -43,18 +46,27 @@ export async function executeRegistryToolForOpenAi(
     return `[TOOL ERROR] Unknown function: ${functionName}`;
   }
 
-  const call: ToolCall = { toolName: functionName, args };
+  const call: ToolCall = { toolName: functionName, args, executionContext: ctx };
   const result = await tool.run(call);
 
   if (!result.ok) {
     return `[TOOL FAILURE] ${functionName}\n\n${result.error || "Unknown error"}`;
   }
 
+  recordCodingTouch(ctx, functionName, args, result.output);
+
   if (functionName === "localfs") {
     return formatLocalFsResult(result.output);
   }
   if (functionName === "observe_operator_pane") {
     return formatObserveOperatorPaneResult(result.output);
+  }
+  if (functionName === "open_operator_file") {
+    if (result.ok && ctx) {
+      const openRef = extractOperatorOpenRef(result.output);
+      if (openRef) ctx.operatorOpenFile = openRef;
+    }
+    return formatOpenOperatorFileResult(result.output);
   }
   if (functionName === "clock") {
     return formatClockResult(result.output);

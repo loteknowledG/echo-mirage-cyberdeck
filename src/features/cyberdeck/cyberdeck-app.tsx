@@ -96,15 +96,22 @@ import {
   operatorMarkdownWasHousekept,
 } from "@/lib/operator-markdown-housekeeping";
 import { parseConvertDocumentIntent } from "@/lib/muthur-document-conversion-intent";
-import { isDocumentEditIntent } from "@/lib/muthur/document-edit-intent";
+import { isDocumentEditIntent, isOperatorPaneEditRequest } from "@/lib/muthur/document-edit-intent";
 import {
   applyMuthurOperatorEdits,
-  OPERATOR_APPLY_DOCUMENT_TEXT_EVENT,
   parseOperatorEditsHeader,
+  pathsReferToSameOperatorFile,
+  reloadOperatorDocumentFromWorkspacePath,
   waitForOperatorDocumentReady,
 } from "@/lib/operator-muthur-edit";
-import { splitMuthurStreamPayload } from "@/lib/muthur-core/muthur-stream-payload";
+import {
+  formatMuthurLiveStreamDisplay,
+  splitMuthurStreamPayload,
+} from "@/lib/muthur-core/muthur-stream-payload";
 import { parseOperatorConversionJson } from "@/lib/muthur-core/operator-conversion-ref";
+import { parseOperatorOpenJson } from "@/lib/muthur-core/operator-open-file-ref";
+import type { MuthurOperatorOpenFileRef } from "@/lib/muthur-core/types";
+import type { MuthurCodingVerifyReceipt } from "@/lib/muthur-core/types";
 import {
   parseExportMarkdownToDocxIntent,
   parseExportMarkdownToPdfIntent,
@@ -217,6 +224,15 @@ import {
 } from "@/lib/chat-user-display-name";
 import { setMuthurScreenSnapshot } from "@/lib/muthur-screen-context";
 import { formatPiScreenContextForMuthur, readPiScreenSnapshot } from "@/lib/pi-screen-context";
+import {
+  findLatestMuthurNotifyIndex,
+  getMuthurNotifyAsciiClass,
+  getMuthurNotifyAsciiLine,
+  getMuthurNotifyBurstClass,
+  getMuthurNotifyLiveClass,
+  getMuthurNotifySettledClass,
+  isMuthurNotifyMessage,
+} from "@/lib/muthur-notify-style";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 import {
@@ -224,6 +240,7 @@ import {
   POWERFIST_STACK_PUSH_EVENT,
   type PowerFistStackCommand,
 } from "@/lib/cyberdeck/powerfist-events";
+import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
 import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration";
@@ -914,6 +931,32 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   return kind.toUpperCase();
 }
 
+function parseCodingVerifyHeader(raw: string | null): MuthurCodingVerifyReceipt | null {
+  if (!raw?.trim()) return null;
+  try {
+    const parsed = JSON.parse(raw) as MuthurCodingVerifyReceipt;
+    if (typeof parsed.passed === "boolean" && Array.isArray(parsed.touched_paths)) {
+      return parsed;
+    }
+  } catch {
+    /* ignore malformed header */
+  }
+  return null;
+}
+
+function formatCodingVerifySystemLine(receipt: MuthurCodingVerifyReceipt): string {
+  const status = receipt.passed ? "PASS" : "FAIL";
+  const touched = receipt.touched_paths.join(", ") || "(none)";
+  let line = `CODING_VERIFY // ${status} // tsc exit ${receipt.tsc_exit_code} // touched: ${touched}`;
+  if (receipt.receipt_path) {
+    line += ` // receipt: ${receipt.receipt_path}`;
+  }
+  if (!receipt.passed && receipt.tsc_stderr_tail.trim()) {
+    line += ` // ${receipt.tsc_stderr_tail.trim().slice(0, 240)}`;
+  }
+  return line;
+}
+
 function parseCustomTabCommand(input: string) {
   const text = input.trim();
   if (!text) return null;
@@ -988,6 +1031,7 @@ export default function CyberdeckApp() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [streamToolTrace, setStreamToolTrace] = useState("");
+  const [muthurNotifyBurstIndex, setMuthurNotifyBurstIndex] = useState<number | null>(null);
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
@@ -2591,6 +2635,47 @@ export default function CyberdeckApp() {
     ],
   );
 
+  const openWorkspaceFileInOperator = useCallback(
+    async (ref: MuthurOperatorOpenFileRef): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/read-file?path=${encodeURIComponent(ref.filePath)}`);
+        const payload = (await res.json()) as { content?: string; error?: string };
+        if (!res.ok || typeof payload.content !== "string") {
+          throw new Error(payload.error || `Failed to read file (${res.status})`);
+        }
+        const fileContent = payload.content;
+
+        const fileName = ref.fileName || ref.filePath.split(/[/\\]/).pop() || "file.txt";
+        const isMarkdown = /\.(md|markdown)$/i.test(fileName);
+
+        await openOperatorFile(ref.filePath, async () => {
+          operatorKindManualRef.current = false;
+          setOperatorTextAsset({
+            kind: isMarkdown ? "markdown" : "text",
+            name: fileName,
+            mimeType: isMarkdown ? "text/markdown" : "text/plain",
+            size: new Blob([fileContent]).size,
+            text: fileContent,
+            localFilePath: ref.filePath,
+          });
+          useCyberdeckTabStore.getState().setServer("m");
+          setNavRailContext("gateway");
+          setOperatorSurfaceMode("workspace");
+          setOperatorDocMode(ref.mode === "view" ? "view" : "edit");
+        });
+        return true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not open file in operator pane.";
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: `OPERATOR OPEN // FAILED // ${message}` },
+        ]);
+        return false;
+      }
+    },
+    [openOperatorFile, setOperatorTextAsset],
+  );
+
   const handleSetOperatorDocMode = useCallback((next: SetStateAction<"view" | "edit">) => {
     setOperatorDocMode(next);
   }, []);
@@ -2682,20 +2767,6 @@ export default function CyberdeckApp() {
       delete window.echoMirageOperatorDocumentText;
     };
   }, [operatorDroppedAsset?.text]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onApplyDocumentText = (event: Event) => {
-      const text = (event as CustomEvent<{ text?: string }>).detail?.text;
-      if (typeof text !== "string") return;
-      setOperatorDocMode("edit");
-      handleOperatorDocumentTextChange(text);
-    };
-    window.addEventListener(OPERATOR_APPLY_DOCUMENT_TEXT_EVENT, onApplyDocumentText);
-    return () => {
-      window.removeEventListener(OPERATOR_APPLY_DOCUMENT_TEXT_EVENT, onApplyDocumentText);
-    };
-  }, [handleOperatorDocumentTextChange]);
 
   useLayoutEffect(() => {
     if (!operatorSurfaceIsDocument || operatorDocMode !== "edit") return;
@@ -3594,6 +3665,22 @@ export default function CyberdeckApp() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamText]);
+
+  const latestMuthurNotifyIndex = useMemo(() => findLatestMuthurNotifyIndex(messages), [messages]);
+
+  useEffect(() => {
+    if (latestMuthurNotifyIndex < 0) {
+      setMuthurNotifyBurstIndex(null);
+      return;
+    }
+    setMuthurNotifyBurstIndex(latestMuthurNotifyIndex);
+    const timer = window.setTimeout(() => {
+      setMuthurNotifyBurstIndex((current) =>
+        current === latestMuthurNotifyIndex ? null : current,
+      );
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [latestMuthurNotifyIndex]);
 
   useEffect(() => {
     if (scanActivityActive) {
@@ -5438,12 +5525,14 @@ const resolved = resolveUiTarget(userMessage);
 
     const operatorContext = {
       previewSurface: autoConvertedDocx ? "markdown" : operatorAssetSurface,
-      fileName: operatorDroppedAsset?.name ?? null,
+      fileName:
+        operatorDroppedAsset?.name ??
+        (operatorActiveFilePath?.trim() ? operatorActiveFilePath.split("/").pop() ?? null : null),
       localFilePath: operatorLocalPath || null,
       docMode: operatorDocMode,
     };
 
-    if (isDocumentEditIntent(userMessage) && operatorSurfaceIsDocument) {
+    if (isOperatorPaneEditRequest(userMessage, operatorContext) && operatorSurfaceIsDocument) {
       flushMuthurObservation();
     }
 
@@ -5528,7 +5617,7 @@ const resolved = resolveUiTarget(userMessage);
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           fullText += chunk;
-          streamDisplayText = fullText.replace(/^=+\s*$/gm, "").replace(/^=+$\n?/g, "");
+          streamDisplayText = formatMuthurLiveStreamDisplay(fullText);
           scheduleStreamFlush();
         }
       }
@@ -5579,6 +5668,15 @@ const resolved = resolveUiTarget(userMessage);
       setMessages((prev) => [...prev, { role: "assistant", text: cleanedText }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
 
+      const codingVerifyReceipt =
+        streamPayload.codingVerify ?? parseCodingVerifyHeader(res.headers.get("x-muthur-coding-verify"));
+      if (codingVerifyReceipt) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: formatCodingVerifySystemLine(codingVerifyReceipt) },
+        ]);
+      }
+
       if (!autoConvertedDocx) {
         const operatorConversionRef =
           streamPayload.operatorConversion ??
@@ -5604,12 +5702,32 @@ const resolved = resolveUiTarget(userMessage);
         }
       }
 
+      const operatorOpenRef =
+        streamPayload.operatorOpenFile ??
+        parseOperatorOpenJson(res.headers.get("x-muthur-operator-open"));
+      if (operatorOpenRef) {
+        const opened = await openWorkspaceFileInOperator(operatorOpenRef);
+        if (opened) {
+          flushMuthurObservation();
+          await waitForOperatorDocumentReady(3000);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: `OPERATOR OPEN // ${operatorOpenRef.fileName} // ${operatorOpenRef.filePath}`,
+            },
+          ]);
+        }
+      }
+
       const editsToApply =
         operatorEditsFromStream.length > 0 ? operatorEditsFromStream : operatorEdits;
+      let operatorEditApplied = false;
       if (editsToApply.length > 0) {
         setOperatorDocMode("edit");
         const editResult = await applyMuthurOperatorEdits(editsToApply);
         if (editResult === "applied") {
+          operatorEditApplied = true;
           setMessages((prev) => [
             ...prev,
             {
@@ -5617,6 +5735,36 @@ const resolved = resolveUiTarget(userMessage);
               text: "OPERATOR EDIT // MUTHUR applied — Ctrl+Z to undo in the operator pane.",
             },
           ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: "OPERATOR EDIT // FAILED // MUTHUR could not apply the edit in the operator pane.",
+            },
+          ]);
+        }
+      }
+
+      if (
+        codingVerifyReceipt &&
+        !operatorEditApplied &&
+        operatorActiveFilePath?.trim()
+      ) {
+        const touchedPath = codingVerifyReceipt.touched_paths.find((touch) =>
+          pathsReferToSameOperatorFile(touch, operatorActiveFilePath),
+        );
+        if (touchedPath) {
+          const synced = await reloadOperatorDocumentFromWorkspacePath(touchedPath);
+          if (synced) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                text: "OPERATOR SYNC // reloaded open file from disk after MUTHUR write.",
+              },
+            ]);
+          }
         }
       }
 
@@ -5792,14 +5940,80 @@ const resolved = resolveUiTarget(userMessage);
   };
 
   useEffect(() => {
-    const pushToChat = (detail: PowerFistStackCommand | undefined) => {
-      const message = detail?.message?.trim();
+    const pushToChat = async (detail: PowerFistStackCommand | undefined) => {
+      if (!detail) return;
+
+      const toolOverride = detail.toolOverride;
+      if (toolOverride) {
+        const cardLine = detail.message.trim() || `POWERFIST OVERRIDE // ${detail.card.title}`;
+        setMessages((prev) => [...prev, { role: "user", text: cardLine }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: `POWERFIST OVERRIDE // ${detail.card.title} // ${toolOverride.name}`,
+          },
+        ]);
+
+        const result = await runPowerfistToolOverride(toolOverride, detail.composerSupplement);
+        if (!result.ok) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: `TOOL FAILURE // ${result.error || result.text || toolOverride.name}`,
+            },
+          ]);
+          return;
+        }
+
+        setMessages((prev) => [...prev, { role: "assistant", text: result.text.trim() }]);
+
+        if (result.operatorOpenFile) {
+          const opened = await openWorkspaceFileInOperator(result.operatorOpenFile);
+          if (opened) {
+            flushMuthurObservation();
+            await waitForOperatorDocumentReady(3000);
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                text: `OPERATOR OPEN // ${result.operatorOpenFile?.fileName} // ${result.operatorOpenFile?.filePath}`,
+              },
+            ]);
+          }
+        }
+
+        if (result.operatorEdits && result.operatorEdits.length > 0) {
+          setOperatorDocMode("edit");
+          const editResult = await applyMuthurOperatorEdits(result.operatorEdits);
+          if (editResult === "applied") {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                text: "OPERATOR EDIT // MUTHUR applied — Ctrl+Z to undo in the operator pane.",
+              },
+            ]);
+          }
+        }
+
+        if (result.codingVerify) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "system", text: formatCodingVerifySystemLine(result.codingVerify!) },
+          ]);
+        }
+        return;
+      }
+
+      const message = detail.message.trim();
       if (!message) return;
       void handleSend(message, { preserveSelectedSurface: true });
     };
     const handlePowerFistPush = (event: Event) => {
       event.preventDefault();
-      pushToChat((event as CustomEvent<PowerFistStackCommand>).detail);
+      void pushToChat((event as CustomEvent<PowerFistStackCommand>).detail);
     };
     const channel =
       typeof BroadcastChannel === "undefined"
@@ -5807,7 +6021,7 @@ const resolved = resolveUiTarget(userMessage);
         : new BroadcastChannel(POWERFIST_STACK_CHANNEL);
     if (channel) {
       channel.onmessage = (event: MessageEvent<PowerFistStackCommand>) => {
-        pushToChat(event.data);
+        void pushToChat(event.data);
       };
     }
     window.addEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
@@ -7142,6 +7356,25 @@ const resolved = resolveUiTarget(userMessage);
                     /(failure|failuer|failed|invalid_key|auth_rejected|uplink_error|api\s*error|http_[45]\d{2}|empty_response|rate_limit)/i.test(
                       m.text,
                     );
+                  const muthurNotifyBurstClass =
+                    m.role === "system" &&
+                    typeof m.text === "string" &&
+                    i === muthurNotifyBurstIndex &&
+                    i === latestMuthurNotifyIndex
+                      ? getMuthurNotifyBurstClass(m.text)
+                      : null;
+                  const muthurNotifySettledClass =
+                    m.role === "system" &&
+                    typeof m.text === "string" &&
+                    isMuthurNotifyMessage(m.text) &&
+                    i === latestMuthurNotifyIndex &&
+                    !muthurNotifyBurstClass
+                      ? getMuthurNotifySettledClass(m.text)
+                      : null;
+                  const muthurNotifyAscii =
+                    m.role === "system" && typeof m.text === "string"
+                      ? getMuthurNotifyAsciiLine(m.text)
+                      : null;
                   return (
                     <div
                       key={i}
@@ -7180,22 +7413,33 @@ const resolved = resolveUiTarget(userMessage);
                     )}
                     <span
                       className={
-                        isModelConnectedLine
-                          ? "font-medium text-green-300"
-                          : isSystemFailureLine
-                            ? "font-medium text-red-300"
-                            : "text-gray-300"
+                        muthurNotifyBurstClass
+                          ? muthurNotifyBurstClass
+                          : muthurNotifySettledClass
+                            ? muthurNotifySettledClass
+                            : isModelConnectedLine
+                              ? "font-medium text-green-300"
+                              : isSystemFailureLine
+                                ? "font-medium text-red-300"
+                                : "text-gray-300"
                       }
                       style={
-                        isModelConnectedLine
-                          ? { textShadow: "0 0 10px rgba(34, 197, 94, 0.45)" }
-                          : isSystemFailureLine
-                            ? { textShadow: "0 0 8px rgba(248, 113, 113, 0.35)" }
-                            : undefined
+                        muthurNotifyBurstClass || muthurNotifySettledClass
+                          ? undefined
+                          : isModelConnectedLine
+                            ? { textShadow: "0 0 10px rgba(34, 197, 94, 0.45)" }
+                            : isSystemFailureLine
+                              ? { textShadow: "0 0 8px rgba(248, 113, 113, 0.35)" }
+                              : undefined
                       }
                     >
                       {m.role === "system" ? (
-                        <span className="whitespace-pre-wrap">{renderGatewayMessageText(m.text)}</span>
+                        <>
+                          {muthurNotifyAscii ? (
+                            <span className={getMuthurNotifyAsciiClass(m.text)}>{muthurNotifyAscii}</span>
+                          ) : null}
+                          <span className="whitespace-pre-wrap">{renderGatewayMessageText(m.text)}</span>
+                        </>
                       ) : (
                         <>
                           {m.role === "assistant" && m.toolTrace ? (
@@ -7215,7 +7459,10 @@ const resolved = resolveUiTarget(userMessage);
                   </div>
                   );
                 })}
-                {streamText && (
+                {streamText && (() => {
+                  const streamLiveClass = getMuthurNotifyLiveClass(streamText);
+                  const streamAscii = streamLiveClass ? getMuthurNotifyAsciiLine(streamText) : null;
+                  return (
                   <div
                     data-chat-row={messages.length}
                     className={`nav-row py-1 text-xs ${
@@ -7234,11 +7481,21 @@ const resolved = resolveUiTarget(userMessage);
                             .join(" · ")}
                         </span>
                       ) : null}
-                      <span className="text-green-300">{streamText}</span>
+                      {streamAscii ? (
+                        <span className={getMuthurNotifyAsciiClass(streamText)}>{streamAscii}</span>
+                      ) : null}
+                      <span
+                        className={
+                          streamLiveClass ?? "text-green-300 whitespace-pre-wrap"
+                        }
+                      >
+                        {streamText}
+                      </span>
                     </span>
                     <span className="animate-pulse">█</span>
                   </div>
-                )}
+                  );
+                })()}
                   {isStreaming && !streamText && (
                     <div
                       data-chat-row={messages.length}

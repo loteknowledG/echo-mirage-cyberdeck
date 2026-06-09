@@ -26,6 +26,40 @@ export function parseOperatorEditsHeader(headerValue: string | null): OperatorEd
 
 export type ApplyMuthurEditsResult = false | "applied";
 
+export function pathsReferToSameOperatorFile(a: string, b: string): boolean {
+  const norm = (value: string) => value.trim().replace(/\\/g, "/").toLowerCase();
+  const left = norm(a);
+  const right = norm(b);
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const leftBase = left.split("/").pop() ?? left;
+  const rightBase = right.split("/").pop() ?? right;
+  if (leftBase !== rightBase) return false;
+  return left.endsWith(right) || right.endsWith(left);
+}
+
+export async function reloadOperatorDocumentFromWorkspacePath(filePath: string): Promise<boolean> {
+  if (typeof window === "undefined" || !filePath.trim()) return false;
+
+  try {
+    const res = await fetch(`/api/read-file?path=${encodeURIComponent(filePath.trim())}`);
+    const payload = (await res.json()) as { content?: string; error?: string };
+    if (!res.ok || typeof payload.content !== "string") return false;
+
+    requestOperatorEditMode();
+    syncOperatorDocumentText(payload.content);
+    await waitForOperatorDocumentReady(3000, 0);
+
+    const workbench = await waitForOperatorWorkbench(2500);
+    if (readOperatorDocumentText() !== payload.content) {
+      workbench?.setDocumentText?.(payload.content) ?? workbench?.forceDocumentText?.(payload.content);
+    }
+    return readOperatorDocumentText() === payload.content;
+  } catch {
+    return false;
+  }
+}
+
 function requestOperatorEditMode(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent("echo-mirage-operator-request-edit-mode"));
@@ -167,12 +201,17 @@ export async function applyMuthurOperatorEdits(
   }
 
   syncOperatorDocumentText(proposed);
-  await waitForEditSurface(200);
+  await waitForOperatorDocumentReady(3000, 0);
 
   const workbench = await waitForOperatorWorkbench(2500);
-  if (workbench?.forceDocumentText?.(proposed) || workbench?.setDocumentText?.(proposed)) {
-    toast.message("MUTHUR edit applied — Ctrl+Z to undo.", { duration: 4000 });
-    return "applied";
+  const editorMatches = readOperatorDocumentText() === proposed;
+  if (!editorMatches) {
+    workbench?.setDocumentText?.(proposed) ?? workbench?.forceDocumentText?.(proposed);
+  }
+
+  if (readOperatorDocumentText() !== proposed) {
+    toast.error("MUTHUR edit could not sync to the operator editor.");
+    return false;
   }
 
   toast.message("MUTHUR edit applied — Ctrl+Z to undo.", { duration: 4000 });

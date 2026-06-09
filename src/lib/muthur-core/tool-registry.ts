@@ -4,7 +4,9 @@ import { Bash, OverlayFs } from "just-bash";
 import { convertDocumentToMarkdown } from "@/lib/muthur-document-conversion.server";
 import { convertMarkdownFileToDocx } from "@/lib/markdown-to-docx.server";
 import { convertMarkdownFileToPdf } from "@/lib/markdown-to-pdf.server";
+import { isOperatorWorkspaceTextPath } from "@/lib/operator-file-surface";
 import { getLatestMuthurObservation } from "@/lib/muthur/observation/observation-store.server";
+import { validateReadFilePath } from "@/lib/muthur/execution/safety-policy";
 import { parseSuggestOperatorEditArgs } from "@/lib/muthur-core/suggest-operator-edit";
 import {
   runGitDiff,
@@ -331,12 +333,76 @@ async function runObserveOperatorPane(call: ToolCall): Promise<ToolResult> {
   };
 }
 
+async function runOpenOperatorFile(call: ToolCall): Promise<ToolResult> {
+  const filePath = getStringArg(call, "filePath") || getStringArg(call, "path");
+  if (!filePath) {
+    return { ok: false, error: "open_operator_file requires filePath." };
+  }
+
+  const validated = validateReadFilePath(
+    path.isAbsolute(filePath) ? filePath : path.join(WORKSPACE_ROOT, filePath),
+  );
+  if (!validated.ok) {
+    return { ok: false, error: validated.reason };
+  }
+
+  const abs = validated.abs;
+  const ext = path.extname(abs).toLowerCase();
+  if (ext === ".docx" || ext === ".pdf") {
+    return {
+      ok: false,
+      error:
+        ext === ".docx"
+          ? "DOCX cannot open in Monaco directly — use convert_document_to_markdown first."
+          : "PDF cannot open in Monaco — use convert_document_to_markdown or localfs cat.",
+    };
+  }
+  if (!isOperatorWorkspaceTextPath(abs)) {
+    return {
+      ok: false,
+      error:
+        "File type is not Monaco-editable. Use a text/code/markdown path or convert_document_to_markdown for DOCX.",
+    };
+  }
+
+  try {
+    const stat = await fs.stat(abs);
+    if (!stat.isFile()) {
+      return { ok: false, error: "Path is not a file." };
+    }
+    if (stat.size > 2 * 1024 * 1024) {
+      return { ok: false, error: "File is too large to open in the operator pane (>2 MB)." };
+    }
+    await fs.readFile(abs, "utf8");
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not read file.",
+    };
+  }
+
+  const modeRaw = getStringArg(call, "mode").toLowerCase();
+  const mode = modeRaw === "view" ? "view" : "edit";
+  const fileName = path.basename(abs);
+
+  return {
+    ok: true,
+    output: {
+      queued: true,
+      filePath: abs,
+      fileName,
+      mode,
+    },
+  };
+}
+
 async function runSuggestOperatorEdit(call: ToolCall): Promise<ToolResult> {
   const parsed = parseSuggestOperatorEditArgs(call.args);
   if (!parsed.ok) {
     return { ok: false, error: parsed.error };
   }
 
+  const pendingOpen = call.executionContext?.operatorOpenFile;
   const observation = getLatestMuthurObservation("cyberdeck");
   const editor = observation?.editor;
   const hasOpenDocument = Boolean(observation?.visibleDocument?.trim());
@@ -344,11 +410,11 @@ async function runSuggestOperatorEdit(call: ToolCall): Promise<ToolResult> {
     editor?.content?.trim() || observation?.documentExcerpt?.trim(),
   );
 
-  if (!editor?.active && !(hasOpenDocument && hasTextContext)) {
+  if (!editor?.active && !(hasOpenDocument && hasTextContext) && !pendingOpen) {
     return {
       ok: false,
       error:
-        "No active operator document. Open a markdown or code file in the operator pane first (convert DOCX to markdown if needed).",
+        "No active operator document. Call open_operator_file first, or ask the operator to open a markdown/code file in the operator pane.",
     };
   }
 
@@ -357,8 +423,8 @@ async function runSuggestOperatorEdit(call: ToolCall): Promise<ToolResult> {
     output: {
       queued: true,
       edit: parsed.edit,
-      fileName: editor?.fileName ?? observation?.visibleDocument ?? null,
-      filePath: editor?.filePath ?? null,
+      fileName: editor?.fileName ?? pendingOpen?.fileName ?? observation?.visibleDocument ?? null,
+      filePath: editor?.filePath ?? pendingOpen?.filePath ?? null,
     },
   };
 }
@@ -371,6 +437,12 @@ export function createMuthurToolRegistry(): ToolRegistry {
         description:
           "Read the latest visible operator surface state (open file, cursor, excerpt). Read-only — no edits or actions.",
         run: runObserveOperatorPane,
+      },
+      open_operator_file: {
+        name: "open_operator_file",
+        description:
+          "Open a workspace text/markdown/code file in the operator Monaco editor on the operator's screen. Use before suggest_operator_edit when nothing is open.",
+        run: runOpenOperatorFile,
       },
       workspace_exec: {
         name: "workspace_exec",

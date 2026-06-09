@@ -161,6 +161,29 @@ export function formatClockResult(result: unknown): string {
   return parts.join("\n\n");
 }
 
+export function formatOpenOperatorFileResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] open_operator_file returned no output.";
+  }
+
+  const payload = result as {
+    filePath?: string;
+    fileName?: string;
+    mode?: string;
+    queued?: boolean;
+  };
+
+  const parts = [
+    "[TOOL OK] OPEN_OPERATOR_FILE // QUEUED_FOR_OPERATOR_PANE",
+    "The deck will load this file in Monaco on the operator screen.",
+    payload.filePath ? `FILE // ${payload.filePath}` : null,
+    payload.fileName ? `NAME // ${payload.fileName}` : null,
+    payload.mode ? `MODE // ${payload.mode.toUpperCase()}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
 export function formatConvertDocumentResult(result: unknown): string {
   if (!result || typeof result !== "object") {
     return "[TOOL] convert_document_to_markdown returned no output.";

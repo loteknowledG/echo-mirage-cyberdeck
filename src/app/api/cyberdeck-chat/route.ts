@@ -19,6 +19,7 @@ import {
   formatOperatorChatContextPrompt,
   isDocxFileName,
   isDocumentEditIntent,
+  isOperatorPaneEditRequest,
   type OperatorChatContext,
 } from "@/lib/muthur/document-edit-intent";
 import {
@@ -29,22 +30,25 @@ import {
 const MUTHUR_AVAILABLE_TOOLS_PROMPT =
   "\n\nAVAILABLE TOOLS:" +
   "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane (file name, language, cursor, dirty, content excerpt)." +
+  "\n- open_operator_file: Open a workspace text/markdown/code file in the operator Monaco editor on the operator's screen. Call before suggest_operator_edit when nothing is open." +
   "\n- suggest_operator_edit: Propose typed edits to markdown/code/text open in the operator Monaco editor. Edits auto-apply in the operator pane (Ctrl+Z to undo). Not for DOCX/PDF previews." +
   "\n- localfs: REAL disk — read anywhere; mkdir/write only inside the Echo Mirage repo. Use write to create or update source files." +
   "\n- workspace_exec: REAL disk — allowlisted commands only (pnpm exec tsc --noEmit, pnpm lint, pnpm build, git diff, git log, etc.). Run after edits to verify." +
   "\n- git_status / git_diff: REAL disk — inspect repo changes after coding." +
   "\n- justbash: EPHEMERAL mirror only — rg/ls/cat search; writes do NOT persist. Never use for pnpm, git, or file changes." +
   "\n- clock: Server date/time." +
-  "\n\nCODING ECHO MIRAGE (Phase A):" +
+  "\n\nCODING ECHO MIRAGE (Phase A + B):" +
   "\n1. localfs write (or suggest_operator_edit for open operator files) to change code." +
   "\n2. git_status or git_diff to review changes." +
-  "\n3. workspace_exec with `pnpm exec tsc --noEmit` to typecheck; report exit code." +
+  "\n3. After file touches, MUTHUR auto-runs `git diff --stat` + `pnpm exec tsc --noEmit` and writes a receipt under `.muthur/receipts/coding/` — report PASS/FAIL from that receipt." +
+  "\n4. You may still call workspace_exec for extra checks (lint, build) when asked." +
   "\n\nIMPORTANT: When the user asks what is in the operator pane, call observe_operator_pane." +
-  "\nWhen they ask to edit/fix/rewrite/remove text from the open markdown or code file, call observe_operator_pane then suggest_operator_edit (prefer replace_line_range for targeted edits). Edits apply immediately — confirm what changed; mention Ctrl+Z if they want to undo." +
+  "\nWhen they ask to edit a file and Monaco is not active, call open_operator_file with the path, then suggest_operator_edit (prefer replace_line_range for targeted edits). Edits apply immediately — confirm what changed; mention Ctrl+Z if they want to undo." +
+  "\nWhen a file is already open in the operator pane, NEVER use localfs write on that file — only suggest_operator_edit." +
   "\nNever use justbash/find to locate the user's open document — use observe_operator_pane for the file already open in the operator pane.";
 
 function buildDocumentEditHint(message: string, operatorContext?: OperatorChatContext | null): string {
-  if (!isDocumentEditIntent(message)) return "";
+  if (!isOperatorPaneEditRequest(message, operatorContext)) return "";
 
   const ctxPath = operatorContext?.localFilePath?.trim() ?? "";
   const ctxName = operatorContext?.fileName?.trim() ?? "";
@@ -79,6 +83,8 @@ function buildDocumentEditHint(message: string, operatorContext?: OperatorChatCo
   return (
     "\n\nOPERATOR HINT: User wants an in-pane edit on the open operator document. " +
     "Call observe_operator_pane, then suggest_operator_edit to remove/replace the requested text. " +
+    "Do NOT use localfs write on a file already open in the operator pane — use suggest_operator_edit only. " +
+    "For HTML comments or a single top line, use replace_line_range with startLine=1 endLine=1. " +
     "Edits apply immediately — confirm what changed; Ctrl+Z undoes in the operator pane. " +
     "Do NOT search the filesystem with justbash."
   );
@@ -178,7 +184,7 @@ function buildMuthurSystemContent(args: {
   glyphDoctrine: string;
 }): { systemContent: string; toolsEnabled: boolean } {
   const toolsEnabled = shouldEnableMuthurTools(args.message);
-  const needsOperator = messageNeedsOperatorContext(args.message);
+  const needsOperator = messageNeedsOperatorContext(args.message, args.operatorContext);
 
   let systemContent =
     "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful.";

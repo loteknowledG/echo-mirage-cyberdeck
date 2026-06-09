@@ -35,9 +35,32 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   {
     type: "function",
     function: {
+      name: "open_operator_file",
+      description:
+        "Open a text/markdown/code file from the Echo Mirage workspace in the operator Monaco editor on the operator's screen. Call this before suggest_operator_edit when no file is open in the operator pane. Not for DOCX/PDF — convert DOCX first.",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: {
+            type: "string",
+            description: "Absolute or repo-relative path to a Monaco-editable file (.md, .ts, .tsx, .json, etc.).",
+          },
+          mode: {
+            type: "string",
+            enum: ["edit", "view"],
+            description: "Optional. Defaults to edit.",
+          },
+        },
+        required: ["filePath"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "suggest_operator_edit",
         description:
-          "Propose a typed edit to the markdown/code/text file open in the operator Monaco editor. Applies immediately in the operator pane (Ctrl+Z to undo; save when ready). Call observe_operator_pane first. Not for DOCX/PDF/image previews. Prefer replace_line_range for surgical edits; replace_content only when rewriting the whole file.",
+          "Propose a typed edit to the markdown/code/text file open in the operator Monaco editor. Applies immediately in the operator pane (Ctrl+Z to undo; save when ready). Call open_operator_file (or observe_operator_pane) first. Not for DOCX/PDF/image previews. Prefer replace_line_range for surgical edits; replace_content only when rewriting the whole file.",
       parameters: {
         type: "object",
         properties: {

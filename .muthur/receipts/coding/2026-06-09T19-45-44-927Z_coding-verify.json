@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-06-09T19:45:44.932Z",
+  "passed": true,
+  "touched_paths": [
+    "src/lib/muthur-core/loop.ts"
+  ],
+  "tsc_exit_code": 0,
+  "tsc_stderr_tail": "",
+  "git_diff_stat": ".cursor/hooks/mechanicus-tts-last.json         |  2 +-\n package.json                                   |  2 +\n src/app/api/cyberdeck-chat/route.ts            |  8 ++-\n src/app/api/read-file/route.ts                 |  9 ++-\n src/features/cyberdeck/cyberdeck-app.tsx       | 97 ++++++++++++++++++++++++++\n src/lib/muthur-core/execute-openai-tool.ts     | 14 +++-\n src/lib/muthur-core/format-tool-result.ts      | 23 ++++++\n src/lib/muthur-core/muthur-chat-intent.ts      |  2 +-\n src/lib/muthur-core/muthur-provider-chat.ts    | 63 +++++++++++++++--\n src/lib/muthur-core/muthur-stream-payload.ts   | 60 ++++++++++++++--\n src/lib/muthur-core/openai-tool-definitions.ts | 25 ++++++-\n src/lib/muthur-core/tool-registry.ts           | 80 +++++++++++++++++++--\n src/lib/muthur-core/types.ts                   | 30 ++++++++\n src/lib/operator-file-surface.ts               |  6 ++\n 14 files changed, 396 insertions(+), 25 deletions(-)",
+  "receipt_path": "F:\\dev\\echo-mirage-cyberdeck\\.muthur\\receipts\\coding\\2026-06-09T19-45-44-927Z_coding-verify.json"
+}

@@ -1023,6 +1023,20 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   }
 }
 
+@keyframes muthur-race-strobe {
+  0% {
+    background-position: -140% 0;
+    text-shadow: 0 0 4px rgba(34, 197, 94, 0.18);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(134, 239, 172, 0.55);
+  }
+  100% {
+    background-position: 140% 0;
+    text-shadow: 0 0 4px rgba(34, 197, 94, 0.18);
+  }
+}
+
 @keyframes cyberdeck-cogitating-sweep {
   0% {
     background-position: -140% 0;
@@ -1043,13 +1057,17 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   gap: 0.35rem;
 }
 
+.muthur-notify-race,
 .cyberdeck-cogitating-text {
-  color: rgba(34, 197, 94, 0.92);
+  display: inline;
+  color: rgba(134, 239, 172, 0.95);
   background-image: linear-gradient(
     90deg,
-    rgba(34, 197, 94, 0.48) 0%,
+    rgba(34, 197, 94, 0.45) 0%,
+    rgba(230, 255, 240, 0.95) 42%,
     rgba(134, 239, 172, 1) 50%,
-    rgba(34, 197, 94, 0.48) 100%
+    rgba(230, 255, 240, 0.95) 58%,
+    rgba(34, 197, 94, 0.45) 100%
   );
   background-size: 220% 100%;
   background-repeat: no-repeat;
@@ -1057,7 +1075,91 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: cyberdeck-cogitating-sweep 1.35s linear infinite;
+}
+
+.muthur-notify-race-burst {
+  animation: muthur-race-strobe 0.75s linear 5 forwards;
+}
+
+.muthur-notify-race-live,
+.cyberdeck-cogitating-text {
+  animation: muthur-race-strobe 0.75s linear infinite;
+}
+
+.muthur-notify-settled-pass {
+  color: rgba(134, 239, 172, 0.92);
+  text-shadow: 0 0 6px rgba(34, 197, 94, 0.22);
+}
+
+.muthur-notify-settled-fail {
+  color: rgba(252, 165, 165, 0.92);
+  text-shadow: 0 0 6px rgba(248, 113, 113, 0.22);
+}
+
+.muthur-notify-ascii {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  user-select: none;
+}
+
+.muthur-notify-ascii-live {
+  color: rgba(74, 222, 128, 0.5);
+}
+
+.muthur-notify-ascii-pass {
+  color: rgba(134, 239, 172, 0.58);
+}
+
+.muthur-notify-ascii-fail {
+  color: rgba(248, 113, 113, 0.62);
+}
+
+.muthur-notify-race-pass {
+  background-image: linear-gradient(
+    90deg,
+    rgba(34, 197, 94, 0.4) 0%,
+    rgba(220, 252, 231, 1) 45%,
+    rgba(134, 239, 172, 1) 50%,
+    rgba(220, 252, 231, 1) 55%,
+    rgba(34, 197, 94, 0.4) 100%
+  );
+}
+
+.muthur-notify-race-fail {
+  background-image: linear-gradient(
+    90deg,
+    rgba(248, 113, 113, 0.35) 0%,
+    rgba(254, 226, 226, 1) 45%,
+    rgba(252, 165, 165, 1) 50%,
+    rgba(254, 226, 226, 1) 55%,
+    rgba(248, 113, 113, 0.35) 100%
+  );
+}
+
+.muthur-notify-race-fail.muthur-notify-race-burst {
+  animation-name: muthur-race-strobe-fail;
+}
+
+.muthur-notify-race-fail.muthur-notify-race-live {
+  animation-name: muthur-race-strobe-fail;
+}
+
+@keyframes muthur-race-strobe-fail {
+  0% {
+    background-position: -140% 0;
+    text-shadow: 0 0 4px rgba(248, 113, 113, 0.2);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(252, 165, 165, 0.55);
+  }
+  100% {
+    background-position: 140% 0;
+    text-shadow: 0 0 4px rgba(248, 113, 113, 0.2);
+  }
 }
 
 /* Echo Mirage wireframe override — content zone only ([data-morphism="realmorphism"]).

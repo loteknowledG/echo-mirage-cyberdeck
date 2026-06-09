@@ -247,18 +247,8 @@ export function OperatorMonacoWorkbench({
   );
 
   const forceDocumentText = useCallback(
-    (text: string): boolean => {
-      const instance = editorRef.current;
-      const model = instance?.getModel();
-      if (!instance || !model) return false;
-      instance.pushUndoStop();
-      model.setValue(text);
-      instance.pushUndoStop();
-      setDirty(text !== savedTextRef.current);
-      publishDocumentChange(text, true);
-      return true;
-    },
-    [publishDocumentChange],
+    (text: string): boolean => setDocumentTextInternal(text),
+    [setDocumentTextInternal],
   );
 
   const applyEdit = useCallback(

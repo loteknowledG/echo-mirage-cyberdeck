@@ -1167,6 +1167,10 @@ export function CyberdeckOperatorPaneBody({
     operatorApplyRef.current = true;
     onOperatorDocumentTextChange(restored);
     operatorDocHistoryTextRef.current = restored;
+    const workbench = window.echoMirageOperatorWorkbench;
+    if (!workbench?.setDocumentText?.(restored)) {
+      workbench?.forceDocumentText?.(restored);
+    }
     queueMicrotask(() => {
       operatorApplyRef.current = false;
     });
@@ -1178,6 +1182,10 @@ export function CyberdeckOperatorPaneBody({
     operatorApplyRef.current = true;
     onOperatorDocumentTextChange(restored);
     operatorDocHistoryTextRef.current = restored;
+    const workbench = window.echoMirageOperatorWorkbench;
+    if (!workbench?.setDocumentText?.(restored)) {
+      workbench?.forceDocumentText?.(restored);
+    }
     queueMicrotask(() => {
       operatorApplyRef.current = false;
     });
@@ -1197,6 +1205,21 @@ export function CyberdeckOperatorPaneBody({
     await onSaveOperatorDocInPlace();
     window.dispatchEvent(new CustomEvent("echo-mirage-operator-file-saved"));
   }, [onSaveOperatorDocInPlace]);
+
+  useEffect(() => {
+    const onApplyDocumentText = (event: Event) => {
+      const text = (event as CustomEvent<{ text?: string }>).detail?.text;
+      if (typeof text !== "string") return;
+      applyOperatorDocText(text, "immediate");
+      queueMicrotask(() => {
+        const workbench = window.echoMirageOperatorWorkbench;
+        if (workbench?.setDocumentText?.(text)) return;
+        workbench?.forceDocumentText?.(text);
+      });
+    };
+    window.addEventListener(OPERATOR_APPLY_DOCUMENT_TEXT_EVENT, onApplyDocumentText);
+    return () => window.removeEventListener(OPERATOR_APPLY_DOCUMENT_TEXT_EVENT, onApplyDocumentText);
+  }, [applyOperatorDocText]);
 
   useEffect(() => {
     if (operatorSurfaceMode !== "browser") {

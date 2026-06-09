@@ -349,6 +349,7 @@ export function PreviewMatrix() {
       applyFocus(deckIndex, cardIndex);
       const deck = activeDecks[deckIndex];
       const card = deck.cards[cardIndex];
+      const composerSupplement = (messageInputRef.current?.value ?? message).trim() || undefined;
       const chatMessage = cardChatMessage(deck.name, targetPaneLabel, card);
       const detail: PowerFistStackCommand = {
         kind: "powerfist-stack-push",
@@ -361,9 +362,14 @@ export function PreviewMatrix() {
         },
         commandId: crypto.randomUUID(),
         message: chatMessage,
+        toolOverride: card.toolOverride,
+        composerSupplement,
         preparedArtifact: card.preview,
         targetPane: targetPaneLabel,
       };
+      if (composerSupplement && card.toolOverride?.composerArg) {
+        setMessage("");
+      }
       const event = new CustomEvent<PowerFistStackCommand>(POWERFIST_STACK_PUSH_EVENT, {
         cancelable: true,
         detail,
@@ -383,7 +389,7 @@ export function PreviewMatrix() {
         pushReceiptTimerRef.current = null;
       }, CARD_PUSH_RECEIPT_DURATION_MS);
     },
-    [activeDecks, applyFocus, targetPaneLabel],
+    [activeDecks, applyFocus, message, targetPaneLabel],
   );
 
   const cancelCardHold = useCallback(() => {

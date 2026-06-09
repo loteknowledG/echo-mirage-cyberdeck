@@ -6,7 +6,12 @@ import { MUTHUR_OPENAI_TOOLS } from "@/lib/muthur-core/openai-tool-definitions";
 import { appendMuthurStreamFooters } from "@/lib/muthur-core/muthur-stream-payload";
 import { dsmlCallsToOpenAiToolCalls, parseDsmlToolCalls, stripDsmlToolMarkup } from "@/lib/muthur-core/parse-dsml-tool-calls";
 import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
-import type { MuthurToolExecutionContext, ToolRegistry } from "@/lib/muthur-core/types";
+import { maybeFinalizeCodingVerify } from "@/lib/muthur-core/coding-verify.server";
+import {
+  createMuthurToolExecutionContext,
+  type MuthurToolExecutionContext,
+  type ToolRegistry,
+} from "@/lib/muthur-core/types";
 
 const textEncoder = new TextEncoder();
 const MAX_TOOL_ROUNDS = ENABLE_AUTOMATION ? 4 : 0;
@@ -60,6 +65,12 @@ function toolsUsedHeaders(
   }
   if (toolCtx.operatorConversion) {
     headers["X-Muthur-Operator-Conversion"] = JSON.stringify(toolCtx.operatorConversion);
+  }
+  if (toolCtx.operatorOpenFile) {
+    headers["X-Muthur-Operator-Open"] = JSON.stringify(toolCtx.operatorOpenFile);
+  }
+  if (toolCtx.codingVerify) {
+    headers["X-Muthur-Coding-Verify"] = JSON.stringify(toolCtx.codingVerify);
   }
   return headers;
 }
@@ -138,7 +149,7 @@ export async function muthurChatWithModelTools(options: {
   const messages: JsonMessage[] = options.baseMessages.map((m) => ({ ...m }));
   const fallbackMessages = options.baseMessages.map((m) => ({ ...m }));
   const toolsUsed: string[] = [];
-  const toolCtx: MuthurToolExecutionContext = { operatorEdits: [], operatorConversion: null };
+  const toolCtx = createMuthurToolExecutionContext();
 
   if (!toolsEnabled) {
     let streamRes: Response;
@@ -212,7 +223,16 @@ export async function muthurChatWithModelTools(options: {
 
       const msg = data.choices?.[0]?.message;
       if (!msg) {
-        write(appendMuthurStreamFooters("[MUTHUR] Empty model response.", toolsUsed, toolCtx.operatorEdits, toolCtx.operatorConversion));
+        write(
+          appendMuthurStreamFooters(
+            "[MUTHUR] Empty model response.",
+            toolsUsed,
+            toolCtx.operatorEdits,
+            toolCtx.operatorConversion,
+            toolCtx.operatorOpenFile,
+            toolCtx.codingVerify,
+          ),
+        );
         return;
       }
 
@@ -262,16 +282,38 @@ export async function muthurChatWithModelTools(options: {
         continue;
       }
 
+      await maybeFinalizeCodingVerify(toolCtx, write);
+
       const text = stripDsmlFromAssistantText(rawContent);
       if (text.trim()) {
         write("\n");
-        write(appendMuthurStreamFooters(text, toolsUsed, toolCtx.operatorEdits, toolCtx.operatorConversion));
+        write(
+          appendMuthurStreamFooters(
+            text,
+            toolsUsed,
+            toolCtx.operatorEdits,
+            toolCtx.operatorConversion,
+            toolCtx.operatorOpenFile,
+            toolCtx.codingVerify,
+          ),
+        );
         return;
       }
 
-      write(appendMuthurStreamFooters("[MUTHUR] Model returned no text.", toolsUsed, toolCtx.operatorEdits, toolCtx.operatorConversion));
+      write(
+        appendMuthurStreamFooters(
+          "[MUTHUR] Model returned no text.",
+          toolsUsed,
+          toolCtx.operatorEdits,
+          toolCtx.operatorConversion,
+          toolCtx.operatorOpenFile,
+          toolCtx.codingVerify,
+        ),
+      );
       return;
     }
+
+    await maybeFinalizeCodingVerify(toolCtx, write);
 
     write("⏳ MUTHUR // composing final reply...\n\n");
     const finalRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, messages);
@@ -281,7 +323,16 @@ export async function muthurChatWithModelTools(options: {
     }
 
     await pipeOpenAiStreamToWrite(finalRes, write);
-    write(appendMuthurStreamFooters("", toolsUsed, toolCtx.operatorEdits, toolCtx.operatorConversion));
+    write(
+      appendMuthurStreamFooters(
+        "",
+        toolsUsed,
+        toolCtx.operatorEdits,
+        toolCtx.operatorConversion,
+        toolCtx.operatorOpenFile,
+        toolCtx.codingVerify,
+      ),
+    );
   });
 }
 

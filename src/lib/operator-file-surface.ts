@@ -280,6 +280,12 @@ export function isOperatorTextEditableSurface(surface: OperatorAssetSurface): bo
   return surface === "markdown" || surface === "text";
 }
 
+/** True when a workspace path is a Monaco-editable text/markdown file. */
+export function isOperatorWorkspaceTextPath(filePath: string): boolean {
+  const lower = filePath.toLowerCase();
+  return matchesExtension(lower, TEXT_EDITABLE_EXTENSIONS);
+}
+
 export function pickerKindForSurface(surface: OperatorAssetSurface): OperatorDocumentPickerKind {
   if (surface === "markdown") return "markdown";
   if (surface === "text") return "text";

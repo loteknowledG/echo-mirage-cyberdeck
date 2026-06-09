@@ -1,5 +1,12 @@
 export type PreviewCardRisk = "safe" | "caution" | "restricted";
 
+export type PreviewCardToolOverride = {
+  name: string;
+  args?: Record<string, unknown>;
+  /** PowerFist composer text is injected into this tool argument when the card is pushed. */
+  composerArg?: string;
+};
+
 export type PreviewCard = {
   type: string;
   title: string;
@@ -9,6 +16,7 @@ export type PreviewCard = {
     kind: "figlet" | "oneline";
     value: string;
   };
+  toolOverride?: PreviewCardToolOverride;
 };
 
 export type PreviewDeck = {
@@ -143,11 +151,108 @@ export const PREVIEW_DECKS: PreviewDeck[] = [
         purpose: "Deal recovery options after failure.",
         risk: "safe",
       },
+    ],
+  },
+  {
+    name: "Coding Deck",
+    badge: "muthur // real disk",
+    cards: [
       {
-        type: "quorum",
-        title: "Gangbang",
-        purpose: "Deal recovery options after failure.",
+        type: "tool",
+        title: "Git Status",
+        purpose: "Manual override: git_status on the Echo Mirage repo.",
         risk: "safe",
+        toolOverride: { name: "git_status", args: {} },
+      },
+      {
+        type: "tool",
+        title: "Git Diff Stat",
+        purpose: "Manual override: git_diff --stat summary.",
+        risk: "safe",
+        toolOverride: { name: "git_diff", args: { stat: true } },
+      },
+      {
+        type: "tool",
+        title: "Typecheck",
+        purpose: "Manual override: pnpm exec tsc --noEmit.",
+        risk: "safe",
+        toolOverride: {
+          name: "workspace_exec",
+          args: { command: "pnpm exec tsc --noEmit" },
+        },
+      },
+      {
+        type: "tool",
+        title: "Lint",
+        purpose: "Manual override: pnpm lint.",
+        risk: "caution",
+        toolOverride: { name: "workspace_exec", args: { command: "pnpm lint" } },
+      },
+      {
+        type: "tool",
+        title: "Coding Verify",
+        purpose: "Manual override: git diff --stat + tsc --noEmit receipt.",
+        risk: "caution",
+        toolOverride: { name: "coding_verify", args: {} },
+      },
+    ],
+  },
+  {
+    name: "Operator Deck",
+    badge: "muthur // monaco",
+    cards: [
+      {
+        type: "tool",
+        title: "Observe Pane",
+        purpose: "Manual override: observe_operator_pane for cyberdeck.",
+        risk: "safe",
+        toolOverride: { name: "observe_operator_pane", args: { surface: "cyberdeck" } },
+      },
+      {
+        type: "tool",
+        title: "Open File",
+        purpose: "Manual override: open_operator_file. Type a repo path in the composer, then push.",
+        risk: "safe",
+        toolOverride: { name: "open_operator_file", args: { mode: "edit" }, composerArg: "filePath" },
+      },
+      {
+        type: "tool",
+        title: "Append Section",
+        purpose:
+          "Manual override: suggest_operator_edit append_section. Type text in the composer (file must be open).",
+        risk: "caution",
+        toolOverride: {
+          name: "suggest_operator_edit",
+          args: { kind: "append_section" },
+          composerArg: "text",
+        },
+      },
+    ],
+  },
+  {
+    name: "Filesystem Deck",
+    badge: "muthur // localfs",
+    cards: [
+      {
+        type: "tool",
+        title: "Cat File",
+        purpose: "Manual override: localfs cat. Type a path in the composer, then push.",
+        risk: "safe",
+        toolOverride: { name: "localfs", args: { action: "cat" }, composerArg: "path" },
+      },
+      {
+        type: "tool",
+        title: "Git Diff Path",
+        purpose: "Manual override: git_diff for one file. Type path in composer.",
+        risk: "safe",
+        toolOverride: { name: "git_diff", args: { stat: false }, composerArg: "path" },
+      },
+      {
+        type: "tool",
+        title: "Stat File",
+        purpose: "Manual override: localfs stat. Type path in composer.",
+        risk: "safe",
+        toolOverride: { name: "localfs", args: { action: "stat" }, composerArg: "path" },
       },
     ],
   },
