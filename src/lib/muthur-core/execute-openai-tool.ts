@@ -3,10 +3,13 @@ import {
   formatConvertDocumentResult,
   formatExportMarkdownToDocxResult,
   formatExportMarkdownToPdfResult,
+  formatGitDiffResult,
+  formatGitStatusResult,
   formatJustBashResult,
   formatLocalFsResult,
   formatObserveOperatorPaneResult,
   formatSuggestOperatorEditResult,
+  formatWorkspaceExecResult,
 } from "@/lib/muthur-core/format-tool-result";
 import { extractOperatorEditFromToolOutput } from "@/lib/muthur-core/suggest-operator-edit";
 import { extractOperatorConversionRef } from "@/lib/muthur-core/operator-conversion-ref";
@@ -75,6 +78,15 @@ export async function executeRegistryToolForOpenAi(
       if (edit) ctx.operatorEdits.push(edit);
     }
     return formatSuggestOperatorEditResult(result.output);
+  }
+  if (functionName === "workspace_exec") {
+    return formatWorkspaceExecResult(result.output);
+  }
+  if (functionName === "git_status") {
+    return formatGitStatusResult(result.output);
+  }
+  if (functionName === "git_diff") {
+    return formatGitDiffResult(result.output);
   }
   return formatJustBashResult(result.output);
 }

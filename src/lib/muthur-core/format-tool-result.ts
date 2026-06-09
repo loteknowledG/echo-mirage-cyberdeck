@@ -2,6 +2,65 @@
 
 export { formatSuggestOperatorEditResult } from "@/lib/muthur-core/suggest-operator-edit";
 
+export function formatWorkspaceExecResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] workspace_exec returned no output.";
+  }
+
+  const payload = result as {
+    command?: string;
+    cwd?: string;
+    stdout?: string;
+    stderr?: string;
+    exitCode?: number;
+    duration_ms?: number;
+  };
+
+  const parts = [
+    "[TOOL] WORKSPACE_EXEC // REAL DISK",
+    payload.command ? `COMMAND // ${payload.command}` : null,
+    payload.cwd ? `CWD // ${payload.cwd}` : null,
+    typeof payload.exitCode === "number" ? `EXIT // ${payload.exitCode}` : null,
+    typeof payload.duration_ms === "number" ? `DURATION_MS // ${payload.duration_ms}` : null,
+    payload.stdout ? `STDOUT\n${payload.stdout.trimEnd()}` : null,
+    payload.stderr ? `STDERR\n${payload.stderr.trimEnd()}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
+export function formatGitStatusResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] git_status returned no output.";
+  }
+
+  const payload = result as { stdout?: string; exitCode?: number };
+  const body = (payload.stdout ?? "").trimEnd();
+  return [
+    "[TOOL] GIT_STATUS // REAL DISK",
+    typeof payload.exitCode === "number" ? `EXIT // ${payload.exitCode}` : null,
+    body ? `STATUS\n${body}` : "STATUS\n(clean working tree)",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+export function formatGitDiffResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] git_diff returned no output.";
+  }
+
+  const payload = result as { stdout?: string; exitCode?: number };
+  const body = (payload.stdout ?? "").trimEnd();
+  return [
+    "[TOOL] GIT_DIFF // REAL DISK",
+    typeof payload.exitCode === "number" ? `EXIT // ${payload.exitCode}` : null,
+    body ? `DIFF\n${body}` : "DIFF\n(no changes)",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 export function formatJustBashResult(result: unknown): string {
   if (!result || typeof result !== "object") {
     return "[TOOL] justbash returned no output.";
@@ -16,7 +75,7 @@ export function formatJustBashResult(result: unknown): string {
   };
 
   const parts = [
-    "[TOOL] JUSTBASH // WORKSPACE MIRROR",
+    "[TOOL] JUSTBASH // EPHEMERAL MIRROR (writes do not persist — use localfs or workspace_exec)",
     payload.command ? `COMMAND // ${payload.command}` : null,
     payload.cwd ? `CWD // ${payload.cwd}` : null,
     typeof payload.exitCode === "number" ? `EXIT // ${payload.exitCode}` : null,

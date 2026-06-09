@@ -1,3 +1,10 @@
+/**
+ * loop.ts — MUTHUR intent router (not the LLM tool loop).
+ *
+ * Maps slash-style / natural-language operator intents to a single structured
+ * tool step (localfs, justbash, document conversion, clock, etc.).
+ * Live agent tool rounds use muthur-provider-chat.ts instead.
+ */
 import type { MuthurLoopState, ToolLoopStep, ToolRegistry } from "./types";
 import { parseExportMarkdownToDocxIntent, parseExportMarkdownToPdfIntent } from "@/lib/markdown-to-docx-intent";
 

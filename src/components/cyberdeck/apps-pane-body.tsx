@@ -63,6 +63,14 @@ export function CyberdeckAppsPaneBody({
         Pick an app profile for the operator pane.{" "}
         <span className="text-[#9a9a9a]">{active.name}</span> is live — the{" "}
         <span className="text-[#9a9a9a]">OPERATOR</span> rail tab renders that workspace.
+        {deckApp === "property-management" ? (
+          <>
+            {" "}
+            Property Management tabs on the rail are limited to{" "}
+            <span className="text-[#9a9a9a]">APPS</span> and{" "}
+            <span className="text-[#9a9a9a]">CALL CENTER</span>.
+          </>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">

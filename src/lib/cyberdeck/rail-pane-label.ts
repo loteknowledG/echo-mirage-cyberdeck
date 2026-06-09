@@ -19,6 +19,7 @@ const RAIL_KIND_DISPLAY: Partial<Record<CyberdeckPaneKind, string>> = {
   "rola-dex": "POWERFIST",
   "test-pane": "TEST",
   apps: "APPS",
+  db8: "DB8",
 };
 
 /** Human pane name for a fixed server-rail tab (m / s / ct / b). */

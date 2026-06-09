@@ -16,10 +16,30 @@ export function openAiToolCallToAction(
     };
   }
 
-  if (functionName === "justbash") {
+  if (functionName === "justbash" || functionName === "workspace_exec") {
     const command = typeof args.command === "string" ? args.command.trim() : "";
     if (!command) return null;
     return { type: "shell_command", source: "muthur", payload: { command, tool: functionName } };
+  }
+
+  if (functionName === "git_status") {
+    return {
+      type: "shell_command",
+      source: "muthur",
+      payload: { command: "git status --short", tool: functionName },
+    };
+  }
+
+  if (functionName === "git_diff") {
+    const segments = ["git", "diff"];
+    if (args.stat === true) segments.push("--stat");
+    const filePath = typeof args.path === "string" ? args.path.trim() : "";
+    if (filePath) segments.push("--", filePath);
+    return {
+      type: "shell_command",
+      source: "muthur",
+      payload: { command: segments.join(" "), tool: functionName },
+    };
   }
 
   if (functionName === "localfs") {

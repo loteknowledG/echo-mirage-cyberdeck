@@ -10,6 +10,9 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { isPropertyManagementTabKind } from "@/lib/cyberdeck/deck-app-registry";
+import type { CyberdeckVoiceTuning } from "@/lib/cyberdeck-voice-tuning";
+import type { Db8DeckSpeakLine } from "@/lib/db8-voice";
 import { MUTHUR_PRESET } from "@/voice/muthurPreset";
 import {
   buildMuthurVoiceMasterCopy,
@@ -206,6 +209,14 @@ import {
   MuthurCommandInput,
   type MuthurCommandInputHandle,
 } from "@/components/cyberdeck/muthur-command-input";
+import { ChatUserRoleLabel } from "@/components/cyberdeck/chat-user-role-label";
+import {
+  DEFAULT_CHAT_USER_DISPLAY_NAME,
+  readChatUserDisplayName,
+  writeChatUserDisplayName,
+} from "@/lib/chat-user-display-name";
+import { setMuthurScreenSnapshot } from "@/lib/muthur-screen-context";
+import { formatPiScreenContextForMuthur, readPiScreenSnapshot } from "@/lib/pi-screen-context";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 import {
@@ -370,6 +381,8 @@ const CUSTOM_TAB_KINDS = [
   "test-pane",
   "realmorphism-kit",
   "apps",
+  "call-center",
+  "db8",
   "catelog",
 ] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -473,10 +486,17 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Test", kind: "test-pane", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
   { label: "Pi", kind: "pi", action: "convert" },
+  { label: "DB8", kind: "db8", action: "convert" },
   { label: "Settings", action: "settings-pane" },
 ] as CustomTabContextMenuAction[]).sort((a, b) =>
   a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
 );
+
+/** Rail tab types available while Property Management is the active deck app. */
+const PROPERTY_MANAGEMENT_TAB_MENU_ACTIONS: CustomTabContextMenuAction[] = [
+  { label: "Apps", kind: "apps", action: "convert" },
+  { label: "Call Center", kind: "call-center", action: "convert" },
+];
 
 type CyberdeckChatHistoryMessage = {
   role: "user" | "assistant";
@@ -760,8 +780,8 @@ function textForSpeech(value: string) {
   const raw = typeof value === "string" ? value : "";
   if (!raw.trim()) return "";
   return raw
-    .replace(/#/g, "")
-    .replace(/[*\/\\]+/g, " ")
+    .replace(/[#*\/\\]+/g, " ")
+    .replace(/[\u2500-\u257F\u2590-\u259F\u25A0-\u25FF\u2600-\u26FF\u2700-\u27BF\u2B50\u25C6\u25C7\u25B2\u25B3\u2B1A-\u2B1C]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -830,6 +850,16 @@ function normalizeCustomTabKind(kind: string) {
   if (nextKind === "test-pane" || nextKind === "test_pane" || nextKind === "test") {
     return "test-pane" as CustomTabKind;
   }
+  if (nextKind === "debate" || nextKind === "debate-forum" || nextKind === "debate_forum") {
+    return "db8" as CustomTabKind;
+  }
+  if (
+    nextKind === "call-center" ||
+    nextKind === "call_center" ||
+    nextKind === "callcenter"
+  ) {
+    return "call-center" as CustomTabKind;
+  }
   if (CUSTOM_TAB_KINDS.includes(nextKind as CustomTabKind)) {
     return nextKind as CustomTabKind;
   }
@@ -863,6 +893,8 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "sound-profile") return "♪";
   if (kind === "test-pane") return "T";
   if (kind === "apps") return "A";
+  if (kind === "call-center") return "CC";
+  if (kind === "db8") return "8";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
@@ -877,6 +909,8 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "sound-profile") return "Sound Profile";
   if (kind === "test-pane") return "Test";
   if (kind === "apps") return "APPS";
+  if (kind === "call-center") return "CALL CENTER";
+  if (kind === "db8") return "DB8";
   return kind.toUpperCase();
 }
 
@@ -919,7 +953,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|diagnostics|diagnostic|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test|apps)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test|apps|call-center|callcenter|call_center)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -949,6 +983,7 @@ export default function CyberdeckApp() {
   const [inputHistory, setInputHistory] = useState<string[]>([]);
   const [canSendInput, setCanSendInput] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatUserDisplayName, setChatUserDisplayName] = useState(DEFAULT_CHAT_USER_DISPLAY_NAME);
   const [chatHydrated, setChatHydrated] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
@@ -1031,6 +1066,13 @@ export default function CyberdeckApp() {
   const [heapHydrated, setHeapHydrated] = useState(false);
   const [deckMode, setDeckMode] = useState<DeckMode>(() => loadDeckMode());
   const [deckApp, setDeckApp] = useState<DeckAppId>(() => loadDeckApp());
+  const customTabContextMenuActions = useMemo(
+    () =>
+      deckApp === "property-management"
+        ? PROPERTY_MANAGEMENT_TAB_MENU_ACTIONS
+        : CUSTOM_TAB_CONTEXT_MENU_ACTIONS,
+    [deckApp],
+  );
   const [audioMuted, setAudioMutedState] = useState<boolean>(() => isMuted());
   const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -1628,13 +1670,19 @@ export default function CyberdeckApp() {
     [motherTone],
   );
 
-  const synthesizeMirageChunk = useCallback(async (text: string, voiceTuning: MuthurVoiceDialState) => {
+  const synthesizeMirageChunk = useCallback(async (text: string, voiceTuning: CyberdeckVoiceTuning) => {
     const res = await fetch("/api/cyberdeck-voice", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text,
-        voiceTuning,
+        voiceTuning: {
+          ratePercent: voiceTuning.ratePercent,
+          pitchHz: voiceTuning.pitchHz,
+          volume: voiceTuning.volume,
+          voiceType: voiceTuning.voiceType,
+          gender: voiceTuning.gender,
+        },
         apiKey: providerKeys.openai || "",
       }),
     });
@@ -1795,6 +1843,46 @@ export default function CyberdeckApp() {
     }
     return false;
   }, [playMirageBuffer, stopMirageAudio, synthesizeMirageChunk]);
+
+  const speakDeckVoiceLine = useCallback<Db8DeckSpeakLine>(
+    async (text, profile) => {
+      await unlockMotherAudio();
+      stopMirageAudio();
+      try {
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
+      } catch {
+        /* ignore */
+      }
+
+      const tuning: CyberdeckVoiceTuning = {
+        ratePercent: profile.ratePercent,
+        pitchHz: profile.pitchHz,
+        volume: profile.volume,
+        voiceType: profile.voiceType,
+        gender: profile.gender,
+      };
+
+      try {
+        const result = await synthesizeMirageChunk(text, tuning);
+        if (result.kind === "audio") {
+          await playMirageBuffer(result.audio);
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+
+      const deckAudio = await loadDeckAudio();
+      await deckAudio.speakDryFallback(text, {
+        rate: profile.browserRate,
+        pitch: profile.browserPitch,
+        volume: profile.volume,
+      });
+    },
+    [playMirageBuffer, stopMirageAudio, synthesizeMirageChunk, unlockMotherAudio],
+  );
 
   const abortMotherSpeech = useCallback(() => {
     speakSequenceRef.current += 1;
@@ -2018,12 +2106,18 @@ export default function CyberdeckApp() {
           }
         } catch { /* ignore */ }
       }
+      setChatUserDisplayName(readChatUserDisplayName());
     } catch {
       /* ignore chat restore errors */
     } finally {
       setChatHydrated(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!chatHydrated) return;
+    writeChatUserDisplayName(chatUserDisplayName);
+  }, [chatHydrated, chatUserDisplayName]);
 
   useEffect(() => {
     if (!chatHydrated) return;
@@ -2235,6 +2329,73 @@ export default function CyberdeckApp() {
       flushMuthurObservation();
     };
   }, [publishOperatorObservation]);
+
+  useEffect(() => {
+    if (!deckUiHydrated) return;
+
+    const syncMuthurScreenSnapshot = () => {
+      const { server, customTabs, activeCustomTabId } = useCyberdeckTabStore.getState();
+      const activeCustomTab = customTabs.find((tab) => tab.id === activeCustomTabId) ?? null;
+      const operatorSurface = operatorDroppedAsset
+        ? resolveOperatorAssetSurface(operatorDroppedAsset)
+        : null;
+      const operatorText =
+        operatorSurfaceIsDocument && operatorDroppedAsset
+          ? readOperatorPaneSaveText(operatorDroppedAsset.text || "")
+          : null;
+
+      setMuthurScreenSnapshot({
+        capturedAt: new Date().toISOString(),
+        activeServer: server,
+        activeCustomTab: activeCustomTab?.label ?? null,
+        chat: messages.map((message) => ({
+          role:
+            message.role === "user" || message.role === "assistant" || message.role === "system"
+              ? message.role
+              : "error",
+          label:
+            message.role === "user"
+              ? chatUserDisplayName
+              : message.role === "assistant"
+                ? "MUTHUR"
+                : message.role === "system"
+                  ? "SYS"
+                  : "ERR",
+          text: message.text,
+        })),
+        streamingMuthur: streamText || null,
+        operator: operatorDroppedAsset
+          ? {
+              surfaceMode: operatorSurfaceMode,
+              fileName: operatorDroppedAsset.name ?? null,
+              filePath:
+                operatorActiveFilePath?.trim() ||
+                operatorDroppedAsset.localFilePath?.trim() ||
+                null,
+              previewSurface: operatorSurface,
+              docMode: operatorDocMode,
+              documentText: operatorText,
+            }
+          : null,
+        browserUrl: operatorSurfaceMode === "browser" ? operatorBrowserUrl : null,
+      });
+    };
+
+    syncMuthurScreenSnapshot();
+    const unsubscribe = useCyberdeckTabStore.subscribe(syncMuthurScreenSnapshot);
+    return unsubscribe;
+  }, [
+    chatUserDisplayName,
+    deckUiHydrated,
+    messages,
+    operatorActiveFilePath,
+    operatorDocMode,
+    operatorDroppedAsset,
+    operatorBrowserUrl,
+    operatorSurfaceIsDocument,
+    operatorSurfaceMode,
+    streamText,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -4122,10 +4283,10 @@ export default function CyberdeckApp() {
             setProviderKeyboardHighlightId(pid);
             return;
           }
-        } else if (navKey) {
+        } else if (navKey && !isEditableTarget) {
           e.preventDefault();
         }
-        return;
+        if (!isEditableTarget) return;
       }
 
       if (inChatCol && !inChatInput) {
@@ -4169,6 +4330,9 @@ export default function CyberdeckApp() {
         navRailContext === "gateway" && (inGateway || (!inChatCol && !inRail));
 
       if (!allowGatewayKeys) return;
+
+      // Pi composer and gateway key fields handle Enter/arrows locally.
+      if (isEditableTarget) return;
 
       const ids = [...PROVIDER_IDS];
       const pivot =
@@ -4573,6 +4737,21 @@ export default function CyberdeckApp() {
         setMessages((prev) => [
           ...prev,
           { role: "system", text: "TAB_CONVERT_SKIPPED // SELECT_A_CUSTOM_TAB_FIRST" },
+        ]);
+        setIsStreaming(false);
+        return;
+      }
+
+      if (
+        deckApp === "property-management" &&
+        !isPropertyManagementTabKind(tabCommand.surfaceKind)
+      ) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: "TAB_CONVERT_SKIPPED // PROPERTY_MANAGEMENT_ALLOWS_APPS_AND_CALL_CENTER_ONLY",
+          },
         ]);
         setIsStreaming(false);
         return;
@@ -5281,6 +5460,7 @@ const resolved = resolveUiTarget(userMessage);
       const latestAssistantMessage =
         [...messages].reverse().find((message) => message.role === "assistant")?.text || "";
       const glyphContext = await buildGlyphContextSnapshot();
+      const piScreenContext = formatPiScreenContextForMuthur(readPiScreenSnapshot());
       let res: Response;
       try {
         res = await fetch("/api/cyberdeck-chat", {
@@ -5295,6 +5475,7 @@ const resolved = resolveUiTarget(userMessage);
             memoryContext,
             browserContext: browserContextForRequest,
             glyphContext,
+            piScreenContext,
             history,
             operatorContext,
           }),
@@ -6482,6 +6663,23 @@ const resolved = resolveUiTarget(userMessage);
         return shell(<ActivatedCyberdeckPane kind="pi" server={server} />);
       }
 
+      if (tab.kind === "db8") {
+        return (
+          <div
+            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
+            data-pointer-target="db8"
+          >
+            <ActivatedCyberdeckPane
+              kind="db8"
+              activeProvider={activeProvider}
+              modelId={modelID}
+              apiKey={providerKeys[activeProvider] || ""}
+              onSpeakLine={speakDeckVoiceLine}
+            />
+          </div>
+        );
+      }
+
       if (tab.kind === "catelog" || tab.kind === "catalog") {
         return shell(<ActivatedCyberdeckPane kind="catalog" />);
       }
@@ -6566,6 +6764,22 @@ const resolved = resolveUiTarget(userMessage);
         );
       }
 
+      if (tab.kind === "call-center") {
+        return (
+          <div
+            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
+            data-pointer-target="call-center"
+          >
+            <ActivatedCyberdeckPane
+              kind="call-center"
+              activeProvider={activeProvider}
+              modelId={modelID}
+              apiKey={providerKeys[activeProvider] || ""}
+            />
+          </div>
+        );
+      }
+
       return shell(
         <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
           BLANK TAB // RIGHT-CLICK TAB RAIL TO PICK A TYPE, OR USE CHAT /tab COMMANDS.
@@ -6575,6 +6789,7 @@ const resolved = resolveUiTarget(userMessage);
     [
       activeProvider,
       connectionState,
+      activeProvider,
       customTabBrowserNavigate,
       deckApp,
       deckMode,
@@ -6583,6 +6798,7 @@ const resolved = resolveUiTarget(userMessage);
       messages,
       messages.length,
       modelID,
+      providerKeys,
       muthurMemory,
       muthurMemoryHydrated,
       muthurMemoryLoadError,
@@ -6590,6 +6806,7 @@ const resolved = resolveUiTarget(userMessage);
       providerModelFetchStatus,
       streamText,
       toggleDeckMode,
+      speakDeckVoiceLine,
       toggleVoiceEnabled,
       updateCustomTab,
       voiceEnabled,
@@ -6702,7 +6919,7 @@ const resolved = resolveUiTarget(userMessage);
               </>
             ) : railTabContextMenu.variant === "new" ? (
               <>
-                {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
+                {customTabContextMenuActions.map((action) => (
                   <CyberdeckMenuButton
                     key={action.label}
                     type="button"
@@ -6715,7 +6932,7 @@ const resolved = resolveUiTarget(userMessage);
               </>
             ) : (
               <>
-                {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
+                {customTabContextMenuActions.map((action) => (
                   <CyberdeckMenuButton
                     key={`convert-${action.label}`}
                     type="button"
@@ -6933,11 +7150,15 @@ const resolved = resolveUiTarget(userMessage);
                         chatKeyboardHighlightIndex === i ? "nav-row-kb-hover" : ""
                       }`}
                     >
-                    <span
-                      className={
-                        m.role === "user"
-                          ? "text-gray-600"
-                          : m.role === "assistant"
+                    {m.role === "user" ? (
+                      <ChatUserRoleLabel
+                        displayName={chatUserDisplayName}
+                        onDisplayNameChange={setChatUserDisplayName}
+                      />
+                    ) : (
+                      <span
+                        className={
+                          m.role === "assistant"
                             ? "text-green-400"
                             : m.role === "system"
                               ? isModelConnectedLine
@@ -6946,18 +7167,17 @@ const resolved = resolveUiTarget(userMessage);
                                   ? "text-red-400"
                                   : "text-amber-400/90"
                               : "text-red-400"
-                      }
-                    >
-                      [
-                      {m.role === "user"
-                        ? "USR"
-                        : m.role === "assistant"
+                        }
+                      >
+                        [
+                        {m.role === "assistant"
                           ? "MUTHUR"
                           : m.role === "system"
                             ? "SYS"
                             : "ERR"}
-                      ]{" "}
-                    </span>
+                        ]{" "}
+                      </span>
+                    )}
                     <span
                       className={
                         isModelConnectedLine

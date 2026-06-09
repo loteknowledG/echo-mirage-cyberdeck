@@ -552,7 +552,10 @@ def main() -> int:
     _write_tts_pid_lock(proc.pid)
     _log(f"spawned child pid={proc.pid} voice_timeout={env.get('VOICE_PROFILE_TIMEOUT_SEC')} play_timeout={env.get('BOOTUP_PLAYBACK_TIMEOUT_SEC')}")
 
-    wait_for_child = os.environ.get("CURSOR_HOOK_MECHANICUS_WAIT", "").strip().lower() in (
+    # On Windows, fire-and-forget TTS children often route to the wrong audio session
+    # (silent playback). Default to waiting so pygame/WASAPI uses the hook process tree.
+    wait_default = "1" if sys.platform == "win32" else ""
+    wait_for_child = os.environ.get("CURSOR_HOOK_MECHANICUS_WAIT", wait_default).strip().lower() in (
         "1",
         "true",
         "yes",

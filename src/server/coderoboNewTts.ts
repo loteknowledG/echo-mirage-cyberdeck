@@ -67,8 +67,13 @@ function makeHeaders(token: string): HeadersInit {
   };
 }
 
+const CODEROBO_MIN_TEXT_LENGTH = 10;
+
 function normalizeText(value: string) {
-  return (value || "").trim();
+  const trimmed = (value || "").trim();
+  if (trimmed.length >= CODEROBO_MIN_TEXT_LENGTH) return trimmed;
+  if (!trimmed) return trimmed;
+  return trimmed.padEnd(CODEROBO_MIN_TEXT_LENGTH, ".");
 }
 
 function toIntegerString(value: number | undefined, fallback: number) {

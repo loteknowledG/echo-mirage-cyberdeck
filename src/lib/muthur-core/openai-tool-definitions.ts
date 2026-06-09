@@ -72,9 +72,59 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   {
     type: "function",
     function: {
+      name: "workspace_exec",
+      description:
+        "Run an allowlisted shell command on the REAL Echo Mirage workspace disk (changes persist). Allowed: pnpm exec tsc --noEmit, pnpm lint, pnpm build, pnpm e2e, git diff, git diff --stat, git status --short, git log --oneline -10. Use after code edits to verify. Prefer git_status/git_diff for git; use localfs write for file edits.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "Exact allowlisted command string (no shell chaining).",
+          },
+        },
+        required: ["command"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "git_status",
+      description: "Short git status for the Echo Mirage repo (real disk). Use after edits.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "git_diff",
+      description:
+        "Git diff for the Echo Mirage repo (real disk). Optional path limits to one file; stat=true for summary only.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Optional file path inside the workspace.",
+          },
+          stat: {
+            type: "boolean",
+            description: "If true, use git diff --stat (summary).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "justbash",
       description:
-        "Runs a shell command in a copy-on-write workspace mirror of the Echo Mirage project (reads real files; writes are ephemeral). Use for rg/git/ls/cat inside the repo, quick inspection.",
+        "READ-ONLY sandbox: runs shell in a copy-on-write mirror (writes DO NOT persist). Use only for rg/ls/cat quick search. Never use for pnpm, git, or anything that must change or verify real files — use workspace_exec, git_status, git_diff, or localfs instead.",
       parameters: {
         type: "object",
         properties: {
@@ -92,7 +142,7 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
     function: {
       name: "localfs",
       description:
-        "Filesystem on the machine running the Next dev server. ls, cat, stat on any readable path. mkdir and write only inside the Echo Mirage workspace project root (not outside the repo). write creates parent directories by default.",
+        "Filesystem on the machine running the Next dev server. ls, cat, stat on any readable path. mkdir and write persist on REAL disk — only inside the Echo Mirage workspace project root. Prefer localfs write for creating/updating source files.",
       parameters: {
         type: "object",
         properties: {

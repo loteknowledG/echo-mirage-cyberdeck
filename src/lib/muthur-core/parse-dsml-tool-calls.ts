@@ -6,21 +6,37 @@ export type ParsedDsmlToolCall = {
 };
 
 const INVOKE_RE = /invoke\s+name="([^"]+)"/gi;
-const PARAM_RE =
-  /parameter\s+name="([^"]+)"(?:\s+string="[^"]*")?\s*>([\s\S]*?)(?:<\|?\|?DSML\|?\|?\/parameter>|<\uFF5C\uFF5CDSML\uFF5C\uFF5C\/parameter>)/gi;
+
+/** `</|DSML|parameter>` or `</｜｜DSML｜｜parameter>` — slash immediately after `<`. */
+const DSML_TAG =
+  "(?:\\|+\\|*DSML\\|+\\|*|\\uFF5C\\uFF5CDSML\\uFF5C\\uFF5C)";
+
+const PARAM_RE = new RegExp(
+  `parameter\\s+name="([^"]+)"(?:\\s+string="[^"]*")?\\s*>([\\s\\S]*?)</${DSML_TAG}parameter>`,
+  "gi",
+);
+
+const INVOKE_CLOSE = new RegExp(`</${DSML_TAG}invoke>`, "i");
+
+const INVOKE_BLOCK_RE = new RegExp(
+  `<${DSML_TAG}invoke[^>]*>[\\s\\S]*?</${DSML_TAG}invoke>\\s*`,
+  "gi",
+);
+
+function normalizeDsmlInput(text: string): string {
+  return text.replace(/^\[MUTHUR\]\s*/i, "").trim();
+}
 
 /** Remove DSML tool blocks from assistant-visible text. */
 export function stripDsmlToolMarkup(text: string): string {
-  if (!text.includes("DSML") && !/invoke\s+name="/i.test(text)) {
+  const body = normalizeDsmlInput(text);
+  if (!body.includes("DSML") && !/invoke\s+name="/i.test(body)) {
     return text;
   }
-  return text
-    .replace(/<\|?\|?DSML\|?\|?tool_calls>\s*/gi, "")
-    .replace(/<\|?\|?DSML\|?\|?\/tool_calls>\s*/gi, "")
-    .replace(/<\|?\|?DSML\|?\|?invoke[^>]*>[\s\S]*?<\|?\|?DSML\|?\|?\/invoke>\s*/gi, "")
-    .replace(/<\uFF5C\uFF5CDSML\uFF5C\uFF5Ctool_calls>\s*/g, "")
-    .replace(/<\uFF5C\uFF5CDSML\uFF5C\uFF5C\/tool_calls>\s*/g, "")
-    .replace(/<\uFF5C\uFF5CDSML\uFF5C\uFF5Cinvoke[^>]*>[\s\S]*?<\uFF5C\uFF5CDSML\uFF5C\uFF5C\/invoke>\s*/g, "")
+  return body
+    .replace(new RegExp(`</?${DSML_TAG}\\/?tool_calls>?\\s*`, "gi"), "")
+    .replace(new RegExp(`^${DSML_TAG}tool_calls\\s*$`, "gim"), "")
+    .replace(INVOKE_BLOCK_RE, "")
     .trim();
 }
 
@@ -36,7 +52,8 @@ function parseInvokeBlock(block: string): Record<string, unknown> {
 
 /** Parse DSML invoke blocks from model content into executable tool calls. */
 export function parseDsmlToolCalls(text: string): ParsedDsmlToolCall[] {
-  if (!text.includes("DSML") && !/invoke\s+name="/i.test(text)) {
+  const body = normalizeDsmlInput(text);
+  if (!body.includes("DSML") && !/invoke\s+name="/i.test(body)) {
     return [];
   }
 
@@ -44,13 +61,13 @@ export function parseDsmlToolCalls(text: string): ParsedDsmlToolCall[] {
   let invokeMatch: RegExpExecArray | null;
   INVOKE_RE.lastIndex = 0;
 
-  while ((invokeMatch = INVOKE_RE.exec(text)) !== null) {
+  while ((invokeMatch = INVOKE_RE.exec(body)) !== null) {
     const name = invokeMatch[1]?.trim();
     if (!name) continue;
 
     const blockStart = invokeMatch.index + invokeMatch[0].length;
-    const rest = text.slice(blockStart);
-    const endMatch = rest.match(/<\|?\|?DSML\|?\|?\/invoke>|<\uFF5C\uFF5CDSML\uFF5C\uFF5C\/invoke>/i);
+    const rest = body.slice(blockStart);
+    const endMatch = rest.match(INVOKE_CLOSE);
     const block = endMatch?.index != null ? rest.slice(0, endMatch.index) : rest;
 
     calls.push({

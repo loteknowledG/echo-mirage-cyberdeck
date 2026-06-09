@@ -5,6 +5,15 @@ import {
   normalizePiComposerHeight,
   schedulePiComposerHeightSync,
 } from "@/lib/pi-composer-layout";
+import {
+  formatMuthurScreenContextForPi,
+  readMuthurScreenSnapshot,
+} from "@/lib/muthur-screen-context";
+import {
+  clearPiScreenSnapshot,
+  flattenPiAgentMessage,
+  setPiScreenSnapshot,
+} from "@/lib/pi-screen-context";
 
 type PiChatPaneBodyProps = {
   server: string;
@@ -73,6 +82,40 @@ async function promptForProviderKey(
 
   await ui.getAppStorage().providerKeys.set(provider, trimmedKey);
   return true;
+}
+
+function syncPiScreenFromAgent(agent: {
+  state: {
+    messages: unknown[];
+    model?: { provider?: string; id?: string } | null;
+    thinkingLevel?: string;
+    isStreaming?: boolean;
+    streamingMessage?: unknown;
+  };
+}): void {
+  const state = agent.state;
+  const chat = state.messages
+    .map((message) => flattenPiAgentMessage(message))
+    .filter((line): line is NonNullable<typeof line> => Boolean(line));
+
+  let streamingPi: string | null = null;
+  if (state.isStreaming && state.streamingMessage) {
+    streamingPi = flattenPiAgentMessage(state.streamingMessage)?.text ?? null;
+  }
+
+  const model = state.model?.id
+    ? `${state.model.provider ?? "unknown"}/${state.model.id}`
+    : null;
+
+  setPiScreenSnapshot({
+    capturedAt: new Date().toISOString(),
+    mounted: true,
+    model,
+    thinkingLevel: state.thinkingLevel ?? null,
+    isStreaming: Boolean(state.isStreaming),
+    chat,
+    streamingPi,
+  });
 }
 
 function createEmptyAssistantMessage(model: { api: string; provider: string; id: string }) {
@@ -159,6 +202,7 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
                 apiKey = (await ui.getAppStorage().providerKeys.get(String(model.provider))) || "";
               }
 
+              const muthurScreenContext = formatMuthurScreenContextForPi(readMuthurScreenSnapshot());
               const response = await fetch("/api/pi-chat", {
                 method: "POST",
                 headers: {
@@ -169,6 +213,7 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
                   apiKey,
                   model: model.id,
                   systemPrompt: context.systemPrompt,
+                  muthurScreenContext,
                   messages: context.messages,
                 }),
                 signal: options?.signal,
@@ -178,7 +223,14 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
 
               if (!response.ok || !response.body) {
                 const errorText = await response.text().catch(() => "");
-                throw new Error(errorText || `Pi proxy error ${response.status}`);
+                let message = errorText || `Pi proxy error ${response.status}`;
+                try {
+                  const parsed = JSON.parse(errorText) as { error?: string };
+                  if (parsed.error?.trim()) message = parsed.error.trim();
+                } catch {
+                  /* keep raw body */
+                }
+                throw new Error(message);
               }
 
               partial.timestamp = Date.now();
@@ -190,7 +242,20 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
               let text = "";
 
               while (true) {
-                const { value, done } = await reader.read();
+                let value: Uint8Array | undefined;
+                let done = false;
+                try {
+                  ({ value, done } = await reader.read());
+                } catch (readError) {
+                  if (options?.signal?.aborted) throw readError;
+                  const detail =
+                    readError instanceof Error ? readError.message : "connection lost";
+                  throw new Error(
+                    detail === "network error" || detail === "Failed to fetch"
+                      ? "Pi uplink lost connection — check API key and dev server, then retry."
+                      : `Pi stream interrupted: ${detail}`,
+                  );
+                }
                 if (done) break;
 
                 const delta = decoder.decode(value, { stream: true });
@@ -215,8 +280,12 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
               queueMicrotask(forceReady);
               console.debug("[pi-tab] stream done", { length: text.length });
             } catch (error) {
-              const message =
+              let message =
                 error instanceof Error ? error.message : "Pi proxy request failed";
+              if (message === "network error" || message === "Failed to fetch") {
+                message =
+                  "Pi uplink failed — could not reach /api/pi-chat. Check dev server and network, then retry.";
+              }
               const failed = {
                 ...partial,
                 stopReason: options?.signal?.aborted ? ("aborted" as const) : ("error" as const),
@@ -239,7 +308,7 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
         agent = new Agent({
           initialState: {
             systemPrompt:
-              "You are Pi running inside the Echo Mirage Cyberdeck. Be technical, direct, and helpful.",
+              "You are Pi running inside the Echo Mirage Cyberdeck. Be technical, direct, and helpful. Each request includes a read-only MUTHUR screen snapshot (ECHO chat, operator pane, active tab) — use it to answer questions about what the operator and MUTHUR are looking at.",
             model: getModel("opencode", "big-pickle"),
             thinkingLevel: "off",
             messages: [],
@@ -259,7 +328,9 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
               messages: agent.state.messages.length,
             });
           }
+          syncPiScreenFromAgent(agent);
         });
+        syncPiScreenFromAgent(agent);
 
         const chatPanel = new ui.ChatPanel();
         chatPanel.style.display = "block";
@@ -307,6 +378,7 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
 
     return () => {
       disposed = true;
+      clearPiScreenSnapshot();
       const cleanup = (panel as (HTMLElement & { __echoMirageCleanup?: () => void }) | null)
         ?.__echoMirageCleanup;
       cleanup?.();

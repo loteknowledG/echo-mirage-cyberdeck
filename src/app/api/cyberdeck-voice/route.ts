@@ -21,12 +21,22 @@ export async function POST(request: Request) {
       typeof voiceTuning.pitchHz === "number"
         ? voiceTuning.pitchHz
         : MUTHUR_PRESET.backend.pitchHz;
+    const voiceType =
+      typeof voiceTuning.voiceType === "string" && voiceTuning.voiceType.trim()
+        ? voiceTuning.voiceType.trim()
+        : MUTHUR_PRESET.backend.voiceType;
+    const gender =
+      voiceTuning.gender === "Male" || voiceTuning.gender === "Female"
+        ? voiceTuning.gender
+        : MUTHUR_PRESET.backend.gender;
 
     console.info("[muthur] request", {
       requestId,
       textLength: text.length,
       text,
       voiceTuning: {
+        voiceType,
+        gender,
         ratePercent,
         pitchHz,
         volume: typeof voiceTuning.volume === "number" ? voiceTuning.volume : null,
@@ -35,7 +45,9 @@ export async function POST(request: Request) {
 
     const result = await renderCoderoboNewTts({
       text,
-      ...MUTHUR_PRESET.backend,
+      language: MUTHUR_PRESET.backend.language,
+      voiceType,
+      gender,
       ratePercent,
       pitchHz,
     });

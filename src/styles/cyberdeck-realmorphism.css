@@ -186,6 +186,43 @@
   .observe-presence-glyph {
     transition: none;
   }
+
+  .observe-presence-glyph--thinking,
+  .observe-presence-glyph--speaking,
+  .observe-presence-glyph--critical {
+    animation: none;
+  }
+}
+
+@keyframes muthur-thinking {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes muthur-speaking {
+  0%, 100% { text-shadow: 0 0 8px rgba(103, 232, 249, 0.45); }
+  50% { text-shadow: 0 0 16px rgba(103, 232, 249, 0.9), 0 0 22px rgba(103, 232, 249, 0.4); }
+}
+
+@keyframes muthur-critical {
+  0%, 100% { color: #fca5a5; text-shadow: 0 0 6px rgba(252, 165, 165, 0.35); }
+  50% { color: #fecaca; text-shadow: 0 0 12px rgba(255, 255, 255, 0.75), 0 0 18px rgba(252, 165, 165, 0.5); }
+}
+
+.observe-presence-glyph--thinking {
+  animation: muthur-thinking 1.6s ease-in-out infinite;
+  color: #a5f3fc;
+}
+
+.observe-presence-glyph--speaking {
+  animation: muthur-speaking 1.1s ease-in-out infinite;
+  color: #cffafe;
+}
+
+.observe-presence-glyph--critical {
+  animation: muthur-critical 0.9s ease-in-out infinite;
+  border-color: #7a2a2a;
+  color: #fecaca;
 }
 
 /* ── Host bench (pane footers, recessed areas) ─────────────────────────── */

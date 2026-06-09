@@ -30,9 +30,15 @@ const MUTHUR_AVAILABLE_TOOLS_PROMPT =
   "\n\nAVAILABLE TOOLS:" +
   "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane (file name, language, cursor, dirty, content excerpt)." +
   "\n- suggest_operator_edit: Propose typed edits to markdown/code/text open in the operator Monaco editor. Edits auto-apply in the operator pane (Ctrl+Z to undo). Not for DOCX/PDF previews." +
-  "\n- justbash: Run shell commands in the workspace (rg, git, ls, cat)." +
-  "\n- localfs: Read files, mkdir, write (workspace only)." +
+  "\n- localfs: REAL disk — read anywhere; mkdir/write only inside the Echo Mirage repo. Use write to create or update source files." +
+  "\n- workspace_exec: REAL disk — allowlisted commands only (pnpm exec tsc --noEmit, pnpm lint, pnpm build, git diff, git log, etc.). Run after edits to verify." +
+  "\n- git_status / git_diff: REAL disk — inspect repo changes after coding." +
+  "\n- justbash: EPHEMERAL mirror only — rg/ls/cat search; writes do NOT persist. Never use for pnpm, git, or file changes." +
   "\n- clock: Server date/time." +
+  "\n\nCODING ECHO MIRAGE (Phase A):" +
+  "\n1. localfs write (or suggest_operator_edit for open operator files) to change code." +
+  "\n2. git_status or git_diff to review changes." +
+  "\n3. workspace_exec with `pnpm exec tsc --noEmit` to typecheck; report exit code." +
   "\n\nIMPORTANT: When the user asks what is in the operator pane, call observe_operator_pane." +
   "\nWhen they ask to edit/fix/rewrite/remove text from the open markdown or code file, call observe_operator_pane then suggest_operator_edit (prefer replace_line_range for targeted edits). Edits apply immediately — confirm what changed; mention Ctrl+Z if they want to undo." +
   "\nNever use justbash/find to locate the user's open document — use observe_operator_pane for the file already open in the operator pane.";

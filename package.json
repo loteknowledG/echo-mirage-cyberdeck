@@ -33,6 +33,8 @@
     "oneline-art:sync-all": "node scripts/sync-oneline-art-gist.mjs && node scripts/sync-asky-oneline-art.mjs && node scripts/sync-kulaone-oneline-art.mjs",
     "probe:memory-cards": "tsx scripts/probe-memory-card-registry.ts && tsx scripts/probe-memory-card-parser-regression.ts",
     "probe:muthur-observation": "tsx scripts/probe-muthur-observation.ts",
+    "probe:muthur-phase-a": "tsx scripts/probe-muthur-phase-a-coder.ts",
+    "probe:muthur-dsml": "tsx scripts/probe-dsml-parse.ts",
     "probe:operator-file-surface": "tsx scripts/probe-operator-file-surface.ts",
     "probe:resolve-convert-document-path": "tsx scripts/probe-resolve-convert-document-path.ts",
     "puppeteer:install": "node scripts/install-puppeteer-chrome.mjs",

@@ -17,6 +17,8 @@ export const CYBERDECK_PANE_KINDS = [
   "sound-profile",
   "test-pane",
   "apps",
+  "call-center",
+  "db8",
 ] as const;
 
 export type CyberdeckPaneKind = (typeof CYBERDECK_PANE_KINDS)[number];
@@ -56,6 +58,8 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   "sound-profile": { label: "SOUND PROFILE", fetchHints: ["PROFILE", "SFX"] },
   "test-pane": { label: "TEST", fetchHints: ["EMBLA", "4-WAY"] },
   apps: { label: "APPS", fetchHints: ["REGISTRY", "APP PROFILE", "OPERATOR TARGET"] },
+  "call-center": { label: "CALL CENTER", fetchHints: ["QUEUE", "INBOUND", "RESIDENT COMMS"] },
+  db8: { label: "DB8", fetchHints: ["CHAMBER", "DEBATE ROUND", "CONSENSUS"] },
 };
 
 const TAB_KIND_ALIASES: Record<string, CyberdeckPaneKind> = {

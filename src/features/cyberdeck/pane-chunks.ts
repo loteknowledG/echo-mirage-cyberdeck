@@ -23,6 +23,8 @@ const PANE_IMPORTS: Record<CyberdeckPaneKind, () => Promise<CyberdeckPaneModule>
   "sound-profile": () => import("@/features/cyberdeck/pane-loaders/sound-profile"),
   "test-pane": () => import("@/features/cyberdeck/pane-loaders/test-pane"),
   apps: () => import("@/features/cyberdeck/pane-loaders/apps"),
+  "call-center": () => import("@/features/cyberdeck/pane-loaders/call-center"),
+  db8: () => import("@/features/cyberdeck/pane-loaders/db8"),
 };
 
 export function importCyberdeckPane(kind: string): Promise<CyberdeckPaneModule> {

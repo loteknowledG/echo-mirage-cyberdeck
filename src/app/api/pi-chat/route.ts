@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
-import type { Message, TextContent, ThinkingContent, ToolCall, ImageContent } from "@mariozechner/pi-ai";
+import { getModel, streamSimple, type Message, type Model } from "@mariozechner/pi-ai";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const textEncoder = new TextEncoder();
 
-const CHAT_URL: Record<string, string> = {
-  opencode: "https://opencode.ai/zen/v1/chat/completions",
-  openai: "https://api.openai.com/v1/chat/completions",
-  openrouter: "https://openrouter.ai/api/v1/chat/completions",
+const PROVIDER_BASE_URL: Record<string, string> = {
+  opencode: "https://opencode.ai/zen/v1",
+  openai: "https://api.openai.com/v1",
+  openrouter: "https://openrouter.ai/api/v1",
 };
 
 const DEFAULT_PROVIDER_KEY_ENV: Record<string, string | undefined> = {
-  opencode: process.env.OPENCODE_API_KEY || process.env.ZEN_API_KEY || process.env.NEXT_PUBLIC_ZEN_API_KEY,
+  opencode:
+    process.env.OPENCODE_API_KEY ||
+    process.env.ZEN_API_KEY ||
+    process.env.NEXT_PUBLIC_ZEN_API_KEY,
   openai: process.env.OPENAI_API_KEY,
   openrouter: process.env.OPENROUTER_API_KEY,
 };
@@ -26,139 +32,75 @@ function resolveProviderApiKey(provider: string, suppliedApiKey: unknown): strin
   return "";
 }
 
-function flattenTextContent(content: Array<TextContent | ThinkingContent | ToolCall | ImageContent>) {
-  return content
-    .map((item) => {
-      if (item.type === "text") return item.text;
-      if (item.type === "thinking") return item.thinking;
-      if (item.type === "toolCall") return `${item.name}(${JSON.stringify(item.arguments)})`;
-      if (item.type === "image") return "[image]";
-      return "";
-    })
-    .filter(Boolean)
-    .join("\n\n")
-    .trim();
+function resolvePiModel(provider: string, modelId: string): Model<string> | null {
+  const known = getModel(provider as "opencode", modelId as "big-pickle");
+  if (known) return known;
+
+  const baseUrl = PROVIDER_BASE_URL[provider];
+  if (!baseUrl) return null;
+
+  return {
+    id: modelId,
+    name: modelId,
+    api: "openai-completions",
+    provider,
+    baseUrl,
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 128_000,
+    maxTokens: 8_192,
+  } as Model<string>;
 }
 
-function toOpenAiMessages(systemPrompt: string | undefined, messages: Message[]) {
-  const normalized: Array<{ role: "system" | "user" | "assistant" | "tool"; content: string; tool_call_id?: string }> = [];
-
-  if (systemPrompt?.trim()) {
-    normalized.push({ role: "system", content: systemPrompt.trim() });
-  }
-
-  for (const message of messages) {
-    if (message.role === "user") {
-      const content =
-        typeof message.content === "string"
-          ? message.content
-          : message.content
-              .map((item) => (item.type === "text" ? item.text : item.type === "image" ? "[image]" : ""))
-              .filter(Boolean)
-              .join("\n\n")
-              .trim();
-      if (content) normalized.push({ role: "user", content });
-      continue;
-    }
-
-    if (message.role === "assistant") {
-      const content = flattenTextContent(message.content);
-      if (content) normalized.push({ role: "assistant", content });
-      continue;
-    }
-
-    if (message.role === "toolResult") {
-      const content = message.content
-        .map((item) => (item.type === "text" ? item.text : item.type === "image" ? "[image]" : ""))
-        .filter(Boolean)
-        .join("\n\n")
-        .trim();
-      if (content) {
-        normalized.push({
-          role: "tool",
-          content,
-          tool_call_id: message.toolCallId,
-        });
-      }
+function formatPiUplinkError(raw: string): string {
+  const trimmed = raw.trim();
+  const jsonStart = trimmed.indexOf("{");
+  if (jsonStart >= 0) {
+    try {
+      const parsed = JSON.parse(trimmed.slice(jsonStart)) as {
+        error?: { message?: string };
+        message?: string;
+      };
+      const inner = parsed.error?.message || parsed.message;
+      if (typeof inner === "string" && inner.trim()) return inner.trim();
+    } catch {
+      /* keep raw */
     }
   }
-
-  return normalized;
+  return trimmed.replace(/^\d{3}\s*/, "") || "Pi uplink failed";
 }
 
-async function streamOpenAiCompatibleResponse(response: Response) {
-  const contentType = response.headers.get("content-type") || "";
-  const body = response.body;
-
-  if (!body) {
-    return new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.close();
-      },
-    });
-  }
-
-  if (!contentType.includes("text/event-stream")) {
-    return new ReadableStream<Uint8Array>({
-      async start(controller) {
-        const reader = body.getReader();
-        const decoder = new TextDecoder();
-        try {
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            const text = decoder.decode(value, { stream: true });
-            if (text) controller.enqueue(textEncoder.encode(text));
-          }
-          const rest = decoder.decode();
-          if (rest) controller.enqueue(textEncoder.encode(rest));
-        } finally {
-          controller.close();
-        }
-      },
-    });
-  }
-
+function piStreamToPlainText(
+  eventStream: ReturnType<typeof streamSimple>,
+): ReadableStream<Uint8Array> {
   return new ReadableStream<Uint8Array>({
     async start(controller) {
-      const reader = body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      const emit = (text: string) => {
-        if (!text) return;
-        controller.enqueue(textEncoder.encode(text));
+      const write = (text: string) => {
+        if (text) controller.enqueue(textEncoder.encode(text));
       };
 
       try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split(/\r?\n/);
-          buffer = lines.pop() ?? "";
-
-          for (const rawLine of lines) {
-            const line = rawLine.trim();
-            if (!line || !line.startsWith("data:")) continue;
-
-            const data = line.slice(5).trim();
-            if (data === "[DONE]") {
-              controller.close();
-              return;
-            }
-
-            try {
-              const parsed = JSON.parse(data);
-              const content = parsed.choices?.[0]?.delta?.content || "";
-              emit(content);
-            } catch {
-              // Ignore malformed chunks.
-            }
+        for await (const event of eventStream) {
+          if (event.type === "text_delta" && event.delta) {
+            write(event.delta);
+            continue;
+          }
+          if (event.type === "error") {
+            const message = formatPiUplinkError(
+              event.error.errorMessage?.trim() || "Pi uplink failed",
+            );
+            write(`\n[Pi] ${message}`);
+            controller.close();
+            return;
           }
         }
-      } finally {
+        controller.close();
+      } catch (error) {
+        const message = formatPiUplinkError(
+          error instanceof Error ? error.message : "Pi uplink failed",
+        );
+        write(`\n[Pi] ${message}`);
         controller.close();
       }
     },
@@ -169,14 +111,17 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const provider = typeof body.provider === "string" ? body.provider : "opencode";
-    const endpoint = CHAT_URL[provider];
+    const modelId =
+      typeof body.model === "string" && body.model.trim() ? body.model.trim() : "big-pickle";
+
     console.debug("[api/pi-chat] incoming", {
       provider,
-      model: body.model,
+      model: modelId,
       messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
     });
 
-    if (!endpoint) {
+    const model = resolvePiModel(provider, modelId);
+    if (!model) {
       return NextResponse.json({ error: `Unsupported provider: ${provider}` }, { status: 400 });
     }
 
@@ -185,32 +130,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "API key required" }, { status: 401 });
     }
 
-    const systemPrompt = typeof body.systemPrompt === "string" ? body.systemPrompt : undefined;
+    const baseSystemPrompt = typeof body.systemPrompt === "string" ? body.systemPrompt : "";
+    const muthurScreenContext =
+      typeof body.muthurScreenContext === "string" ? body.muthurScreenContext.trim() : "";
+    const systemPrompt = [baseSystemPrompt.trim(), muthurScreenContext].filter(Boolean).join("\n");
     const messages = Array.isArray(body.messages) ? (body.messages as Message[]) : [];
-    const model =
-      typeof body.model === "string" && body.model.trim() ? body.model.trim() : "trinity-large-preview-free";
 
-    const providerResponse = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    const eventStream = streamSimple(
+      model,
+      {
+        systemPrompt: systemPrompt || undefined,
+        messages,
+        tools: [],
       },
-      body: JSON.stringify({
-        model,
-        messages: toOpenAiMessages(systemPrompt, messages),
-        stream: true,
-      }),
-    });
+      { apiKey },
+    );
 
-    console.debug("[api/pi-chat] upstream", providerResponse.status);
+    console.debug("[api/pi-chat] upstream", { provider, model: modelId, api: model.api });
 
-    if (!providerResponse.ok) {
-      const text = await providerResponse.text().catch(() => "");
-      return NextResponse.json({ error: `API error ${providerResponse.status}: ${text}` }, { status: 502 });
-    }
-
-    return new Response(await streamOpenAiCompatibleResponse(providerResponse), {
+    return new Response(piStreamToPlainText(eventStream), {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",

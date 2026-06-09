@@ -6,6 +6,11 @@ import { convertMarkdownFileToDocx } from "@/lib/markdown-to-docx.server";
 import { convertMarkdownFileToPdf } from "@/lib/markdown-to-pdf.server";
 import { getLatestMuthurObservation } from "@/lib/muthur/observation/observation-store.server";
 import { parseSuggestOperatorEditArgs } from "@/lib/muthur-core/suggest-operator-edit";
+import {
+  runGitDiff,
+  runGitStatus,
+  runWorkspaceExec,
+} from "@/lib/muthur-core/workspace-tools.server";
 import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
@@ -295,6 +300,24 @@ async function runClock(call: ToolCall): Promise<ToolResult> {
   };
 }
 
+async function runWorkspaceExecTool(call: ToolCall): Promise<ToolResult> {
+  const command = toCommand(call);
+  if (!command) {
+    return { ok: false, error: "workspace_exec requires a command string." };
+  }
+  return runWorkspaceExec(command);
+}
+
+async function runGitStatusTool(_call: ToolCall): Promise<ToolResult> {
+  return runGitStatus();
+}
+
+async function runGitDiffTool(call: ToolCall): Promise<ToolResult> {
+  const filePath = getStringArg(call, "path");
+  const stat = getBoolArg(call, "stat", false);
+  return runGitDiff({ path: filePath || undefined, stat });
+}
+
 async function runObserveOperatorPane(call: ToolCall): Promise<ToolResult> {
   const surfaceRaw = getStringArg(call, "surface");
   const requestedSurface =
@@ -349,16 +372,32 @@ export function createMuthurToolRegistry(): ToolRegistry {
           "Read the latest visible operator surface state (open file, cursor, excerpt). Read-only — no edits or actions.",
         run: runObserveOperatorPane,
       },
+      workspace_exec: {
+        name: "workspace_exec",
+        description:
+          "Run allowlisted shell commands on the real workspace disk (pnpm tsc/lint/build/e2e, git).",
+        run: runWorkspaceExecTool,
+      },
+      git_status: {
+        name: "git_status",
+        description: "git status --short on the real Echo Mirage repo.",
+        run: runGitStatusTool,
+      },
+      git_diff: {
+        name: "git_diff",
+        description: "git diff on the real Echo Mirage repo; optional path and stat summary.",
+        run: runGitDiffTool,
+      },
       justbash: {
         name: "justbash",
         description:
-          "Runs a bash command against a copy-on-write mirror of the Echo Mirage workspace. Reads the real project; writes stay in memory.",
+          "Ephemeral mirror only — reads real files; writes do not persist. Use for rg/ls/cat search, not builds or git.",
         run: runJustBash,
       },
       localfs: {
         name: "localfs",
         description:
-          "Access the machine running the dev server: ls, cat, stat anywhere; mkdir and write_text only inside the Echo Mirage workspace directory (project root).",
+          "Real disk: ls, cat, stat anywhere; mkdir and write only inside the Echo Mirage workspace root.",
         run: runLocalFs,
       },
       clock: {

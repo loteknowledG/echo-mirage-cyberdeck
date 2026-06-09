@@ -295,7 +295,18 @@ export function PropertyManagerDemo() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 font-mono text-[10px]">
-              <ObservePresenceGlyph active subsystemLabel="muthur in" scopeLabel="observation" />
+              <ObservePresenceGlyph
+                active
+                state={
+                  state === "speaking"
+                    ? "speaking"
+                    : state === "processing" || state === "listening"
+                      ? "thinking"
+                      : "idle"
+                }
+                subsystemLabel="muthur in"
+                scopeLabel="observation"
+              />
               <span data-testid="observation-authority" className="border border-cyan-900 px-2 py-1 text-cyan-300">
                 OBSERVE // READ ONLY
               </span>

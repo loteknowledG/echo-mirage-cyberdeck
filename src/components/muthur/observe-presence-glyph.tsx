@@ -7,6 +7,7 @@ export const OBSERVE_TRANSCRIPT_PREFIX = `${OBSERVE_PRESENCE_GLYPH} [OBSERVE]`;
 
 type ObservePresenceGlyphProps = {
   active: boolean;
+  state?: "idle" | "thinking" | "speaking" | "critical";
   className?: string;
   subsystemLabel?: string;
   scopeLabel?: string;
@@ -14,15 +15,19 @@ type ObservePresenceGlyphProps = {
 
 export function ObservePresenceGlyph({
   active,
+  state = "idle",
   className,
 }: ObservePresenceGlyphProps) {
   if (!active) return null;
 
+  const resolvedState = state ?? "idle";
+
   return (
     <span
-      className={cn("observe-presence-glyph", className)}
+      className={cn("observe-presence-glyph", className, `observe-presence-glyph--${resolvedState}`)}
       data-testid="observe-presence-glyph"
       data-observing="true"
+      data-muthur-state={resolvedState}
       tabIndex={0}
       title="observe"
       aria-label={`${OBSERVE_PRESENCE_GLYPH} observe presence active`}

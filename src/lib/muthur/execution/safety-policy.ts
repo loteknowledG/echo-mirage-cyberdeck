@@ -5,10 +5,14 @@ export const ALLOWED_SHELL_COMMANDS = [
   "pnpm exec tsc --noEmit",
   "pnpm build",
   "pnpm e2e",
+  "pnpm lint",
   "git diff",
+  "git diff --stat",
   "git status --short",
   "git log --oneline -10",
 ] as const;
+
+export const WORKSPACE_ROOT = path.resolve(process.cwd());
 
 const RUNNABLE_ACTIONS: MuthurActionType[] = [
   "shell_command",
@@ -26,8 +30,6 @@ const RUNNABLE_ACTIONS: MuthurActionType[] = [
 ];
 
 const ALWAYS_REQUIRES_CONFIRMATION: MuthurActionType[] = ["write_file"];
-
-const WORKSPACE_ROOT = path.resolve(process.cwd());
 
 export function isPathInsideWorkspace(targetPath: string): boolean {
   const root = path.resolve(WORKSPACE_ROOT);
