@@ -77,6 +77,70 @@ export function buildOperatorSaveIntent(options: {
   };
 }
 
+export function isOperatorAbsoluteDiskPath(filePath: string): boolean {
+  const trimmed = filePath.trim();
+  if (!trimmed) return false;
+  if (/^[a-zA-Z]:[\\/]/.test(trimmed) || trimmed.startsWith("\\\\")) return true;
+  return trimmed.startsWith("/");
+}
+
+export type OperatorDiskSaveTarget =
+  | { kind: "folder"; path: string }
+  | { kind: "workspace"; path: string };
+
+/** Resolve folder-pane or workspace absolute path for in-place save. */
+export function resolveOperatorDiskSavePath(
+  activeFilePath: string | null | undefined,
+  localFilePath: string | null | undefined,
+  roots: OperatorDocFolderRoot[],
+): OperatorDiskSaveTarget | null {
+  if (activeFilePath && canSaveOperatorFileInPlace(activeFilePath, roots)) {
+    return { kind: "folder", path: activeFilePath };
+  }
+  const workspacePath =
+    localFilePath?.trim() ||
+    (activeFilePath && isOperatorAbsoluteDiskPath(activeFilePath) ? activeFilePath.trim() : "");
+  if (workspacePath && isOperatorAbsoluteDiskPath(workspacePath)) {
+    return { kind: "workspace", path: workspacePath };
+  }
+  return null;
+}
+
+export function canSaveOperatorDocumentInPlace(
+  activeFilePath: string | null | undefined,
+  localFilePath: string | null | undefined,
+  roots: OperatorDocFolderRoot[],
+): boolean {
+  return resolveOperatorDiskSavePath(activeFilePath, localFilePath, roots) !== null;
+}
+
+export async function saveOperatorWorkspaceFile(
+  filePath: string,
+  text: string,
+): Promise<{ ok: boolean; filePath?: string; error?: string }> {
+  try {
+    const res = await fetch("/api/write-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: filePath, content: text }),
+    });
+    const payload = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      path?: string;
+      error?: string;
+    };
+    if (!res.ok || !payload.ok) {
+      return { ok: false, error: payload.error || `Write failed (${res.status})` };
+    }
+    return { ok: true, filePath: payload.path ?? filePath };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Write failed.",
+    };
+  }
+}
+
 export async function saveOperatorFileInPlace(
   filePath: string,
   text: string,
@@ -91,6 +155,29 @@ export async function saveOperatorFileInPlace(
     return { ok: false, error: "Folder root is no longer available." };
   }
   return writeFileToFolderRoot(root, filePath, text);
+}
+
+export async function saveOperatorDocumentInPlace(
+  activeFilePath: string,
+  text: string,
+  roots: OperatorDocFolderRoot[],
+  localFilePath?: string | null,
+): Promise<{
+  ok: boolean;
+  filePath?: string;
+  error?: string;
+  via?: OperatorDiskSaveTarget["kind"];
+}> {
+  const target = resolveOperatorDiskSavePath(activeFilePath, localFilePath, roots);
+  if (!target) {
+    return { ok: false, error: "No writable path for in-place save." };
+  }
+  if (target.kind === "folder") {
+    const result = await saveOperatorFileInPlace(target.path, text, roots);
+    return { ...result, via: "folder" };
+  }
+  const result = await saveOperatorWorkspaceFile(target.path, text);
+  return { ...result, via: "workspace" };
 }
 
 export async function saveViaCadreApi(

@@ -39,10 +39,10 @@ import {
 import { cleanOperatorPasteText } from "@/lib/operator-paste-cleaner";
 import {
   buildOperatorSaveIntent,
-  canSaveOperatorFileInPlace,
+  canSaveOperatorDocumentInPlace,
   downloadOperatorDoc,
   isPickerAbortError,
-  saveOperatorFileInPlace,
+  saveOperatorDocumentInPlace,
   saveViaCadreApi,
 } from "@/lib/operator-save";
 import { readFileFromFolderRoot } from "@/lib/operator-folder-nav";
@@ -421,13 +421,20 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
       toast.error("No open file to save.");
       return;
     }
-    const result = await saveOperatorFileInPlace(activeFilePath, text, folderRootsRef.current);
+    const result = await saveOperatorDocumentInPlace(
+      activeFilePath,
+      text,
+      folderRootsRef.current,
+      asset?.localFilePath,
+    );
     if (!result.ok) {
       toast.error(result.error || "Could not save file.");
       return;
     }
-    toast.success(`Saved "${activeFilePath.split("/").pop()}".`);
-  }, [activeFilePath, asset?.text]);
+    const savedName =
+      result.filePath?.split(/[/\\]/).pop() || activeFilePath.split(/[/\\]/).pop() || "file";
+    toast.success(`Saved "${savedName}".`);
+  }, [activeFilePath, asset?.localFilePath, asset?.text]);
 
   const saveDocAs = useCallback(async () => {
     const text = asset?.text || "";
@@ -582,7 +589,11 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
       onSaveOperatorDocAsFile={saveDocAs}
       operatorCanSaveInPlace={
         folderRootsCount >= 0 &&
-        canSaveOperatorFileInPlace(activeFilePath, folderRootsRef.current)
+        canSaveOperatorDocumentInPlace(
+          activeFilePath,
+          asset?.localFilePath,
+          folderRootsRef.current,
+        )
       }
       onCopyOperatorDocToClipboard={copyToClipboard}
       onOperatorDocumentTextChange={handleTextChange}

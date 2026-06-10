@@ -154,10 +154,10 @@ import {
 } from "@/lib/operator-folder-nav";
 import {
   buildOperatorSaveIntent,
-  canSaveOperatorFileInPlace,
+  canSaveOperatorDocumentInPlace,
   downloadOperatorDoc,
   isPickerAbortError,
-  saveOperatorFileInPlace,
+  saveOperatorDocumentInPlace,
   saveViaCadreApi,
   type OperatorSaveIntent,
 } from "@/lib/operator-save";
@@ -3069,7 +3069,13 @@ export default function CyberdeckApp() {
       toast.error("No open file to save.");
       return;
     }
-    if (!canSaveOperatorFileInPlace(operatorActiveFilePath, operatorFolderRootsRef.current)) {
+    if (
+      !canSaveOperatorDocumentInPlace(
+        operatorActiveFilePath,
+        operatorDroppedAsset?.localFilePath,
+        operatorFolderRootsRef.current,
+      )
+    ) {
       toast.info("This document has no folder path — use Save as or pick a location.");
       await saveOperatorDocAsFile();
       return;
@@ -3078,20 +3084,26 @@ export default function CyberdeckApp() {
       handleOperatorDocumentTextChange(text);
     }
 
-    const result = await saveOperatorFileInPlace(
+    const result = await saveOperatorDocumentInPlace(
       operatorActiveFilePath,
       text,
       operatorFolderRootsRef.current,
+      operatorDroppedAsset?.localFilePath,
     );
     if (!result.ok) {
       toast.error(result.error || "Could not save file.");
       return;
     }
     window.dispatchEvent(new CustomEvent("echo-mirage-operator-file-saved"));
-    toast.success(`Saved "${operatorActiveFilePath.split("/").pop()}".`);
+    const savedName =
+      result.filePath?.split(/[/\\]/).pop() ||
+      operatorActiveFilePath.split(/[/\\]/).pop() ||
+      "file";
+    toast.success(`Saved "${savedName}".`);
   }, [
     handleOperatorDocumentTextChange,
     operatorActiveFilePath,
+    operatorDroppedAsset?.localFilePath,
     operatorDroppedAsset?.text,
     operatorSurfaceIsDocument,
     saveOperatorDocAsFile,
@@ -3099,13 +3111,22 @@ export default function CyberdeckApp() {
 
   const saveOperatorDocument = useCallback(() => {
     if (
-      canSaveOperatorFileInPlace(operatorActiveFilePath, operatorFolderRootsRef.current)
+      canSaveOperatorDocumentInPlace(
+        operatorActiveFilePath,
+        operatorDroppedAsset?.localFilePath,
+        operatorFolderRootsRef.current,
+      )
     ) {
       void saveOperatorDocInPlace();
       return;
     }
     saveOperatorDocAsFile();
-  }, [operatorActiveFilePath, saveOperatorDocAsFile, saveOperatorDocInPlace]);
+  }, [
+    operatorActiveFilePath,
+    operatorDroppedAsset?.localFilePath,
+    saveOperatorDocAsFile,
+    saveOperatorDocInPlace,
+  ]);
 
   const exportOperatorMarkdown = useCallback(async (format: OperatorExportFormat) => {
     const text = operatorDroppedAsset?.text || "";
@@ -5752,7 +5773,13 @@ const resolved = resolveUiTarget(userMessage);
           operatorEditApplied = true;
           const systemLines = ["OPERATOR EDIT // MUTHUR applied — Ctrl+Z to undo in the operator pane."];
           if (shouldAutoCommitOperatorEdits(muthurUplinkMode)) {
-            if (canSaveOperatorFileInPlace(operatorActiveFilePath, operatorFolderRootsRef.current)) {
+            if (
+              canSaveOperatorDocumentInPlace(
+                operatorActiveFilePath,
+                operatorDroppedAsset?.localFilePath,
+                operatorFolderRootsRef.current,
+              )
+            ) {
               await saveOperatorDocInPlace();
               systemLines.push(`OPERATOR SAVE // ${operatorEditFileName} // Agent auto-commit`);
             } else {
@@ -8092,8 +8119,9 @@ const resolved = resolveUiTarget(userMessage);
                   onSaveOperatorDocAsFile={saveOperatorDocAsFile}
                   operatorCanSaveInPlace={
                     operatorFolderRootsCount >= 0 &&
-                    canSaveOperatorFileInPlace(
+                    canSaveOperatorDocumentInPlace(
                       operatorActiveFilePath,
+                      operatorDroppedAsset?.localFilePath,
                       operatorFolderRootsRef.current,
                     )
                   }
