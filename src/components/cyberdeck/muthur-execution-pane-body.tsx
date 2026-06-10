@@ -10,6 +10,7 @@ import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-
 import { CyberdeckFilterButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import type { MuthurAction, MuthurActionStatus } from "@/lib/muthur/execution/execution-types";
 import { useMuthurExecutionRuntime } from "@/lib/muthur/execution/use-muthur-execution-runtime";
+import { useMuthurPersistentRuntime } from "@/lib/muthur/runtime/use-muthur-persistent-runtime";
 import { cn } from "@/lib/utils";
 
 function screenshotPreviewUrl(filePath: string | undefined): string | null {
@@ -104,6 +105,19 @@ function ActionRow({
   );
 }
 
+function runtimePostureBadgeClass(posture: string | undefined): string {
+  switch (posture) {
+    case "watch":
+      return "border-emerald-500/50 bg-emerald-950/30 text-emerald-200";
+    case "patrol":
+      return "border-amber-500/50 bg-amber-950/25 text-amber-200";
+    case "stopped":
+      return "border-red-500/50 bg-red-950/30 text-red-200";
+    default:
+      return "border-[#333] bg-[#111] text-[#888]";
+  }
+}
+
 export function MuthurExecutionPaneBody() {
   const {
     state,
@@ -115,6 +129,14 @@ export function MuthurExecutionPaneBody() {
     resetSession,
     verifyRoute,
   } = useMuthurExecutionRuntime();
+  const {
+    state: runtimeState,
+    error: runtimeError,
+    busy: runtimeBusy,
+    startWatch,
+    stopWatch,
+    patrolNow,
+  } = useMuthurPersistentRuntime();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(true);
 
@@ -155,7 +177,7 @@ export function MuthurExecutionPaneBody() {
             <div className="flex flex-col">
               <CyberdeckPaneHeaderTitle>MUTHUR EXECUTION</CyberdeckPaneHeaderTitle>
               <CyberdeckPaneHeaderSubtitle>
-                BROWSER VERIFICATION // LOCALHOST PROOF
+                PERSISTENT RUNTIME // BROWSER PROOF
               </CyberdeckPaneHeaderSubtitle>
             </div>
           }
@@ -173,13 +195,66 @@ export function MuthurExecutionPaneBody() {
         />
 
         <div className="space-y-3 border-b border-[#141414] p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[9px] uppercase tracking-wide text-[#777]">Runtime</span>
+            <span
+              className={cn(
+                "rounded-sm border px-1.5 py-0.5 font-mono text-[9px]",
+                runtimePostureBadgeClass(runtimeState?.posture),
+              )}
+            >
+              [ {(runtimeState?.posture ?? "standby").toUpperCase()} ]
+            </span>
+            {runtimeState?.watch_enabled ? (
+              <span className="font-mono text-[9px] text-emerald-300">WATCH ON</span>
+            ) : (
+              <span className="font-mono text-[9px] text-[#666]">WATCH OFF</span>
+            )}
+            {runtimeState?.patrol_in_flight ? (
+              <span className="font-mono text-[9px] text-amber-300">PATROL RUNNING</span>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap gap-1">
+            {runtimeState?.watch_enabled ? (
+              <CyberdeckActionButton disabled={runtimeBusy} onClick={() => void stopWatch()}>
+                STOP WATCH
+              </CyberdeckActionButton>
+            ) : (
+              <CyberdeckActionButton variant="accent" disabled={runtimeBusy} onClick={() => void startWatch()}>
+                START WATCH
+              </CyberdeckActionButton>
+            )}
+            <CyberdeckActionButton disabled={runtimeBusy || busy} onClick={() => void patrolNow()}>
+              PATROL NOW
+            </CyberdeckActionButton>
+          </div>
+
+          {runtimeState?.last_patrol ? (
+            <div className="space-y-1 font-mono text-[9px]">
+              <div className={runtimeState.last_patrol.passed ? "text-emerald-300" : "text-red-300"}>
+                LAST PATROL // {runtimeState.last_patrol.passed ? "PASS" : "FAIL"} //{" "}
+                {runtimeState.last_patrol.checks.map((check) => check.check).join(" + ")}
+              </div>
+              {runtimeState.last_patrol.receipt_path ? (
+                <div className="truncate text-[#777]">RECEIPT // {runtimeState.last_patrol.receipt_path}</div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="font-mono text-[9px] text-[#666]">
+              No patrol yet. START WATCH or PATROL NOW to run tsc + /cyberdeck verify outside chat.
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2 font-mono text-[9px] tracking-wide text-[#8a8a8a]">
             <span>LOOP // {loopLabel}</span>
             <span>MODE // {modeLabel}</span>
             <span>QUEUE // {queueLength}</span>
             {state?.current_task ? <span>TASK // {state.current_task}</span> : null}
+            {runtimeState ? <span>PATROLS // {runtimeState.patrol_count}</span> : null}
           </div>
 
+          {runtimeError ? <div className="font-mono text-[9px] text-red-300">{runtimeError}</div> : null}
           {error ? <div className="font-mono text-[9px] text-red-300">{error}</div> : null}
           {state?.last_error ? (
             <div className="font-mono text-[9px] text-red-300/90">LAST ERROR // {state.last_error}</div>
