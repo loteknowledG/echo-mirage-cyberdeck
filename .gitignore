@@ -145,3 +145,16 @@ dist
 /.tmp
 /test-results
 /test-results
+
+# MUTHUR auto-generated receipts (coding verify, screenshots, verification)
+.muthur/receipts/
+
+# Cursor hook runtime state (scripts under .cursor/hooks/ stay tracked)
+.cursor/hooks/mechanicus-tts-last.json
+.cursor/hooks/mechanicus-tts.pid
+.cursor/hooks/mechanicus-tts-stderr.log
+.cursor/hooks/mechanicus-hook.log
+.cursor/hooks/__pycache__/
+
+# Local dev scratch under .tmp/
+.tmp/
