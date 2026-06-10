@@ -39,6 +39,7 @@ export function CyberdeckWebTabFrame({
     if (useWebview) {
       const view = localWebviewRef.current;
       if (!view) return;
+      view.setAttribute("allowpopups", "");
       try {
         const current = view.getURL?.();
         if (current !== target) {
@@ -65,7 +66,6 @@ export function CyberdeckWebTabFrame({
         ref={setWebviewRef}
         src={url}
         partition="persist:custom-tab-browser"
-        allowpopups=""
         className={className}
       />
     );

@@ -1,4 +1,5 @@
 export type PmCallScenarioCategory =
+  | "plumbing"
   | "maintenance"
   | "leasing"
   | "emergency"
@@ -46,6 +47,15 @@ export type PmCallEpisodeDigest = {
   lesson: string;
 };
 
+export type PmCallPersistence = {
+  callId: string;
+  caseId: string;
+  caseSlug: string;
+  folderRelative: string;
+  createdCase: boolean;
+  matchedExistingCase: boolean;
+};
+
 export type PmCallEpisode = {
   id: string;
   startedAt: number;
@@ -53,6 +63,7 @@ export type PmCallEpisode = {
   scenarioId: string;
   turns: PmCallTurn[];
   digest: PmCallEpisodeDigest | null;
+  persistence?: PmCallPersistence;
 };
 
 export type PmCallSimAction = "resident_turn" | "observer_close";

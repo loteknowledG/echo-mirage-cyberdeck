@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/action-button";
+import { fetchPmCaseMatches, persistPmCallRecord } from "@/lib/pm-call-center/case-client";
 import { fetchPmCallObserverDigest, fetchPmCallResidentTurn } from "@/lib/pm-call-center/client";
 import { pmCallScenarioById, PM_CALL_SCENARIOS } from "@/lib/pm-call-center/scenarios";
 import {
@@ -15,10 +16,12 @@ import { createPmCallTurn } from "@/lib/pm-call-center/transcript";
 import type {
   PmCallEpisode,
   PmCallEpisodeDigest,
+  PmCallPersistence,
   PmCallScenario,
   PmCallSimPhase,
   PmCallTurn,
 } from "@/lib/pm-call-center/types";
+import type { CaseMatchCandidate } from "@/lib/property-manager/cases/types";
 import { cn } from "@/lib/utils";
 
 type SimPhase = PmCallSimPhase;
@@ -162,6 +165,8 @@ export function CallCenterPanel({
   const [digest, setDigest] = useState<PmCallEpisodeDigest | null>(null);
   const [episodes, setEpisodes] = useState<PmCallEpisode[]>([]);
   const [showArchive, setShowArchive] = useState(false);
+  const [matchedCase, setMatchedCase] = useState<CaseMatchCandidate | null>(null);
+  const [lastPersistence, setLastPersistence] = useState<PmCallPersistence | null>(null);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -227,15 +232,29 @@ export function CallCenterPanel({
     el.scrollTop = el.scrollHeight;
   }, [turns, busy, digest]);
 
-  const startScenario = useCallback((next: PmCallScenario) => {
+  const startScenario = useCallback(async (next: PmCallScenario) => {
     abortRef.current?.abort();
     setScenario(next);
     setTurns([createPmCallTurn("resident", next.openingLine)]);
     setComposer("");
     setOperatorNotesDraft("");
     setDigest(null);
+    setLastPersistence(null);
     setPhase("live");
     setStatus(`Live — ${next.title}. Reply as the operator.`);
+
+    try {
+      const { bestMatch } = await fetchPmCaseMatches(next.id);
+      setMatchedCase(bestMatch);
+      if (bestMatch) {
+        setStatus(
+          `Live — ${next.title}. Open case ${bestMatch.caseId} matched (${bestMatch.matchReasons.join(", ")}).`,
+        );
+      }
+    } catch {
+      setMatchedCase(null);
+    }
+
     focusComposer();
   }, [focusComposer]);
 
@@ -301,20 +320,36 @@ export function CallCenterPanel({
         signal: abortRef.current.signal,
       });
       setDigest(nextDigest);
+      const endedAt = Date.now();
+      const persistence = await persistPmCallRecord({
+        scenarioId: scenario.id,
+        turns,
+        digest: nextDigest,
+        startedAt: turns[0]?.at ?? endedAt,
+        endedAt,
+        attachCaseSlug: matchedCase?.slug,
+      });
+      setLastPersistence(persistence);
+
       const episode: PmCallEpisode = {
         id:
           typeof crypto !== "undefined" && "randomUUID" in crypto
             ? crypto.randomUUID()
             : `${Date.now()}`,
-        startedAt: turns[0]?.at ?? Date.now(),
-        endedAt: Date.now(),
+        startedAt: turns[0]?.at ?? endedAt,
+        endedAt,
         scenarioId: scenario.id,
         turns,
         digest: nextDigest,
+        persistence,
       };
       setEpisodes(appendPmCallEpisode(episode));
       setPhase("review");
-      setStatus("Simulation complete — observer digest saved.");
+      setStatus(
+        persistence.createdCase
+          ? `Case ${persistence.caseId} created — call ${persistence.callId} saved to disk.`
+          : `Call ${persistence.callId} attached to case ${persistence.caseId}.`,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Observer failed";
       setPhase("hung_up");
@@ -323,7 +358,7 @@ export function CallCenterPanel({
       busyRef.current = false;
       setBusy(false);
     }
-  }, [activeProvider, apiKey, modelId, phase, scenario, turns]);
+  }, [activeProvider, apiKey, matchedCase?.slug, modelId, phase, scenario, turns]);
 
   const sendOperatorLine = useCallback(async () => {
     const text = composer.trim();
@@ -383,6 +418,8 @@ export function CallCenterPanel({
     setComposer("");
     setOperatorNotesDraft("");
     setDigest(null);
+    setMatchedCase(null);
+    setLastPersistence(null);
     setStatus("Pick a scenario to start a text simulation.");
   }, []);
 
@@ -422,7 +459,7 @@ export function CallCenterPanel({
               <button
                 key={item.id}
                 type="button"
-                onClick={() => startScenario(item)}
+                onClick={() => void startScenario(item)}
                 className="rounded-sm border border-[#25352c] bg-black/70 p-3 text-left transition-colors hover:border-emerald-500/40"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -466,6 +503,23 @@ export function CallCenterPanel({
               </div>
             ) : null}
             {phase === "review" && digest ? <DigestCard digest={digest} /> : null}
+            {phase === "review" && lastPersistence ? (
+              <div className="rounded-sm border border-[#25352c] bg-black/80 p-3 font-mono text-[10px] leading-relaxed text-[#b0b0b0]">
+                <div className="text-[9px] tracking-[0.1em] text-emerald-300/90">CASE PERSISTENCE</div>
+                <p className="mt-1">
+                  <span className="text-[#707070]">Case:</span> {lastPersistence.caseId}
+                </p>
+                <p>
+                  <span className="text-[#707070]">Call:</span> {lastPersistence.callId}
+                </p>
+                <p>
+                  <span className="text-[#707070]">Folder:</span> {lastPersistence.folderRelative}
+                </p>
+                <p className="text-[#8a8a8a]">
+                  {lastPersistence.createdCase ? "New case opened." : "Attached to existing open case."}
+                </p>
+              </div>
+            ) : null}
           </div>
 
           {phase === "live" ? (
@@ -550,8 +604,9 @@ export function CallCenterPanel({
                 key={episode.id}
                 className="font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]"
               >
-                {episode.digest?.scenarioTitle ?? episode.scenarioId} —{" "}
-                {episode.digest?.routing.urgency ?? "?"} — {episode.turns.length} turns
+                {episode.persistence?.caseId ?? episode.digest?.scenarioTitle ?? episode.scenarioId} —{" "}
+                {episode.persistence?.callId ?? episode.digest?.routing.urgency ?? "?"} —{" "}
+                {episode.turns.length} turns
               </li>
             ))}
           </ul>

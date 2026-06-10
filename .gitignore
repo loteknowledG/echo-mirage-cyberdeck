@@ -159,3 +159,7 @@ dist
 # Local dev scratch under .tmp/
 .tmp/
 /.muthur/runtime
+
+# Property Manager case evidence (runtime; folder scaffold stays tracked)
+data/property-manager/cases/*
+!data/property-manager/cases/.gitkeep

@@ -3,15 +3,15 @@ import type { PmCallScenario } from "@/lib/pm-call-center/types";
 export const PM_CALL_SCENARIOS: readonly PmCallScenario[] = [
   {
     id: "leak-4b",
-    title: "Active water leak",
-    category: "maintenance",
-    description: "Resident reports water under the kitchen sink in unit 4B.",
-    residentName: "Jordan Lee",
-    propertyHint: "Riverside Courts — Unit 4B",
+    title: "4B Kitchen Sink Leak",
+    category: "plumbing",
+    description: "Resident reports an active kitchen sink leak in unit 4B.",
+    residentName: "Jordan",
+    propertyHint: "Oak Ridge Apartments — Unit 4B",
     openingLine:
       "Hi, this is Jordan in 4B. There's water pooling under my kitchen sink and it's getting worse.",
     residentBrief:
-      "You are Jordan Lee, a tenant in unit 4B. You are worried about damage. Answer the operator's questions honestly. " +
+      "You are Jordan, a tenant in unit 4B. You are worried about damage. Answer the operator's questions honestly. " +
       "You were home when it started about an hour ago. You shut off the valve under the sink but it still drips.",
   },
   {
