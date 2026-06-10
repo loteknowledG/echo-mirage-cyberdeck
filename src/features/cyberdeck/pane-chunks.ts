@@ -11,6 +11,7 @@ const PANE_IMPORTS: Record<CyberdeckPaneKind, () => Promise<CyberdeckPaneModule>
   settings: () => import("@/features/cyberdeck/pane-loaders/settings"),
   document: () => import("@/features/cyberdeck/pane-loaders/document"),
   diagnostics: () => import("@/features/cyberdeck/pane-loaders/diagnostics"),
+  "muthur-execution": () => import("@/features/cyberdeck/pane-loaders/muthur-execution"),
   pi: () => import("@/features/cyberdeck/pane-loaders/pi-chat"),
   catalog: () => import("@/features/cyberdeck/pane-loaders/catalog"),
   operators: () => import("@/features/cyberdeck/pane-loaders/operators"),

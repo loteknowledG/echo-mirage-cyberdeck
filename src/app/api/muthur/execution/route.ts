@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { closeBrowserSession } from "@/lib/muthur/browser/browser-session";
 import { readScreenshotPng } from "@/lib/muthur/browser/serve-screenshot.server";
 import { getMuthurExecutionLoop } from "@/lib/muthur/execution/execution-loop";
 import {
@@ -65,6 +66,12 @@ export async function POST(req: NextRequest) {
     if (op === "clear_queue") {
       const removed = loop.clearQueue();
       return NextResponse.json({ ok: true, removed, state: loop.getState() });
+    }
+
+    if (op === "reset_session") {
+      loop.forceRecover();
+      await closeBrowserSession();
+      return NextResponse.json({ ok: true, state: loop.getState() });
     }
 
     if (op === "approve") {

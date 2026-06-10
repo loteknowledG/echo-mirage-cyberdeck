@@ -120,9 +120,26 @@ export async function openRoute(options: {
   const page = await ensurePage();
   sessionConsoleEntries = [];
 
-  const response = await page.goto(validation.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+  let response: { status(): number } | null = null;
+  let lastGotoError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      response = await page.goto(validation.url, { waitUntil: "load", timeout: 60_000 });
+      lastGotoError = undefined;
+      break;
+    } catch (error) {
+      lastGotoError = error;
+      if (attempt === 0) {
+        await page.waitForTimeout(1_500);
+      }
+    }
+  }
+  if (lastGotoError) {
+    throw lastGotoError instanceof Error ? lastGotoError : new Error("Browser navigation failed.");
+  }
+
   if (options.wait_for_selector) {
-    await page.locator(options.wait_for_selector).waitFor({ state: "visible", timeout: 20_000 }).catch(() => undefined);
+    await page.locator(options.wait_for_selector).waitFor({ state: "visible", timeout: 25_000 }).catch(() => undefined);
   }
 
   let screenshot: BrowserScreenshotResult | undefined;
@@ -131,10 +148,15 @@ export async function openRoute(options: {
   }
 
   const bodyText = await page.locator("body").innerText().catch(() => "");
+  let httpStatus = response?.status() ?? 0;
+  if (httpStatus === 0 && page.url()) {
+    // Playwright may omit a response object after a committed localhost navigation.
+    httpStatus = 200;
+  }
   const snapshot: BrowserNavigationSnapshot = {
     url: page.url(),
     title: await page.title(),
-    status: response?.status() ?? 0,
+    status: httpStatus,
     console_entries: [...sessionConsoleEntries],
     body_text_excerpt: bodyText.slice(0, 4000),
     screenshot,

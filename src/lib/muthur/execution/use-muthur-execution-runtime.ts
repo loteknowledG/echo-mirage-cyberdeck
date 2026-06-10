@@ -32,6 +32,7 @@ async function postExecution(body: Record<string, unknown>) {
 export function useMuthurExecutionRuntime(pollMs = 800, pollEnabled = true) {
   const [state, setState] = useState<MuthurRuntimeState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     const next = await fetchExecutionState();
@@ -50,22 +51,41 @@ export function useMuthurExecutionRuntime(pollMs = 800, pollEnabled = true) {
   }, [pollEnabled, pollMs, refresh]);
 
   const control = useCallback(async (body: Record<string, unknown>) => {
-    const data = await postExecution(body);
-    if (data.state) setState(data.state);
-    return data;
+    setBusy(true);
+    try {
+      const data = await postExecution(body);
+      if (data.state) setState(data.state);
+      return data;
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Execution control failed.";
+      setError(message);
+      throw caught;
+    } finally {
+      setBusy(false);
+    }
   }, []);
 
   return {
     state,
     error,
+    busy,
     refresh,
     stop: () => control({ op: "stop" }),
     pause: () => control({ op: "pause" }),
     resume: () => control({ op: "resume" }),
     clearQueue: () => control({ op: "clear_queue" }),
+    resetSession: () => control({ op: "reset_session" }),
     approve: (actionId: string) => control({ op: "approve", actionId }),
     deny: (actionId: string) => control({ op: "deny", actionId }),
     setMode: (mode: MuthurRuntimeState["execution_mode"]) => control({ op: "set_mode", mode }),
+    verifyRoute: (route: string, taskLabel?: string) =>
+      control({
+        op: "verify_route",
+        route,
+        mode: "execute",
+        wait: true,
+        taskLabel: taskLabel ?? `verify-${route}`,
+      }),
   };
 }
 

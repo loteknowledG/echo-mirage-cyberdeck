@@ -5,6 +5,7 @@ export const CYBERDECK_PANE_KINDS = [
   "settings",
   "document",
   "diagnostics",
+  "muthur-execution",
   "pi",
   "catalog",
   "operators",
@@ -43,6 +44,10 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
     label: "DIAGNOSTIC",
     fetchHints: ["BUS", "MEMORY", "VOICE", "HEAP"],
   },
+  "muthur-execution": {
+    label: "EXECUTION",
+    fetchHints: ["BROWSER", "VERIFY", "SCREENSHOT", "RECEIPTS"],
+  },
   pi: { label: "PI CHAT", fetchHints: ["CHAT CORE", "STREAM"] },
   catalog: { label: "CATALOG" },
   operators: { label: "OPERATORS" },
@@ -65,6 +70,9 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
 const TAB_KIND_ALIASES: Record<string, CyberdeckPaneKind> = {
   catelog: "catalog",
   diagnostic: "diagnostics",
+  execution: "muthur-execution",
+  "execution-pane": "muthur-execution",
+  muthur_execution: "muthur-execution",
   dropbay: "drop-bay",
 };
 

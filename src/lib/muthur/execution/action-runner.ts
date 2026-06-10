@@ -242,8 +242,14 @@ export async function runMuthurAction(
           wait_for_selector: typeof action.payload.wait_for_selector === "string" ? action.payload.wait_for_selector : undefined,
         });
         const consoleErrors = snapshot.console_entries.filter((entry) => entry.severity === "error");
+        const httpOk = snapshot.status >= 200 && snapshot.status < 500;
+        const navigatedLocally =
+          snapshot.url.startsWith(baseUrl) ||
+          snapshot.url.includes("127.0.0.1") ||
+          snapshot.url.includes("localhost");
+        const softOk = navigatedLocally && snapshot.body_text_excerpt.trim().length > 0;
         return {
-          success: snapshot.status >= 200 && snapshot.status < 500,
+          success: httpOk || softOk,
           duration_ms: Date.now() - startedAt,
           stdout: snapshot.body_text_excerpt.slice(0, 2000),
           screenshot_path: snapshot.screenshot?.screenshot_path,

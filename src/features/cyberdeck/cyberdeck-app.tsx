@@ -397,6 +397,7 @@ const CUSTOM_TAB_KINDS = [
   "connection",
   "pi",
   "diagnostics",
+  "muthur-execution",
   "catalog",
   "operators",
   "memory-atlas",
@@ -513,6 +514,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Sound Profile", kind: "sound-profile", action: "convert" },
   { label: "Test", kind: "test-pane", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
+  { label: "Execution", kind: "muthur-execution", action: "convert" },
   { label: "Pi", kind: "pi", action: "convert" },
   { label: "DB8", kind: "db8", action: "convert" },
   { label: "Settings", action: "settings-pane" },
@@ -535,23 +537,11 @@ function isCustomTabKind(kind: unknown): kind is CustomTabKind {
   return typeof kind === "string" && normalizeCustomTabKind(kind) !== null;
 }
 
-function isRetiredCustomTabKind(kind: unknown): boolean {
-  if (typeof kind !== "string") return false;
-  const normalized = kind.trim().toLowerCase();
-  return (
-    normalized === "muthur-execution" ||
-    normalized === "muthur_execution" ||
-    normalized === "execution" ||
-    normalized === "execution-pane"
-  );
-}
-
 function sanitizeCustomTabs(value: unknown): CustomTab[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const tab = item as Partial<CustomTab>;
-    if (isRetiredCustomTabKind(tab.kind)) return [];
     const id = typeof tab.id === "string" && tab.id.trim() ? tab.id.trim() : "";
     const label = typeof tab.label === "string" && tab.label.trim() ? tab.label.trim() : "TAB";
     const kind = isCustomTabKind(tab.kind) ? tab.kind : "blank";
@@ -832,6 +822,14 @@ function normalizeCustomTabKind(kind: string) {
   if (nextKind === "diagnostic") {
     return "diagnostics" as CustomTabKind;
   }
+  if (
+    nextKind === "muthur-execution" ||
+    nextKind === "muthur_execution" ||
+    nextKind === "execution" ||
+    nextKind === "execution-pane"
+  ) {
+    return "muthur-execution" as CustomTabKind;
+  }
   if (nextKind === "memoryatlas" || nextKind === "memory_atlas") {
     return "memory-atlas" as CustomTabKind;
   }
@@ -923,6 +921,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "apps") return "A";
   if (kind === "call-center") return "CC";
   if (kind === "db8") return "8";
+  if (kind === "muthur-execution") return "E";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
@@ -939,6 +938,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "apps") return "APPS";
   if (kind === "call-center") return "CALL CENTER";
   if (kind === "db8") return "DB8";
+  if (kind === "muthur-execution") return "EXECUTION";
   return kind.toUpperCase();
 }
 
@@ -1007,7 +1007,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test|apps|call-center|callcenter|call_center)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test|apps|call-center|callcenter|call_center)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -6925,6 +6925,10 @@ const resolved = resolveUiTarget(userMessage);
             chatCount={messages.length + (streamText ? 1 : 0)}
           />,
         );
+      }
+
+      if (tab.kind === "muthur-execution") {
+        return shell(<ActivatedCyberdeckPane kind="muthur-execution" />);
       }
 
       if (tab.kind === "pi") {
