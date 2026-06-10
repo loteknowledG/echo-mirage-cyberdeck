@@ -310,6 +310,9 @@ export async function bootMuthur(config: Partial<MuthurBootConfig> = {}): Promis
   const { loadedDocs, docHash, isNew } = await runStartupSequencer(memory, aiName, mergedConfig.workspaceRoot);
   await recordRuntimeIdentity(memory, aiName, ideName);
 
+  const { ensureEchoMirageAtlasSeed } = await import("../atlas/ensure-echo-mirage-seed");
+  await ensureEchoMirageAtlasSeed();
+
   memory.flush();
 
   const memoryCount = memory.getMemoryCount();
@@ -381,6 +384,42 @@ export async function buildMemoryContext(query?: string): Promise<string> {
         lines.push(`  - ${h.type}: ${h.text.slice(0, 100)}`);
       }
     }
+  }
+
+  try {
+    const { getAtlas } = await import("../atlas/atlas");
+    const { ensureEchoMirageAtlasSeed } = await import("../atlas/ensure-echo-mirage-seed");
+    await ensureEchoMirageAtlasSeed();
+    const atlas = getAtlas();
+
+    const projectCtx = await atlas.resolveProjectContext("echo-mirage", "exploratory");
+    if (projectCtx.primary) {
+      lines.push("- Atlas project:");
+      lines.push(`  ${projectCtx.primary.name}: ${projectCtx.primary.summary.slice(0, 120)}`);
+      for (const related of projectCtx.context.slice(0, 5)) {
+        lines.push(`  - ${related.name} (${related.kind})`);
+      }
+    }
+
+    if (query?.trim()) {
+      const resolved = await atlas.resolveEntity(query.trim());
+      if (resolved.entity) {
+        lines.push(`- Atlas match: ${resolved.entity.name}`);
+        lines.push(`  ${resolved.entity.summary.slice(0, 120)}`);
+        const relCount = resolved.hardRelations.length + resolved.softRelations.length;
+        if (relCount > 0) {
+          lines.push(`  Relations: ${relCount}`);
+        }
+      }
+      if (resolved.memoryHits.length > 0) {
+        lines.push("- Atlas memory hits:");
+        for (const hit of resolved.memoryHits.slice(0, 3)) {
+          lines.push(`  - ${hit.type}: ${hit.text.slice(0, 80)}`);
+        }
+      }
+    }
+  } catch {
+    // Atlas is optional enrichment — memory context still returns
   }
 
   return lines.join("\n");

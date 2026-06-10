@@ -88,6 +88,7 @@ const nextConfig = {
 		"playwright-core",
 		"just-bash",
 		"@mongodb-js/zstd",
+		"sql.js",
 	],
 	webpack: (config, { dev, isServer }) => {
 		if (isServer) {

@@ -186,13 +186,18 @@ async function ensureMuthurBooted(): Promise<void> {
 function buildMemoryPrompt(clientMemory: unknown, serverMemory: string): string {
   const client =
     typeof clientMemory === "string" && clientMemory.trim() ? clientMemory.trim() : "";
+  const server = serverMemory.trim();
+  const parts: string[] = [];
   if (client) {
-    return `\n\nPersistent MUTHUR memory:\n${client}`;
+    parts.push(`Session memory (browser):\n${client}`);
   }
-  if (serverMemory.trim()) {
-    return `\n\nMUTHUR Memory Context:\n${serverMemory.trim()}`;
+  if (server) {
+    parts.push(`Ship memory (atlas + SQLite):\n${server}`);
   }
-  return "";
+  if (!parts.length) {
+    return "";
+  }
+  return `\n\n${parts.join("\n\n")}`;
 }
 
 function buildEditorContextPrompt(): string {
@@ -538,8 +543,7 @@ export async function POST(request: Request) {
         const model =
           (typeof modelFromBody === "string" && modelFromBody.trim()) || defaultModelForProvider(provider);
 
-        const serverMemoryCtx =
-          clientSentMemoryField || clientHasMemory ? "" : await getMuthurMemoryContext(message);
+        const serverMemoryCtx = await getMuthurMemoryContext(message);
         const memoryPrompt = buildMemoryPrompt(memoryContext, serverMemoryCtx);
 
         const { systemContent, toolsEnabled } = buildMuthurSystemContent({
@@ -617,10 +621,7 @@ export async function POST(request: Request) {
     const envModel = process.env.OPENCODE_MODEL || "trinity-large-preview-free";
     const endpoint = "https://opencode.ai/zen/v1/chat/completions";
 
-    const fallbackMemoryCtx =
-      clientSentMemoryField || clientHasMemory
-        ? ""
-        : await getMuthurMemoryContext(typeof message === "string" ? message : "");
+    const fallbackMemoryCtx = await getMuthurMemoryContext(typeof message === "string" ? message : "");
     const fallbackMemoryPrompt = buildMemoryPrompt(memoryContext, fallbackMemoryCtx);
 
     const userMessage = typeof message === "string" ? message : "";

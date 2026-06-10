@@ -32,6 +32,7 @@ import {
   saveMuthurMemory,
   type MuthurMemoryState,
 } from "@/lib/muthur-memory";
+import { persistMuthurShipMemoryTurn } from "@/lib/muthur-ship-memory";
 import {
   OPERATOR_BROWSER_HOME_URL,
   deriveOperatorBrowserUrl,
@@ -5706,6 +5707,7 @@ const resolved = resolveUiTarget(userMessage);
       
       setMessages((prev) => [...prev, { role: "assistant", text: cleanedText }]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
+      persistMuthurShipMemoryTurn(userMessage, cleanedText || fullText);
 
       const codingVerifyReceipt =
         streamPayload.codingVerify ?? parseCodingVerifyHeader(res.headers.get("x-muthur-coding-verify"));

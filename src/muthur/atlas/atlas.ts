@@ -135,6 +135,16 @@ export class SemanticAtlas {
           entity = e;
           break;
         }
+        const aliases = e.attributes?.aliases;
+        if (Array.isArray(aliases)) {
+          const aliasHit = aliases.some(
+            (alias) => typeof alias === "string" && alias.toLowerCase() === normalizedKey
+          );
+          if (aliasHit) {
+            entity = e;
+            break;
+          }
+        }
       }
     }
 
@@ -230,6 +240,77 @@ export class SemanticAtlas {
       verified,
       memoryHits,
     };
+  }
+
+  ensureEntity(
+    id: string,
+    kind: EntityKind,
+    name: string,
+    summary: string,
+    options?: {
+      confidence?: number;
+      aliases?: string[];
+      attributes?: Record<string, unknown>;
+    }
+  ): AtlasEntity {
+    const existing = this._entities.get(id);
+    if (existing) {
+      return existing;
+    }
+
+    const entity: AtlasEntity = {
+      id,
+      kind,
+      name,
+      summary,
+      confidence: options?.confidence ?? 0.85,
+      status: "active",
+      attributes: {
+        aliases: options?.aliases ?? [],
+        ...options?.attributes,
+      },
+      created_at: Date.now(),
+      updated_at: Date.now(),
+    };
+
+    this._entities.set(id, entity);
+
+    this.memory.add(
+      "atlas_entity",
+      `${kind}: ${name} - ${summary}`,
+      { atlas_id: id, kind, seeded: true, ...options?.attributes }
+    );
+
+    return entity;
+  }
+
+  async ensureRelation(
+    sourceEntityId: string,
+    targetEntityId: string,
+    relationType: RelationType,
+    weight: number = 0.5,
+    provenance?: Record<string, unknown>
+  ): Promise<AtlasRelation | null> {
+    for (const rel of this._relations.values()) {
+      if (
+        rel.source_entity_id === sourceEntityId &&
+        rel.target_entity_id === targetEntityId &&
+        rel.relation_type === relationType
+      ) {
+        return rel;
+      }
+    }
+    return this.addRelation(sourceEntityId, targetEntityId, relationType, weight, provenance);
+  }
+
+  getSourcesForEntity(entityId: string): AtlasSource[] {
+    const sources: AtlasSource[] = [];
+    for (const src of this._sources.values()) {
+      if (src.entity_id === entityId) {
+        sources.push(src);
+      }
+    }
+    return sources;
   }
 
   async addEntity(

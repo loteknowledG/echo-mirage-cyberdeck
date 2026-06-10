@@ -560,6 +560,234 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   visibility: hidden;
 }
 
+/* Memory Atlas entity tiles — rail-style lift stack: face up-left, floor down-right */
+[data-memory-atlas-entities] .memory-atlas-lift-stack {
+  --atlas-wall-depth: 6px;
+  --atlas-face-lift-y: 4px;
+  --atlas-wall-side: #222;
+  --atlas-wall-floor: #1a1a1a;
+  --atlas-ground-plate: #050505;
+  --atlas-ground-border: #2a2a2a;
+  --atlas-face-bg: #000;
+  --atlas-face-border: #2d2d2d;
+  position: relative;
+  overflow: visible;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(calc(2.75rem + var(--atlas-wall-depth)), auto);
+  width: 100%;
+  margin-bottom: 0.25rem;
+  padding: 0 var(--atlas-wall-depth) var(--atlas-wall-depth) 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: #b8b8b8;
+  box-sizing: border-box;
+}
+
+/*
+ * L-wall — rail poppedShadow: floor bar inset left; inner corner pocket stays open (gap).
+ */
+[data-memory-atlas-entities] .memory-atlas-lift-stack::before {
+  content: "";
+  position: absolute;
+  left: var(--atlas-wall-depth);
+  bottom: 0;
+  width: calc(100% - var(--atlas-wall-depth) * 2);
+  height: var(--atlas-wall-depth);
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--atlas-wall-floor) 0,
+    var(--atlas-wall-floor) 2px,
+    color-mix(in srgb, var(--atlas-wall-floor) 72%, #000) 2px,
+    color-mix(in srgb, var(--atlas-wall-floor) 72%, #000) 4px
+  );
+  pointer-events: none;
+  transition: opacity 60ms ease;
+}
+
+/*
+ * Side wall — skips top face row; stops above floor bar so corner gap matches tab rail.
+ */
+[data-memory-atlas-entities] .memory-atlas-lift-stack::after {
+  content: "";
+  position: absolute;
+  top: calc((100% - var(--atlas-wall-depth)) / 4);
+  right: 0;
+  bottom: var(--atlas-wall-depth);
+  width: var(--atlas-wall-depth);
+  background: repeating-linear-gradient(
+    to right,
+    var(--atlas-wall-side) 0,
+    var(--atlas-wall-side) 2px,
+    color-mix(in srgb, var(--atlas-wall-side) 72%, #000) 2px,
+    color-mix(in srgb, var(--atlas-wall-side) 72%, #000) 4px
+  );
+  pointer-events: none;
+  transition: top 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 60ms ease;
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack:not([aria-pressed="true"]):hover:not(:disabled)::after {
+  top: calc((100% - var(--atlas-wall-depth)) / 4 - var(--atlas-face-lift-y));
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack .memory-atlas-tile-ground,
+[data-memory-atlas-entities] .memory-atlas-lift-stack .memory-atlas-tile-face {
+  grid-area: 1 / 1;
+}
+
+/* Floor / shadow plate — offset down-right like rail poppedShadow */
+[data-memory-atlas-entities] .memory-atlas-lift-stack .memory-atlas-tile-ground {
+  position: relative;
+  z-index: 0;
+  width: calc(100% - var(--atlas-wall-depth));
+  height: calc(100% - var(--atlas-wall-depth));
+  margin: var(--atlas-wall-depth) 0 0 var(--atlas-wall-depth);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack .memory-atlas-tile-ground-plate {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 2.75rem;
+  border: 1px solid transparent;
+  background: transparent;
+  box-sizing: border-box;
+  opacity: 0;
+  transition:
+    border-color 60ms ease,
+    background-color 60ms ease,
+    opacity 60ms ease;
+}
+
+/* Shadow plate only when pressed — hover/rest show L-corner walls only */
+[data-memory-atlas-entities] .memory-atlas-lift-stack[aria-pressed="true"] .memory-atlas-tile-ground-plate,
+[data-memory-atlas-entities] .memory-atlas-lift-stack.is-atlas-selected .memory-atlas-tile-ground-plate {
+  border-color: var(--atlas-ground-border);
+  background: var(--atlas-ground-plate);
+  opacity: 0.88;
+}
+
+/* Face plate — rests up-left, lifts further on hover, sinks onto floor when selected */
+[data-memory-atlas-entities] .memory-atlas-lift-stack .memory-atlas-tile-face {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: calc(100% - var(--atlas-wall-depth));
+  height: calc(100% - var(--atlas-wall-depth));
+  margin: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--atlas-face-border);
+  background: var(--atlas-face-bg);
+  box-sizing: border-box;
+  transform: translate(0, 0);
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 60ms ease,
+    border-color 60ms ease,
+    text-shadow 60ms ease,
+    box-shadow 60ms ease,
+    background-color 60ms ease;
+  will-change: transform;
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack:not([aria-pressed="true"]):hover:not(:disabled) .memory-atlas-tile-face {
+  transform: translate(-2px, -4px);
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack:not([aria-pressed="true"]):hover:not(:disabled) {
+  --atlas-wall-side: #5a6abf;
+  --atlas-wall-floor: #3d4d85;
+  --atlas-ground-border: rgba(114, 137, 218, 0.45);
+  --atlas-ground-plate: rgba(114, 137, 218, 0.1);
+  --atlas-face-border: rgba(114, 137, 218, 0.55);
+  --atlas-face-bg: rgba(114, 137, 218, 0.08);
+  color: #9aa7ff;
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack:not([aria-pressed="true"]):hover:not(:disabled) .memory-atlas-tile-face {
+  text-shadow: 0 0 10px rgba(114, 137, 218, 0.35);
+  box-shadow: 0 0 10px rgba(114, 137, 218, 0.18);
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack:not([aria-pressed="true"]):hover:not(:disabled) .memory-atlas-entity-id {
+  color: rgba(154, 167, 255, 0.72);
+}
+
+[data-deck-mode="ascii"] [data-memory-atlas-entities] .memory-atlas-lift-stack:not([aria-pressed="true"]):hover:not(:disabled) .memory-atlas-tile-face.depth-panel__face--ascii::after {
+  opacity: 0.14;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(114, 137, 218, 0.5) 3px,
+    rgba(114, 137, 218, 0.5) 4px
+  );
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack:not([aria-pressed="true"]):active:not(:disabled) .memory-atlas-tile-face {
+  transform: translate(2px, 4px);
+  transition-duration: 80ms;
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack[aria-pressed="true"],
+[data-memory-atlas-entities] .memory-atlas-lift-stack.is-atlas-selected {
+  --atlas-wall-side: #2a6b56;
+  --atlas-wall-floor: #1f4f3f;
+  --atlas-ground-border: rgba(54, 255, 115, 0.35);
+  --atlas-ground-plate: rgba(54, 255, 115, 0.04);
+  --atlas-face-border: rgba(54, 255, 115, 0.6);
+  --atlas-face-bg: rgba(54, 255, 115, 0.05);
+  color: #36ff73;
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack[aria-pressed="true"]::before,
+[data-memory-atlas-entities] .memory-atlas-lift-stack[aria-pressed="true"]::after,
+[data-memory-atlas-entities] .memory-atlas-lift-stack.is-atlas-selected::before,
+[data-memory-atlas-entities] .memory-atlas-lift-stack.is-atlas-selected::after {
+  opacity: 0;
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack[aria-pressed="true"] .memory-atlas-tile-face,
+[data-memory-atlas-entities] .memory-atlas-lift-stack.is-atlas-selected .memory-atlas-tile-face {
+  transform: translate(var(--atlas-wall-depth), var(--atlas-wall-depth));
+  text-shadow: 0 0 12px rgba(54, 255, 115, 0.38);
+  box-shadow: inset 0 0 0 1px rgba(54, 255, 115, 0.2);
+}
+
+[data-memory-atlas-entities] .memory-atlas-lift-stack[aria-pressed="true"] .memory-atlas-entity-id,
+[data-memory-atlas-entities] .memory-atlas-lift-stack.is-atlas-selected .memory-atlas-entity-id {
+  color: rgba(54, 255, 115, 0.65);
+}
+
+[data-deck-mode="ascii"] [data-memory-atlas-entities] .memory-atlas-lift-stack[aria-pressed="true"] .memory-atlas-tile-face.depth-panel__face--ascii::after,
+[data-deck-mode="ascii"] [data-memory-atlas-entities] .memory-atlas-lift-stack.is-atlas-selected .memory-atlas-tile-face.depth-panel__face--ascii::after {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(54, 255, 115, 0.45) 3px,
+    rgba(54, 255, 115, 0.45) 4px
+  );
+}
+
+[data-deck-mode="realmorphism"] [data-memory-atlas-entities] .memory-atlas-lift-stack.realmorphism-control {
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+[data-deck-mode="realmorphism"] [data-morphism="realmorphism"] [data-memory-atlas-entities] .memory-atlas-lift-stack.realmorphism-control:hover:not(:disabled),
+[data-deck-mode="realmorphism"] [data-memory-atlas-entities] .memory-atlas-lift-stack.realmorphism-control:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: transparent;
+}
+
 /* Pane chrome toolbars — separate from rail (.ascii-morph-btn) */
 [data-morphism="asciimorphism"] .ascii-morph-btn {
   display: inline-flex;
