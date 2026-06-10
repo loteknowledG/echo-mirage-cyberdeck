@@ -65,7 +65,7 @@ export function CyberdeckWebTabFrame({
         ref={setWebviewRef}
         src={url}
         partition="persist:custom-tab-browser"
-        allowpopups
+        allowpopups=""
         className={className}
       />
     );

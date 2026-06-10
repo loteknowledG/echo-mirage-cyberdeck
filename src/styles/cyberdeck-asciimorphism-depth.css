@@ -19,6 +19,7 @@
   --deck-depth-ink-amber: #fcd34d;
   --deck-depth-ink-critical: #fca5a5;
   --deck-depth-ink-disabled: #565656;
+  --deck-green-text-glow: 0 0 6px rgba(54, 255, 115, 0.32);
 }
 
 [data-deck-mode="ascii"] .cyberdeck-message-box {
@@ -86,6 +87,7 @@
 [data-deck-mode="ascii"] .deck-depth-control:hover:not(:disabled) .depth-panel__face,
 [data-deck-mode="ascii"] .muthur-depth-control:hover:not(:disabled) .depth-panel__face {
   color: var(--deck-depth-ink-signal);
+  text-shadow: var(--deck-green-text-glow);
 }
 
 [data-deck-mode="ascii"] .deck-depth-control[data-posture="amber"]:hover:not(:disabled) .depth-panel__face,
@@ -104,7 +106,8 @@
 [data-deck-mode="ascii"] .muthur-depth-control.is-latched .depth-panel__face {
   transform: translate(var(--panel-depth), var(--panel-depth));
   color: var(--deck-depth-ink-signal);
-  text-shadow: 0 0 8px rgba(54, 255, 115, 0.38);
+  text-shadow: var(--deck-green-text-glow);
+  box-shadow: none;
 }
 
 [data-deck-mode="ascii"] .deck-depth-control[aria-pressed="true"]::before,
@@ -180,4 +183,9 @@
 
 [data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls {
   overflow: visible;
+}
+
+[data-deck-mode="ascii"] .depth-panel[data-glow="true"] .depth-panel__face {
+  text-shadow: none;
+  box-shadow: none;
 }

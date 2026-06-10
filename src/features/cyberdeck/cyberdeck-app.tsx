@@ -10,7 +10,6 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { isPropertyManagementTabKind } from "@/lib/cyberdeck/deck-app-registry";
 import type { CyberdeckVoiceTuning } from "@/lib/cyberdeck-voice-tuning";
 import type { Db8DeckSpeakLine } from "@/lib/db8-voice";
 import { MUTHUR_PRESET } from "@/voice/muthurPreset";
@@ -184,13 +183,6 @@ import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import {
-  DeckAppProvider,
-  loadDeckApp,
-  notifyDeckAppChange,
-  saveDeckApp,
-  type DeckAppId,
-} from "@/lib/deck-app";
 import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
 import { MORPHISM_ZONE_REALMORPHISM, paneToolbarMorphismZone } from "@/lib/cyberdeck/morphism-zones";
 import {
@@ -410,7 +402,6 @@ const CUSTOM_TAB_KINDS = [
   "sound-profile",
   "test-pane",
   "realmorphism-kit",
-  "apps",
   "call-center",
   "db8",
   "catelog",
@@ -507,8 +498,8 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Memory Atlas", kind: "memory-atlas", action: "convert" },
   { label: "Voice Lab", kind: "voice-lab", action: "convert" },
   { label: "Flight Log", kind: "flight-log", action: "convert" },
+  { label: "Call Center", kind: "call-center", action: "convert" },
   { label: "Drop Bay", kind: "drop-bay", action: "convert" },
-  { label: "Apps", kind: "apps", action: "convert" },
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Kit", action: "kit-pane" },
   { label: "Powerfist", kind: "rola-dex", action: "convert" },
@@ -522,12 +513,6 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
 ] as CustomTabContextMenuAction[]).sort((a, b) =>
   a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
 );
-
-/** Rail tab types available while Property Management is the active deck app. */
-const PROPERTY_MANAGEMENT_TAB_MENU_ACTIONS: CustomTabContextMenuAction[] = [
-  { label: "Apps", kind: "apps", action: "convert" },
-  { label: "Call Center", kind: "call-center", action: "convert" },
-];
 
 type CyberdeckChatHistoryMessage = {
   role: "user" | "assistant";
@@ -919,7 +904,6 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "rola-dex") return "#";
   if (kind === "sound-profile") return "♪";
   if (kind === "test-pane") return "T";
-  if (kind === "apps") return "A";
   if (kind === "call-center") return "CC";
   if (kind === "db8") return "8";
   if (kind === "muthur-execution") return "E";
@@ -936,7 +920,6 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "rola-dex") return "Rola Dex";
   if (kind === "sound-profile") return "Sound Profile";
   if (kind === "test-pane") return "Test";
-  if (kind === "apps") return "APPS";
   if (kind === "call-center") return "CALL CENTER";
   if (kind === "db8") return "DB8";
   if (kind === "muthur-execution") return "EXECUTION";
@@ -1008,7 +991,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test|apps|call-center|callcenter|call_center)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test|call-center|callcenter|call_center)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -1122,14 +1105,6 @@ export default function CyberdeckApp() {
   const [heapTextDraft, setHeapTextDraft] = useState("");
   const [heapHydrated, setHeapHydrated] = useState(false);
   const [deckMode, setDeckMode] = useState<DeckMode>(() => loadDeckMode());
-  const [deckApp, setDeckApp] = useState<DeckAppId>(() => loadDeckApp());
-  const customTabContextMenuActions = useMemo(
-    () =>
-      deckApp === "property-management"
-        ? PROPERTY_MANAGEMENT_TAB_MENU_ACTIONS
-        : CUSTOM_TAB_CONTEXT_MENU_ACTIONS,
-    [deckApp],
-  );
   const [audioMuted, setAudioMutedState] = useState<boolean>(() => isMuted());
   const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -1537,19 +1512,6 @@ export default function CyberdeckApp() {
     });
     loadOrchestrationBundle().then((bundle) => {
       setOrchestration(bundle);
-    });
-  }, []);
-
-  const toggleDeckMode = useCallback(() => {
-    setDeckMode((prev) => {
-      const next = prev === "ascii" ? "realmorphism" : "ascii";
-      emitSignal({
-        source: "system",
-        type: "mode_changed",
-        payload: { mode: next === "ascii" ? "ASCII" : "REALMORPHISM" },
-        severity: "info",
-      });
-      return next;
     });
   }, []);
 
@@ -2090,11 +2052,6 @@ export default function CyberdeckApp() {
     saveMuthurUplinkMode(muthurUplinkMode);
     setMUTHURMode(getMuthurUplinkModeMeta(muthurUplinkMode).internalMode);
   }, [muthurUplinkMode]);
-
-  useEffect(() => {
-    saveDeckApp(deckApp);
-    notifyDeckAppChange(deckApp);
-  }, [deckApp]);
 
   useEffect(() => {
     const onRequestEditMode = () => setOperatorDocMode("edit");
@@ -4868,21 +4825,6 @@ export default function CyberdeckApp() {
         return;
       }
 
-      if (
-        deckApp === "property-management" &&
-        !isPropertyManagementTabKind(tabCommand.surfaceKind)
-      ) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: "TAB_CONVERT_SKIPPED // PROPERTY_MANAGEMENT_ALLOWS_APPS_AND_CALL_CENTER_ONLY",
-          },
-        ]);
-        setIsStreaming(false);
-        return;
-      }
-
       convertCustomTab(activeCustomTabId, tabCommand.surfaceKind, {
         label: tabCommand.label,
         glyph: tabCommand.glyph,
@@ -6643,6 +6585,28 @@ const resolved = resolveUiTarget(userMessage);
     playDeckSystemSound("chirp", 0.05);
   }, []);
 
+  const openOrFocusCallCenterTab = useCallback(() => {
+    const customTabs = useCyberdeckTabStore.getState().customTabs;
+    const existing = customTabs.find((t) => t.kind === "call-center");
+    if (existing) {
+      useCyberdeckTabStore.getState().setActiveCustomTabId(existing.id);
+      setNavRailContext("tabs");
+      playDeckSystemSound("chirp", 0.05);
+      return;
+    }
+    const id = `tab-${crypto.randomUUID()}`;
+    const tab: CustomTab = {
+      id,
+      label: defaultCustomTabLabelForKind("call-center"),
+      glyph: defaultCustomTabGlyphForKind("call-center"),
+      kind: "call-center",
+    };
+    useCyberdeckTabStore.getState().setCustomTabs((prev) => [...prev, tab]);
+    useCyberdeckTabStore.getState().setActiveCustomTabId(id);
+    setNavRailContext("tabs");
+    playDeckSystemSound("chirp", 0.05);
+  }, []);
+
   const openOrFocusModuleTab = useCallback(
     (target:
       | "memory-atlas"
@@ -6922,8 +6886,6 @@ const resolved = resolveUiTarget(userMessage);
             kind="settings"
             voiceEnabled={voiceEnabled}
             onVoiceToggle={toggleVoiceEnabled}
-            deckMode={deckMode}
-            onDeckModeToggle={toggleDeckMode}
             audioMuted={audioMuted}
             onAudioMuteToggle={toggleAudioMuted}
             identity={identity}
@@ -7061,16 +7023,6 @@ const resolved = resolveUiTarget(userMessage);
         );
       }
 
-      if (tab.kind === "apps") {
-        return shell(
-          <ActivatedCyberdeckPane
-            kind="apps"
-            deckApp={deckApp}
-            onDeckAppChange={setDeckApp}
-          />,
-        );
-      }
-
       if (tab.kind === "call-center") {
         return (
           <div
@@ -7098,7 +7050,6 @@ const resolved = resolveUiTarget(userMessage);
       connectionState,
       activeProvider,
       customTabBrowserNavigate,
-      deckApp,
       deckMode,
       handleCustomTabDrop,
       heapEntries.length,
@@ -7112,7 +7063,6 @@ const resolved = resolveUiTarget(userMessage);
       operatorBrowserEngine,
       providerModelFetchStatus,
       streamText,
-      toggleDeckMode,
       speakDeckVoiceLine,
       toggleVoiceEnabled,
       updateCustomTab,
@@ -7126,10 +7076,8 @@ const resolved = resolveUiTarget(userMessage);
     <div
       ref={cyberdeckRootRef}
       data-deck-mode={deckMode}
-      data-deck-app={deckApp}
       className="terminal-window box-border flex h-full min-h-0 w-full flex-1 overflow-hidden bg-background font-mono text-green-500 max-md:min-h-0 max-md:flex-col md:h-screen"
     >
-      <DeckAppProvider appId={deckApp}>
       <DeckModeProvider mode={deckMode}>
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence
@@ -7226,7 +7174,7 @@ const resolved = resolveUiTarget(userMessage);
               </>
             ) : railTabContextMenu.variant === "new" ? (
               <>
-                {customTabContextMenuActions.map((action) => (
+                {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
                   <CyberdeckMenuButton
                     key={action.label}
                     type="button"
@@ -7239,7 +7187,7 @@ const resolved = resolveUiTarget(userMessage);
               </>
             ) : (
               <>
-                {customTabContextMenuActions.map((action) => (
+                {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
                   <CyberdeckMenuButton
                     key={`convert-${action.label}`}
                     type="button"
@@ -7275,6 +7223,16 @@ const resolved = resolveUiTarget(userMessage);
                 event.stopPropagation();
               }}
             >
+              <CyberdeckMenuButton
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeMirageContextMenu();
+                  openOrFocusCallCenterTab();
+                }}
+              >
+                Open Call Center
+              </CyberdeckMenuButton>
               <CyberdeckMenuButton
                 type="button"
                 role="menuitem"
@@ -8160,8 +8118,6 @@ const resolved = resolveUiTarget(userMessage);
                     kind="settings"
                     voiceEnabled={voiceEnabled}
                     onVoiceToggle={toggleVoiceEnabled}
-                    deckMode={deckMode}
-                    onDeckModeToggle={toggleDeckMode}
                     audioMuted={audioMuted}
                     onAudioMuteToggle={toggleAudioMuted}
                     identity={identity}
@@ -8174,7 +8130,6 @@ const resolved = resolveUiTarget(userMessage);
       </ResizablePanelGroup>
         </div>
       </DeckModeProvider>
-      </DeckAppProvider>
     </div>
   );
 }

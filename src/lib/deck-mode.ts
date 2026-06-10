@@ -12,8 +12,8 @@ import {
 /**
  * Deck content surface mode. Does not affect fixed asciimorphism chrome (rail, headers).
  *
- * - `realmorphism` — 3D shadow controls in the content zone.
- * - `ascii`        — asciimorphism mechanical depth on content controls.
+ * - `ascii`        — asciimorphism mechanical depth on content controls (default).
+ * - `realmorphism` — legacy 3D shadow controls; selector removed, locked to ascii for now.
  */
 export type DeckMode = "realmorphism" | "ascii";
 
@@ -22,17 +22,12 @@ export const DECK_MODE_CHANGE_EVENT = "echo-mirage-deck-mode-change";
 
 const DeckModeContext = createContext<DeckMode | null>(null);
 
-export function normalizeDeckMode(value: unknown): DeckMode {
-  return value === "ascii" ? "ascii" : "realmorphism";
+export function normalizeDeckMode(_value: unknown): DeckMode {
+  return "ascii";
 }
 
 export function loadDeckMode(): DeckMode {
-  if (typeof window === "undefined") return "realmorphism";
-  try {
-    return normalizeDeckMode(window.localStorage.getItem(DECK_MODE_STORAGE_KEY));
-  } catch {
-    return "realmorphism";
-  }
+  return "ascii";
 }
 
 export function saveDeckMode(mode: DeckMode) {

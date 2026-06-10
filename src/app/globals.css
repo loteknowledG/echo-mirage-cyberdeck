@@ -228,7 +228,17 @@ body,
 
 .terminal-window {
   /* animation: flicker 0.15s infinite; */
-  text-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+  --deck-green-text-glow: 0 0 6px rgba(54, 255, 115, 0.32);
+  text-shadow: none;
+}
+
+/* Subtle phosphor on green terminal ink — text only, not button washes */
+.terminal-window :where([class*="text-green-"], [class*="text-emerald-"]) {
+  text-shadow: var(--deck-green-text-glow);
+}
+
+.terminal-window :where([class*="text-gray-"], [class*="text-neutral-"], [class*="text-[#"]) {
+  text-shadow: none;
 }
 
 /* Force cyberdeck mono text to Hack. */
@@ -755,7 +765,7 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 [data-memory-atlas-entities] .memory-atlas-lift-stack[aria-pressed="true"] .memory-atlas-tile-face,
 [data-memory-atlas-entities] .memory-atlas-lift-stack.is-atlas-selected .memory-atlas-tile-face {
   transform: translate(var(--atlas-wall-depth), var(--atlas-wall-depth));
-  text-shadow: 0 0 12px rgba(54, 255, 115, 0.38);
+  text-shadow: var(--deck-green-text-glow, 0 0 6px rgba(54, 255, 115, 0.32));
   box-shadow: inset 0 0 0 1px rgba(54, 255, 115, 0.2);
 }
 
@@ -906,7 +916,7 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-signal .ascii-morph-btn-face {
-  text-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
+  text-shadow: var(--deck-green-text-glow, 0 0 6px rgba(54, 255, 115, 0.32));
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-amber {
@@ -915,7 +925,7 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-amber .ascii-morph-btn-face {
-  text-shadow: 0 0 8px rgba(255, 191, 77, 0.45);
+  text-shadow: none;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-critical {
@@ -929,7 +939,7 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 
 [data-morphism="asciimorphism"] .ascii-morph-btn:hover .ascii-morph-btn-face {
   transform: translateY(-4px) translateX(-2px);
-  text-shadow: 0 0 10px rgba(114, 137, 218, 0.35);
+  text-shadow: none;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn:hover {
@@ -938,7 +948,7 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-signal:hover .ascii-morph-btn-face {
   color: #36ff73;
-  text-shadow: 0 0 12px rgba(54, 255, 115, 0.38);
+  text-shadow: var(--deck-green-text-glow, 0 0 6px rgba(54, 255, 115, 0.32));
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn:active .ascii-morph-btn-face {
@@ -960,7 +970,7 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed.is-signal .ascii-morph-btn-face {
-  text-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
+  text-shadow: var(--deck-green-text-glow, 0 0 6px rgba(54, 255, 115, 0.32));
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed:hover .ascii-morph-btn-face {
@@ -969,7 +979,7 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed.is-signal:hover .ascii-morph-btn-face {
   color: #36ff73;
-  text-shadow: 0 0 12px rgba(54, 255, 115, 0.38);
+  text-shadow: var(--deck-green-text-glow, 0 0 6px rgba(54, 255, 115, 0.32));
 }
 
 /* Custom Scrollbar for Cyberdeck */
@@ -1456,8 +1466,9 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 
 /* Echo Mirage wireframe override — content zone only ([data-morphism="realmorphism"]).
    Asciimorphism chrome (rail, echo/mirage/pane headers) is never touched.
-   Kit showroom ([data-registry-showroom]) keeps full realmorphism color. */
-[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) {
+   Kit showroom ([data-registry-showroom]) keeps full realmorphism color.
+   Phosphor glow is intentional on depth/ASCII controls — do not blanket-strip text-shadow. */
+[data-deck-mode="ascii"] [data-morphism="realmorphism"]:not(:where([data-registry-showroom] *)) .realmorphism-control {
   text-shadow: none !important;
 }
 

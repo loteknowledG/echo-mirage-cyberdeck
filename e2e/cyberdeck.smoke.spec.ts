@@ -87,15 +87,8 @@ test("cyberdeck renders and switches required alpha modules", async ({ page }) =
   await expect(page.getByText("DECK :: cold start :: SUCCESS")).toBeVisible();
 
   await openAuditSurface(page, "Settings");
-  await expect(page.getByText("REALMORPHISM / WIREFRAME OVERRIDE")).toBeVisible({ timeout: 30000 });
-
-  const modeSwitch = page.getByRole("switch", { name: /Realmorphism content mode on|Wireframe override on/ });
-  await expect(modeSwitch).toBeVisible();
+  await expect(page.getByText("DEPTH PANEL LAB")).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText("MECHANICAL DEPTH PRIMITIVE")).toBeVisible();
   const deckRoot = page.locator("[data-deck-mode]").first();
-  await expect(deckRoot).toHaveAttribute("data-deck-mode", /^(realmorphism|ascii)$/);
-  const initialMode = await deckRoot.getAttribute("data-deck-mode");
-  const initialSwitchLabel = await modeSwitch.getAttribute("aria-label");
-  await modeSwitch.click();
-  await expect(deckRoot).not.toHaveAttribute("data-deck-mode", initialMode!);
-  await expect(modeSwitch).not.toHaveAttribute("aria-label", initialSwitchLabel!);
+  await expect(deckRoot).toHaveAttribute("data-deck-mode", "ascii");
 });

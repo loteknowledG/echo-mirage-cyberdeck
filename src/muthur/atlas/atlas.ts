@@ -98,7 +98,11 @@ export class SemanticAtlas {
     const coreConcepts: Array<{ id: string; name: string; summary: string }> = [
       { id: "concept:voice", name: "Voice", summary: "Speech synthesis and voice interaction" },
       { id: "concept:memory", name: "Memory", summary: "Persistent memory and recall systems" },
-      { id: "concept:audio", name: "Audio", summary: "Audio processing and playback" },
+      {
+        id: "concept:audio",
+        name: "Audio",
+        summary: "Deck SFX — Web Audio synthesis, keyboard/nav sounds, sonar, chime fallbacks.",
+      },
       { id: "concept:identity", name: "Identity", summary: "Identity persistence and bootstrapping" },
     ];
 

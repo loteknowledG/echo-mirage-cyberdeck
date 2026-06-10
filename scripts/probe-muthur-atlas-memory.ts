@@ -51,6 +51,20 @@ async function testInProcessAtlasMemory(): Promise<void> {
   assert.ok(paneEntities.some((entity) => entity.id === "project:echo-mirage"));
   assert.ok(paneEntities.some((entity) => entity.id === "concept:muthur"));
 
+  const muthurPane = paneEntities.find((entity) => entity.id === "concept:muthur");
+  assert.ok(muthurPane?.locations.length, "expected MUTHUR entity locations");
+  assert.ok(
+    muthurPane?.locations.some((loc) => loc.path.includes("boot_muthur.ts")),
+    "expected boot path in MUTHUR locations",
+  );
+
+  const audioPane = paneEntities.find((entity) => entity.id === "concept:audio");
+  assert.ok(audioPane?.locations.length, "expected Audio entity locations");
+  assert.ok(
+    audioPane?.locations.some((loc) => loc.path.includes("AudioEngine.js")),
+    "expected AudioEngine path in Audio locations",
+  );
+
   const resolved = await atlas.resolveEntity("muthur");
   assert.ok(resolved.entity, "expected MUTHUR entity resolution");
   assert.ok(resolved.hardRelations.length >= 1, "expected doctrine relations");

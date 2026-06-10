@@ -17,7 +17,6 @@ export const CYBERDECK_PANE_KINDS = [
   "rola-dex",
   "sound-profile",
   "test-pane",
-  "apps",
   "call-center",
   "db8",
 ] as const;
@@ -62,7 +61,6 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   "rola-dex": { label: "ROLA-DEX", fetchHints: ["DEX", "CAROUSEL"] },
   "sound-profile": { label: "SOUND PROFILE", fetchHints: ["PROFILE", "SFX"] },
   "test-pane": { label: "TEST", fetchHints: ["EMBLA", "4-WAY"] },
-  apps: { label: "APPS", fetchHints: ["REGISTRY", "APP PROFILE", "OPERATOR TARGET"] },
   "call-center": { label: "CALL CENTER", fetchHints: ["QUEUE", "INBOUND", "RESIDENT COMMS"] },
   db8: { label: "DB8", fetchHints: ["CHAMBER", "DEBATE ROUND", "CONSENSUS"] },
 };

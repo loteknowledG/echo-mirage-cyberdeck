@@ -201,8 +201,29 @@ export function CyberdeckMemoryAtlasPaneBody() {
                     />
                   </div>
                   <div className="mt-1 text-[9px] text-[#b8b8b8]">{Math.round(selectedEntity.confidence * 100)}%</div>
-                  <div className="mt-3 text-[9px] text-[#8f8f8f]">SOURCE</div>
-                  <div className="text-[9px] text-[#cfcfcf]">{selectedEntity.source}</div>
+                  <div className="mt-3 text-[9px] text-[#8f8f8f]">LOCATIONS</div>
+                  <div className="space-y-1 text-[9px] text-[#cfcfcf]">
+                    {selectedEntity.locations.length === 0 ? (
+                      <div className="text-[#8f8f8f]">NO CANONICAL PATH — {selectedEntity.source}</div>
+                    ) : (
+                      selectedEntity.locations.map((location) => (
+                        <div
+                          key={`${selectedEntity.id}-${location.path}-${location.locator}`}
+                          className="break-all font-mono"
+                        >
+                          <span className="text-[#9aa7ff]">{location.locatorType.toUpperCase()}</span>
+                          {" :: "}
+                          {location.path}
+                          {location.isPrimary ? (
+                            <span className="text-emerald-300/90"> // PRIMARY</span>
+                          ) : null}
+                          {location.authority !== "inferred" ? (
+                            <span className="text-[#8f8f8f]"> [{location.authority}]</span>
+                          ) : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               ) : null}
             </div>
