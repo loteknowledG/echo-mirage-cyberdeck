@@ -9,6 +9,7 @@ import {
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { CyberdeckFilterButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import type { MuthurAction, MuthurActionStatus } from "@/lib/muthur/execution/execution-types";
+import type { MuthurPatrolReceipt } from "@/lib/muthur/runtime/runtime-types";
 import { useMuthurExecutionRuntime } from "@/lib/muthur/execution/use-muthur-execution-runtime";
 import { useMuthurPersistentRuntime } from "@/lib/muthur/runtime/use-muthur-persistent-runtime";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,23 @@ function consoleErrorCount(action: MuthurAction | null | undefined): number {
     }).length;
   }
   return 0;
+}
+
+function PatrolHistoryRow({ patrol }: { patrol: MuthurPatrolReceipt }) {
+  return (
+    <div className="border border-[#1a1a1a] bg-black px-2 py-1.5 font-mono text-[9px]">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={patrol.passed ? "text-emerald-300" : "text-red-300"}>
+          {patrol.passed ? "PASS" : "FAIL"}
+        </span>
+        <span className="text-[#888]">{patrol.source ?? "runtime"}</span>
+        <span className="text-emerald-300/80">{patrol.task_label}</span>
+      </div>
+      <div className="mt-1 truncate text-[#666]">
+        {patrol.checks.map((check) => `${check.check}:${check.passed ? "ok" : "fail"}`).join(" // ")}
+      </div>
+    </div>
+  );
 }
 
 function ActionRow({
@@ -246,10 +264,24 @@ export function MuthurExecutionPaneBody() {
             </div>
           )}
 
+          {(runtimeState?.patrol_history.length ?? 0) > 1 ? (
+            <div className="space-y-1">
+              <div className="font-mono text-[9px] uppercase tracking-wide text-[#777]">Patrol history</div>
+              <div className="custom-scrollbar flex max-h-[10rem] flex-col gap-1 overflow-y-auto">
+                {runtimeState?.patrol_history.slice(0, 12).map((patrol) => (
+                  <PatrolHistoryRow key={patrol.id} patrol={patrol} />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap gap-2 font-mono text-[9px] tracking-wide text-[#8a8a8a]">
             <span>LOOP // {loopLabel}</span>
             <span>MODE // {modeLabel}</span>
             <span>QUEUE // {queueLength}</span>
+            {runtimeState?.task_queue.length ? (
+              <span>BG TASKS // {runtimeState.task_queue.length}</span>
+            ) : null}
             {state?.current_task ? <span>TASK // {state.current_task}</span> : null}
             {runtimeState ? <span>PATROLS // {runtimeState.patrol_count}</span> : null}
           </div>

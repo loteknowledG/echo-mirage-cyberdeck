@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { runGitDiff, runWorkspaceExec } from "@/lib/muthur-core/workspace-tools.server";
+import { schedulePostCodingVerifyPatrol } from "@/lib/muthur/runtime/schedule-patrol.server";
 import type { MuthurCodingVerifyReceipt, MuthurToolExecutionContext } from "@/lib/muthur-core/types";
 
 const RECEIPT_DIR = path.join(process.cwd(), ".muthur", "receipts", "coding");
@@ -81,5 +82,9 @@ export async function maybeFinalizeCodingVerify(
   const receipt = await runCodingVerify(ctx.codingTouches);
   ctx.codingVerify = receipt;
   write(formatCodingVerifyForStream(receipt));
+  if (receipt.passed && ctx.uplinkMode === "agent") {
+    schedulePostCodingVerifyPatrol(receipt.touched_paths);
+    write("⏳ MUTHUR // runtime patrol queued (tsc + /cyberdeck)…\n");
+  }
   return receipt;
 }

@@ -1,12 +1,17 @@
 import { getMuthurRuntimeStore, type MuthurRuntimeStore } from "./runtime-store.server";
 import { runMuthurHealthPatrol } from "./patrol.server";
-import type { MuthurPersistentRuntimeState } from "./runtime-types";
+import type {
+  MuthurBackgroundTask,
+  MuthurBackgroundTaskKind,
+  MuthurPersistentRuntimeState,
+} from "./runtime-types";
 
 export class MuthurPersistentRuntime {
   private store: MuthurRuntimeStore;
   private watchTimer: ReturnType<typeof setInterval> | null = null;
   private hydrated = false;
   private patrolPromise: Promise<void> | null = null;
+  private taskPumpPromise: Promise<void> | null = null;
 
   constructor(store: MuthurRuntimeStore) {
     this.store = store;
@@ -49,6 +54,7 @@ export class MuthurPersistentRuntime {
   disposeForTests(): void {
     this.stopWatchTimer();
     this.patrolPromise = null;
+    this.taskPumpPromise = null;
     this.hydrated = false;
   }
 
@@ -71,7 +77,59 @@ export class MuthurPersistentRuntime {
     return this.store.getSnapshot();
   }
 
-  async patrolNow(taskLabel = "manual-patrol"): Promise<MuthurPersistentRuntimeState> {
+  async enqueueTask(input: {
+    kind: MuthurBackgroundTaskKind;
+    label: string;
+    source: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<MuthurPersistentRuntimeState> {
+    await this.ensureHydrated();
+    this.store.enqueueTask(input);
+    await this.store.persistToDisk();
+    await this.processTaskQueue();
+    return this.store.getSnapshot();
+  }
+
+  private async processTaskQueue(): Promise<void> {
+    if (this.taskPumpPromise) return;
+    this.taskPumpPromise = (async () => {
+      try {
+        while (this.store.peekTask()) {
+          if (this.store.getSnapshot().patrol_in_flight || this.patrolPromise) {
+            await this.patrolPromise;
+            continue;
+          }
+          const task = this.store.shiftTask();
+          if (!task) break;
+          await this.runBackgroundTask(task);
+          await this.store.persistToDisk();
+        }
+      } finally {
+        this.taskPumpPromise = null;
+      }
+    })();
+    await this.taskPumpPromise;
+  }
+
+  private async runBackgroundTask(task: MuthurBackgroundTask): Promise<void> {
+    const running: MuthurBackgroundTask = { ...task, status: "running" };
+    try {
+      if (task.kind === "patrol" || task.kind === "verify_cyberdeck") {
+        await this.patrolNow(task.label, task.source);
+        this.store.completeTask(running, "completed");
+        return;
+      }
+      this.store.completeTask(running, "failed", `Unsupported task kind: ${task.kind}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Background task failed.";
+      this.store.completeTask(running, "failed", message);
+    }
+  }
+
+  async patrolNow(
+    taskLabel = "manual-patrol",
+    source = "manual",
+  ): Promise<MuthurPersistentRuntimeState> {
     await this.ensureHydrated();
     if (this.store.getSnapshot().patrol_in_flight) {
       return this.store.getSnapshot();
@@ -86,7 +144,7 @@ export class MuthurPersistentRuntime {
 
     this.patrolPromise = (async () => {
       try {
-        const receipt = await runMuthurHealthPatrol(taskLabel);
+        const receipt = await runMuthurHealthPatrol(taskLabel, source);
         const receiptPath = await this.store.appendPatrolReceipt(receipt);
         receipt.receipt_path = receiptPath;
         this.store.recordPatrol(receipt);
@@ -99,6 +157,7 @@ export class MuthurPersistentRuntime {
           passed: false,
           checks: [{ check: "patrol", passed: false, message }],
           task_label: taskLabel,
+          source,
         });
       } finally {
         this.store.setPatrolInFlight(false);

@@ -13,7 +13,10 @@ async function devServerReachable(baseUrl: string): Promise<boolean> {
   }
 }
 
-export async function runMuthurHealthPatrol(taskLabel = "runtime-patrol"): Promise<MuthurPatrolReceipt> {
+export async function runMuthurHealthPatrol(
+  taskLabel = "runtime-patrol",
+  source = "runtime",
+): Promise<MuthurPatrolReceipt> {
   const startedAt = new Date().toISOString();
   const checks: MuthurPatrolCheck[] = [];
   const loop = getMuthurExecutionLoop();
@@ -92,6 +95,7 @@ export async function runMuthurHealthPatrol(taskLabel = "runtime-patrol"): Promi
     passed,
     checks,
     task_label: taskLabel,
+    source,
     receipt_path: routeReceiptPath,
   };
 }

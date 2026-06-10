@@ -5710,9 +5710,15 @@ const resolved = resolveUiTarget(userMessage);
       const codingVerifyReceipt =
         streamPayload.codingVerify ?? parseCodingVerifyHeader(res.headers.get("x-muthur-coding-verify"));
       if (codingVerifyReceipt) {
+        const systemLines = [formatCodingVerifySystemLine(codingVerifyReceipt)];
+        if (codingVerifyReceipt.passed && muthurUplinkMode === "agent") {
+          systemLines.push(
+            "RUNTIME PATROL // queued after coding verify (tsc + /cyberdeck in background)",
+          );
+        }
         setMessages((prev) => [
           ...prev,
-          { role: "system", text: formatCodingVerifySystemLine(codingVerifyReceipt) },
+          ...systemLines.map((text) => ({ role: "system" as const, text })),
         ]);
       }
 

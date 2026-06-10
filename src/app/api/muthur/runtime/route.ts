@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMuthurPersistentRuntime } from "@/lib/muthur/runtime/persistent-runtime.server";
+import { MUTHUR_BACKGROUND_TASK_KINDS, type MuthurBackgroundTaskKind } from "@/lib/muthur/runtime/runtime-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,28 @@ export async function POST(req: NextRequest) {
 
     if (op === "patrol_now") {
       const taskLabel = typeof body.taskLabel === "string" ? body.taskLabel : "ui-patrol";
-      const state = await runtimeService.patrolNow(taskLabel);
+      const source = typeof body.source === "string" ? body.source : "ui";
+      const state = await runtimeService.patrolNow(taskLabel, source);
+      return NextResponse.json({ ok: true, state });
+    }
+
+    if (op === "enqueue_task") {
+      const kind = typeof body.kind === "string" ? body.kind : "";
+      if (!(MUTHUR_BACKGROUND_TASK_KINDS as readonly string[]).includes(kind)) {
+        return NextResponse.json({ error: "Invalid task kind." }, { status: 400 });
+      }
+      const label = typeof body.label === "string" ? body.label : `task-${Date.now()}`;
+      const source = typeof body.source === "string" ? body.source : "api";
+      const metadata =
+        body.metadata && typeof body.metadata === "object"
+          ? (body.metadata as Record<string, unknown>)
+          : undefined;
+      const state = await runtimeService.enqueueTask({
+        kind: kind as MuthurBackgroundTaskKind,
+        label,
+        source,
+        metadata,
+      });
       return NextResponse.json({ ok: true, state });
     }
 

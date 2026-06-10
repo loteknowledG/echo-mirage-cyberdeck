@@ -72,7 +72,18 @@ export function useMuthurPersistentRuntime(pollMs = 2000, pollEnabled = true) {
     startWatch: () => control({ op: "start_watch" }),
     stopWatch: () => control({ op: "stop_watch" }),
     patrolNow: (taskLabel?: string) =>
-      control({ op: "patrol_now", taskLabel: taskLabel ?? "ui-patrol" }),
+      control({ op: "patrol_now", taskLabel: taskLabel ?? "ui-patrol", source: "ui" }),
+    enqueueTask: (input: {
+      kind: "patrol" | "verify_cyberdeck";
+      label: string;
+      source?: string;
+    }) =>
+      control({
+        op: "enqueue_task",
+        kind: input.kind,
+        label: input.label,
+        source: input.source ?? "ui",
+      }),
     stop: () => control({ op: "stop" }),
     reset: () => control({ op: "reset" }),
   };

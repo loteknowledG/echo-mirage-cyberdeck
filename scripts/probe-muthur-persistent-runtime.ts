@@ -66,13 +66,22 @@ async function testInProcessRuntime(): Promise<void> {
   assert.equal(stopped.watch_enabled, false);
   assert.equal(stopped.posture, "standby");
 
+  const enqueued = await runtime.enqueueTask({
+    kind: "patrol",
+    label: "probe-enqueued-patrol",
+    source: "probe",
+  });
+  assert.ok(enqueued.recent_tasks.length >= 1 || enqueued.patrol_count >= 1);
+
   const beforePatrolCount = (await runtime.getState()).patrol_count;
-  await runtime.patrolNow("probe-in-process-patrol");
+  await runtime.patrolNow("probe-in-process-patrol", "probe");
   const afterPatrol = await runtime.getState();
   assert.ok(afterPatrol.last_patrol, "expected patrol receipt");
   assert.equal(afterPatrol.patrol_count, beforePatrolCount + 1);
   assert.ok(Array.isArray(afterPatrol.last_patrol?.checks));
   assert.equal(afterPatrol.last_patrol?.checks.length, 2);
+  assert.ok(afterPatrol.patrol_history.length >= 1);
+  assert.equal(afterPatrol.last_patrol?.source, "probe");
 
   try {
     const sessionRaw = await fs.readFile(SESSION_PATH, "utf8");
@@ -103,6 +112,26 @@ async function testRuntimeApi(baseUrl: string): Promise<void> {
   const watchData = (await watchRes.json()) as { state?: { watch_enabled?: boolean } };
   assert.equal(watchRes.ok, true);
   assert.equal(watchData.state?.watch_enabled, true);
+
+  const enqueueRes = await fetch(`${baseUrl}/api/muthur/runtime`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      op: "enqueue_task",
+      kind: "patrol",
+      label: "probe-api-enqueue",
+      source: "probe",
+    }),
+  });
+  const enqueueData = (await enqueueRes.json()) as {
+    state?: { task_queue?: unknown[]; recent_tasks?: unknown[] };
+  };
+  assert.equal(enqueueRes.ok, true);
+  assert.ok(
+    (enqueueData.state?.task_queue?.length ?? 0) +
+      (enqueueData.state?.recent_tasks?.length ?? 0) >=
+      1,
+  );
 
   const stopRes = await fetch(`${baseUrl}/api/muthur/runtime`, {
     method: "POST",

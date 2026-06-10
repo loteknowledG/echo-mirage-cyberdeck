@@ -1,7 +1,12 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import {
   createEmptyPersistentRuntimeState,
+  MAX_PATROL_HISTORY,
+  MAX_RECENT_TASKS,
+  type MuthurBackgroundTask,
+  type MuthurBackgroundTaskKind,
   type MuthurPersistentRuntimeState,
   type MuthurPatrolReceipt,
 } from "./runtime-types";
@@ -44,6 +49,9 @@ export class MuthurRuntimeStore {
       this.state = {
         ...createEmptyPersistentRuntimeState(),
         ...parsed,
+        patrol_history: Array.isArray(parsed.patrol_history) ? parsed.patrol_history : [],
+        task_queue: Array.isArray(parsed.task_queue) ? parsed.task_queue : [],
+        recent_tasks: Array.isArray(parsed.recent_tasks) ? parsed.recent_tasks : [],
         patrol_in_flight: false,
         heartbeat_at: new Date().toISOString(),
       };
@@ -82,12 +90,62 @@ export class MuthurRuntimeStore {
   }
 
   recordPatrol(receipt: MuthurPatrolReceipt): void {
+    const patrol_history = [receipt, ...this.state.patrol_history].slice(0, MAX_PATROL_HISTORY);
     this.patch({
       last_patrol: receipt,
+      patrol_history,
       patrol_count: this.state.patrol_count + 1,
       patrol_in_flight: false,
       posture: this.state.watch_enabled ? "watch" : "standby",
     });
+  }
+
+  enqueueTask(input: {
+    kind: MuthurBackgroundTaskKind;
+    label: string;
+    source: string;
+    metadata?: Record<string, unknown>;
+  }): MuthurBackgroundTask {
+    const task: MuthurBackgroundTask = {
+      id: randomUUID(),
+      kind: input.kind,
+      label: input.label,
+      source: input.source,
+      status: "queued",
+      created_at: new Date().toISOString(),
+      metadata: input.metadata,
+    };
+    this.patch({ task_queue: [...this.state.task_queue, task] });
+    return task;
+  }
+
+  peekTask(): MuthurBackgroundTask | null {
+    return this.state.task_queue[0] ?? null;
+  }
+
+  shiftTask(): MuthurBackgroundTask | null {
+    if (this.state.task_queue.length === 0) return null;
+    const [next, ...rest] = this.state.task_queue;
+    this.patch({ task_queue: rest });
+    return next ?? null;
+  }
+
+  updateTask(taskId: string, partial: Partial<MuthurBackgroundTask>): void {
+    const task_queue = this.state.task_queue.map((task) =>
+      task.id === taskId ? { ...task, ...partial } : task,
+    );
+    this.patch({ task_queue });
+  }
+
+  completeTask(task: MuthurBackgroundTask, status: "completed" | "failed", error?: string): void {
+    const finished: MuthurBackgroundTask = {
+      ...task,
+      status,
+      completed_at: new Date().toISOString(),
+      error,
+    };
+    const recent_tasks = [finished, ...this.state.recent_tasks].slice(0, MAX_RECENT_TASKS);
+    this.patch({ recent_tasks });
   }
 
   stop(): void {
