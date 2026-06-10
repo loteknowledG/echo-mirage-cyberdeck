@@ -26,6 +26,12 @@ import {
   messageNeedsOperatorContext,
   shouldEnableMuthurTools,
 } from "@/lib/muthur-core/muthur-chat-intent";
+import {
+  buildUplinkModeSystemPrompt,
+  normalizeMuthurUplinkMode,
+  shouldEnableToolsForUplinkMode,
+  type MuthurUplinkMode,
+} from "@/lib/muthur-uplink-mode";
 
 const MUTHUR_AVAILABLE_TOOLS_PROMPT =
   "\n\nAVAILABLE TOOLS:" +
@@ -47,14 +53,39 @@ const MUTHUR_AVAILABLE_TOOLS_PROMPT =
   "\nWhen a file is already open in the operator pane, NEVER use localfs write on that file — only suggest_operator_edit." +
   "\nNever use justbash/find to locate the user's open document — use observe_operator_pane for the file already open in the operator pane.";
 
-function buildDocumentEditHint(message: string, operatorContext?: OperatorChatContext | null): string {
+function buildDocumentEditHint(
+  message: string,
+  operatorContext: OperatorChatContext | null | undefined,
+  uplinkMode: MuthurUplinkMode,
+): string {
   if (!isOperatorPaneEditRequest(message, operatorContext)) return "";
+
+  if (uplinkMode === "ask") {
+    return (
+      "\n\nOPERATOR HINT: User mentioned a change but uplink is ASK mode. " +
+      "Ask clarifying questions to understand what they want. Do NOT edit or create files."
+    );
+  }
+  if (uplinkMode === "plan") {
+    return (
+      "\n\nOPERATOR HINT: User mentioned a change but uplink is PLAN mode. " +
+      "Brainstorm the approach and outline steps — do NOT call suggest_operator_edit, localfs, convert, or export. " +
+      "Tell the operator to switch to Debug (edit, manual save) or Agent (edit + auto-save) to apply changes."
+    );
+  }
 
   const ctxPath = operatorContext?.localFilePath?.trim() ?? "";
   const ctxName = operatorContext?.fileName?.trim() ?? "";
   const ctxSurface = operatorContext?.previewSurface ?? "";
 
   if (isDocxFileName(ctxName) || ctxSurface === "docx") {
+    if (uplinkMode === "debug") {
+      return (
+        "\n\nOPERATOR HINT: User wants to edit a DOCX open in the operator pane. " +
+        "Debug mode cannot convert DOCX. Switch to Agent to convert to markdown, edit, and save. " +
+        "Do NOT use justbash or localfs to search the filesystem."
+      );
+    }
     return (
       "\n\nOPERATOR HINT: User wants to edit a DOCX open in the operator pane. " +
       "Do NOT use justbash or localfs to search the filesystem. " +
@@ -72,20 +103,29 @@ function buildDocumentEditHint(message: string, operatorContext?: OperatorChatCo
   );
   if (!obs?.editor?.active && !(hasOpenDocument && hasTextContext)) {
     if (isDocxFileName(obs?.visibleDocument ?? null)) {
-      return buildDocumentEditHint(message, {
-        fileName: obs?.visibleDocument ?? undefined,
-        previewSurface: "docx",
-        localFilePath: obs?.editor?.filePath ?? undefined,
-      });
+      return buildDocumentEditHint(
+        message,
+        {
+          fileName: obs?.visibleDocument ?? undefined,
+          previewSurface: "docx",
+          localFilePath: obs?.editor?.filePath ?? undefined,
+        },
+        uplinkMode,
+      );
     }
     return "\n\nOPERATOR HINT: User wants a document edit but no text editor is active. Open the file in the operator pane. For DOCX, convert to markdown first.";
   }
+  const saveHint =
+    uplinkMode === "agent"
+      ? "Edits auto-save to disk when a writable path exists."
+      : "Debug mode: edits stay in the pane — operator saves manually (Ctrl+S).";
+
   return (
     "\n\nOPERATOR HINT: User wants an in-pane edit on the open operator document. " +
     "Call observe_operator_pane, then suggest_operator_edit to remove/replace the requested text. " +
     "Do NOT use localfs write on a file already open in the operator pane — use suggest_operator_edit only. " +
     "For HTML comments or a single top line, use replace_line_range with startLine=1 endLine=1. " +
-    "Edits apply immediately — confirm what changed; Ctrl+Z undoes in the operator pane. " +
+    `${saveHint} Confirm what changed; Ctrl+Z undoes in the operator pane. ` +
     "Do NOT search the filesystem with justbash."
   );
 }
@@ -178,20 +218,25 @@ function buildEditorContextPrompt(): string {
 function buildMuthurSystemContent(args: {
   message: string;
   operatorContext: OperatorChatContext | null;
+  uplinkMode: MuthurUplinkMode;
   memoryPrompt: string;
   browserPrompt: string;
   glyphPrompt: string;
   glyphDoctrine: string;
 }): { systemContent: string; toolsEnabled: boolean } {
-  const toolsEnabled = shouldEnableMuthurTools(args.message);
+  const toolsEnabled =
+    shouldEnableMuthurTools(args.message) &&
+    shouldEnableToolsForUplinkMode(args.uplinkMode, args.message);
   const needsOperator = messageNeedsOperatorContext(args.message, args.operatorContext);
 
   let systemContent =
     "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful.";
 
+  systemContent += buildUplinkModeSystemPrompt(args.uplinkMode);
+
   if (toolsEnabled) {
     systemContent += MUTHUR_AVAILABLE_TOOLS_PROMPT;
-    systemContent += buildDocumentEditHint(args.message, args.operatorContext);
+    systemContent += buildDocumentEditHint(args.message, args.operatorContext, args.uplinkMode);
     if (needsOperator) {
       systemContent += formatOperatorChatContextPrompt(args.operatorContext);
       systemContent += buildEditorContextPrompt();
@@ -328,8 +373,10 @@ export async function POST(request: Request) {
       glyphContext,
       history,
       operatorContext: operatorContextRaw,
+      uplinkMode: uplinkModeRaw,
     } = body;
     const operatorContext = parseOperatorChatContext(operatorContextRaw);
+    const uplinkMode = normalizeMuthurUplinkMode(uplinkModeRaw);
     const chatHistory = normalizeChatHistory(history);
     const clientHasMemory =
       typeof memoryContext === "string" && memoryContext.trim().length > 0;
@@ -498,6 +545,7 @@ export async function POST(request: Request) {
         const { systemContent, toolsEnabled } = buildMuthurSystemContent({
           message,
           operatorContext,
+          uplinkMode,
           memoryPrompt,
           browserPrompt,
           glyphPrompt,
@@ -517,6 +565,7 @@ export async function POST(request: Request) {
           baseMessages,
           registry: toolsEnabled ? await resolveToolRegistry() : EMPTY_TOOL_REGISTRY,
           toolsEnabled,
+          uplinkMode,
         });
       }
     }
@@ -578,6 +627,7 @@ export async function POST(request: Request) {
     const { systemContent, toolsEnabled } = buildMuthurSystemContent({
       message: userMessage,
       operatorContext,
+      uplinkMode,
       memoryPrompt: fallbackMemoryPrompt,
       browserPrompt,
       glyphPrompt,
@@ -598,6 +648,7 @@ export async function POST(request: Request) {
         baseMessages,
         registry: toolsEnabled ? await resolveToolRegistry() : EMPTY_TOOL_REGISTRY,
         toolsEnabled,
+        uplinkMode,
       });
     }
 

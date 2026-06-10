@@ -16,6 +16,7 @@ import { extractOperatorEditFromToolOutput } from "@/lib/muthur-core/suggest-ope
 import { recordCodingTouch } from "@/lib/muthur-core/coding-touch";
 import { extractOperatorConversionRef } from "@/lib/muthur-core/operator-conversion-ref";
 import { extractOperatorOpenRef } from "@/lib/muthur-core/operator-open-file-ref";
+import { formatBlockedToolMessage, isToolAllowedForUplinkMode } from "@/lib/muthur-uplink-mode";
 import type { MuthurToolExecutionContext, ToolCall, ToolRegistry } from "@/lib/muthur-core/types";
 
 /** MUTHUR chat hot path — run tools directly, no execution-loop allowlist or approval gates. */
@@ -44,6 +45,11 @@ export async function executeRegistryToolForOpenAi(
   const tool = registry.tools[functionName];
   if (!tool) {
     return `[TOOL ERROR] Unknown function: ${functionName}`;
+  }
+
+  const uplinkMode = ctx?.uplinkMode ?? "plan";
+  if (!isToolAllowedForUplinkMode(uplinkMode, functionName)) {
+    return formatBlockedToolMessage(uplinkMode, functionName);
   }
 
   const call: ToolCall = { toolName: functionName, args, executionContext: ctx };

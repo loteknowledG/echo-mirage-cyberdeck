@@ -2,7 +2,8 @@ import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { executeMuthurChatTool } from "@/lib/muthur-core/execute-openai-tool";
-import { MUTHUR_OPENAI_TOOLS } from "@/lib/muthur-core/openai-tool-definitions";
+import { getMuthurOpenAiToolsForMode } from "@/lib/muthur-core/openai-tool-definitions";
+import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
 import { appendMuthurStreamFooters } from "@/lib/muthur-core/muthur-stream-payload";
 import { dsmlCallsToOpenAiToolCalls, parseDsmlToolCalls, stripDsmlToolMarkup } from "@/lib/muthur-core/parse-dsml-tool-calls";
 import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
@@ -140,16 +141,20 @@ export async function muthurChatWithModelTools(options: {
   registry: ToolRegistry;
   /** When false, stream a direct reply with no tool definitions (greetings, small talk). */
   toolsEnabled?: boolean;
+  uplinkMode?: MuthurUplinkMode;
 }): Promise<Response> {
   const { endpoint, apiKey, model, registry } = options;
+  const uplinkMode = options.uplinkMode ?? "plan";
+  const openAiTools = getMuthurOpenAiToolsForMode(uplinkMode);
   const toolsEnabled =
     options.toolsEnabled !== false &&
     ENABLE_AUTOMATION &&
-    Object.keys(registry.tools).length > 0;
+    Object.keys(registry.tools).length > 0 &&
+    openAiTools.length > 0;
   const messages: JsonMessage[] = options.baseMessages.map((m) => ({ ...m }));
   const fallbackMessages = options.baseMessages.map((m) => ({ ...m }));
   const toolsUsed: string[] = [];
-  const toolCtx = createMuthurToolExecutionContext();
+  const toolCtx = createMuthurToolExecutionContext(uplinkMode);
 
   if (!toolsEnabled) {
     let streamRes: Response;
@@ -189,7 +194,7 @@ export async function muthurChatWithModelTools(options: {
             model,
             messages,
             stream: false,
-            tools: MUTHUR_OPENAI_TOOLS,
+            tools: openAiTools,
             tool_choice: "auto",
           }),
         },

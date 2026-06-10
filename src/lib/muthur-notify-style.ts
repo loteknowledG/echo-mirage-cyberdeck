@@ -6,7 +6,7 @@ export function isMuthurNotifyMessage(text: string): boolean {
 
   if (trimmed.startsWith("⏳ MUTHUR")) return true;
 
-  if (/TOOL FAILURE|CODING_VERIFY|OPERATOR OPEN|OPERATOR EDIT|OPERATOR CONVERT|POWERFIST OVERRIDE|MUTHUR_CONVERT/i.test(trimmed)) {
+  if (/TOOL FAILURE|CODING_VERIFY|OPERATOR OPEN|OPERATOR EDIT|OPERATOR SAVE|OPERATOR CONVERT|UNSAVED|POWERFIST OVERRIDE|MUTHUR_CONVERT/i.test(trimmed)) {
     return true;
   }
 
@@ -73,6 +73,8 @@ export function getMuthurNotifyAsciiLine(text: string): string | null {
     return isMuthurNotifyFailure(trimmed) ? ">>>X OPEN DENIED X<<<" : "<==[ FILE OPEN ]==>";
   }
   if (/OPERATOR EDIT/i.test(trimmed)) return "===>[ PATCH ]===>";
+  if (/OPERATOR SAVE/i.test(trimmed)) return "*.*.* DISK COMMIT *.*.*";
+  if (/UNSAVED/i.test(trimmed)) return "----[ UNSAVED ]----";
   if (/OPERATOR CONVERT|MUTHUR_CONVERT/i.test(trimmed)) {
     return isMuthurNotifyFailure(trimmed) ? ">>>X CONVERT FAIL X<<<" : "<<<{ CONVERT }>>>";
   }

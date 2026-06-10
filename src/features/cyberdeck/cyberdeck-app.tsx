@@ -191,14 +191,16 @@ import {
   type DeckAppId,
 } from "@/lib/deck-app";
 import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
-import { MORPHISM_ZONE_REALMORPHISM } from "@/lib/cyberdeck/morphism-zones";
+import { MORPHISM_ZONE_REALMORPHISM, paneToolbarMorphismZone } from "@/lib/cyberdeck/morphism-zones";
 import {
   CyberdeckControlButton,
   CyberdeckMenuButton,
+  CyberdeckPaneToolbarControl,
   MuthurControlButton,
 } from "@/components/cyberdeck/cyberdeck-control-button";
 import { muthurVoiceControlOptions } from "@/lib/cyberdeck/muthur-depth-control";
 import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
+import { MuthurUplinkModeRoller } from "@/components/cyberdeck/muthur-uplink-mode-roller";
 import { isMuted, playBeep, setMuted } from "@/lib/deck-audio";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
 import { useDebouncedEffect } from "@/lib/use-debounced-effect";
@@ -233,7 +235,16 @@ import {
   getMuthurNotifySettledClass,
   isMuthurNotifyMessage,
 } from "@/lib/muthur-notify-style";
+import { setMUTHURMode } from "@/lib/computer-use/control-lease";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
+import { summarizeMuthurOperatorEdits } from "@/lib/muthur-operator-edit-summary";
+import {
+  getMuthurUplinkModeMeta,
+  loadMuthurUplinkMode,
+  saveMuthurUplinkMode,
+  shouldAutoCommitOperatorEdits,
+  type MuthurUplinkMode,
+} from "@/lib/muthur-uplink-mode";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 import {
   POWERFIST_STACK_CHANNEL,
@@ -1032,6 +1043,7 @@ export default function CyberdeckApp() {
   const [streamText, setStreamText] = useState("");
   const [streamToolTrace, setStreamToolTrace] = useState("");
   const [muthurNotifyBurstIndex, setMuthurNotifyBurstIndex] = useState<number | null>(null);
+  const [muthurUplinkMode, setMuthurUplinkMode] = useState<MuthurUplinkMode>(() => loadMuthurUplinkMode());
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
@@ -2072,6 +2084,11 @@ export default function CyberdeckApp() {
     saveDeckMode(deckMode);
     notifyDeckModeChange(deckMode);
   }, [deckMode]);
+
+  useEffect(() => {
+    saveMuthurUplinkMode(muthurUplinkMode);
+    setMUTHURMode(getMuthurUplinkModeMeta(muthurUplinkMode).internalMode);
+  }, [muthurUplinkMode]);
 
   useEffect(() => {
     saveDeckApp(deckApp);
@@ -5567,6 +5584,7 @@ const resolved = resolveUiTarget(userMessage);
             piScreenContext,
             history,
             operatorContext,
+            uplinkMode: muthurUplinkMode,
           }),
         });
       } finally {
@@ -5723,18 +5741,54 @@ const resolved = resolveUiTarget(userMessage);
       const editsToApply =
         operatorEditsFromStream.length > 0 ? operatorEditsFromStream : operatorEdits;
       let operatorEditApplied = false;
+      const operatorEditFileName =
+        operatorActiveFilePath?.split("/").pop() ||
+        operatorDroppedAsset?.name ||
+        "document";
       if (editsToApply.length > 0) {
         setOperatorDocMode("edit");
         const editResult = await applyMuthurOperatorEdits(editsToApply);
         if (editResult === "applied") {
           operatorEditApplied = true;
+          const systemLines = ["OPERATOR EDIT // MUTHUR applied — Ctrl+Z to undo in the operator pane."];
+          if (shouldAutoCommitOperatorEdits(muthurUplinkMode)) {
+            if (canSaveOperatorFileInPlace(operatorActiveFilePath, operatorFolderRootsRef.current)) {
+              await saveOperatorDocInPlace();
+              systemLines.push(`OPERATOR SAVE // ${operatorEditFileName} // Agent auto-commit`);
+            } else {
+              systemLines.push(
+                `UNSAVED // ${operatorEditFileName} // no writable path for Agent auto-save`,
+              );
+            }
+          } else {
+            const unsavedHint =
+              muthurUplinkMode === "debug"
+                ? `UNSAVED // ${operatorEditFileName} — Debug mode: save when ready (Ctrl+S)`
+                : `UNSAVED // ${operatorEditFileName} — save when ready (Ctrl+S)`;
+            systemLines.push(unsavedHint);
+          }
           setMessages((prev) => [
             ...prev,
-            {
-              role: "system",
-              text: "OPERATOR EDIT // MUTHUR applied — Ctrl+Z to undo in the operator pane.",
-            },
+            ...systemLines.map((text) => ({ role: "system" as const, text })),
           ]);
+          if (!cleanedText.trim()) {
+            const summary = summarizeMuthurOperatorEdits(
+              editsToApply,
+              operatorEditFileName,
+              userMessage,
+            );
+            setMessages((prev) => {
+              const next = [...prev];
+              for (let i = next.length - 1; i >= 0; i--) {
+                const row = next[i];
+                if (row.role === "assistant" && !row.text.trim()) {
+                  next[i] = { ...row, text: summary };
+                  break;
+                }
+              }
+              return next;
+            });
+          }
         } else {
           setMessages((prev) => [
             ...prev,
@@ -7534,11 +7588,13 @@ const resolved = resolveUiTarget(userMessage);
                     />
                   </div>
                 </MuthurComposerShell>
-                <div className="muthur-composer-controls flex items-end justify-between gap-2 px-1">
+                <div className="muthur-composer-controls px-1">
+                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
                   <button
                     type="button"
                     onClick={() => handleModelLabelClick("s")}
-                    className={`min-w-0 truncate text-[10px] font-mono ${
+                    className={`min-w-0 shrink truncate text-[10px] font-mono ${
                       connectionState === "connected"
                         ? "text-green-300"
                         : connectionState === "connecting"
@@ -7552,16 +7608,23 @@ const resolved = resolveUiTarget(userMessage);
                       : "NO_MODEL"}{" "}
                     {isStreaming ? "STREAMING" : ""}
                   </button>
-                  <div className="flex items-end gap-2">
+                  <MuthurUplinkModeRoller
+                    mode={muthurUplinkMode}
+                    disabled={isStreaming}
+                    onChange={setMuthurUplinkMode}
+                  />
+                  </div>
+                  <div
+                    className="flex shrink-0 items-center gap-2"
+                    data-morphism={paneToolbarMorphismZone(deckMode)}
+                  >
                     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
                     <CyberdeckControlTooltip label={voiceEnabled ? "Voice on" : "Voice off"}>
-                    <MuthurControlButton
-                      deckMode={deckMode}
+                    <CyberdeckPaneToolbarControl
                       control={muthurVoiceControlOptions(voiceEnabled, voiceHealth)}
-                      glow={voiceEnabled && voiceHealth === "backend"}
                       onClick={toggleVoiceEnabled}
                       aria-label={voiceEnabled ? "Voice on" : "Voice off"}
-                      aria-pressed={voiceEnabled && voiceHealth === "backend"}
+                      aria-pressed={voiceEnabled}
                     >
                       {voiceEnabled ? (
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
@@ -7598,7 +7661,7 @@ const resolved = resolveUiTarget(userMessage);
                           <path d="M21 9L15 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                           </svg>
                         )}
-                    </MuthurControlButton>
+                    </CyberdeckPaneToolbarControl>
                     </CyberdeckControlTooltip>
                     {voiceEnabled && voiceBlockTotal > 0 ? (
                       <>
@@ -7655,9 +7718,8 @@ const resolved = resolveUiTarget(userMessage);
                     ) : null}
                     {!isStreaming ? (
                       <CyberdeckControlTooltip label="Send" disabled={!canSendInput}>
-                      <MuthurControlButton
-                        deckMode={deckMode}
-                        control={{ size: "send", signal: true }}
+                      <CyberdeckPaneToolbarControl
+                        control={{ size: "send", signal: canSendInput, off: !canSendInput }}
                         onClick={() => void handleSend()}
                         disabled={!canSendInput}
                         aria-label="Send"
@@ -7679,14 +7741,13 @@ const resolved = resolveUiTarget(userMessage);
                           />
                           <path d="M11.3 13.7L20.4 3.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                         </svg>
-                      </MuthurControlButton>
+                      </CyberdeckPaneToolbarControl>
                       </CyberdeckControlTooltip>
                     ) : (
                       <CyberdeckControlTooltip label="Stop">
-                      <MuthurControlButton
-                        deckMode={deckMode}
+                      <CyberdeckPaneToolbarControl
                         control={{
-                          size: "icon",
+                          size: "send",
                           amber: true,
                         }}
                         className={deckMode === "ascii" ? "is-latched" : undefined}
@@ -7697,10 +7758,11 @@ const resolved = resolveUiTarget(userMessage);
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
                           <rect x="6.5" y="6.5" width="11" height="11" rx="1.2" />
                         </svg>
-                      </MuthurControlButton>
+                      </CyberdeckPaneToolbarControl>
                       </CyberdeckControlTooltip>
                     )}
                     </CyberdeckPaneTooltipProvider>
+                  </div>
                   </div>
                 </div>
               </div>

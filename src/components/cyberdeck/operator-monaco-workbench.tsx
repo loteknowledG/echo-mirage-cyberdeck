@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import type { editor, IPosition, IRange, ISelection } from "monaco-editor";
 import { appendFlightLog } from "@/lib/flight-log";
-import { setMonacoEditorContext, type MonacoEditorContext } from "@/lib/monaco-editor-context";
+import {
+  clearMonacoEditorContext,
+  setMonacoEditorContext,
+  type MonacoEditorContext,
+} from "@/lib/monaco-editor-context";
 import {
   detectOperatorEditorLanguage,
   exposeOperatorWorkbench,
@@ -88,6 +92,18 @@ function toRange(selection: ISelection | null): OperatorEditorRange | null {
   };
 }
 
+function isLiveEditor(
+  instance: editor.IStandaloneCodeEditor | null | undefined,
+): instance is editor.IStandaloneCodeEditor {
+  if (!instance) return false;
+  try {
+    const model = instance.getModel();
+    return model !== null && !model.isDisposed();
+  } catch {
+    return false;
+  }
+}
+
 export function OperatorMonacoWorkbench({
   activeFilePath = null,
   fileName,
@@ -99,6 +115,8 @@ export function OperatorMonacoWorkbench({
   onSave,
 }: OperatorMonacoWorkbenchProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const mountedRef = useRef(true);
+  const editorDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
   const savedTextRef = useRef(value);
   const stateRef = useRef<OperatorEditorState | null>(null);
   const [pendingDiff, setPendingDiff] = useState<OperatorEditorDiffProposal | null>(null);
@@ -151,32 +169,55 @@ export function OperatorMonacoWorkbench({
   }, [cursor, selection, value]);
 
   const readState = useCallback((): OperatorEditorState => {
-    const model = editorRef.current?.getModel();
-    const currentSelection = editorRef.current?.getSelection() ?? null;
-    const position = editorRef.current?.getPosition() ?? cursor;
+    const instance = editorRef.current;
+    if (isLiveEditor(instance)) {
+      try {
+        const model = instance.getModel();
+        const currentSelection = instance.getSelection() ?? null;
+        const position = instance.getPosition() ?? cursor;
+        return {
+          activeFilePath,
+          fileName,
+          fileExtension: operatorEditorFileExtension(fileName),
+          language,
+          content: model?.getValue() ?? value,
+          selection: {
+            text: model && currentSelection ? model.getValueInRange(currentSelection) : "",
+            range: toRange(currentSelection),
+          },
+          cursor: position,
+          dirty: model ? model.getValue() !== savedTextRef.current : dirty,
+          readOnly: false,
+        };
+      } catch {
+        // Editor torn down between mount check and read.
+      }
+    }
+
     return {
       activeFilePath,
       fileName,
       fileExtension: operatorEditorFileExtension(fileName),
       language,
-      content: model?.getValue() ?? value,
+      content: value,
       selection: {
-        text: model && currentSelection ? model.getValueInRange(currentSelection) : "",
-        range: toRange(currentSelection),
+        text: "",
+        range: toRange(selection),
       },
-      cursor: position,
-      dirty: model ? model.getValue() !== savedTextRef.current : dirty,
+      cursor,
+      dirty,
       readOnly: false,
     };
-  }, [activeFilePath, cursor, dirty, fileName, language, value]);
+  }, [activeFilePath, cursor, dirty, fileName, language, selection, value]);
 
   stateRef.current = readState();
 
   const suggestEdit = useCallback(
     (edit: OperatorEditorEdit): OperatorEditorDiffProposal => {
       const instance = editorRef.current;
-      const model = instance?.getModel();
-      const currentSelection = instance?.getSelection();
+      if (!isLiveEditor(instance)) throw new Error("Operator editor is not ready.");
+      const model = instance.getModel();
+      const currentSelection = instance.getSelection();
       if (!model || !currentSelection) throw new Error("Operator editor is not ready.");
       const proposal = {
         id: crypto.randomUUID(),
@@ -212,31 +253,36 @@ export function OperatorMonacoWorkbench({
   const setDocumentTextInternal = useCallback(
     (text: string, immediate = true): boolean => {
       const instance = editorRef.current;
-      const model = instance?.getModel();
-      if (!instance || !model) return false;
-      if (model.getValue() === text) {
+      if (!isLiveEditor(instance)) return false;
+      try {
+        const model = instance.getModel();
+        if (!model) return false;
+        if (model.getValue() === text) {
+          setDirty(text !== savedTextRef.current);
+          publishDocumentChange(text, immediate);
+          return true;
+        }
+        instance.pushUndoStop();
+        instance.executeEdits("muthur", [
+          {
+            range: model.getFullModelRange(),
+            text,
+            forceMoveMarkers: true,
+          },
+        ]);
+        instance.pushUndoStop();
         setDirty(text !== savedTextRef.current);
         publishDocumentChange(text, immediate);
+        appendFlightLog({
+          actor: "MUTHUR",
+          action: "editor document synced",
+          result: "UNDOABLE // UNSAVED",
+          severity: "success",
+        });
         return true;
+      } catch {
+        return false;
       }
-      instance.pushUndoStop();
-      instance.executeEdits("muthur", [
-        {
-          range: model.getFullModelRange(),
-          text,
-          forceMoveMarkers: true,
-        },
-      ]);
-      instance.pushUndoStop();
-      setDirty(text !== savedTextRef.current);
-      publishDocumentChange(text, immediate);
-      appendFlightLog({
-        actor: "MUTHUR",
-        action: "editor document synced",
-        result: "UNDOABLE // UNSAVED",
-        severity: "success",
-      });
-      return true;
     },
     [publishDocumentChange],
   );
@@ -254,9 +300,10 @@ export function OperatorMonacoWorkbench({
   const applyEdit = useCallback(
     (edit: OperatorEditorEdit): boolean => {
       const instance = editorRef.current;
-      const model = instance?.getModel();
-      const currentSelection = instance?.getSelection();
-      if (!instance || !model || !currentSelection) return false;
+      if (!isLiveEditor(instance)) return false;
+      const model = instance.getModel();
+      const currentSelection = instance.getSelection();
+      if (!model || !currentSelection) return false;
 
       const proposed = proposalContent(model, currentSelection, edit);
       return setDocumentTextInternal(proposed);
@@ -295,9 +342,14 @@ export function OperatorMonacoWorkbench({
 
   useEffect(() => {
     const instance = editorRef.current;
-    const model = instance?.getModel();
-    if (!instance || !model || model.getValue() === value) return;
-    setDocumentTextInternal(value, true);
+    if (!isLiveEditor(instance)) return;
+    try {
+      const model = instance.getModel();
+      if (!model || model.getValue() === value) return;
+      setDocumentTextInternal(value, true);
+    } catch {
+      // Editor disposed during sync.
+    }
   }, [setDocumentTextInternal, value]);
 
   useEffect(
@@ -317,8 +369,27 @@ export function OperatorMonacoWorkbench({
   );
 
   useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      editorDisposablesRef.current.forEach((disposable) => disposable.dispose());
+      editorDisposablesRef.current = [];
+      editorRef.current = null;
+      clearMonacoEditorContext();
+    };
+  }, []);
+
+  useEffect(() => {
     const markSaved = () => {
-      savedTextRef.current = editorRef.current?.getValue() ?? value;
+      const instance = editorRef.current;
+      if (isLiveEditor(instance)) {
+        try {
+          savedTextRef.current = instance.getValue();
+        } catch {
+          savedTextRef.current = value;
+        }
+      } else {
+        savedTextRef.current = value;
+      }
       setDirty(false);
     };
     window.addEventListener("echo-mirage-operator-file-saved", markSaved);
@@ -326,14 +397,24 @@ export function OperatorMonacoWorkbench({
   }, [value]);
 
   const handleMount = useCallback<OnMount>((instance) => {
+    editorDisposablesRef.current.forEach((disposable) => disposable.dispose());
+    editorDisposablesRef.current = [];
     editorRef.current = instance;
+
     const updateSelection = () => {
-      setCursor(instance.getPosition() ?? { lineNumber: 1, column: 1 });
-      setSelection(instance.getSelection());
+      if (!mountedRef.current || !isLiveEditor(instance)) return;
+      try {
+        setCursor(instance.getPosition() ?? { lineNumber: 1, column: 1 });
+        setSelection(instance.getSelection());
+      } catch {
+        // Editor disposed between event and handler.
+      }
     };
     updateSelection();
-    instance.onDidChangeCursorPosition(updateSelection);
-    instance.onDidChangeCursorSelection(updateSelection);
+    editorDisposablesRef.current = [
+      instance.onDidChangeCursorPosition(updateSelection),
+      instance.onDidChangeCursorSelection(updateSelection),
+    ];
     instance.addCommand(2048 | 49, () => void onSave());
   }, [onSave]);
 
@@ -341,7 +422,16 @@ export function OperatorMonacoWorkbench({
     <div
       className="flex min-h-[50vh] flex-1 flex-col overflow-hidden rounded-sm border border-[#1c1c1c] bg-black"
       tabIndex={0}
-      onClick={() => editorRef.current?.focus()}
+      onClick={() => {
+        const instance = editorRef.current;
+        if (isLiveEditor(instance)) {
+          try {
+            instance.focus();
+          } catch {
+            // Editor disposed.
+          }
+        }
+      }}
     >
       <div className="flex items-center justify-between border-b border-[#1c1c1c] px-2 py-1 font-mono text-[9px] tracking-[0.04em] text-[#8a8a8a]">
         <span className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">

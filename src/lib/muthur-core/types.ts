@@ -1,4 +1,5 @@
 import type { OperatorEditorEdit } from "@/lib/operator-workbench";
+import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
 
 export type MuthurOperatorConversionRef = {
   sourcePath: string;
@@ -31,15 +32,19 @@ export type MuthurToolExecutionContext = {
   operatorOpenFile: MuthurOperatorOpenFileRef | null;
   codingTouches: string[];
   codingVerify: MuthurCodingVerifyReceipt | null;
+  uplinkMode: MuthurUplinkMode;
 };
 
-export function createMuthurToolExecutionContext(): MuthurToolExecutionContext {
+export function createMuthurToolExecutionContext(
+  uplinkMode: MuthurUplinkMode = "plan",
+): MuthurToolExecutionContext {
   return {
     operatorEdits: [],
     operatorConversion: null,
     operatorOpenFile: null,
     codingTouches: [],
     codingVerify: null,
+    uplinkMode,
   };
 }
 

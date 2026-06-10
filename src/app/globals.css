@@ -582,7 +582,27 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 
 [data-morphism="asciimorphism"] .ascii-morph-btn:disabled {
   cursor: not-allowed;
-  opacity: 0.3;
+  opacity: 0.42;
+  color: #5a5a5a;
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn:disabled.is-signal,
+[data-morphism="asciimorphism"] .ascii-morph-btn:disabled.is-amber,
+[data-morphism="asciimorphism"] .ascii-morph-btn:disabled.is-off {
+  color: #5a5a5a;
+  opacity: 0.42;
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn:disabled .ascii-morph-btn-face {
+  text-shadow: none;
+  transform: none;
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn:disabled:hover,
+[data-morphism="asciimorphism"] .ascii-morph-btn:disabled:hover .ascii-morph-btn-face {
+  color: #5a5a5a;
+  text-shadow: none;
+  transform: none;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn-stack {
@@ -700,6 +720,28 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 
 [data-morphism="asciimorphism"] .ascii-morph-btn:active .ascii-morph-btn-shadow-stack {
   visibility: hidden;
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed .ascii-morph-btn-face {
+  transform: translateY(4px) translateX(2px);
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed.is-signal {
+  color: #00ff00;
+  opacity: 1;
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed.is-signal .ascii-morph-btn-face {
+  text-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed:hover .ascii-morph-btn-face {
+  transform: translateY(4px) translateX(2px);
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed.is-signal:hover .ascii-morph-btn-face {
+  color: #36ff73;
+  text-shadow: 0 0 12px rgba(54, 255, 115, 0.38);
 }
 
 /* Custom Scrollbar for Cyberdeck */
@@ -1055,6 +1097,28 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+}
+
+.muthur-uplink-roller-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.muthur-uplink-roller-scroll--horizontal {
+  overscroll-behavior-x: contain;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.35) 16%,
+    #000 30%,
+    #000 70%,
+    rgba(0, 0, 0, 0.35) 84%,
+    transparent 100%
+  );
+}
+
+.muthur-uplink-roller-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .muthur-notify-race,

@@ -1,3 +1,6 @@
+import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
+import { isToolAllowedForUplinkMode } from "@/lib/muthur-uplink-mode";
+
 /**
  * OpenAI-compatible `tools` for chat/completions.
  * @see https://platform.openai.com/docs/guides/function-calling
@@ -272,3 +275,9 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
     },
   },
 ];
+
+export function getMuthurOpenAiToolsForMode(mode: MuthurUplinkMode) {
+  return MUTHUR_OPENAI_TOOLS.filter((tool) =>
+    isToolAllowedForUplinkMode(mode, tool.function.name),
+  );
+}

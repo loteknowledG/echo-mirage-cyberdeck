@@ -68,7 +68,12 @@ export function AsciiMorphButton({
   return (
     <button
       type={type}
-      className={cn("ascii-morph-btn", `ascii-morph-btn--${size}`, className)}
+      className={cn(
+        "ascii-morph-btn",
+        `ascii-morph-btn--${size}`,
+        isPushed && "is-pushed",
+        className,
+      )}
       {...props}
     >
       <div className="ascii-morph-btn-stack">
