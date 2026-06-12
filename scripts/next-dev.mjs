@@ -16,7 +16,8 @@ const devStatePath = path.join(devStateDir, 'dev-server.json');
 const DEFAULT_APP_PORT = 3050;
 const DEFAULT_READY_PORT = 3051;
 const MAX_AUTO_PORT = 3099;
-const HEAP_MB = 16384;
+// Cap V8 heap so dev + Electron + OS fit on ~16GB machines (16384 caused OS OOM / ArrayBuffer failures).
+const HEAP_MB = Number(process.env.CYBERDECK_DEV_HEAP_MB) || 6144;
 
 function devNodeEnv() {
   const env = { ...process.env };

@@ -51,6 +51,12 @@ export function buildCaseSummaryMarkdown(caseRecord: PropertyCase): string {
   if (caseRecord.residentPhone) {
     lines.push(`Phone: ${caseRecord.residentPhone}`);
   }
+  if (caseRecord.assignment?.technicianName) {
+    lines.push(`Technician: ${caseRecord.assignment.technicianName}`);
+  }
+  if (caseRecord.eta?.value) {
+    lines.push(`ETA: ${caseRecord.eta.value}`);
+  }
 
   lines.push("");
   return lines.join("\n");

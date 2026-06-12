@@ -17,7 +17,7 @@ foreach ($port in $ports) {
             $parts = $line -split '\s+'
             $processId = $parts[-1]
 
-            if ($processId -match '^\d+$' -and -not $killed.ContainsKey($processId)) {
+            if ($processId -match '^\d+$' -and [int]$processId -gt 4 -and -not $killed.ContainsKey($processId)) {
                 Write-Host "Killing PID $processId on port $port..."
                 taskkill /PID $processId /F | Out-Null
                 $killed[$processId] = $true

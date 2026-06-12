@@ -18,6 +18,7 @@ export const CYBERDECK_PANE_KINDS = [
   "sound-profile",
   "test-pane",
   "call-center",
+  "photoshop",
   "db8",
 ] as const;
 
@@ -62,6 +63,7 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   "sound-profile": { label: "SOUND PROFILE", fetchHints: ["PROFILE", "SFX"] },
   "test-pane": { label: "TEST", fetchHints: ["EMBLA", "4-WAY"] },
   "call-center": { label: "CALL CENTER", fetchHints: ["QUEUE", "INBOUND", "RESIDENT COMMS"] },
+  photoshop: { label: "PHOTOSHOP", fetchHints: ["CANVAS", "LAYERS", "EXPORT"] },
   db8: { label: "DB8", fetchHints: ["CHAMBER", "DEBATE ROUND", "CONSENSUS"] },
 };
 

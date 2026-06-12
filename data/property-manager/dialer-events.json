@@ -1,0 +1,388 @@
+[
+  {
+    "id": "DIAL-EVT-2026-00001",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQ7XUD89-PZ80",
+    "timestamp": "2026-06-10T10:40:58.236Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "7064618886",
+      "caseSlug": null,
+      "participantType": "unknown"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00002",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQ7XUD89-PZ80",
+    "timestamp": "2026-06-10T10:41:09.738Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 11501
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00003",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQ7Y2TFE-PODL",
+    "timestamp": "2026-06-10T10:47:32.513Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "7064618886",
+      "caseSlug": null,
+      "participantType": "unknown"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00004",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQ7Y2TFE-PODL",
+    "timestamp": "2026-06-10T10:49:04.354Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 91866
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00005",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQ7Y5JQ7-GIGR",
+    "timestamp": "2026-06-10T10:49:39.882Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "7064618886",
+      "caseSlug": null,
+      "participantType": "unknown"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00006",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQ7Y5JQ7-GIGR",
+    "timestamp": "2026-06-10T10:49:42.315Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 2441
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00007",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQ7Y6CK7-NXS2",
+    "timestamp": "2026-06-10T10:50:17.243Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "7064618886",
+      "caseSlug": null,
+      "participantType": "unknown"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00008",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQ7Y6CK7-NXS2",
+    "timestamp": "2026-06-10T10:50:37.410Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 20168
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00009",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQ7YDC6Q-39U8",
+    "timestamp": "2026-06-10T10:55:43.351Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "+15550104",
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "participantType": "unknown"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00010",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQ7YDC6Q-39U8",
+    "timestamp": "2026-06-10T11:02:22.471Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "durationMs": 399107
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00011",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQ7ZFM2Q-F9MH",
+    "timestamp": "2026-06-10T11:25:29.128Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "7064618886",
+      "caseSlug": null,
+      "participantType": "unknown"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00012",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQ7ZFM2Q-F9MH",
+    "timestamp": "2026-06-10T11:27:35.299Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 126190
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00013",
+    "type": "incoming_call_ringing",
+    "sessionId": "CALL-SESSION-MQ7ZKF8F-YGD5",
+    "timestamp": "2026-06-10T11:29:13.535Z",
+    "actor": "operator",
+    "payload": {
+      "preset": "resident-4b",
+      "subtitle": "Unit 4B"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00014",
+    "type": "inbound_call_declined",
+    "sessionId": "CALL-SESSION-MQ7ZKF8F-YGD5",
+    "timestamp": "2026-06-10T11:36:16.720Z",
+    "actor": "operator"
+  },
+  {
+    "id": "DIAL-EVT-2026-00015",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQ7ZU9LR-BHDE",
+    "timestamp": "2026-06-10T11:36:52.772Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "7064618886",
+      "caseSlug": null,
+      "participantType": "unknown"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00016",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQ7ZU9LR-BHDE",
+    "timestamp": "2026-06-10T11:37:00.630Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 7859
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00017",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQ80KFIG-26XX",
+    "timestamp": "2026-06-10T11:57:13.534Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "5555550100",
+      "caseSlug": null,
+      "participantType": "property_manager"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00018",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQ80KFIG-26XX",
+    "timestamp": "2026-06-10T11:57:19.638Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 6153
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00019",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQ80KPAI-1JPP",
+    "timestamp": "2026-06-10T11:57:26.157Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "5551234567",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00020",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQ80KPAI-1JPP",
+    "timestamp": "2026-06-10T14:55:55.795Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 10709472
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00021",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQA900B6-IGNS",
+    "timestamp": "2026-06-12T01:28:49.586Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "5559876543",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00022",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQA900B6-IGNS",
+    "timestamp": "2026-06-12T01:29:11.591Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 22032
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00023",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQACNV6M-7D2O",
+    "timestamp": "2026-06-12T03:11:21.544Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00024",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQACNV6M-7D2O",
+    "timestamp": "2026-06-12T03:19:06.458Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 464950
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00025",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQACY26F-9SG0",
+    "timestamp": "2026-06-12T03:19:17.141Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00026",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQACY26F-9SG0",
+    "timestamp": "2026-06-12T03:19:17.971Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 840
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00027",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQADSSLC-RUMQ",
+    "timestamp": "2026-06-12T03:43:11.097Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00028",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQADSSLC-RUMQ",
+    "timestamp": "2026-06-12T03:43:15.430Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 4386
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00029",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQADT4H5-MGCE",
+    "timestamp": "2026-06-12T03:43:26.449Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "5551234567",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00030",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQADT4H5-MGCE",
+    "timestamp": "2026-06-12T03:43:27.731Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 1287
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00031",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQADW21J-10ZX",
+    "timestamp": "2026-06-12T03:45:43.263Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00032",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQADW21J-10ZX",
+    "timestamp": "2026-06-12T03:45:47.123Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 3863
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00033",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAE2200-E0JL",
+    "timestamp": "2026-06-12T03:50:23.140Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "5551234567",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00034",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAE2200-E0JL",
+    "timestamp": "2026-06-12T03:50:24.227Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 1087
+    }
+  }
+]

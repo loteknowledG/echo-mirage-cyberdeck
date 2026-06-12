@@ -608,6 +608,122 @@
 }
 
 /*
+ * Property manager phone dialer — portaled to document.body (outside deck root).
+ * Mirror showroom rolling picker chrome for the 3-row contact rolodex.
+ */
+[data-phone-dialer] [data-float-wheel-showroom] {
+  --showroom-wheel-band: calc(var(--float-wheel-row-px) * var(--float-wheel-visible-rows, 3));
+  position: relative;
+  height: var(--showroom-wheel-band);
+  width: 100%;
+  max-width: none;
+  overflow: hidden;
+  border-radius: 2px;
+  border: 1px solid #25352c;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+[data-phone-dialer] [data-float-wheel-showroom] [data-float-wheel-stage] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: var(--showroom-wheel-band);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.85);
+}
+
+[data-phone-dialer] [data-float-wheel-showroom] [data-float-wheel-stage]::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    to bottom,
+    rgba(3, 8, 6, 0.85) 0%,
+    rgba(3, 8, 6, 0) 38%,
+    rgba(3, 8, 6, 0) 62%,
+    rgba(3, 8, 6, 0.85) 100%
+  );
+}
+
+[data-phone-dialer] [data-float-wheel-showroom]::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - var(--float-wheel-row-px) / 2);
+  height: var(--float-wheel-row-px);
+  z-index: 4;
+  border-top: 1px solid rgba(52, 211, 153, 0.35);
+  border-bottom: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+/* Keypad — asciimorphism buttons on portaled dialer (outside deck root). */
+[data-phone-dialer][data-morphism="asciimorphism"] .dialer-keypad-btn {
+  opacity: 1;
+  color: #8a9a90;
+  font-family: var(--font-mono, ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace);
+}
+
+[data-phone-dialer][data-morphism="asciimorphism"] .dialer-keypad-btn.is-signal {
+  color: #6ecf9a;
+}
+
+[data-phone-dialer][data-morphism="asciimorphism"] .dialer-keypad-btn.is-signal:hover {
+  color: #36ff73;
+}
+
+[data-phone-dialer][data-morphism="asciimorphism"] .dialer-keypad-btn.is-signal:hover .ascii-morph-btn-face {
+  color: #36ff73;
+  text-shadow: 0 0 6px rgba(54, 255, 115, 0.32);
+}
+
+/* Call — depth button on portaled dialer (outside main deck root). */
+[data-phone-dialer][data-deck-mode="ascii"] .dialer-call-btn.deck-depth-control {
+  --panel-face: #000;
+  --panel-border: #2d2d2d;
+  --panel-side: #2a6b56;
+  --panel-bottom: #1f4f3f;
+  --panel-side-hover: #3a9174;
+  --panel-bottom-hover: #2a6b56;
+  color: #8a8a8a;
+}
+
+[data-phone-dialer][data-deck-mode="ascii"] .dialer-call-btn.deck-depth-control .depth-panel__face {
+  color: #6ecf9a;
+  transition:
+    color 120ms ease,
+    text-shadow 120ms ease,
+    border-color 120ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+[data-phone-dialer][data-deck-mode="ascii"] .dialer-call-btn.deck-depth-control:hover:not(:disabled) .depth-panel__face {
+  color: #36ff73;
+  text-shadow: 0 0 8px rgba(54, 255, 115, 0.38);
+  border-color: rgba(52, 211, 153, 0.5);
+  transform: translateY(-4px) translateX(-2px);
+}
+
+[data-phone-dialer][data-deck-mode="ascii"] .dialer-call-btn.deck-depth-control:active:not(:disabled) .depth-panel__face {
+  transform: translate(var(--panel-depth), var(--panel-depth));
+  transition-duration: 80ms;
+}
+
+[data-phone-dialer][data-deck-mode="ascii"] .dialer-call-btn.deck-depth-control:hover:not(:disabled)::after {
+  background: var(--panel-side-hover);
+}
+
+[data-phone-dialer][data-deck-mode="ascii"] .dialer-call-btn.deck-depth-control:hover:not(:disabled)::before {
+  background: var(--panel-bottom-hover);
+}
+
+/*
  * Out of scope (always asciimorphism — do not style here):
  *   .cyberdeck-server-rail, .ascii-btn
  *   .cyberdeck-ascii-header, [data-morphism="asciimorphism"]

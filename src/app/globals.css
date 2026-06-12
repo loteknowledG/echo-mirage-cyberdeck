@@ -808,8 +808,9 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   background: transparent;
   cursor: pointer;
   color: #8a8a8a;
-  line-height: 1.1;
+  line-height: 1;
   font-size: 10px;
+  font-family: var(--font-mono, ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace);
   margin: 0;
   opacity: 0.82;
   box-sizing: border-box;
@@ -865,12 +866,14 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn-shadow-side,
-[data-morphism="asciimorphism"] .ascii-morph-btn-shadow-bottom {
+[data-morphism="asciimorphism"] .ascii-morph-btn-shadow-bottom,
+[data-morphism="asciimorphism"] .ascii-morph-btn-frame {
   margin: 0;
   white-space: pre;
   background: transparent;
   border: 0;
   font: inherit;
+  line-height: 1;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn-shadow-bottom {
@@ -908,6 +911,14 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 
 [data-morphism="asciimorphism"] .ascii-morph-btn--micro {
   font-size: 9px;
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn--compact {
+  font-size: 10px;
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn--tile {
+  font-size: 11px;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-signal {

@@ -16,6 +16,16 @@ export function appendTimelineLine(existing: string, iso: string, note: string):
   return `${trimmed}\n${line}\n`;
 }
 
+/** Human-readable action entry — append-only, em dash separator. */
+export function appendActionTimelineEntry(existing: string, iso: string, note: string): string {
+  const line = `${formatTimelineClock(iso)} — ${note.trim()}`;
+  const trimmed = existing.trimEnd();
+  if (!trimmed || trimmed === "# Timeline") {
+    return `# Timeline\n\n${line}\n`;
+  }
+  return `${trimmed}\n${line}\n`;
+}
+
 export function appendCaseEvent(existing: CaseEvent[], event: CaseEvent): CaseEvent[] {
   return [...existing, event];
 }

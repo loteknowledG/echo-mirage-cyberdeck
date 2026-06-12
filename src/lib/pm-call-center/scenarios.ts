@@ -79,6 +79,16 @@ export const PM_CALL_SCENARIOS: readonly PmCallScenario[] = [
       "You are Riley Chen with a toddler at home. The thermostat shows 85°F. Filter was changed last month. " +
       "You need a realistic timeline; push back if given only generic reassurance.",
   },
+  {
+    id: "dialer-phone",
+    title: "Phone Dialer Call",
+    category: "general",
+    description: "Simulated phone session from the property manager dialer.",
+    residentName: "Caller",
+    propertyHint: "Property Manager Phone",
+    openingLine: "Property manager phone line connected.",
+    residentBrief: "This is a dialer-recorded call without a full training scenario.",
+  },
 ] as const;
 
 export function pmCallScenarioById(id: string): PmCallScenario | undefined {

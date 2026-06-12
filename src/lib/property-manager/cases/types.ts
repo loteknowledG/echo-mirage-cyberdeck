@@ -21,6 +21,24 @@ export type CaseLookupMetadata = {
   tags: string[];
 };
 
+export type CaseTechnicianAssignment = {
+  technicianName: string;
+  vendor?: string;
+  notes?: string;
+  assignedAt: string;
+};
+
+export type CaseEtaRecord = {
+  value: string;
+  notes?: string;
+  recordedAt: string;
+};
+
+export type CaseResidentUpdate = {
+  message: string;
+  sentAt: string;
+};
+
 export type PropertyCase = {
   id: string;
   title: string;
@@ -38,6 +56,9 @@ export type PropertyCase = {
   callIds: string[];
   activeWorkOrderIds: string[];
   lookup: CaseLookupMetadata;
+  assignment?: CaseTechnicianAssignment;
+  eta?: CaseEtaRecord;
+  residentUpdates?: CaseResidentUpdate[];
   createdAt: string;
   updatedAt: string;
 };
@@ -47,14 +68,31 @@ export type CaseEventType =
   | "call_ended"
   | "case_created"
   | "case_updated"
-  | "timeline_note";
+  | "timeline_note"
+  | "technician_assigned"
+  | "eta_added"
+  | "technician_en_route"
+  | "technician_on_site"
+  | "repair_in_progress"
+  | "case_resolved"
+  | "resolution_verified"
+  | "case_closed"
+  | "case_escalated"
+  | "resident_update_sent"
+  | "operator_note_added"
+  | "call_attached_to_case";
+
+export type CaseEventActor = "operator" | "system";
 
 export type CaseEvent = {
+  id?: string;
   type: CaseEventType;
   timestamp: string;
-  callId?: string;
+  actor?: CaseEventActor;
   caseId?: string;
+  callId?: string;
   note?: string;
+  payload?: Record<string, unknown>;
 };
 
 export type PersistedCallRecord = {

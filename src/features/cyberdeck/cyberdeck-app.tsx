@@ -403,6 +403,7 @@ const CUSTOM_TAB_KINDS = [
   "test-pane",
   "realmorphism-kit",
   "call-center",
+  "photoshop",
   "db8",
   "catelog",
 ] as const;
@@ -499,6 +500,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Voice Lab", kind: "voice-lab", action: "convert" },
   { label: "Flight Log", kind: "flight-log", action: "convert" },
   { label: "Call Center", kind: "call-center", action: "convert" },
+  { label: "Photoshop", kind: "photoshop", action: "convert" },
   { label: "Drop Bay", kind: "drop-bay", action: "convert" },
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Kit", action: "kit-pane" },
@@ -872,6 +874,9 @@ function normalizeCustomTabKind(kind: string) {
   ) {
     return "call-center" as CustomTabKind;
   }
+  if (nextKind === "photo-shop" || nextKind === "photo_shop") {
+    return "photoshop" as CustomTabKind;
+  }
   if (CUSTOM_TAB_KINDS.includes(nextKind as CustomTabKind)) {
     return nextKind as CustomTabKind;
   }
@@ -905,6 +910,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "sound-profile") return "♪";
   if (kind === "test-pane") return "T";
   if (kind === "call-center") return "CC";
+  if (kind === "photoshop") return "Ps";
   if (kind === "db8") return "8";
   if (kind === "muthur-execution") return "E";
   if (kind === "pi" || kind === "diagnostics") return "π";
@@ -921,6 +927,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "sound-profile") return "Sound Profile";
   if (kind === "test-pane") return "Test";
   if (kind === "call-center") return "CALL CENTER";
+  if (kind === "photoshop") return "PHOTOSHOP";
   if (kind === "db8") return "DB8";
   if (kind === "muthur-execution") return "EXECUTION";
   return kind.toUpperCase();
@@ -991,7 +998,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test|call-center|callcenter|call_center)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test|call-center|callcenter|call_center|photoshop|photo-shop|photo_shop)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -7035,6 +7042,17 @@ const resolved = resolveUiTarget(userMessage);
               modelId={modelID}
               apiKey={providerKeys[activeProvider] || ""}
             />
+          </div>
+        );
+      }
+
+      if (tab.kind === "photoshop") {
+        return (
+          <div
+            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
+            data-pointer-target="photoshop"
+          >
+            <ActivatedCyberdeckPane kind="photoshop" />
           </div>
         );
       }

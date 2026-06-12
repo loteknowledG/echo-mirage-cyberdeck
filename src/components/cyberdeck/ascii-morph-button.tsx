@@ -83,14 +83,10 @@ export function AsciiMorphButton({
             <pre className="ascii-morph-btn-shadow-bottom">{shadowBottom}</pre>
           </div>
         ) : null}
-        {glyph || textLabel ? (
-          <pre className="ascii-morph-btn-face">{face}</pre>
-        ) : (
-          <div className="ascii-morph-btn-face">
-            <pre className="ascii-morph-btn-frame">{face}</pre>
-            {iconOverlay ? <span className="ascii-morph-btn-content">{children}</span> : null}
-          </div>
-        )}
+        <div className="ascii-morph-btn-face">
+          <pre className="ascii-morph-btn-frame">{face}</pre>
+          {iconOverlay ? <span className="ascii-morph-btn-content">{children}</span> : null}
+        </div>
       </div>
     </button>
   );
