@@ -35,6 +35,49 @@ function railFaceRows(symbol) {
   return [`┌───┐`, `│ ${s} │`, `└───┘`];
 }
 
+/** Dialer keypad interior width — digit + letter row inside one ASCII box. */
+const DIALER_KEY_INTERIOR = 5;
+
+function centerDialerCell(label, width = DIALER_KEY_INTERIOR) {
+  if (!label) return " ".repeat(width);
+  if (label.length >= width) return label.slice(0, width);
+  const pad = width - label.length;
+  const left = Math.floor(pad / 2);
+  return `${" ".repeat(left)}${label}${" ".repeat(pad - left)}`;
+}
+
+/** Face rows: digit + letter row (blank when none) — uniform height like a real dialpad. */
+export function dialerKeyFaceRows(digit, subLabel = "") {
+  const line = "─".repeat(DIALER_KEY_INTERIOR);
+  const glyph = String(digit).slice(0, 1);
+  const sub = String(subLabel).trim();
+  return [
+    `┌${line}┐`,
+    `│${centerDialerCell(glyph)}│`,
+    `│${centerDialerCell(sub)}│`,
+    `└${line}┘`,
+  ];
+}
+
+/** Floor ▓ row — inset left, clipped right so the L-corner pocket stays an open square. */
+function dialerBottomShadow(width) {
+  const shift = RAIL_BOTTOM_SHADOW_SHIFT;
+  const blockLen = width - shift - 1;
+  return `${" ".repeat(shift)}${SHADOW_CHAR.repeat(blockLen)} `;
+}
+
+/** Shadow rows — side ▓ on each face row, floor ▓ bridges the corner (tab-rail pattern). */
+export function dialerKeyShadowRows(digit, subLabel = "") {
+  const faceRows = dialerKeyFaceRows(digit, subLabel);
+  const width = faceRows[0].length;
+  const lines = [" ".repeat(width)];
+  for (let i = 1; i < faceRows.length; i += 1) {
+    lines.push(`${" ".repeat(faceRows[i].length)}${SHADOW_CHAR}`);
+  }
+  lines.push(dialerBottomShadow(width));
+  return lines;
+}
+
 export const art = {
   poppedFace: (symbol) => railFaceRows(symbol).join("\n"),
   poppedShadow: (symbol) => {
@@ -59,6 +102,8 @@ export const art = {
     const s = railTabSymbol(symbol);
     return `┌───┐\n│ ${s} │\n└───┘`;
   },
+  dialerKeyFace: (digit, subLabel = "") => dialerKeyFaceRows(digit, subLabel).join("\n"),
+  dialerKeyShadow: (digit, subLabel = "") => dialerKeyShadowRows(digit, subLabel).join("\n"),
 };
 
 export const BOOT_LOGO = `

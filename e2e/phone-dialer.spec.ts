@@ -35,19 +35,51 @@ async function openDialer(page: Page) {
   return dialer;
 }
 
+type FaceTransform = { translateX: number; translateY: number };
+
+async function faceTransform(button: Locator): Promise<FaceTransform> {
+  return button.locator(".ascii-btn-face").evaluate((element) => {
+    const matrix = new DOMMatrix(getComputedStyle(element).transform);
+    return { translateX: matrix.m41, translateY: matrix.m42 };
+  });
+}
+
 async function expectAsciiKeypadButton(dialer: Locator, digit: string, letters?: string) {
   const label = letters ? `${digit}, ${letters}` : digit;
   const button = dialer.getByRole("button", { name: label, exact: true });
   await expect(button).toBeVisible();
 
-  const frame = button.locator(".ascii-morph-btn-frame");
+  const frame = button.locator(".ascii-btn-face");
   await expect(frame).toBeVisible();
+  await expect(button.locator(":scope > span")).toHaveCount(0);
 
   const faceText = await frame.innerText();
-  expect(faceText.split("\n").length).toBeGreaterThanOrEqual(3);
+  expect(faceText.split("\n").length).toBe(4);
   expect(faceText).toContain("┌");
   expect(faceText).toContain("└");
   expect(faceText).toMatch(new RegExp(`│\\s*${digit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*│`));
+
+  const shadowText = await button.locator(".ascii-btn-shadow").innerText();
+  const shadowBottom = shadowText.split("\n").at(-1) ?? "";
+  expect(shadowBottom.endsWith(" ")).toBeTruthy();
+  expect(shadowBottom.trimEnd().endsWith("▓")).toBeTruthy();
+  if (letters) {
+    expect(faceText).toContain(letters);
+    const buttonBox = await button.boundingBox();
+    const faceBox = await frame.boundingBox();
+    expect(buttonBox).not.toBeNull();
+    expect(faceBox).not.toBeNull();
+    if (buttonBox && faceBox) {
+      const buttonRight = buttonBox.x + buttonBox.width;
+      const buttonBottom = buttonBox.y + buttonBox.height;
+      const faceRight = faceBox.x + faceBox.width;
+      const faceBottom = faceBox.y + faceBox.height;
+      expect(faceBox.x).toBeGreaterThanOrEqual(buttonBox.x - 1);
+      expect(faceBox.y).toBeGreaterThanOrEqual(buttonBox.y - 1);
+      expect(faceRight).toBeLessThanOrEqual(buttonRight + 1);
+      expect(faceBottom).toBeLessThanOrEqual(buttonBottom + 1);
+    }
+  }
 
   const styles = await frame.evaluate((element) => {
     const computed = getComputedStyle(element);
@@ -59,7 +91,7 @@ async function expectAsciiKeypadButton(dialer: Locator, digit: string, letters?:
   });
   expect(styles.whiteSpace).toBe("pre");
   expect(styles.fontFamily.toLowerCase()).toMatch(/mono|cascadia|courier/);
-  expect(Number.parseFloat(styles.lineHeight)).toBeLessThanOrEqual(12);
+  expect(Number.parseFloat(styles.lineHeight)).toBeLessThanOrEqual(18);
 }
 
 async function openCyberdeck(page: Page) {
@@ -91,7 +123,100 @@ test.beforeEach(async ({ page }) => {
   await ensureIdleDialer(page);
 });
 
-test("floating phone dialer keypad renders asciimorphism boxes on property manager", async ({ page }) => {
+test("dialer keypad keys are uniform height including 1 * #", async ({ page }) => {
+  await page.setViewportSize(DESKTOP_VIEWPORT);
+  await page.goto("/property-manager", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("property-manager-case-viewer")).toBeVisible({ timeout: 30000 });
+
+  await openDialer(page);
+  const dialer = dialerRoot(page);
+  const one = dialer.getByRole("button", { name: "1", exact: true });
+  const five = dialer.getByRole("button", { name: "5, JKL", exact: true });
+  const star = dialer.getByRole("button", { name: "*", exact: true });
+  const hash = dialer.getByRole("button", { name: "#", exact: true });
+
+  const [oneBox, fiveBox, starBox, hashBox] = await Promise.all([
+    one.boundingBox(),
+    five.boundingBox(),
+    star.boundingBox(),
+    hash.boundingBox(),
+  ]);
+  for (const box of [oneBox, fiveBox, starBox, hashBox]) {
+    expect(box).not.toBeNull();
+  }
+  if (oneBox && fiveBox && starBox && hashBox) {
+    expect(oneBox.height).toBeCloseTo(fiveBox.height, 0);
+    expect(starBox.height).toBeCloseTo(fiveBox.height, 0);
+    expect(hashBox.height).toBeCloseTo(fiveBox.height, 0);
+    expect(oneBox.width).toBeCloseTo(fiveBox.width, 0);
+  }
+
+  const oneFace = await one.locator(".ascii-btn-face").innerText();
+  expect(oneFace.split("\n").length).toBe(4);
+  expect(oneFace).toMatch(/│ {5}│/);
+});
+
+test("floating dialer fits led display keypad and call without scrolling", async ({ page }) => {
+  await page.setViewportSize(DESKTOP_VIEWPORT);
+  await page.goto("/property-manager", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("property-manager-case-viewer")).toBeVisible({ timeout: 30000 });
+
+  await openDialer(page);
+  const dialer = dialerRoot(page);
+  const body = page.getByTestId("property-manager-phone-dialer-body");
+  const led = dialer.locator('[aria-live="polite"]');
+  const call = dialer.getByRole("button", { name: /^Call$/i });
+
+  await expect(led).toBeVisible();
+  await expect(call).toBeVisible();
+
+  const fits = await body.evaluate((element) => ({
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+  }));
+  expect(fits.scrollHeight).toBeLessThanOrEqual(fits.clientHeight + 1);
+});
+
+test("dialer keypad face lifts on hover and presses without hiding shadow", async ({ page }) => {
+  await page.setViewportSize(DESKTOP_VIEWPORT);
+  await page.goto("/property-manager", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("property-manager-case-viewer")).toBeVisible({ timeout: 30000 });
+
+  await openDialer(page);
+  const dialer = dialerRoot(page);
+  const button = dialer.getByRole("button", { name: "5, JKL", exact: true });
+  const shadow = button.locator(".ascii-btn-shadow");
+
+  const atRest = await faceTransform(button);
+  expect(atRest.translateY).toBeCloseTo(0, 0);
+  expect(atRest.translateX).toBeCloseTo(0, 0);
+
+  await button.hover();
+  await page.waitForTimeout(280);
+  const hovered = await faceTransform(button);
+  expect(hovered.translateY).toBeLessThan(atRest.translateY - 2);
+  expect(hovered.translateX).toBeLessThan(atRest.translateX);
+
+  await button.hover();
+  await page.waitForTimeout(80);
+  const box = await button.boundingBox();
+  expect(box).not.toBeNull();
+  if (box) {
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await expect
+      .poll(async () => (await faceTransform(button)).translateY, { timeout: 2000 })
+      .toBeGreaterThan(2);
+    await expect(shadow).toBeVisible();
+    const shadowOpacity = await shadow.evaluate((element) => getComputedStyle(element).opacity);
+    expect(Number.parseFloat(shadowOpacity)).toBeGreaterThan(0.4);
+    await page.mouse.up();
+  }
+});
+
+test("floating phone dialer keypad renders rail ascii boxes on property manager", async ({ page }) => {
   await page.setViewportSize(DESKTOP_VIEWPORT);
   await page.goto("/property-manager", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("property-manager-case-viewer")).toBeVisible({ timeout: 30000 });
@@ -106,7 +231,7 @@ test("floating phone dialer keypad renders asciimorphism boxes on property manag
   await expect(display).not.toHaveText(before);
 
   await expect(dialer.locator(".dialer-keypad-btn").first()).toHaveScreenshot(
-    "phone-dialer-keypad-asciimorphism.png",
+    "phone-dialer-keypad-rail-ascii.png",
     { animations: "disabled", maxDiffPixels: 120 },
   );
 });
@@ -140,7 +265,7 @@ test("property manager dialer stays usable after hang-up", async ({ page }) => {
   await expect(display).toContainText("9");
 });
 
-test("call center tab dialer keypad renders asciimorphism boxes", async ({ page }) => {
+test("call center tab dialer keypad renders rail ascii boxes", async ({ page }) => {
   await openCyberdeck(page);
   await openCallCenterTab(page);
 

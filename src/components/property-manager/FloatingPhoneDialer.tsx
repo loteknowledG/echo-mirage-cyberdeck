@@ -199,7 +199,7 @@ export function FloatingPhoneDialer({
         dragElastic={0.12}
         dragMomentum={false}
         className={cn(
-          "pointer-events-auto absolute bottom-4 right-4 flex w-[min(100%,17.5rem)] flex-col overflow-hidden rounded-md border border-[#25352c] bg-[#030806]/95 shadow-2xl shadow-black/60 backdrop-blur-sm",
+          "pointer-events-auto absolute bottom-4 right-4 flex w-[min(100%,21rem)] flex-col overflow-hidden rounded-md border border-[#25352c] bg-[#030806]/95 shadow-2xl shadow-black/60 backdrop-blur-sm",
           !expanded && "pointer-events-none invisible opacity-0",
         )}
       >
@@ -217,7 +217,10 @@ export function FloatingPhoneDialer({
             ×
           </button>
         </div>
-        <div className="min-h-0 max-h-[min(70vh,26rem)] overflow-y-auto overflow-x-hidden">
+        <div
+          data-testid="property-manager-phone-dialer-body"
+          className="min-h-0 max-h-[min(72vh,28rem)] overflow-y-auto overflow-x-hidden"
+        >
           <PhoneDialer
             floating
             selectedCase={selectedCase}
@@ -233,6 +236,7 @@ export function FloatingPhoneDialer({
   return createPortal(
     <div
       data-phone-dialer
+      data-phone-dialer-layout="floating"
       data-deck-mode="ascii"
       data-morphism="asciimorphism"
       className="pointer-events-none fixed z-[9999]"

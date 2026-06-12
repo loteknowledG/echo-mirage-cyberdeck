@@ -384,5 +384,235 @@
       "caseSlug": null,
       "durationMs": 1087
     }
+  },
+  {
+    "id": "DIAL-EVT-2026-00035",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAE89DX-328L",
+    "timestamp": "2026-06-12T03:55:12.696Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00036",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAE89DX-328L",
+    "timestamp": "2026-06-12T03:55:18.017Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 5355
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00037",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAEAD2N-ONB4",
+    "timestamp": "2026-06-12T03:56:50.740Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00038",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAEAD2N-ONB4",
+    "timestamp": "2026-06-12T03:56:50.895Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "durationMs": 148
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00039",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAEC4QC-FN0E",
+    "timestamp": "2026-06-12T03:58:13.244Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00040",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAEC4QC-FN0E",
+    "timestamp": "2026-06-12T03:58:17.178Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 3938
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00041",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAFILOD-ICOX",
+    "timestamp": "2026-06-12T04:31:14.867Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00042",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAFILOD-ICOX",
+    "timestamp": "2026-06-12T04:31:19.532Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 4751
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00043",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAFMZ07-8YZN",
+    "timestamp": "2026-06-12T04:34:39.424Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00044",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAFMZ07-8YZN",
+    "timestamp": "2026-06-12T04:34:48.225Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 9574
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00045",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAFR13R-KKQJ",
+    "timestamp": "2026-06-12T04:37:48.006Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": null,
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00046",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAFR13R-KKQJ",
+    "timestamp": "2026-06-12T04:37:51.988Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": null,
+      "durationMs": 3994
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00047",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAG3WUC-87DM",
+    "timestamp": "2026-06-12T04:47:49.008Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00048",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAG3WUC-87DM",
+    "timestamp": "2026-06-12T04:48:01.095Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "durationMs": 12090
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00049",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAGGFN1-254E",
+    "timestamp": "2026-06-12T04:57:33.245Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00050",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAGGFN1-254E",
+    "timestamp": "2026-06-12T04:57:35.105Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "durationMs": 1870
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00051",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAITOXS-7HRB",
+    "timestamp": "2026-06-12T06:03:51.069Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00052",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAITOXS-7HRB",
+    "timestamp": "2026-06-12T06:03:54.911Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "durationMs": 3868
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00053",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAJ1T0P-JTEV",
+    "timestamp": "2026-06-12T06:10:09.613Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "55512345677",
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "participantType": "resident"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00054",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAJ1T0P-JTEV",
+    "timestamp": "2026-06-12T06:10:13.350Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "durationMs": 3717
+    }
   }
 ]

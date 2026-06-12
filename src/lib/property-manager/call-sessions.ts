@@ -76,6 +76,13 @@ export function keypadLetters(digit: string): string | undefined {
   return KEYPAD_LETTERS[digit];
 }
 
+/** Letter row under each keypad digit (incl. `0` → `+`). Empty string when none. */
+export function keypadSubLabel(digit: string, letters?: string): string {
+  if (letters) return letters;
+  if (digit === "0") return "+";
+  return KEYPAD_LETTERS[digit] ?? "";
+}
+
 export function normalizePhoneInput(raw: string): string {
   return raw.replace(/[^\d*#+]/g, "").slice(0, DIALER_MAX_DIGITS);
 }

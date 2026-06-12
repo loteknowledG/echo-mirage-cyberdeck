@@ -183,7 +183,7 @@ export function PhoneDialer({
         <header
           className={cn(
             "shrink-0 border-b border-[#25352c] px-2",
-            floating ? "border-[#1c2a22] py-1.5" : "py-2",
+            floating ? "border-[#1c2a22] py-1" : "py-2",
           )}
         >
           {floating ? (
@@ -237,7 +237,7 @@ export function PhoneDialer({
       <div
         className={cn(
           "min-h-0 flex-1",
-          floating ? "space-y-2 overflow-hidden p-2" : "custom-scrollbar space-y-3 overflow-y-auto p-3",
+          floating ? "space-y-1 overflow-hidden p-1.5" : "custom-scrollbar space-y-3 overflow-y-auto p-3",
         )}
       >
         {error ? (
@@ -295,7 +295,7 @@ export function PhoneDialer({
           <section
             className={cn(
               "rounded-sm border border-[#25352c] bg-black/60",
-              floating ? "p-2" : "p-3",
+              floating ? "p-1.5" : "p-3",
             )}
           >
             {!floating ? (
@@ -303,8 +303,8 @@ export function PhoneDialer({
             ) : null}
             <div
               className={cn(
-                "rounded-sm border border-[#2d2d2d] bg-black px-3 py-2 text-center font-mono tracking-[0.08em] text-emerald-200",
-                floating ? "min-h-[1.75rem] text-base" : "min-h-[2.25rem] text-lg",
+                "rounded-sm border border-[#2d2d2d] bg-black text-center font-mono tracking-[0.08em] text-emerald-200",
+                floating ? "min-h-[1.5rem] px-2 py-1 text-sm" : "min-h-[2.25rem] px-3 py-2 text-lg",
               )}
               aria-live="polite"
             >
@@ -322,7 +322,7 @@ export function PhoneDialer({
               )
             ) : null}
 
-            <div className="mt-3 flex justify-end">
+            <div className={cn("flex justify-end", floating ? "mt-1" : "mt-3")}>
               <button
                 type="button"
                 aria-label="Backspace"
@@ -334,24 +334,28 @@ export function PhoneDialer({
               </button>
             </div>
 
-            <div className="mt-1.5 grid grid-cols-3 place-items-center gap-x-1 gap-y-0.5">
+            <div
+              className={cn(
+                "grid grid-cols-3 place-items-start justify-items-center",
+                floating ? "mt-1 gap-0" : "mt-2 gap-x-1 gap-y-2",
+              )}
+            >
               {KEYPAD_ROWS.flat().map((key) => (
                 <KeypadButton
                   key={key.digit}
                   digit={key.digit}
                   letters={key.letters}
-                  compact={floating}
                   disabled={dialDisabled}
                   onPress={(digit) => setDialInput((current) => appendDialDigit(current, digit))}
                 />
               ))}
             </div>
 
-            <div className="mt-3 flex w-full justify-center">
+            <div className={cn("flex w-full justify-center", floating ? "mt-1.5" : "mt-3")}>
               <CyberdeckActionButton
                 variant="accent"
                 disabled={dialDisabled || !normalizePhoneInput(dialInput)}
-                className="dialer-call-btn inline-flex items-center justify-center gap-1.5 px-5"
+                className="dialer-call-btn"
                 onClick={() =>
                   void run(() =>
                     postDialerAction({

@@ -662,35 +662,113 @@
   border-bottom: 1px solid rgba(52, 211, 153, 0.35);
 }
 
-/* Keypad — asciimorphism buttons on portaled dialer (outside deck root). */
-[data-phone-dialer][data-morphism="asciimorphism"] .dialer-keypad-btn {
-  opacity: 1;
+/*
+ * Keypad — tab-rail ASCII stack on portaled dialer (TerminalArt / .ascii-btn).
+ * Do not use pane-toolbar AsciiMorphButton art here.
+ */
+[data-phone-dialer] .dialer-keypad-btn.ascii-btn {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 0 1ch 1ch 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
   color: #8a9a90;
+  line-height: 1;
+  font-size: 13px;
   font-family: var(--font-mono, ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace);
+  margin: 0;
+  opacity: 1;
+  overflow: visible;
+  box-sizing: border-box;
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: none;
+  text-rendering: geometricPrecision;
 }
 
-[data-phone-dialer][data-morphism="asciimorphism"] .dialer-keypad-btn.is-signal {
+[data-phone-dialer] .dialer-keypad-btn .ascii-btn-stack {
+  display: inline-grid;
+  place-items: start;
+}
+
+[data-phone-dialer] .dialer-keypad-btn .ascii-btn-shadow,
+[data-phone-dialer] .dialer-keypad-btn .ascii-btn-face {
+  grid-area: 1 / 1;
+  margin: 0;
+  white-space: pre;
+  background: transparent;
+  border: 0;
+  font: inherit;
+}
+
+[data-phone-dialer] .dialer-keypad-btn .ascii-btn-shadow {
+  color: inherit;
+  opacity: 0.72;
+}
+
+[data-phone-dialer] .dialer-keypad-btn .ascii-btn-face {
+  text-shadow: none;
+  transition:
+    color 60ms ease,
+    text-shadow 60ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+[data-phone-dialer] .dialer-keypad-btn.is-signal {
   color: #6ecf9a;
 }
 
-[data-phone-dialer][data-morphism="asciimorphism"] .dialer-keypad-btn.is-signal:hover {
+[data-phone-dialer] .dialer-keypad-btn.is-signal:hover:not(:disabled) {
   color: #36ff73;
 }
 
-[data-phone-dialer][data-morphism="asciimorphism"] .dialer-keypad-btn.is-signal:hover .ascii-morph-btn-face {
-  color: #36ff73;
-  text-shadow: 0 0 6px rgba(54, 255, 115, 0.32);
+[data-phone-dialer] .dialer-keypad-btn.is-signal:hover:not(:disabled):not(:active) .ascii-btn-face {
+  transform: translateY(-4px) translateX(-2px);
+  text-shadow: 0 0 8px rgba(54, 255, 115, 0.32);
+}
+
+[data-phone-dialer] .dialer-keypad-btn:active:not(:disabled) .ascii-btn-face {
+  transform: translateY(4px) translateX(2px);
+  transition-duration: 80ms;
+}
+
+[data-phone-dialer] .dialer-keypad-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  color: #5a5a5a;
+}
+
+/* Floating dialer — tight keypad grid so LED + call fit without scrolling */
+[data-phone-dialer][data-phone-dialer-layout="floating"] .dialer-keypad-btn.ascii-btn {
+  padding: 0 0.55ch 0.5ch 0;
+  font-size: 12px;
 }
 
 /* Call — depth button on portaled dialer (outside main deck root). */
-[data-phone-dialer][data-deck-mode="ascii"] .dialer-call-btn.deck-depth-control {
+[data-phone-dialer][data-deck-mode="ascii"] .dialer-call-btn.depth-panel--control {
+  --panel-depth: 6px;
   --panel-face: #000;
   --panel-border: #2d2d2d;
   --panel-side: #2a6b56;
   --panel-bottom: #1f4f3f;
   --panel-side-hover: #3a9174;
   --panel-bottom-hover: #2a6b56;
+  display: inline-block;
+  /* Right padding = chasm + side wall (face stops before ::after pocket) */
+  padding: 0 calc(var(--panel-depth) * 2) var(--panel-depth) 0;
+  overflow: visible;
   color: #8a8a8a;
+}
+
+[data-phone-dialer][data-deck-mode="ascii"] .dialer-call-btn .depth-panel__face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
 }
 
 [data-phone-dialer][data-deck-mode="ascii"] .dialer-call-btn.deck-depth-control .depth-panel__face {
