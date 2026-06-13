@@ -3,8 +3,8 @@
   "hooks": {
     "afterAgentResponse": [
       {
-        "command": "python -u .cursor/hooks/speak_last_sentence_mechanicus.py",
-        "timeout": 120
+        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/hooks/run-speak-last-mechanicus.ps1",
+        "timeout": 180
       }
     ]
   }

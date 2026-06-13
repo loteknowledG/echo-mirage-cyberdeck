@@ -43,6 +43,6 @@ export function messageNeedsOperatorContext(
   );
 }
 
-export function shouldEnableMuthurTools(message: string): boolean {
-  return !isCasualMuthurChat(message);
+export function shouldEnableMuthurTools(_message: string): boolean {
+  return true;
 }

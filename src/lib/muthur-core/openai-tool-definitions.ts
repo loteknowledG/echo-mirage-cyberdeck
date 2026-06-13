@@ -260,6 +260,41 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   {
     type: "function",
     function: {
+      name: "operator_browser",
+      description:
+        "Operator web pane: open URLs or web search queries, capture snapshot text, navigate back/forward/reload, or interact via CSS selector. Do NOT use for local filesystem paths — use localfs instead.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["goto", "snapshot", "back", "forward", "reload", "click", "type", "submit"],
+            description: "Browser action to perform in the operator web pane.",
+          },
+          url: {
+            type: "string",
+            description: "goto: absolute URL or site to open.",
+          },
+          query: {
+            type: "string",
+            description: "goto: search query when no direct URL (opens DuckDuckGo).",
+          },
+          selector: {
+            type: "string",
+            description: "click/type/submit: CSS selector in the visible page.",
+          },
+          value: {
+            type: "string",
+            description: "type: text to enter into the selected field.",
+          },
+        },
+        required: ["action"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "clock",
       description: "Current date/time on the server machine.",
       parameters: {

@@ -184,6 +184,25 @@ export function formatOpenOperatorFileResult(result: unknown): string {
   return parts.join("\n\n");
 }
 
+export function formatOperatorBrowserResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] operator_browser returned no output.";
+  }
+
+  const payload = result as { kind?: string; url?: string; selector?: string; value?: string };
+
+  const parts = [
+    "[TOOL OK] OPERATOR_BROWSER // QUEUED_FOR_OPERATOR_WEB_PANE",
+    "The deck will run this browser action in the operator web pane.",
+    payload.kind ? `ACTION // ${payload.kind.toUpperCase()}` : null,
+    payload.url ? `TARGET // ${payload.url}` : null,
+    payload.selector ? `SELECTOR // ${payload.selector}` : null,
+    payload.value ? `VALUE // ${payload.value}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
 export function formatConvertDocumentResult(result: unknown): string {
   if (!result || typeof result !== "object") {
     return "[TOOL] convert_document_to_markdown returned no output.";

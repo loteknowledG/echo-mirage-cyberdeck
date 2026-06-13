@@ -9,6 +9,7 @@ import type {
 export type { CaseBoardFilter, CaseCallDetailPayload, CaseCallListItem, CaseDetailPayload, CaseListItem };
 
 export const CASE_BOARD_FILTERS: { id: CaseBoardFilter; label: string }[] = [
+  { id: "all", label: "All" },
   { id: "open", label: "Open" },
   { id: "urgent", label: "Urgent" },
   { id: "emergency", label: "Emergency" },

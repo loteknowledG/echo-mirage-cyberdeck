@@ -1,9 +1,11 @@
 import type { OperatorEditorEdit } from "@/lib/operator-workbench";
 import type {
   MuthurCodingVerifyReceipt,
+  MuthurOperatorBrowserRef,
   MuthurOperatorConversionRef,
   MuthurOperatorOpenFileRef,
 } from "@/lib/muthur-core/types";
+import { parseOperatorBrowserJson } from "@/lib/muthur-core/operator-browser-ref";
 import { parseOperatorConversionJson } from "@/lib/muthur-core/operator-conversion-ref";
 import { parseOperatorOpenJson } from "@/lib/muthur-core/operator-open-file-ref";
 import { stripDsmlToolMarkup } from "@/lib/muthur-core/parse-dsml-tool-calls";
@@ -14,6 +16,8 @@ const OPERATOR_CONVERSION_FOOTER_RE =
   /\n\n\[MUTHUR_OPERATOR_CONVERSION\]([\s\S]*?)\[\/MUTHUR_OPERATOR_CONVERSION\]\s*$/;
 const OPERATOR_OPEN_FOOTER_RE =
   /\n\n\[MUTHUR_OPERATOR_OPEN\]([\s\S]*?)\[\/MUTHUR_OPERATOR_OPEN\]\s*$/;
+const OPERATOR_BROWSER_FOOTER_RE =
+  /\n\n\[MUTHUR_OPERATOR_BROWSER\]([\s\S]*?)\[\/MUTHUR_OPERATOR_BROWSER\]\s*$/;
 const VERIFY_RECEIPT_FOOTER_RE =
   /\n\n\[MUTHUR_VERIFY_RECEIPT\]([\s\S]*?)\[\/MUTHUR_VERIFY_RECEIPT\]\s*$/;
 const TOOLS_USED_FOOTER_RE = /\n\n\[MUTHUR_TOOLS_USED\]([\s\S]*?)\[\/MUTHUR_TOOLS_USED\]/;
@@ -23,7 +27,18 @@ const UPLINK_PROGRESS_RE = /^⏳ MUTHUR[^\n]*\n/gm;
 const CODING_VERIFY_INLINE_RE =
   /\n⏳ MUTHUR \/\/ verify:[^\n]*\n(?:\n\[MUTHUR_VERIFY\][\s\S]*?)(?=\n\n\[MUTHUR_|$)/;
 
-/** During uplink streaming, show only the latest progress line until real reply text arrives. */
+/** Shown client-side before /api/cyberdeck-chat returns its first byte. */
+export const MUTHUR_UPLINK_PREPARING = "⏳ MUTHUR // preparing uplink...";
+
+function dedupeConsecutiveProgressLines(lines: string[]): string[] {
+  const stages: string[] = [];
+  for (const line of lines) {
+    if (stages.at(-1) !== line) stages.push(line);
+  }
+  return stages;
+}
+
+/** During uplink streaming, show recent progress stages until real reply text arrives. */
 export function formatMuthurLiveStreamDisplay(text: string): string {
   const progressLines = [...text.matchAll(/^⏳ MUTHUR[^\n]*/gm)].map((match) => match[0]);
   const latestProgress = progressLines.at(-1) ?? "";
@@ -40,7 +55,10 @@ export function formatMuthurLiveStreamDisplay(text: string): string {
     .trim();
 
   if (body) return body;
-  return latestProgress;
+
+  const stages = dedupeConsecutiveProgressLines(progressLines);
+  if (stages.length <= 1) return latestProgress;
+  return stages.slice(-4).join("\n");
 }
 
 function parseEditsJson(raw: string): OperatorEditorEdit[] {
@@ -78,6 +96,7 @@ export function appendMuthurStreamFooters(
   operatorConversion?: MuthurOperatorConversionRef | null,
   operatorOpenFile?: MuthurOperatorOpenFileRef | null,
   codingVerify?: MuthurCodingVerifyReceipt | null,
+  operatorBrowser?: MuthurOperatorBrowserRef | null,
 ): string {
   let out = text;
   if (toolsUsed.length > 0) {
@@ -88,6 +107,9 @@ export function appendMuthurStreamFooters(
   }
   if (operatorOpenFile) {
     out += `\n\n[MUTHUR_OPERATOR_OPEN]${JSON.stringify(operatorOpenFile)}[/MUTHUR_OPERATOR_OPEN]`;
+  }
+  if (operatorBrowser) {
+    out += `\n\n[MUTHUR_OPERATOR_BROWSER]${JSON.stringify(operatorBrowser)}[/MUTHUR_OPERATOR_BROWSER]`;
   }
   if (operatorEdits.length > 0) {
     out += `\n\n[MUTHUR_OPERATOR_EDITS]${JSON.stringify(operatorEdits)}[/MUTHUR_OPERATOR_EDITS]`;
@@ -104,6 +126,7 @@ export function splitMuthurStreamPayload(text: string): {
   operatorEdits: OperatorEditorEdit[];
   operatorConversion: MuthurOperatorConversionRef | null;
   operatorOpenFile: MuthurOperatorOpenFileRef | null;
+  operatorBrowser: MuthurOperatorBrowserRef | null;
   codingVerify: MuthurCodingVerifyReceipt | null;
   toolsUsed: string;
 } {
@@ -111,6 +134,7 @@ export function splitMuthurStreamPayload(text: string): {
   let operatorEdits: OperatorEditorEdit[] = [];
   let operatorConversion: MuthurOperatorConversionRef | null = null;
   let operatorOpenFile: MuthurOperatorOpenFileRef | null = null;
+  let operatorBrowser: MuthurOperatorBrowserRef | null = null;
   let codingVerify: MuthurCodingVerifyReceipt | null = null;
 
   const verifyMatch = body.match(VERIFY_RECEIPT_FOOTER_RE);
@@ -131,6 +155,12 @@ export function splitMuthurStreamPayload(text: string): {
     operatorOpenFile = parseOperatorOpenJson(openMatch[1]);
   }
 
+  const browserMatch = body.match(OPERATOR_BROWSER_FOOTER_RE);
+  if (browserMatch) {
+    body = body.slice(0, browserMatch.index ?? body.length);
+    operatorBrowser = parseOperatorBrowserJson(browserMatch[1]);
+  }
+
   const conversionMatch = body.match(OPERATOR_CONVERSION_FOOTER_RE);
   if (conversionMatch) {
     body = body.slice(0, conversionMatch.index ?? body.length);
@@ -149,5 +179,35 @@ export function splitMuthurStreamPayload(text: string): {
     .replace(UPLINK_PROGRESS_RE, "")
     .replace(/^=+$\n?/gm, "")
     .trim();
-  return { displayText, operatorEdits, operatorConversion, operatorOpenFile, codingVerify, toolsUsed };
+  return { displayText, operatorEdits, operatorConversion, operatorOpenFile, operatorBrowser, codingVerify, toolsUsed };
+}
+
+/** Pick text to commit after uplink — never drop a visible stream body when footers strip to empty. */
+export function resolveMuthurCommittedDisplayText(args: {
+  fullText: string;
+  streamDisplayText: string;
+  glyphDisplayText: string;
+  toolsUsed?: string;
+}): string {
+  const fromGlyph = args.glyphDisplayText.replace(/^=+$\n?/g, "").trim();
+  if (fromGlyph) return fromGlyph;
+
+  const fromStream = args.streamDisplayText
+    .replace(/^⏳ MUTHUR[^\n]*\n?/gm, "")
+    .replace(/^=+$\n?/g, "")
+    .trim();
+  if (fromStream) return fromStream;
+
+  const fromPayload = splitMuthurStreamPayload(args.fullText).displayText.trim();
+  if (fromPayload) return fromPayload;
+
+  const tools = (args.toolsUsed ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (tools.length > 0) {
+    return `Tools used: ${tools.join(" · ")}`;
+  }
+
+  return "";
 }

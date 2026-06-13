@@ -52,17 +52,6 @@ function resolveModel(provider: string, modelId: string) {
   } as ReturnType<typeof getModel>;
 }
 
-async function collectStreamText(eventStream: ReturnType<typeof streamSimple>): Promise<string> {
-  let text = "";
-  for await (const event of eventStream) {
-    if (event.type === "text_delta" && event.delta) text += event.delta;
-    if (event.type === "error") {
-      throw new Error(event.error.errorMessage?.trim() || "Call simulation uplink failed");
-    }
-  }
-  return text.trim();
-}
-
 function residentSystemPrompt(scenario: NonNullable<ReturnType<typeof pmCallScenarioById>>): string {
   return [
     "You are simulating a property management inbound caller (resident/tenant) in a TRAINING exercise.",
@@ -155,6 +144,75 @@ function debateStreamToText(eventStream: ReturnType<typeof streamSimple>): Reada
   });
 }
 
+function observerStream(
+  scenario: NonNullable<ReturnType<typeof pmCallScenarioById>>,
+  transcript: string,
+  eventStream: ReturnType<typeof streamSimple>,
+  provider: string,
+  modelId: string,
+): ReadableStream<Uint8Array> {
+  const operatorLines = (transcript.match(/^OPERATOR:/gm) ?? []).length;
+  const thinkingLines = (transcript.match(/^OPERATOR_THINKING:/gm) ?? []).length;
+  const turnCount = (transcript.match(/^(RESIDENT|OPERATOR|SYSTEM):/gm) ?? []).length;
+
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (payload: Record<string, unknown>) => {
+        controller.enqueue(textEncoder.encode(`${JSON.stringify(payload)}\n`));
+      };
+
+      try {
+        send({
+          type: "progress",
+          step: "transcript",
+          message: "Reading call transcript",
+          detail: `${turnCount} lines · ${operatorLines} operator · ${thinkingLines} thinking notes`,
+        });
+        send({
+          type: "progress",
+          step: "model",
+          message: "Connecting observer model",
+          detail: `${provider} / ${modelId}`,
+        });
+
+        let raw = "";
+        let composeStarted = false;
+        for await (const event of eventStream) {
+          if (event.type === "text_delta" && event.delta) {
+            if (!composeStarted) {
+              composeStarted = true;
+              send({
+                type: "progress",
+                step: "compose",
+                message: "Composing training digest",
+                detail: "Analyzing intent, routing, and operator actions…",
+              });
+            }
+            raw += event.delta;
+          }
+          if (event.type === "error") {
+            throw new Error(event.error.errorMessage?.trim() || "Observer uplink failed");
+          }
+        }
+
+        send({
+          type: "progress",
+          step: "parse",
+          message: "Parsing observer JSON",
+          detail: `${raw.length} chars received`,
+        });
+        const digest = parseObserverDigest(raw, scenario.id);
+        send({ type: "digest", digest });
+        controller.close();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Observer failed";
+        send({ type: "error", message });
+        controller.close();
+      }
+    },
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -230,10 +288,14 @@ export async function POST(request: Request) {
       { systemPrompt: OBSERVER_SYSTEM_PROMPT, messages, tools: [] },
       { apiKey },
     );
-    const raw = await collectStreamText(eventStream);
-    const digest = parseObserverDigest(raw, scenario.id);
 
-    return NextResponse.json({ digest });
+    return new Response(observerStream(scenario, transcript, eventStream, provider, modelId), {
+      headers: {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
   } catch (error) {
     console.error("[api/pm-call-sim][error]", error);
     return NextResponse.json(

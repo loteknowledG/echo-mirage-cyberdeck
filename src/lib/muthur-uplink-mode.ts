@@ -1,7 +1,5 @@
 /** MUTHUR composer uplink modes — autonomy, tools, and disk commit policy. */
 
-import { isCasualMuthurChat } from "@/lib/muthur-core/muthur-chat-intent";
-
 export type MuthurUplinkMode = "ask" | "plan" | "agent" | "debug";
 
 export type MuthurUplinkCommitPolicy = "never" | "manual" | "immediate";
@@ -55,6 +53,8 @@ const READ_ONLY_TOOLS = new Set([
   "git_status",
   "git_diff",
   "justbash",
+  "localfs",
+  "operator_browser",
 ]);
 
 const DEBUG_TOOLS = new Set([
@@ -67,7 +67,6 @@ const DEBUG_TOOLS = new Set([
 const AGENT_TOOLS = new Set([
   ...DEBUG_TOOLS,
   "convert_document_to_markdown",
-  "localfs",
   "export_markdown_to_docx",
   "export_markdown_to_pdf",
 ]);
@@ -158,14 +157,14 @@ export function buildUplinkModeSystemPrompt(mode: MuthurUplinkMode): string {
       return (
         "\n\nUPLINK MODE: ASK (OBSERVE). Your job is to understand before acting. " +
         "Ask focused clarifying questions until requirements are clear. " +
-        "You may use read-only tools (observe_operator_pane, git_status, git_diff, clock, justbash search) to inform questions. " +
-        "Do NOT edit files, create documents, or call suggest_operator_edit, open_operator_file, localfs, workspace_exec, convert, or export tools."
+        "You may use read-only tools (observe_operator_pane, localfs ls/cat/stat, operator_browser, git_status, git_diff, clock, justbash search) to inform questions. " +
+        "Do NOT edit files, create documents, or call suggest_operator_edit, open_operator_file, localfs write/mkdir, workspace_exec, convert, or export tools."
       );
     case "plan":
       return (
         "\n\nUPLINK MODE: PLAN (ASSIST). Brainstorm and discuss with the operator — outline approaches, tradeoffs, and steps. " +
-        "You may use read-only tools to inspect context. " +
-        "Do NOT edit, patch, convert, export, or create any files. Do NOT call suggest_operator_edit, open_operator_file, localfs, workspace_exec, convert, or export. " +
+        "You may use read-only tools (observe_operator_pane, localfs ls/cat/stat, operator_browser, git_status, git_diff, justbash) to inspect context. " +
+        "Do NOT edit, patch, convert, export, or create any files. Do NOT call suggest_operator_edit, open_operator_file, localfs write/mkdir, workspace_exec, convert, or export. " +
         "If the operator wants changes applied, tell them to switch to Debug (patch, manual save) or Agent (patch + auto-save)."
       );
     case "agent":
@@ -184,8 +183,6 @@ export function buildUplinkModeSystemPrompt(mode: MuthurUplinkMode): string {
   }
 }
 
-export function shouldEnableToolsForUplinkMode(mode: MuthurUplinkMode, message: string): boolean {
-  if (mode === "agent" || mode === "debug") return true;
-  if (isCasualMuthurChat(message)) return false;
+export function shouldEnableToolsForUplinkMode(_mode: MuthurUplinkMode, _message: string): boolean {
   return true;
 }

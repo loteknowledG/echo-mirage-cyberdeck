@@ -614,5 +614,28 @@
       "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
       "durationMs": 3717
     }
+  },
+  {
+    "id": "DIAL-EVT-2026-00055",
+    "type": "outbound_call_started",
+    "sessionId": "CALL-SESSION-MQAJKA0E-OH9G",
+    "timestamp": "2026-06-12T06:24:31.434Z",
+    "actor": "operator",
+    "payload": {
+      "phoneNumber": "7064618886",
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "participantType": "vendor"
+    }
+  },
+  {
+    "id": "DIAL-EVT-2026-00056",
+    "type": "call_ended",
+    "sessionId": "CALL-SESSION-MQAJKA0E-OH9G",
+    "timestamp": "2026-06-12T06:24:46.677Z",
+    "actor": "operator",
+    "payload": {
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "durationMs": 15269
+    }
   }
 ]

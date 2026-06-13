@@ -70,6 +70,9 @@ function toolsUsedHeaders(
   if (toolCtx.operatorOpenFile) {
     headers["X-Muthur-Operator-Open"] = JSON.stringify(toolCtx.operatorOpenFile);
   }
+  if (toolCtx.operatorBrowser) {
+    headers["X-Muthur-Operator-Browser"] = JSON.stringify(toolCtx.operatorBrowser);
+  }
   if (toolCtx.codingVerify) {
     headers["X-Muthur-Coding-Verify"] = JSON.stringify(toolCtx.codingVerify);
   }
@@ -236,6 +239,7 @@ export async function muthurChatWithModelTools(options: {
             toolCtx.operatorConversion,
             toolCtx.operatorOpenFile,
             toolCtx.codingVerify,
+            toolCtx.operatorBrowser,
           ),
         );
         return;
@@ -300,6 +304,7 @@ export async function muthurChatWithModelTools(options: {
             toolCtx.operatorConversion,
             toolCtx.operatorOpenFile,
             toolCtx.codingVerify,
+            toolCtx.operatorBrowser,
           ),
         );
         return;
@@ -313,6 +318,7 @@ export async function muthurChatWithModelTools(options: {
           toolCtx.operatorConversion,
           toolCtx.operatorOpenFile,
           toolCtx.codingVerify,
+          toolCtx.operatorBrowser,
         ),
       );
       return;
@@ -336,6 +342,7 @@ export async function muthurChatWithModelTools(options: {
         toolCtx.operatorConversion,
         toolCtx.operatorOpenFile,
         toolCtx.codingVerify,
+        toolCtx.operatorBrowser,
       ),
     );
   });

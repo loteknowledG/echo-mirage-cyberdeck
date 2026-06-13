@@ -57,8 +57,12 @@
     "test:predeploy:layout": "pnpm exec tsc --noEmit && pnpm build && playwright test e2e/cyberdeck.layout.spec.ts",
     "test:predeploy:kit": "pnpm exec tsc --noEmit && playwright test e2e/realmorphism-kit-scroll.spec.ts e2e/realmorphism-kit-rolling-picker.spec.ts e2e/glyph-oneline-art-roller.spec.ts",
     "test:predeploy": "pnpm exec tsc --noEmit && pnpm probe:muthur-observation && pnpm build && playwright test",
-    "voice:cursor:read-last-response": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CURSOR_HOOK_MECHANICUS_EXTRACT='full'; $j = Join-Path (Get-Location) '.cursor/hooks/sample-after-agent.json'; if (-not (Test-Path $j)) { Write-Error 'Missing .cursor/hooks/sample-after-agent.json'; exit 1 }; Get-Content -Raw $j | python -u (Join-Path (Get-Location) '.cursor/hooks/speak_last_sentence_mechanicus.py')\"",
-    "voice:cursor:read-last-response:dry": "python .cursor/hooks/speak_last_sentence_mechanicus.py --dry-run"
+    "voice:cursor:enable-mechanicus": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/enable-mechanicus-cursor-voice.ps1",
+    "voice:cursor:read-last-response": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:SAMUS_MANUS_ROOT='C:\\dev\\samus-manus'; $env:CURSOR_HOOK_MECHANICUS_EXTRACT='full'; $env:CURSOR_HOOK_MECHANICUS_LAST_SENTENCE='1'; $env:CURSOR_HOOK_MECHANICUS_WAIT='1'; $j = Join-Path (Get-Location) '.cursor/hooks/sample-after-agent.json'; if (-not (Test-Path $j)) { Write-Error 'Missing .cursor/hooks/sample-after-agent.json'; exit 1 }; Get-Content -Raw $j | powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path (Get-Location) '.cursor/hooks/run-speak-last-mechanicus.ps1')\"",
+    "voice:cursor:read-last-response:dry": "python .cursor/hooks/speak_last_sentence_mechanicus.py --dry-run",
+    "hook:test-mechanicus-last": "python .cursor/hooks/speak_last_sentence_mechanicus.py --self-test",
+    "hook:dry-mechanicus-last": "python .cursor/hooks/speak_last_sentence_mechanicus.py --dry-run",
+    "hook:smoke-mechanicus-voice": "pnpm run voice:cursor:read-last-response"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.3.24",

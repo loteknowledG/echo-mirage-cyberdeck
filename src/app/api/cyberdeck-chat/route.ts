@@ -23,6 +23,7 @@ import {
   type OperatorChatContext,
 } from "@/lib/muthur/document-edit-intent";
 import {
+  isCasualMuthurChat,
   messageNeedsOperatorContext,
   shouldEnableMuthurTools,
 } from "@/lib/muthur-core/muthur-chat-intent";
@@ -32,12 +33,17 @@ import {
   shouldEnableToolsForUplinkMode,
   type MuthurUplinkMode,
 } from "@/lib/muthur-uplink-mode";
+import { messageReferencesLocalPath } from "@/lib/browser-intents";
+
+const MUTHUR_COGNITION_DOCTRINE =
+  "\n\nCOGNITION: You interpret operator intent and choose tools. The deck does not pre-run browser searches, file reads, or conversions from regex on the operator's message — call tools yourself (localfs, operator_browser, observe_operator_pane, etc.). Do not emit [GLYPH:...] unless the operator explicitly asked for a glyph render.";
 
 const MUTHUR_AVAILABLE_TOOLS_PROMPT =
   "\n\nAVAILABLE TOOLS:" +
   "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane (file name, language, cursor, dirty, content excerpt)." +
   "\n- open_operator_file: Open a workspace text/markdown/code file in the operator Monaco editor on the operator's screen. Call before suggest_operator_edit when nothing is open." +
   "\n- suggest_operator_edit: Propose typed edits to markdown/code/text open in the operator Monaco editor. Edits auto-apply in the operator pane (Ctrl+Z to undo). Not for DOCX/PDF previews." +
+  "\n- operator_browser: Operator web pane — goto URL or search query, snapshot page text, back/forward/reload, click/type/submit. Not for local disk paths." +
   "\n- localfs: REAL disk — read anywhere; mkdir/write only inside the Echo Mirage repo. Use write to create or update source files." +
   "\n- workspace_exec: REAL disk — allowlisted commands only (pnpm exec tsc --noEmit, pnpm lint, pnpm build, git diff, git log, etc.). Run after edits to verify." +
   "\n- git_status / git_diff: REAL disk — inspect repo changes after coding." +
@@ -247,11 +253,20 @@ function buildMuthurSystemContent(args: {
       systemContent += buildEditorContextPrompt();
     } else {
       systemContent +=
-        "\n\nOnly call tools when the user asks for an action (edit a file, run a command, read the operator pane, convert a document, etc.). Do not probe the workspace or operator pane unprompted.";
+        "\n\nInterpret the operator's intent and call tools when an action is needed (read a path, browse the web, edit a file, run a command). Do not probe unprompted.";
     }
-  } else {
+  } else if (isCasualMuthurChat(args.message)) {
     systemContent +=
-      "\n\nReply conversationally in plain text. Do not call any tools for greetings or small talk.";
+      "\n\nReply conversationally. Tools are available if the operator asks for an action in the same turn.";
+  } else {
+    systemContent += "\n\nReply in plain text.";
+  }
+
+  systemContent += MUTHUR_COGNITION_DOCTRINE;
+
+  if (messageReferencesLocalPath(args.message)) {
+    systemContent +=
+      "\n\nThe user referenced a local filesystem path. Use localfs ls/cat/stat on that path (paths outside the Echo Mirage repo are read-only). Do NOT search the web or open a browser for disk paths.";
   }
 
   systemContent += args.glyphDoctrine + args.memoryPrompt + args.browserPrompt + args.glyphPrompt;
@@ -387,6 +402,9 @@ export async function POST(request: Request) {
       typeof memoryContext === "string" && memoryContext.trim().length > 0;
     /** Cyberdeck always ships client memory — skip boot_muthur on the hot path. */
     const clientSentMemoryField = typeof memoryContext === "string";
+    const toolRegistryPrefetch = ENABLE_AUTOMATION
+      ? resolveToolRegistry()
+      : Promise.resolve(EMPTY_TOOL_REGISTRY);
 
     if (body.warm === true && process.env.NODE_ENV !== "production") {
       await resolveToolRegistry();
@@ -543,7 +561,9 @@ export async function POST(request: Request) {
         const model =
           (typeof modelFromBody === "string" && modelFromBody.trim()) || defaultModelForProvider(provider);
 
-        const serverMemoryCtx = await getMuthurMemoryContext(message);
+        const serverMemoryCtx = clientSentMemoryField
+          ? ""
+          : await getMuthurMemoryContext(message);
         const memoryPrompt = buildMemoryPrompt(memoryContext, serverMemoryCtx);
 
         const { systemContent, toolsEnabled } = buildMuthurSystemContent({
@@ -567,7 +587,7 @@ export async function POST(request: Request) {
           apiKey: resolvedApiKey,
           model,
           baseMessages,
-          registry: toolsEnabled ? await resolveToolRegistry() : EMPTY_TOOL_REGISTRY,
+          registry: toolsEnabled ? await toolRegistryPrefetch : EMPTY_TOOL_REGISTRY,
           toolsEnabled,
           uplinkMode,
         });

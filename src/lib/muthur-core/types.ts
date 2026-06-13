@@ -1,5 +1,8 @@
+import type { BrowserCommand } from "@/lib/browser-intents";
 import type { OperatorEditorEdit } from "@/lib/operator-workbench";
 import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
+
+export type MuthurOperatorBrowserRef = BrowserCommand;
 
 export type MuthurOperatorConversionRef = {
   sourcePath: string;
@@ -30,6 +33,7 @@ export type MuthurToolExecutionContext = {
   operatorEdits: OperatorEditorEdit[];
   operatorConversion: MuthurOperatorConversionRef | null;
   operatorOpenFile: MuthurOperatorOpenFileRef | null;
+  operatorBrowser: MuthurOperatorBrowserRef | null;
   codingTouches: string[];
   codingVerify: MuthurCodingVerifyReceipt | null;
   uplinkMode: MuthurUplinkMode;
@@ -42,6 +46,7 @@ export function createMuthurToolExecutionContext(
     operatorEdits: [],
     operatorConversion: null,
     operatorOpenFile: null,
+    operatorBrowser: null,
     codingTouches: [],
     codingVerify: null,
     uplinkMode,

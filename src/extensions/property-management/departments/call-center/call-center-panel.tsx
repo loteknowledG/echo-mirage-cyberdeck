@@ -16,6 +16,7 @@ import { createPmCallTurn } from "@/lib/pm-call-center/transcript";
 import type {
   PmCallEpisode,
   PmCallEpisodeDigest,
+  PmCallObserverProgressEvent,
   PmCallPersistence,
   PmCallScenario,
   PmCallSimPhase,
@@ -25,6 +26,97 @@ import type { CaseMatchCandidate } from "@/lib/property-manager/cases/types";
 import { cn } from "@/lib/utils";
 
 type SimPhase = PmCallSimPhase;
+
+/** Snapshot taken when operator opens scenario picker — Cancel restores this. */
+type PickerReturnState = {
+  phase: Exclude<SimPhase, "pick" | "observing">;
+  scenario: PmCallScenario;
+  turns: PmCallTurn[];
+  composer: string;
+  operatorNotesDraft: string;
+  digest: PmCallEpisodeDigest | null;
+  status: string;
+  matchedCase: CaseMatchCandidate | null;
+  lastPersistence: PmCallPersistence | null;
+};
+
+type ObserverFeedItem = {
+  step: string;
+  message: string;
+  detail?: string;
+  state: "active" | "done" | "error";
+};
+
+function pushObserverFeedItem(
+  prev: ObserverFeedItem[],
+  event: { step: string; message: string; detail?: string },
+): ObserverFeedItem[] {
+  const done = prev.map((item) =>
+    item.state === "active" ? { ...item, state: "done" as const } : item,
+  );
+  const existing = done.findIndex((item) => item.step === event.step);
+  if (existing >= 0) {
+    return done.map((item, index) =>
+      index === existing
+        ? { ...item, message: event.message, detail: event.detail, state: "active" as const }
+        : item,
+    );
+  }
+  return [...done, { ...event, state: "active" as const }];
+}
+
+function finishObserverFeed(prev: ObserverFeedItem[]): ObserverFeedItem[] {
+  return prev.map((item) =>
+    item.state === "active" ? { ...item, state: "done" as const } : item,
+  );
+}
+
+function failObserverFeed(prev: ObserverFeedItem[]): ObserverFeedItem[] {
+  return prev.map((item) =>
+    item.state === "active" ? { ...item, state: "error" as const } : item,
+  );
+}
+
+function observerStatusLine(message: string, detail?: string): string {
+  return detail ? `${message} — ${detail}` : message;
+}
+
+function ObserverActivityFeed({ items }: { items: ObserverFeedItem[] }) {
+  return (
+    <div
+      className="space-y-2 rounded-sm border border-emerald-500/25 bg-emerald-500/5 p-3"
+      aria-live="polite"
+      aria-busy={items.some((item) => item.state === "active")}
+    >
+      <div className="font-mono text-[9px] tracking-[0.12em] text-emerald-300/90">OBSERVER ACTIVITY</div>
+      <ul className="space-y-1.5">
+        {items.map((item) => (
+          <li
+            key={item.step}
+            className={cn(
+              "flex gap-2 font-mono text-[9px] leading-relaxed tracking-[0.04em]",
+              item.state === "error" ? "text-rose-300" : "text-[#b0b0b0]",
+            )}
+          >
+            <span className="mt-[1px] shrink-0 w-[1.1rem] text-center" aria-hidden>
+              {item.state === "done" ? "✓" : item.state === "error" ? "!" : "…"}
+            </span>
+            <span>
+              <span className={item.state === "active" ? "text-emerald-200" : undefined}>
+                {item.message}
+              </span>
+              {item.detail ? (
+                <span className="mt-0.5 block text-[8px] tracking-[0.05em] text-[#707070]">
+                  {item.detail}
+                </span>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 type CallCenterPanelProps = {
   activeProvider?: string;
@@ -167,6 +259,8 @@ export function CallCenterPanel({
   const [showArchive, setShowArchive] = useState(false);
   const [matchedCase, setMatchedCase] = useState<CaseMatchCandidate | null>(null);
   const [lastPersistence, setLastPersistence] = useState<PmCallPersistence | null>(null);
+  const [pickerReturn, setPickerReturn] = useState<PickerReturnState | null>(null);
+  const [observerFeed, setObserverFeed] = useState<ObserverFeedItem[]>([]);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -202,7 +296,11 @@ export function CallCenterPanel({
 
   useEffect(() => {
     if (!hydrated) return;
-    if (phase === "pick" || !scenario) {
+    if (phase === "pick") {
+      if (!pickerReturn) clearPmCallSimSession();
+      return;
+    }
+    if (!scenario) {
       clearPmCallSimSession();
       return;
     }
@@ -219,7 +317,7 @@ export function CallCenterPanel({
       status,
       updatedAt: Date.now(),
     });
-  }, [hydrated, phase, scenario, turns, composer, operatorNotesDraft, digest, status]);
+  }, [hydrated, phase, scenario, turns, composer, operatorNotesDraft, digest, status, pickerReturn]);
 
   useEffect(() => {
     if (!hydrated || phase !== "live") return;
@@ -230,10 +328,11 @@ export function CallCenterPanel({
     const el = threadRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [turns, busy, digest]);
+  }, [turns, busy, digest, observerFeed]);
 
   const startScenario = useCallback(async (next: PmCallScenario) => {
     abortRef.current?.abort();
+    setPickerReturn(null);
     setScenario(next);
     setTurns([createPmCallTurn("resident", next.openingLine)]);
     setComposer("");
@@ -290,6 +389,16 @@ export function CallCenterPanel({
     setStatus("Call ended. Review notes, then run the observer.");
   }, [phase, scenario, turns]);
 
+  const notifyObserverProgress = useCallback((event: PmCallObserverProgressEvent) => {
+    setObserverFeed((prev) => pushObserverFeedItem(prev, event));
+    setStatus(observerStatusLine(event.message, event.detail));
+  }, []);
+
+  const notifyObserverStep = useCallback((step: string, message: string, detail?: string) => {
+    setObserverFeed((prev) => pushObserverFeedItem(prev, { step, message, detail }));
+    setStatus(observerStatusLine(message, detail));
+  }, []);
+
   const runObserver = useCallback(async () => {
     if (!scenario || phase !== "hung_up") {
       return;
@@ -308,7 +417,8 @@ export function CallCenterPanel({
     busyRef.current = true;
     setBusy(true);
     setPhase("observing");
-    setStatus("Observer reviewing your handling…");
+    setObserverFeed([]);
+    notifyObserverStep("start", "Observer run started", scenario.title);
 
     try {
       const nextDigest = await fetchPmCallObserverDigest({
@@ -318,9 +428,16 @@ export function CallCenterPanel({
         model: modelId,
         apiKey,
         signal: abortRef.current.signal,
+        onProgress: notifyObserverProgress,
       });
       setDigest(nextDigest);
       const endedAt = Date.now();
+
+      notifyObserverStep(
+        "persist",
+        "Saving call to case file",
+        matchedCase ? `Attaching to ${matchedCase.caseId}` : "Matching open case or creating new",
+      );
       const persistence = await persistPmCallRecord({
         scenarioId: scenario.id,
         turns,
@@ -330,6 +447,12 @@ export function CallCenterPanel({
         attachCaseSlug: matchedCase?.slug,
       });
       setLastPersistence(persistence);
+
+      notifyObserverStep(
+        "archive",
+        "Archiving training simulation",
+        `${persistence.callId} → ${persistence.caseId}`,
+      );
 
       const episode: PmCallEpisode = {
         id:
@@ -344,6 +467,7 @@ export function CallCenterPanel({
         persistence,
       };
       setEpisodes(appendPmCallEpisode(episode));
+      setObserverFeed((prev) => finishObserverFeed(prev));
       setPhase("review");
       setStatus(
         persistence.createdCase
@@ -352,13 +476,25 @@ export function CallCenterPanel({
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Observer failed";
+      setObserverFeed((prev) => failObserverFeed(prev));
       setPhase("hung_up");
       setStatus(`Observer failed: ${message}`);
     } finally {
       busyRef.current = false;
       setBusy(false);
     }
-  }, [activeProvider, apiKey, matchedCase?.slug, modelId, phase, scenario, turns]);
+  }, [
+    activeProvider,
+    apiKey,
+    matchedCase?.caseId,
+    matchedCase?.slug,
+    modelId,
+    notifyObserverProgress,
+    notifyObserverStep,
+    phase,
+    scenario,
+    turns,
+  ]);
 
   const sendOperatorLine = useCallback(async () => {
     const text = composer.trim();
@@ -412,6 +548,7 @@ export function CallCenterPanel({
   const resetToPicker = useCallback(() => {
     abortRef.current?.abort();
     clearPmCallSimSession();
+    setPickerReturn(null);
     setPhase("pick");
     setScenario(null);
     setTurns([]);
@@ -423,6 +560,54 @@ export function CallCenterPanel({
     setStatus("Pick a scenario to start a text simulation.");
   }, []);
 
+  const openScenarioPicker = useCallback(() => {
+    if (phase === "pick" || !scenario || phase === "observing") return;
+    if (phase !== "live" && phase !== "hung_up" && phase !== "review") return;
+
+    abortRef.current?.abort();
+    busyRef.current = false;
+    setBusy(false);
+    setPickerReturn({
+      phase,
+      scenario,
+      turns,
+      composer,
+      operatorNotesDraft,
+      digest,
+      status,
+      matchedCase,
+      lastPersistence,
+    });
+    setPhase("pick");
+    setStatus("Pick a scenario, or cancel to return to your previous session.");
+  }, [
+    composer,
+    digest,
+    lastPersistence,
+    matchedCase,
+    operatorNotesDraft,
+    phase,
+    scenario,
+    status,
+    turns,
+  ]);
+
+  const cancelScenarioPicker = useCallback(() => {
+    if (!pickerReturn) return;
+
+    const snapshot = pickerReturn;
+    setPickerReturn(null);
+    setScenario(snapshot.scenario);
+    setTurns(snapshot.turns);
+    setComposer(snapshot.composer);
+    setOperatorNotesDraft(snapshot.operatorNotesDraft);
+    setDigest(snapshot.digest);
+    setMatchedCase(snapshot.matchedCase);
+    setLastPersistence(snapshot.lastPersistence);
+    setPhase(snapshot.phase);
+    setStatus(snapshot.status);
+  }, [pickerReturn]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-sm border border-[#1c1c1c] bg-black/75 px-2 py-1.5">
@@ -432,8 +617,13 @@ export function CallCenterPanel({
         </div>
         <div className="flex flex-wrap gap-1.5">
           {phase !== "pick" ? (
-            <CyberdeckActionButton variant="neutral" disabled={busy} onClick={resetToPicker}>
+            <CyberdeckActionButton variant="neutral" disabled={busy} onClick={openScenarioPicker}>
               New
+            </CyberdeckActionButton>
+          ) : null}
+          {phase === "pick" && pickerReturn ? (
+            <CyberdeckActionButton variant="neutral" onClick={cancelScenarioPicker}>
+              Cancel
             </CyberdeckActionButton>
           ) : null}
           {phase === "hung_up" ? (
@@ -454,6 +644,12 @@ export function CallCenterPanel({
 
       {phase === "pick" ? (
         <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
+          {pickerReturn ? (
+            <p className="mb-2 font-mono text-[9px] tracking-[0.06em] text-[#8a9a90]">
+              Browsing scenarios — <span className="text-emerald-300/90">Cancel</span> returns to{" "}
+              {pickerReturn.scenario.title} ({pickerReturn.phase.replace("_", " ")}).
+            </p>
+          ) : null}
           <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
             {PM_CALL_SCENARIOS.map((item) => (
               <button
@@ -497,10 +693,11 @@ export function CallCenterPanel({
                 onNotesChange={updateTurnNotes}
               />
             ))}
-            {busy ? (
-              <div className="font-mono text-[9px] tracking-[0.1em] text-[#606060]">
-                …
-              </div>
+            {phase === "observing" && observerFeed.length > 0 ? (
+              <ObserverActivityFeed items={observerFeed} />
+            ) : null}
+            {busy && phase !== "observing" ? (
+              <div className="font-mono text-[9px] tracking-[0.1em] text-[#606060]">…</div>
             ) : null}
             {phase === "review" && digest ? <DigestCard digest={digest} /> : null}
             {phase === "review" && lastPersistence ? (

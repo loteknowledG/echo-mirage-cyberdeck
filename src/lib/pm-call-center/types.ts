@@ -68,6 +68,14 @@ export type PmCallEpisode = {
 
 export type PmCallSimAction = "resident_turn" | "observer_close";
 
+/** NDJSON progress line while observer_close streams. */
+export type PmCallObserverProgressEvent = {
+  type: "progress";
+  step: string;
+  message: string;
+  detail?: string;
+};
+
 export type PmCallSimPhase = "pick" | "live" | "hung_up" | "observing" | "review";
 
 /** In-progress call simulation — survives page refresh. */

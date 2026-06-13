@@ -411,6 +411,52 @@ async function runOpenOperatorFile(call: ToolCall): Promise<ToolResult> {
   };
 }
 
+async function runOperatorBrowser(call: ToolCall): Promise<ToolResult> {
+  const action = getStringArg(call, "action").toLowerCase() || "goto";
+
+  if (action === "goto") {
+    const url = getStringArg(call, "url") || getStringArg(call, "query");
+    if (!url) {
+      return { ok: false, error: "operator_browser goto requires url or query." };
+    }
+    return { ok: true, output: { kind: "goto", url } };
+  }
+
+  if (action === "snapshot") {
+    return { ok: true, output: { kind: "snapshot" } };
+  }
+  if (action === "back") {
+    return { ok: true, output: { kind: "back" } };
+  }
+  if (action === "forward") {
+    return { ok: true, output: { kind: "forward" } };
+  }
+  if (action === "reload") {
+    return { ok: true, output: { kind: "reload" } };
+  }
+  if (action === "click") {
+    const selector = getStringArg(call, "selector");
+    if (!selector) return { ok: false, error: "operator_browser click requires selector." };
+    return { ok: true, output: { kind: "click", selector } };
+  }
+  if (action === "type") {
+    const selector = getStringArg(call, "selector");
+    const value = getStringArg(call, "value");
+    if (!selector) return { ok: false, error: "operator_browser type requires selector." };
+    return { ok: true, output: { kind: "type", selector, value } };
+  }
+  if (action === "submit") {
+    const selector = getStringArg(call, "selector");
+    if (!selector) return { ok: false, error: "operator_browser submit requires selector." };
+    return { ok: true, output: { kind: "submit", selector } };
+  }
+
+  return {
+    ok: false,
+    error: "operator_browser action must be goto, snapshot, back, forward, reload, click, type, or submit.",
+  };
+}
+
 async function runSuggestOperatorEdit(call: ToolCall): Promise<ToolResult> {
   const parsed = parseSuggestOperatorEditArgs(call.args);
   if (!parsed.ok) {
@@ -458,6 +504,12 @@ export function createMuthurToolRegistry(): ToolRegistry {
         description:
           "Open a workspace text/markdown/code file in the operator Monaco editor on the operator's screen. Use before suggest_operator_edit when nothing is open.",
         run: runOpenOperatorFile,
+      },
+      operator_browser: {
+        name: "operator_browser",
+        description:
+          "Control the operator web pane: goto URL or search query, snapshot page text, back/forward/reload, click/type/submit by CSS selector. Use for web research — not for local disk paths (use localfs).",
+        run: runOperatorBrowser,
       },
       workspace_exec: {
         name: "workspace_exec",

@@ -34,15 +34,9 @@ import {
 import { persistMuthurShipMemoryTurn } from "@/lib/muthur-ship-memory";
 import {
   OPERATOR_BROWSER_HOME_URL,
-  deriveOperatorBrowserUrl,
-  extractAssistantBrowserCommand,
-  looksLikeAffirmativeReply,
-  looksLikeBrowserSearchOffer,
   looksLikeCaptchaBlock,
-  looksLikeOperatorWebIntent,
+  messageReferencesLocalPath,
   normalizeOperatorBrowserUrl,
-  parseBrowserCommand,
-  parseBrowserUseModeCommand,
 } from "@/lib/browser-intents";
 import { useBrowserController } from "@/lib/use-browser-controller";
 import { CyberdeckCustomTabBrowserSync } from "@/components/cyberdeck/cyberdeck-custom-tab-browser-sync";
@@ -54,7 +48,6 @@ import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import type { CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
 import {
   loadComputerUse,
-  messageMayUseComputerUse,
 } from "@/features/cyberdeck/runtime/defer-computer-use";
 import {
   bindDeckKeyboardSfx,
@@ -95,7 +88,6 @@ import {
   normalizeMarkdownMechanical,
   operatorMarkdownWasHousekept,
 } from "@/lib/operator-markdown-housekeeping";
-import { parseConvertDocumentIntent } from "@/lib/muthur-document-conversion-intent";
 import { isDocumentEditIntent, isOperatorPaneEditRequest } from "@/lib/muthur/document-edit-intent";
 import {
   applyMuthurOperatorEdits,
@@ -106,9 +98,12 @@ import {
 } from "@/lib/operator-muthur-edit";
 import {
   formatMuthurLiveStreamDisplay,
+  MUTHUR_UPLINK_PREPARING,
+  resolveMuthurCommittedDisplayText,
   splitMuthurStreamPayload,
 } from "@/lib/muthur-core/muthur-stream-payload";
 import { parseOperatorConversionJson } from "@/lib/muthur-core/operator-conversion-ref";
+import { parseOperatorBrowserJson } from "@/lib/muthur-core/operator-browser-ref";
 import { parseOperatorOpenJson } from "@/lib/muthur-core/operator-open-file-ref";
 import type { MuthurOperatorOpenFileRef } from "@/lib/muthur-core/types";
 import type { MuthurCodingVerifyReceipt } from "@/lib/muthur-core/types";
@@ -4772,7 +4767,7 @@ export default function CyberdeckApp() {
     messageInputRef.current?.clear();
     setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
     setIsStreaming(true);
-    setStreamText("");
+    setStreamText(MUTHUR_UPLINK_PREPARING);
     setStreamToolTrace("");
     setGeneratedUI(null);
 
@@ -5037,414 +5032,11 @@ ${diff}`;
       return;
     }
 
-    const convertIntent = parseConvertDocumentIntent(userMessage);
-    if (convertIntent) {
-      setIsStreaming(false);
-      await openConvertedMarkdownInOperator(convertIntent.filePath);
-      return;
-    }
-
-    const exportDocxIntent = parseExportMarkdownToDocxIntent(userMessage);
-    if (exportDocxIntent) {
-      setIsStreaming(false);
-      if (exportDocxIntent.fromOperator) {
-        await exportOperatorMarkdown("docx");
-      } else if (exportDocxIntent.filePath) {
-        await exportMarkdownFileToDocx(exportDocxIntent.filePath);
-      }
-      return;
-    }
-
-    const exportPdfIntent = parseExportMarkdownToPdfIntent(userMessage);
-    if (exportPdfIntent) {
-      setIsStreaming(false);
-      if (exportPdfIntent.fromOperator) {
-        await exportOperatorMarkdown("pdf");
-      } else if (exportPdfIntent.filePath) {
-        await exportMarkdownFileToPdf(exportPdfIntent.filePath);
-      }
-      return;
-    }
-
-    const muthurReadMatch = userMessage.match(/^\/muthur\s+read\s+(.+)$/i);
-    if (muthurReadMatch) {
-      const filePath = muthurReadMatch[1].trim();
-      setMessages((prev) => [
-        ...prev,
-        { role: "system", text: `MUTHUR_READ // ${filePath}` },
-      ]);
-      setIsStreaming(false);
-      try {
-        const res = await fetch(`/api/read-file?path=${encodeURIComponent(filePath)}`);
-        if (!res.ok) throw new Error("Failed to read file");
-        const { content } = await res.json() as { content: string };
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", text: `Here's the content of ${filePath}:\n\n\`\`\`\n${content.slice(0, 4000)}\n\`\`\`\n${content.length > 4000 ? "\n...(truncated)" : ""}` },
-        ]);
-      } catch {
-        setMessages((prev) => [
-          ...prev,
-          { role: "system", text: `MUTHUR_READ // FAILED // FILE_NOT_FOUND_OR_ERROR` },
-        ]);
-      }
-      return;
-    }
-
-    const muthurHistoryMatch = userMessage.match(/^\/muthur\s+history\s*$/i);
-    if (muthurHistoryMatch) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "system", text: "MUTHUR_HISTORY // FETCHING..." },
-      ]);
-      setIsStreaming(false);
-      try {
-        const res = await fetch("/api/git-log");
-        if (!res.ok) throw new Error("Failed to get history");
-        const { log } = await res.json() as { log: string };
-        if (!log) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", text: "No commit history found." },
-          ]);
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", text: `Recent commits:\n\n${log.slice(0, 3000)}` },
-          ]);
-        }
-      } catch {
-        setMessages((prev) => [
-          ...prev,
-          { role: "system", text: "MUTHUR_HISTORY // FAILED // ERROR" },
-        ]);
-      }
-      return;
-    }
-
-    const muthurStatusMatch = userMessage.match(/^\/muthur\s+status\s*$/i);
-    if (muthurStatusMatch) {
-      setIsStreaming(false);
-      const statusText = `
-⚡ MUTHUR STATUS REPORT
-========================
-Provider: ${activeProvider.toUpperCase()}
-Model: ${modelID || "NOT SELECTED"}
-API Key: ${providerKeys[activeProvider] ? "✓ CONFIGURED" : "✗ MISSING"}
-Model Status: ${modelFetchStatusByProvider[activeProvider] || "idle"}
-Verified: ${verifiedProviders[activeProvider] ? "✓ YES" : "✗ NO"}
-Rate Limited: ${rateLimitedProviders.has(activeProvider) ? "⚠️ YES" : "✓ NO"}
-Connection: ${connectionState.toUpperCase()}
-
-Last Messages: ${messages.slice(-3).map(m => `[${m.role.substring(0,3)}] ${m.text.substring(0,30)}...`).join("\n")}
-`;
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: statusText },
-      ]);
-      return;
-    }
-
-    if (messageMayUseComputerUse(userMessage)) {
-      const {
-        detectSelfStatusIntent,
-        detectInspectIntent,
-        detectExecDeckShowIntent,
-        detectExecDeckPrepareIntent,
-        detectExecDeckClearIntent,
-        detectExecDeckPushIntent,
-        detectExecDeckExecuteIntent,
-        detectExecDeckDescribeStagedIntent,
-        formatStatusText,
-        getLastSurfaceClassification,
-        formatSurfaceResponse,
-        openDeck,
-        isDeckOpen,
-        describeDeck,
-        buildReviewerHand,
-        prepareHand,
-        getCardTableState,
-        clearDeck,
-        narrate,
-        pushHandToStack,
-        attemptExecute,
-        isTeachingDemoTrigger,
-        runTeachingDemo,
-        runComputerUseBridgeAction,
-        resolveUiTarget,
-      } = await loadComputerUse();
-
-    if (detectSelfStatusIntent(userMessage)) {
-      const statusText = formatStatusText();
-      setMessages((prev) => [...prev, { role: "assistant", text: statusText }]);
-      setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, statusText));
-      setIsStreaming(false);
-      return;
-    }
-
-    if (detectInspectIntent(userMessage)) {
-      const lastSurface = getLastSurfaceClassification();
-      if (lastSurface) {
-        let response = formatSurfaceResponse(lastSurface);
-        if (screenshotRef.current && lastSurface.surface === "unknown") {
-          response += " Screenshot captured — surface type unclassified. Consider reviewing the image content manually.";
-          screenshotRef.current = null;
-        }
-        setMessages((prev) => [...prev, { role: "assistant", text: response }]);
-        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, response));
-      } else {
-        const response = "Screenshot capture is not available in this environment. Please paste a screenshot image using the attachment button, then ask me to inspect it.";
-        setMessages((prev) => [...prev, { role: "assistant", text: response }]);
-        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, response));
-      }
-      setIsStreaming(false);
-      return;
-    }
-
-    if (detectExecDeckShowIntent(userMessage)) {
-      openDeck();
-      useCyberdeckTabStore.getState().setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
-      useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-      if (isDeckOpen()) {
-        const desc = describeDeck();
-        setMessages((prev) => [...prev, { role: "assistant", text: `Card Table displayed. ${desc}` }]);
-        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, `Card Table displayed. ${desc}`));
-      }
-      setIsStreaming(false);
-      return;
-    }
-
-if (detectExecDeckPrepareIntent(userMessage)) {
-      openDeck();
-      const cards = buildReviewerHand();
-      const hand = prepareHand("Reviewer Hand", cards);
-      useCyberdeckTabStore.getState().setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
-      useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-      const desc = describeDeck();
-      narrate("HAND_PREPARED");
-      setMessages((prev) => [...prev, { role: "assistant", text: desc }]);
-      setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, desc));
-      setIsStreaming(false);
-      return;
-    }
-
-    if (detectExecDeckDescribeStagedIntent(userMessage)) {
-      const state = getCardTableState();
-      if (!state.stagedHand || state.stagedHand.cards.length === 0) {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", text: "No staged hand. Ask MUTHUR to prepare a reviewer hand." },
-        ]);
-      } else {
-        const lines: string[] = [];
-        lines.push(`## Staged Hand: ${state.stagedHand.name}`);
-        for (const card of state.stagedHand.cards) {
-          lines.push(`  [ ] ${card.title} — ${card.purpose} (${card.riskLevel} risk)${card.requiredConfirmation ? " [CONF REQUIRED]" : ""}`);
-        }
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", text: lines.join("\n") },
-        ]);
-      }
-      useCyberdeckTabStore.getState().setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
-      useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-      setIsStreaming(false);
-      return;
-    }
-
-    if (detectExecDeckClearIntent(userMessage)) {
-      clearDeck();
-      narrate("CARD_TABLE_CLEARED");
-      useCyberdeckTabStore.getState().setServer(safeServerId("s") as (typeof SERVER_IDS)[number]);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: "Card table cleared. All cards discarded." },
-      ]);
-      setIsStreaming(false);
-      return;
-    }
-
-    if (detectExecDeckPushIntent(userMessage)) {
-      openDeck();
-      const result = pushHandToStack();
-      if (!options?.preserveSelectedSurface) {
-        useCyberdeckTabStore.getState().setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
-        useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-      }
-      if (result.pushed > 0) {
-        narrate("HAND_PUSHED_TO_STACK");
-      }
-      const desc = describeDeck();
-      setMessages((prev) => [...prev, { role: "assistant", text: desc }]);
-      setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, desc));
-      setIsStreaming(false);
-      return;
-    }
-
-    if (detectExecDeckExecuteIntent(userMessage)) {
-      openDeck();
-      const result = attemptExecute();
-      useCyberdeckTabStore.getState().setServer(safeServerId("ct") as (typeof SERVER_IDS)[number]);
-      useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-      narrate("EXECUTION_DISABLED");
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: result.reason },
-      ]);
-      setIsStreaming(false);
-      return;
-    }
-
-    if (isTeachingDemoTrigger(userMessage)) {
-      void runTeachingDemo();
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: "Starting guided teaching demo. Follow the highlighted regions with your cursor." },
-      ]);
-      setIsStreaming(false);
-      return;
-    }
-
-    const runPointerCommand = async (): Promise<boolean> => {
-      const text = userMessage.toLowerCase();
-      const wantsClear = /\bclear\s+(?:the\s+)?(?:indicator|indicators|pointer|pointers|marker|markers)\b/.test(text);
-      const wantsIndicate = /\bindicate\b/.test(text);
-      const wantsHighlight = /\bhighlight\b/.test(text);
-
-      if (!wantsClear && !wantsIndicate && !wantsHighlight) return false;
-
-      if (wantsClear) {
-        const result = await runComputerUseBridgeAction({ name: "clear_indicators" });
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: result.success
-              ? "INDICATE_CLEAR // ACTIVE_MARKERS 0"
-              : `INDICATE_CLEAR_FAILED // ${result.error ?? "UNKNOWN"}`,
-          },
-        ]);
-        setIsStreaming(false);
-        return true;
-      }
-
-      const findVisibleTextTarget = (label: string): HTMLElement | null => {
-        const candidates = Array.from(
-          document.querySelectorAll<HTMLElement>('[data-pointer-target], button, [role="button"], h1, h2, h3, span'),
-        );
-        return candidates.find((candidate) => {
-          if (!candidate.textContent?.toLowerCase().includes(label)) return false;
-          const rect = candidate.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0 && rect.bottom >= 0 && rect.right >= 0;
-        }) ?? null;
-      };
-
-const resolved = resolveUiTarget(userMessage);
-      if (!resolved.success) {
-        setMessages((prev) => [
-          ...prev,
-          { role: "system", text: "INDICATE_SKIPPED // TARGET_NOT_RECOGNIZED" },
-        ]);
-        setIsStreaming(false);
-        return true;
-      }
-
-      const getTargetElement = (target: CanonicalTarget): HTMLElement | null => {
-        switch (target) {
-          case "COMMAND_INPUT":
-            return messageInputRef.current?.element ?? null;
-          case "VOICE_LAB":
-            return (
-              document.querySelector<HTMLElement>('[data-pointer-target="voice-lab"]') ??
-              findVisibleTextTarget("voice lab") ??
-              gatewayColumnRef.current
-            );
-          case "LEFT_CONSOLE":
-            return document.querySelector<HTMLElement>('[data-pointer-target="left-console"]') ?? null;
-          case "RIGHT_PANEL":
-            return document.querySelector<HTMLElement>('[data-pointer-target="right-panel"]') ?? null;
-          case "CENTER_STAGE":
-            return findVisibleTextTarget("main") ?? null;
-          default:
-            return null;
-        }
-      };
-
-      const target = getTargetElement(resolved.target);
-      if (!target) {
-        setMessages((prev) => [
-          ...prev,
-          { role: "system", text: `INDICATE_SKIPPED // TARGET_NOT_VISIBLE // ${resolved.target}` },
-        ]);
-        setIsStreaming(false);
-        return true;
-      }
-
-      const rect = target.getBoundingClientRect();
-      const position = {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
-      };
-      const result = await runComputerUseBridgeAction({
-        name: wantsHighlight ? "indicate_highlight" : "indicate_point",
-        params: {
-          position,
-          width: Math.max(48, Math.min(rect.width, 420)),
-          height: Math.max(32, Math.min(rect.height, 220)),
-          label: resolved.target === "VOICE_LAB" ? "Voice Lab" : "Command input",
-          ttlMs: 30_000,
-        },
-      });
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "system",
-          text: result.success
-            ? `INDICATE_${wantsHighlight ? "HIGHLIGHT" : "POINT"} // ${resolved.target}`
-            : `INDICATE_FAILED // ${result.error ?? "UNKNOWN"}`,
-        },
-      ]);
-      setIsStreaming(false);
-      return true;
-    };
-
-    if (await runPointerCommand()) {
-      return;
-    }
-    }
-
-    const browserCommand =
-      parseBrowserCommand(userMessage) ||
-      (operatorSurfaceMode === "browser" ? parseBrowserUseModeCommand(userMessage) : null);
-
     if (/^(document|document mode|operator|operator pane|close browser|exit browser|workspace)$/i.test(userMessage.trim())) {
       setOperatorSurfaceMode("workspace");
       setMessages((prev) => [
         ...prev,
         { role: "system", text: "OPERATOR // DOCUMENT MODE — use the folder icon (top right) to browse files." },
-      ]);
-      setIsStreaming(false);
-      return;
-    }
-
-    if (browserCommand) {
-      const actionResult = await performBrowserCommand(browserCommand);
-      const engineMatch = actionResult.match(/ENGINE:\s*([A-Z0-9_ -]+)/i);
-      if (engineMatch?.[1]) {
-        setOperatorBrowserEngine(engineMatch[1].trim().toUpperCase().replace(/\s+/g, "_"));
-      }
-      const captchaBlocked = looksLikeCaptchaBlock(actionResult) || actionResult.includes("CAPTCHA_BLOCKED");
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "system",
-          text:
-            captchaBlocked
-              ? `BROWSER_BLOCKED // CAPTCHA // MANUAL_COMPLETION_REQUIRED\n${actionResult}`
-              : browserCommand.kind === "snapshot"
-                ? `BROWSER_SNAPSHOT // ${actionResult}`
-                : `BROWSER_ACTION // ${browserCommand.kind.toUpperCase()} // ${actionResult}`,
-        },
       ]);
       setIsStreaming(false);
       return;
@@ -5480,12 +5072,6 @@ const resolved = resolveUiTarget(userMessage);
 
     let browserContextForRequest =
       operatorSurfaceMode === "browser" ? operatorBrowserSnapshot || `URL: ${operatorBrowserUrl}` : "";
-    if (looksLikeOperatorWebIntent(userMessage)) {
-      browserContextForRequest =
-        (await openOperatorBrowser(deriveOperatorBrowserUrl(userMessage))) ||
-        browserContextForRequest ||
-        `URL: ${operatorBrowserUrl}`;
-    }
 
     const operatorAssetSurface = operatorDroppedAsset
       ? resolveOperatorAssetSurface(operatorDroppedAsset)
@@ -5524,6 +5110,10 @@ const resolved = resolveUiTarget(userMessage);
       flushMuthurObservation();
     }
 
+    if (messageReferencesLocalPath(messageForApi)) {
+      messageForApi = `${messageForApi}\n\n[System: Local filesystem path referenced — use localfs ls/cat/stat on that path. Do not open the web browser.]`;
+    }
+
     let uplinkTimedOut = false;
     try {
       const abortCtl = new AbortController();
@@ -5534,8 +5124,6 @@ const resolved = resolveUiTarget(userMessage);
       }, CHAT_UPLINK_TIMEOUT_MS);
       const memoryContext = buildMuthurMemoryContext(muthurMemoryRef.current, userMessage);
       const history = buildCyberdeckChatHistory(messages);
-      const latestAssistantMessage =
-        [...messages].reverse().find((message) => message.role === "assistant")?.text || "";
       const glyphContext = await buildGlyphContextSnapshot();
       const piScreenContext = formatPiScreenContextForMuthur(readPiScreenSnapshot());
       let res: Response;
@@ -5617,32 +5205,6 @@ const resolved = resolveUiTarget(userMessage);
       }
       setStreamText(streamDisplayText);
 
-      const allowBrowserDirective =
-        ENABLE_AUTOMATION &&
-        looksLikeAffirmativeReply(userMessage) &&
-        looksLikeBrowserSearchOffer(latestAssistantMessage);
-
-      const assistantBrowserCommand = allowBrowserDirective
-        ? extractAssistantBrowserCommand(fullText)
-        : null;
-      if (assistantBrowserCommand) {
-        const actionResult = await performBrowserCommand(assistantBrowserCommand);
-        const engineMatch = actionResult.match(/ENGINE:\s*([A-Z0-9_ -]+)/i);
-        if (engineMatch?.[1]) {
-          setOperatorBrowserEngine(engineMatch[1].trim().toUpperCase().replace(/\s+/g, "_"));
-        }
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: `BROWSER_ACTION // ${assistantBrowserCommand.kind.toUpperCase()} // ${actionResult}`,
-          },
-        ]);
-        setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, actionResult));
-        setStreamText("");
-        return;
-      }
-
       // Clean up fullText - remove excessive === lines and trim
       const streamPayload = splitMuthurStreamPayload(fullText);
       if (streamPayload.toolsUsed) {
@@ -5650,11 +5212,23 @@ const resolved = resolveUiTarget(userMessage);
       }
       const operatorEditsFromStream = streamPayload.operatorEdits;
       const glyphResponse = parseGlyphResponseActions(streamPayload.displayText);
-      const cleanedText = glyphResponse.displayText
-        .replace(/^=+$\n?/g, "")
-        .trim();
-      
-      setMessages((prev) => [...prev, { role: "assistant", text: cleanedText }]);
+      const toolsTrace =
+        streamPayload.toolsUsed || muthurToolsHeader || streamToolTrace || "";
+      let cleanedText = resolveMuthurCommittedDisplayText({
+        fullText,
+        streamDisplayText,
+        glyphDisplayText: glyphResponse.displayText,
+        toolsUsed: toolsTrace,
+      });
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: cleanedText,
+          ...(toolsTrace ? { toolTrace: toolsTrace } : {}),
+        },
+      ]);
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
       persistMuthurShipMemoryTurn(userMessage, cleanedText || fullText);
 
@@ -5714,6 +5288,28 @@ const resolved = resolveUiTarget(userMessage);
             },
           ]);
         }
+      }
+
+      const operatorBrowserRef =
+        streamPayload.operatorBrowser ??
+        parseOperatorBrowserJson(res.headers.get("x-muthur-operator-browser"));
+      if (operatorBrowserRef) {
+        const actionResult = await performBrowserCommand(operatorBrowserRef);
+        const engineMatch = actionResult.match(/ENGINE:\s*([A-Z0-9_ -]+)/i);
+        if (engineMatch?.[1]) {
+          setOperatorBrowserEngine(engineMatch[1].trim().toUpperCase().replace(/\s+/g, "_"));
+        }
+        const captchaBlocked =
+          looksLikeCaptchaBlock(actionResult) || actionResult.includes("CAPTCHA_BLOCKED");
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: captchaBlocked
+              ? `BROWSER_BLOCKED // CAPTCHA // MANUAL_COMPLETION_REQUIRED\n${actionResult}`
+              : `BROWSER_ACTION // ${operatorBrowserRef.kind.toUpperCase()} // ${actionResult}`,
+          },
+        ]);
       }
 
       const editsToApply =
@@ -5806,58 +5402,6 @@ const resolved = resolveUiTarget(userMessage);
         }
       }
 
-      if (glyphResponse.actions.length > 0) {
-        try {
-          await applyGlyphActionsFromMuthur(glyphResponse.actions);
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "system",
-              text: `⟁ GLYPH // ${glyphResponse.actions.length} directive(s) applied to ASCII pane`,
-            },
-          ]);
-        } catch (err) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "system",
-              text: `⟁ GLYPH // FAILED // ${err instanceof Error ? err.message : "Glyph directive failed"}`,
-            },
-          ]);
-        }
-      }
-      
-      // Check for MUTHUR exec commands like [EXEC: typecheck] or [EXEC: read path=src/app/page.tsx]
-      const execMatch = fullText.match(/\[EXEC:(\w+)(?:\s+(.*))?\]/i);
-      if (execMatch) {
-        const command = execMatch[1].toLowerCase();
-        
-        const args: Record<string, string> = {};
-        if (execMatch[2]) {
-          execMatch[2].split(" ").forEach(part => {
-            const [key, val] = part.split("=");
-            if (key && val) args[key] = val;
-          });
-        }
-        try {
-          const execRes = await fetch("/api/muthur-command", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ command, args }),
-          });
-          const execResult = await execRes.json();
-          setMessages((prev) => [
-            ...prev,
-            { role: "system", text: `⚡ EXEC[${command.toUpperCase()}] // ${JSON.stringify(execResult).slice(0, 200)}` },
-          ]);
-        } catch (e) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "system", text: `⚡ EXEC[${command.toUpperCase()}] // ERROR: ${(e as Error).message}` },
-          ]);
-        }
-      }
-      
       setStreamText("");
 
       if (activeProvider && modelID) {
@@ -7529,8 +7073,14 @@ const resolved = resolveUiTarget(userMessage);
                   );
                 })}
                 {streamText && (() => {
-                  const streamLiveClass = getMuthurNotifyLiveClass(streamText);
-                  const streamAscii = streamLiveClass ? getMuthurNotifyAsciiLine(streamText) : null;
+                  const progressLines = streamText
+                    .split("\n")
+                    .filter((line) => line.trim().startsWith("⏳ MUTHUR"));
+                  const streamProgressLine = progressLines.at(-1) ?? streamText;
+                  const streamLiveClass = getMuthurNotifyLiveClass(streamProgressLine);
+                  const streamAscii = streamLiveClass
+                    ? getMuthurNotifyAsciiLine(streamProgressLine)
+                    : null;
                   return (
                   <div
                     data-chat-row={messages.length}
@@ -7565,19 +7115,6 @@ const resolved = resolveUiTarget(userMessage);
                   </div>
                   );
                 })()}
-                  {isStreaming && !streamText && (
-                    <div
-                      data-chat-row={messages.length}
-                      className={`nav-row py-1 text-xs text-green-500/90 ${
-                        chatKeyboardHighlightIndex === messages.length ? "nav-row-kb-hover" : ""
-                      }`}
-                    >
-                      <span className="cyberdeck-cogitating">
-                        <span className="animate-pulse">█</span>
-                        <span className="cyberdeck-cogitating-text">⚡ MUTHUR COGITATING...</span>
-                      </span>
-                    </div>
-                  )}
                 <div ref={messagesEndRef} />
               </div>
             </div>

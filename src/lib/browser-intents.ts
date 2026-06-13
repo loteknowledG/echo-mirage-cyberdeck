@@ -1,5 +1,21 @@
 export const OPERATOR_BROWSER_HOME_URL = "https://duckduckgo.com/";
 
+/** Windows, UNC, or Unix absolute path (single segment or full path). */
+export function looksLikeLocalPath(value: string): boolean {
+  const trimmed = value.trim();
+  return /^[a-zA-Z]:[\\/]/.test(trimmed) || /^\\\\/.test(trimmed) || /^\//.test(trimmed);
+}
+
+/** True when the operator message points at disk, not the web. */
+export function messageReferencesLocalPath(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (/[a-zA-Z]:[\\/]/.test(trimmed)) return true;
+  if (/(?:^|\s)\\\\[^\s]+/.test(trimmed)) return true;
+  if (/(?:^|\s)\/(?:[\w.-]+\/)+[\w.-]+/.test(trimmed)) return true;
+  return false;
+}
+
 const KNOWN_CAR_MAKES = [
   "acura",
   "audi",
@@ -261,6 +277,7 @@ function containsLocalOperatorKeyword(text: string): boolean {
 export function looksLikeOperatorWebIntent(intent: string) {
   const text = intent.trim().toLowerCase();
   if (!text) return false;
+  if (messageReferencesLocalPath(intent)) return false;
   if (containsLocalOperatorKeyword(text)) return false;
   return (
     /^(?:\/web|web:)\b/i.test(text) ||
@@ -293,6 +310,7 @@ export function looksLikeAffirmativeReply(text: string) {
 export function parseBrowserCommand(input: string): BrowserCommand | null {
   const text = input.trim();
   if (!text) return null;
+  if (messageReferencesLocalPath(text)) return null;
   const commandText = stripMuthurInvocationPrefix(text);
 
   if (containsLocalOperatorKeyword(commandText)) return null;
@@ -338,7 +356,7 @@ export function parseBrowserCommand(input: string): BrowserCommand | null {
 
   const shoppingIntent =
     /^(?:find|search|look for|look up|show me|show)\b/i.test(body) ||
-    /\b(?:for sale|on sale|available|in stock|dealership|dealer|inventory|used car|used cars|new car|new cars|car lot|auto lot|near me|nearby|in\s+[a-z])/i.test(
+    /\b(?:for sale|on sale|available|in stock|dealership|dealer|inventory|used car|used cars|new car|new cars|car lot|auto lot|near me|nearby)\b/i.test(
       body,
     );
   if (shoppingIntent) {
@@ -361,6 +379,7 @@ export function parseBrowserCommand(input: string): BrowserCommand | null {
 export function parseBrowserUseModeCommand(input: string): BrowserCommand | null {
   const text = stripMuthurInvocationPrefix(input).trim();
   if (!text) return null;
+  if (messageReferencesLocalPath(text)) return null;
   if (containsLocalOperatorKeyword(text)) return null;
 
   const parsed = parseBrowserCommand(text);
@@ -388,6 +407,7 @@ function stripAssistantDirectiveMarkup(text: string) {
 export function extractAssistantBrowserCommand(text: string): BrowserCommand | null {
   const cleaned = stripAssistantDirectiveMarkup(text);
   if (!cleaned) return null;
+  if (messageReferencesLocalPath(cleaned)) return null;
   if (containsLocalOperatorKeyword(cleaned)) return null;
 
   const lines = cleaned.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);

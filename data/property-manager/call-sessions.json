@@ -343,6 +343,23 @@
       "casePropertyName": "Oak Ridge Apartments",
       "caseUnitId": "4b",
       "endedAt": "2026-06-12T06:10:13.294Z"
+    },
+    {
+      "id": "CALL-SESSION-MQAJKA0E-OH9G",
+      "direction": "outbound",
+      "participantType": "vendor",
+      "participantName": "Mike's Plumbing",
+      "phoneNumber": "7064618886",
+      "status": "ended",
+      "startedAt": "2026-06-12T06:24:31.405Z",
+      "createdAt": "2026-06-12T06:24:31.405Z",
+      "updatedAt": "2026-06-12T06:24:46.674Z",
+      "caseId": "CASE-2026-12",
+      "caseSlug": "CASE-2026-12-oakridge-4b-plumbing-leak",
+      "caseTitle": "4B Kitchen Sink Leak",
+      "casePropertyName": "Oak Ridge Apartments",
+      "caseUnitId": "4b",
+      "endedAt": "2026-06-12T06:24:46.674Z"
     }
   ],
   "incomingSessionId": null,

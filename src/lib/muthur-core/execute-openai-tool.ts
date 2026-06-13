@@ -9,11 +9,13 @@ import {
   formatLocalFsResult,
   formatObserveOperatorPaneResult,
   formatOpenOperatorFileResult,
+  formatOperatorBrowserResult,
   formatSuggestOperatorEditResult,
   formatWorkspaceExecResult,
 } from "@/lib/muthur-core/format-tool-result";
 import { extractOperatorEditFromToolOutput } from "@/lib/muthur-core/suggest-operator-edit";
 import { recordCodingTouch } from "@/lib/muthur-core/coding-touch";
+import { extractOperatorBrowserRef } from "@/lib/muthur-core/operator-browser-ref";
 import { extractOperatorConversionRef } from "@/lib/muthur-core/operator-conversion-ref";
 import { extractOperatorOpenRef } from "@/lib/muthur-core/operator-open-file-ref";
 import { formatBlockedToolMessage, isToolAllowedForUplinkMode } from "@/lib/muthur-uplink-mode";
@@ -73,6 +75,13 @@ export async function executeRegistryToolForOpenAi(
       if (openRef) ctx.operatorOpenFile = openRef;
     }
     return formatOpenOperatorFileResult(result.output);
+  }
+  if (functionName === "operator_browser") {
+    if (result.ok && ctx) {
+      const browserRef = extractOperatorBrowserRef(result.output);
+      if (browserRef) ctx.operatorBrowser = browserRef;
+    }
+    return formatOperatorBrowserResult(result.output);
   }
   if (functionName === "clock") {
     return formatClockResult(result.output);

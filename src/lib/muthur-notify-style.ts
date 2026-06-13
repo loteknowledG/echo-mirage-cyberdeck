@@ -55,6 +55,7 @@ export function getMuthurNotifyAsciiLine(text: string): string | null {
   const trimmed = text.trim();
 
   if (trimmed.startsWith("⏳ MUTHUR")) {
+    if (/preparing uplink/i.test(trimmed)) return "<<<---=={ UPLINK }==--->>>";
     if (/uplink active/i.test(trimmed)) return "<<<---=={ UPLINK }==--->>>";
     if (/thinking/i.test(trimmed)) return "*~~[ COGITATE ]~~*";
     if (/tools:/i.test(trimmed)) return "<==[ TOOL RUN ]==>";
