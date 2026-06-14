@@ -92,6 +92,9 @@ const nextConfig = {
 		"just-bash",
 		"@mongodb-js/zstd",
 		"sql.js",
+		"@napi-rs/canvas",
+		"gif-frames",
+		"gif-encoder-2",
 	],
 	webpack: (config, { dev, isServer }) => {
 		if (isServer) {
