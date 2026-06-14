@@ -16,6 +16,7 @@ Debug stdin: set CURSOR_HOOK_MECHANICUS_DEBUG=1 for Cursor, then retry once.
 Disable: CURSOR_HOOK_MECHANICUS_LAST_SENTENCE=0
 Extraction mode: CURSOR_HOOK_MECHANICUS_EXTRACT=full (default) | block | sentence | entire | all
 Manual “read last response” from this repo: `pnpm run voice:cursor:read-last-response` (sample JSON fixture; real runs use Cursor stdin).
+Stop in-flight hook speech: `pnpm run voice:cursor:stop` (kills ffplay / Samus / SAPI child for this hook).
 Cyberdeck (pnpm dev): write `.cursor/hooks/mechanicus-cursor.muted` containing `1` to mute; delete file or `0` to unmute (UI uses dev bridge GET/POST /__cyberdeck/mechanicus-cursor).
 Legacy win32 spawn (full detach; can break default audio on some PCs): CURSOR_HOOK_MECHANICUS_DETACHED=1
 Voice helper resolution:
@@ -206,6 +207,7 @@ def _tts_timeout_env(snippet: str) -> dict[str, str]:
     return {
         "VOICE_PROFILE_TIMEOUT_SEC": str(int(voice_sec)),
         "BOOTUP_PLAYBACK_TIMEOUT_SEC": str(int(play_sec)),
+        "BOOTUP_PLAYBACK": os.environ.get("CURSOR_HOOK_BOOTUP_PLAYBACK", "ffplay"),
     }
 
 
@@ -434,6 +436,173 @@ def dry_run() -> int:
     return 0
 
 
+def prepare_speak_plan(raw_in: str) -> dict:
+    """Build speak plan from Cursor hook stdin (used by --plan-speak and main())."""
+    if os.environ.get("CURSOR_HOOK_MECHANICUS_LAST_SENTENCE", "1").strip().lower() in (
+        "0",
+        "false",
+        "no",
+        "off",
+    ):
+        return {"skip": True, "reason": "disabled"}
+
+    if _cyberdeck_mutes_cursor_hook():
+        _log("main: muted (mechanicus-cursor.muted)")
+        return {"skip": True, "reason": "muted"}
+
+    if not raw_in.strip():
+        _log("main: empty stdin")
+        return {"skip": True, "reason": "empty_stdin"}
+
+    if os.environ.get("CURSOR_HOOK_MECHANICUS_DEBUG", "").strip() in ("1", "true", "yes"):
+        _log(f"main: stdin head={raw_in[:800]!r}")
+
+    data = _parse_json_object(raw_in)
+    if not data:
+        head = raw_in[:200].replace("\r", "\\r").replace("\n", "\\n")
+        _log(f"main: bad JSON (len={len(raw_in)} head={head!r})")
+        return {"skip": True, "reason": "bad_json"}
+
+    full = _extract_full_text(data)
+    mode = os.environ.get("CURSOR_HOOK_MECHANICUS_EXTRACT", "full").strip().lower()
+    snippet = _sanitize_tts_snippet(tts_excerpt(full, mode))
+    if not snippet:
+        _log(f"main: no snippet (text len={len(full)}) keys={list(data.keys())[:12]}")
+        return {"skip": True, "reason": "no_snippet"}
+
+    if _should_skip_duplicate_snippet(snippet):
+        _log(f"main: debounced duplicate snippet (len={len(snippet)})")
+        return {"skip": True, "reason": "debounced"}
+
+    _wait_for_prior_tts()
+
+    voice_profile = _read_cursor_hook_voice_profile()
+    _log(
+        f"main: mode={mode!r} full_len={len(full)} snippet_len={len(snippet)} "
+        f"voice={voice_profile} python={sys.executable}"
+    )
+
+    root, vp = _resolve_voice_profile_helper()
+    if not os.path.isfile(vp):
+        _log(f"missing voice_profile: {vp}")
+        return {"skip": True, "reason": "missing_voice_profile", "path": vp}
+
+    env = _tts_timeout_env(snippet)
+    vol = _read_cursor_tts_volume_override()
+    if vol:
+        env["CURSOR_HOOK_BOOTUP_TTS_VOLUME"] = vol
+
+    return {
+        "skip": False,
+        "reason": "",
+        "snippet": snippet,
+        "profile": voice_profile,
+        "voiceProfilePath": vp,
+        "samusRoot": root,
+        "python": sys.executable,
+        "env": env,
+    }
+
+
+def plan_speak() -> int:
+    raw_in = _read_stdin_text()
+    plan = prepare_speak_plan(raw_in)
+    sys.stdout.write(json.dumps(plan, ensure_ascii=False))
+    return 0
+
+
+def spawn_speak_child(plan: dict) -> int:
+    """Legacy nested spawn (non-Windows or explicit fallback). Prefer PS1 inline speak on Windows."""
+    if plan.get("skip"):
+        return 0
+
+    snippet = str(plan.get("snippet") or "")
+    voice_profile = str(plan.get("profile") or "mechanicus-voice")
+    vp = str(plan.get("voiceProfilePath") or "")
+    root = str(plan.get("samusRoot") or "")
+    if not vp or not os.path.isfile(vp):
+        _log(f"missing voice_profile: {vp}")
+        return 0
+
+    creationflags = 0
+    use_detached = False
+    if sys.platform == "win32":
+        use_detached = os.environ.get(
+            "CURSOR_HOOK_MECHANICUS_DETACHED", ""
+        ).strip().lower() in ("1", "true", "yes", "on")
+        if use_detached:
+            no_win = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            creationflags = 0x00000008 | 0x00000200 | no_win
+        else:
+            # Avoid CREATE_NO_WINDOW — it often routes pygame/WASAPI to a silent endpoint.
+            creationflags = getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)
+
+    popen_kw: dict = {
+        "cwd": root,
+        "env": os.environ.copy(),
+        "stdin": subprocess.DEVNULL,
+        "close_fds": False if sys.platform == "win32" else True,
+    }
+
+    tts_log = open(_TTS_STDERR_PATH, "a", encoding="utf-8")
+    try:
+        tts_log.write(f"\n--- TTS stderr {time.strftime('%Y-%m-%dT%H:%M:%S')} ---\n")
+        tts_log.flush()
+        popen_kw["stdout"] = tts_log
+        popen_kw["stderr"] = subprocess.STDOUT
+        env = popen_kw["env"]
+        env.pop("CURSOR_HOOK_BOOTUP_TTS_VOLUME", None)
+        env.setdefault("PYTHONIOENCODING", "utf-8")
+        env.setdefault("PYTHONUTF8", "1")
+        for key, value in (plan.get("env") or {}).items():
+            env[str(key)] = str(value)
+        cmd = [sys.executable, vp, "speak", voice_profile, "--", snippet]
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                creationflags=creationflags,
+                **popen_kw,
+            )
+        except OSError as e:
+            if sys.platform == "win32" and not use_detached:
+                _log(f"Popen breakaway failed ({e}); retrying detached spawn")
+                no_win = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                creationflags = 0x00000008 | 0x00000200 | no_win
+                proc = subprocess.Popen(cmd, creationflags=creationflags, **popen_kw)
+            else:
+                raise
+    except OSError as e:
+        _log(f"Popen failed: {e}")
+        print(f"[mechanicus-hook] could not start TTS: {e}", file=sys.stderr)
+        return 0
+    finally:
+        tts_log.close()
+
+    _write_tts_pid_lock(proc.pid)
+    _log(
+        f"spawned child pid={proc.pid} python={sys.executable} "
+        f"voice_timeout={(plan.get('env') or {}).get('VOICE_PROFILE_TIMEOUT_SEC')} "
+        f"play_timeout={(plan.get('env') or {}).get('BOOTUP_PLAYBACK_TIMEOUT_SEC')}"
+    )
+
+    wait_default = "1" if sys.platform == "win32" else ""
+    wait_for_child = os.environ.get("CURSOR_HOOK_MECHANICUS_WAIT", wait_default).strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if wait_for_child:
+        timeout = float((plan.get("env") or {}).get("VOICE_PROFILE_TIMEOUT_SEC", "120")) + 30.0
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            _log(f"child pid={proc.pid} wait timed out")
+        finally:
+            _clear_tts_pid_lock()
+    return 0
+
+
 def main() -> int:
     if os.environ.get("CURSOR_HOOK_MECHANICUS_LAST_SENTENCE", "1").strip().lower() in (
         "0",
@@ -448,127 +617,8 @@ def main() -> int:
         return 0
 
     raw_in = _read_stdin_text()
-    if _cyberdeck_mutes_cursor_hook():
-        _log("main: muted (mechanicus-cursor.muted)")
-        return 0
-    if not raw_in.strip():
-        _log("main: empty stdin")
-        return 0
-    if os.environ.get("CURSOR_HOOK_MECHANICUS_DEBUG", "").strip() in ("1", "true", "yes"):
-        _log(f"main: stdin head={raw_in[:800]!r}")
-    data = _parse_json_object(raw_in)
-    if not data:
-        head = raw_in[:200].replace("\r", "\\r").replace("\n", "\\n")
-        _log(f"main: bad JSON (len={len(raw_in)} head={head!r})")
-        return 0
-
-    full = _extract_full_text(data)
-    mode = os.environ.get("CURSOR_HOOK_MECHANICUS_EXTRACT", "full").strip().lower()
-    snippet = _sanitize_tts_snippet(tts_excerpt(full, mode))
-    if not snippet:
-        _log(f"main: no snippet (text len={len(full)}) keys={list(data.keys())[:12]}")
-        return 0
-
-    if _should_skip_duplicate_snippet(snippet):
-        _log(f"main: debounced duplicate snippet (len={len(snippet)})")
-        return 0
-
-    _wait_for_prior_tts()
-
-    voice_profile = _read_cursor_hook_voice_profile()
-    _log(f"main: mode={mode!r} full_len={len(full)} snippet_len={len(snippet)} voice={voice_profile}")
-
-    root, vp = _resolve_voice_profile_helper()
-    if not os.path.isfile(vp):
-        _log(f"missing voice_profile: {vp}")
-        print(f"[mechanicus-hook] missing voice_profile: {vp}", file=sys.stderr)
-        return 0
-
-    # Windows: avoid DETACHED_PROCESS by default — it can leave pygame/WASAPI with no audible
-    # default endpoint even though the child starts. Prefer job breakaway so playback survives
-    # hook exit without a full console detach. Override with CURSOR_HOOK_MECHANICUS_DETACHED=1.
-    creationflags = 0
-    use_detached = False
-    if sys.platform == "win32":
-        no_win = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        use_detached = os.environ.get(
-            "CURSOR_HOOK_MECHANICUS_DETACHED", ""
-        ).strip().lower() in ("1", "true", "yes", "on")
-        if use_detached:
-            creationflags = 0x00000008 | 0x00000200 | no_win  # DETACHED | NEW_GROUP
-        else:
-            creationflags = getattr(
-                subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0
-            ) | no_win
-
-    popen_kw: dict = {
-        "cwd": root,
-        "env": os.environ.copy(),
-        "stdin": subprocess.DEVNULL,
-        "stdout": subprocess.DEVNULL,
-        "close_fds": False if sys.platform == "win32" else True,
-    }
-
-    tts_log = open(_TTS_STDERR_PATH, "a", encoding="utf-8")
-    try:
-        tts_log.write(f"\n--- TTS stderr {time.strftime('%Y-%m-%dT%H:%M:%S')} ---\n")
-        tts_log.flush()
-        popen_kw["stderr"] = tts_log
-        env = popen_kw["env"]
-        env.pop("CURSOR_HOOK_BOOTUP_TTS_VOLUME", None)
-        env.setdefault("PYTHONIOENCODING", "utf-8")
-        env.setdefault("PYTHONUTF8", "1")
-        env.update(_tts_timeout_env(snippet))
-        vol = _read_cursor_tts_volume_override()
-        cmd = [sys.executable, vp, "speak", voice_profile]
-        # Volume trim via env (read in voice_profile.speak_profile) avoids argparse edge cases
-        # with negative % values and keeps assistant text from being mistaken for CLI flags.
-        if vol:
-            env["CURSOR_HOOK_BOOTUP_TTS_VOLUME"] = vol
-        cmd.append("--")
-        cmd.append(snippet)
-        try:
-            proc = subprocess.Popen(
-                cmd,
-                creationflags=creationflags,
-                **popen_kw,
-            )
-        except OSError as e:
-            if sys.platform == "win32" and not use_detached:
-                _log(f"Popen breakaway failed ({e}); retrying detached spawn")
-                creationflags = 0x00000008 | 0x00000200 | getattr(
-                    subprocess, "CREATE_NO_WINDOW", 0
-                )
-                proc = subprocess.Popen(cmd, creationflags=creationflags, **popen_kw)
-            else:
-                raise
-    except OSError as e:
-        _log(f"Popen failed: {e}")
-        print(f"[mechanicus-hook] could not start TTS: {e}", file=sys.stderr)
-        return 0
-    finally:
-        tts_log.close()
-
-    _write_tts_pid_lock(proc.pid)
-    _log(f"spawned child pid={proc.pid} voice_timeout={env.get('VOICE_PROFILE_TIMEOUT_SEC')} play_timeout={env.get('BOOTUP_PLAYBACK_TIMEOUT_SEC')}")
-
-    # On Windows, fire-and-forget TTS children often route to the wrong audio session
-    # (silent playback). Default to waiting so pygame/WASAPI uses the hook process tree.
-    wait_default = "1" if sys.platform == "win32" else ""
-    wait_for_child = os.environ.get("CURSOR_HOOK_MECHANICUS_WAIT", wait_default).strip().lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    )
-    if wait_for_child:
-        try:
-            proc.wait(timeout=float(env.get("VOICE_PROFILE_TIMEOUT_SEC", "120")) + 30.0)
-        except subprocess.TimeoutExpired:
-            _log(f"child pid={proc.pid} wait timed out")
-        finally:
-            _clear_tts_pid_lock()
-    return 0
+    plan = prepare_speak_plan(raw_in)
+    return spawn_speak_child(plan)
 
 
 if __name__ == "__main__":
@@ -576,4 +626,6 @@ if __name__ == "__main__":
         raise SystemExit(self_test())
     if "--dry-run" in sys.argv:
         raise SystemExit(dry_run())
+    if "--plan-speak" in sys.argv:
+        raise SystemExit(plan_speak())
     raise SystemExit(main())

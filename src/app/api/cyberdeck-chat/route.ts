@@ -15,6 +15,7 @@ import {
   buildGlyphContextPrompt,
   MUTHUR_GLYPH_DOCTRINE,
 } from "@/lib/muthur-glyph-doctrine";
+import { buildMemoryPrompt } from "@/muthur/memory/chat-memory";
 import {
   formatOperatorChatContextPrompt,
   isDocxFileName,
@@ -189,23 +190,6 @@ async function ensureMuthurBooted(): Promise<void> {
   await muthurBootPromise;
 }
 
-function buildMemoryPrompt(clientMemory: unknown, serverMemory: string): string {
-  const client =
-    typeof clientMemory === "string" && clientMemory.trim() ? clientMemory.trim() : "";
-  const server = serverMemory.trim();
-  const parts: string[] = [];
-  if (client) {
-    parts.push(`Session memory (browser):\n${client}`);
-  }
-  if (server) {
-    parts.push(`Ship memory (atlas + SQLite):\n${server}`);
-  }
-  if (!parts.length) {
-    return "";
-  }
-  return `\n\n${parts.join("\n\n")}`;
-}
-
 function buildEditorContextPrompt(): string {
   try {
     const obs = getLatestMuthurObservation("cyberdeck");
@@ -274,9 +258,10 @@ function buildMuthurSystemContent(args: {
   return { systemContent, toolsEnabled };
 }
 
-async function getMuthurMemoryContext(message: string): Promise<string> {
+async function getMuthurMemoryContext(message: string, clientMemory?: unknown): Promise<string> {
   const queryHash = hashQuery(message);
   const now = Date.now();
+  const clientContext = typeof clientMemory === "string" ? clientMemory : "";
 
   const cached = _memoryContextCache.get(queryHash);
   if (cached && now - cached.timestamp < MEMORY_CONTEXT_TTL_MS) {
@@ -288,7 +273,7 @@ async function getMuthurMemoryContext(message: string): Promise<string> {
     const { buildMemoryContext } = await import("@/muthur/boot/boot_muthur");
 
     const ctx = await Promise.race([
-      buildMemoryContext(message),
+      buildMemoryContext(message, { clientContext, workspaceRoot: process.cwd() }),
       new Promise<string>((resolve) => setTimeout(() => resolve(""), MEMORY_CONTEXT_TIMEOUT_MS)),
     ]);
     const context = ctx || "";
@@ -398,10 +383,6 @@ export async function POST(request: Request) {
     const operatorContext = parseOperatorChatContext(operatorContextRaw);
     const uplinkMode = normalizeMuthurUplinkMode(uplinkModeRaw);
     const chatHistory = normalizeChatHistory(history);
-    const clientHasMemory =
-      typeof memoryContext === "string" && memoryContext.trim().length > 0;
-    /** Cyberdeck always ships client memory — skip boot_muthur on the hot path. */
-    const clientSentMemoryField = typeof memoryContext === "string";
     const toolRegistryPrefetch = ENABLE_AUTOMATION
       ? resolveToolRegistry()
       : Promise.resolve(EMPTY_TOOL_REGISTRY);
@@ -561,9 +542,7 @@ export async function POST(request: Request) {
         const model =
           (typeof modelFromBody === "string" && modelFromBody.trim()) || defaultModelForProvider(provider);
 
-        const serverMemoryCtx = clientSentMemoryField
-          ? ""
-          : await getMuthurMemoryContext(message);
+        const serverMemoryCtx = await getMuthurMemoryContext(message, memoryContext);
         const memoryPrompt = buildMemoryPrompt(memoryContext, serverMemoryCtx);
 
         const { systemContent, toolsEnabled } = buildMuthurSystemContent({
@@ -641,7 +620,10 @@ export async function POST(request: Request) {
     const envModel = process.env.OPENCODE_MODEL || "trinity-large-preview-free";
     const endpoint = "https://opencode.ai/zen/v1/chat/completions";
 
-    const fallbackMemoryCtx = await getMuthurMemoryContext(typeof message === "string" ? message : "");
+    const fallbackMemoryCtx = await getMuthurMemoryContext(
+      typeof message === "string" ? message : "",
+      memoryContext
+    );
     const fallbackMemoryPrompt = buildMemoryPrompt(memoryContext, fallbackMemoryCtx);
 
     const userMessage = typeof message === "string" ? message : "";

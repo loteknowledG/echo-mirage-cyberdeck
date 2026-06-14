@@ -108,8 +108,6 @@ import { parseOperatorOpenJson } from "@/lib/muthur-core/operator-open-file-ref"
 import type { MuthurOperatorOpenFileRef } from "@/lib/muthur-core/types";
 import type { MuthurCodingVerifyReceipt } from "@/lib/muthur-core/types";
 import {
-  parseExportMarkdownToDocxIntent,
-  parseExportMarkdownToPdfIntent,
   docxFilenameFromMarkdownName,
   pdfFilenameFromMarkdownName,
   type OperatorExportFormat,

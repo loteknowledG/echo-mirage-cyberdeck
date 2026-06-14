@@ -30,6 +30,8 @@ type KnobProps = {
   defaultActive?: boolean;
   onActiveChange?: (active: boolean) => void;
   clickTogglesActive?: boolean;
+  showReadout?: boolean;
+  showLabel?: boolean;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -83,6 +85,8 @@ export function Knob({
   defaultActive = true,
   onActiveChange,
   clickTogglesActive,
+  showReadout = true,
+  showLabel = true,
 }: KnobProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const hostRef = React.useRef<HTMLFieldSetElement>(null);
@@ -546,6 +550,7 @@ export function Knob({
         className={cn(
           "mt-2 grid min-h-[1rem] w-full grid-cols-[4ch_6ch] items-baseline justify-center gap-2 tabular-nums",
           isLight ? "text-[#37332f]" : "text-[#e4e8ea]",
+          !showReadout && "hidden",
         )}
       >
         <span className="inline-block text-right text-[0.95rem] leading-none">
@@ -580,6 +585,7 @@ export function Knob({
         className={cn(
           "relative block w-full select-none pt-1",
           isLight ? "text-[#35312c]" : "text-[#e4e8ea]",
+          !showLabel && "hidden",
         )}
         htmlFor={inputId}
       >

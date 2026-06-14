@@ -2,6 +2,8 @@ import initSqlJs, { type Database, type SqlJsStatic, type SqlValue } from "sql.j
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import path from "path";
 
+import { computeSemanticEmbedding, cosineSimilarity } from "./semantic-embedding";
+
 export type MemoryKind =
   | "conversation"
   | "startup_sequencer"
@@ -76,22 +78,6 @@ function tokenize(text: string): string[] {
   return (text.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter(t => !STOPWORDS.has(t));
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0;
-  let dot = 0;
-  let aNorm = 0;
-  let bNorm = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    aNorm += a[i] * a[i];
-    bNorm += b[i] * b[i];
-  }
-  aNorm = Math.sqrt(aNorm);
-  bNorm = Math.sqrt(bNorm);
-  if (aNorm === 0 || bNorm === 0) return 0;
-  return dot / (aNorm * bNorm);
-}
-
 function recencyScore(createdAt: number, nowTs: number): number {
   const ageSeconds = Math.max(0, nowTs - createdAt);
   const halfLife = HALF_LIFE_DAYS * 24 * 3600;
@@ -133,7 +119,8 @@ export class Memory {
   private _dirty: boolean = false;
 
   constructor(options: MemoryOptions = {}) {
-    this.dbPath = options.path ?? ".muthur/memory/muthur-memory.db";
+    const envPath = process.env.MUTHUR_MEMORY_DB_PATH?.trim();
+    this.dbPath = options.path ?? (envPath || ".muthur/memory/muthur-memory.db");
     this.wSemantic = options.wSemantic ?? DEFAULT_WEIGHTS.semantic;
     this.wLexical = options.wLexical ?? DEFAULT_WEIGHTS.lexical;
     this.wRecency = options.wRecency ?? DEFAULT_WEIGHTS.recency;
@@ -203,6 +190,15 @@ export class Memory {
 
   async ready(): Promise<void> {
     await this._ready;
+  }
+
+  /** Shared sql.js handle for atlas persistence in the same ship database. */
+  getDatabase(): Database | null {
+    return this.db;
+  }
+
+  markDirty(): void {
+    this._dirty = true;
   }
 
   flush(): void {
@@ -320,10 +316,12 @@ export class Memory {
 
     const ts = Date.now();
     const metaJson = JSON.stringify(metadata ?? {});
+    const embedding = computeSemanticEmbedding(text);
+    const embJson = JSON.stringify(embedding);
 
     this.db.run(
       `INSERT INTO memories (type, text, metadata, embedding, created_at) VALUES (?, ?, ?, ?, ?)`,
-      [kind, text, metaJson, null, ts]
+      [kind, text, metaJson, embJson, ts]
     );
 
     const result = this.db.exec(`SELECT last_insert_rowid()`);
@@ -396,6 +394,7 @@ export class Memory {
 
     const nowTs = Date.now();
     const [wSem, wLex, wRec, wMeta] = this._normalizeWeights();
+    const queryEmb = computeSemanticEmbedding(query);
 
     const candidateIds = this._candidateIds(query, metadataFilter, 750);
     if (!candidateIds.length) return [];
@@ -411,12 +410,6 @@ export class Memory {
 
     const rows = result[0].values;
 
-    const semanticById: Map<number, number> = new Map();
-    for (const row of rows) {
-      const emb = row[4] ? JSON.parse(row[4] as string) : null;
-      if (!emb) continue;
-    }
-
     const ranked: Array<{ score: number; record: MemoryRecord }> = [];
 
     for (const row of rows) {
@@ -431,8 +424,9 @@ export class Memory {
         if (!match) continue;
       }
 
-      const emb = row[4] ? JSON.parse(row[4] as string) : null;
-      const semantic = 0;
+      const emb = row[4] ? (JSON.parse(row[4] as string) as number[]) : null;
+      const semantic =
+        emb && emb.length > 0 ? cosineSimilarity(queryEmb, emb) : cosineSimilarity(queryEmb, computeSemanticEmbedding(rText));
       const lexical = lexScore(query, rText);
       const recency = recencyScore(rCreated, nowTs);
 

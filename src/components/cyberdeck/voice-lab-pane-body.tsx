@@ -1,11 +1,25 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
 import {
   CyberdeckPaneHeader,
   CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
 import { Switch } from "@/components/ui/switch";
+
+const VoiceFlowPanel = dynamic(
+  () => import("@/components/voice-studio/voice-flow-panel").then((m) => m.VoiceFlowPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3 font-mono text-[10px] text-[#8e8e8e]">
+        Loading voice studio…
+      </div>
+    ),
+  },
+);
 
 type VoiceLabPaneBodyProps = {
   voiceEnabled: boolean;
@@ -25,25 +39,20 @@ export function CyberdeckVoiceLabPaneBody({
               <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
                 VOICE LAB
               </CyberdeckPaneHeaderTitle>
-              <CyberdeckPaneHeaderSubtitle>MUTHUR CHANNEL // SYNTH CONTROL</CyberdeckPaneHeaderSubtitle>
+              <CyberdeckPaneHeaderSubtitle>
+                MUTHUR CHANNEL // SYNTH CONTROL // CURSOR HOOKS
+              </CyberdeckPaneHeaderSubtitle>
             </div>
           }
         />
         <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 font-mono text-[10px]">
-          <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3 text-[#8e8e8e]">
-            PROFILE: <span className="text-[#cfcfcf]">mechanicus-voice</span>
-          </div>
           <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3">
-            <div className="mb-2 text-[9px] tracking-[0.08em] text-[#8a8a8a]">VOICE ENABLE</div>
+            <div className="mb-2 text-[9px] tracking-[0.08em] text-[#8a8a8a]">
+              IN-DECK MUTHUR VOICE
+            </div>
             <Switch checked={voiceEnabled} onCheckedChange={onVoiceToggle} aria-label="Toggle cyberdeck voice" />
           </div>
-          <div className="rounded-sm border border-[#1c1c1c] bg-black/80 p-3 text-[#9a9a9a]">
-            RATE_SLOT: <span className="text-[#d0d0d0]">1.00x (visual)</span>
-            <br />
-            PITCH_SLOT: <span className="text-[#d0d0d0]">0.92 (visual)</span>
-            <br />
-            HARMONIC_WASH: <span className="text-[#d0d0d0]">ENABLED (visual)</span>
-          </div>
+          <VoiceFlowPanel compact />
         </div>
       </div>
     </div>

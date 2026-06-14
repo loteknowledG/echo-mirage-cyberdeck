@@ -154,6 +154,10 @@ dist
 .cursor/hooks/mechanicus-tts.pid
 .cursor/hooks/mechanicus-tts-stderr.log
 .cursor/hooks/mechanicus-hook.log
+.cursor/hooks/cursor-hook-python.txt
+.cursor/hooks/mechanicus-tts-out-*.log
+.cursor/hooks/mechanicus-tts-err-*.log
+.cursor/hooks/tts-plan-*.json
 .cursor/hooks/__pycache__/
 
 # Local dev scratch under .tmp/

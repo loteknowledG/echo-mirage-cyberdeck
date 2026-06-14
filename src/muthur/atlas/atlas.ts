@@ -1,4 +1,10 @@
 import { getMemory, MemoryRecord } from "../memory/core";
+import {
+  persistAtlasAlias,
+  persistAtlasEntity,
+  persistAtlasRelation,
+  persistAtlasSource,
+} from "./atlas-store";
 
 export type EntityKind = "project" | "doc" | "concept";
 export type RelationType =
@@ -91,10 +97,9 @@ export class SemanticAtlas {
     this._entities = new Map();
     this._relations = new Map();
     this._sources = new Map();
-    this._seedCoreConcepts();
   }
 
-  private _seedCoreConcepts(): void {
+  seedCoreConcepts(): void {
     const coreConcepts: Array<{ id: string; name: string; summary: string }> = [
       { id: "concept:voice", name: "Voice", summary: "Speech synthesis and voice interaction" },
       { id: "concept:memory", name: "Memory", summary: "Persistent memory and recall systems" },
@@ -107,17 +112,41 @@ export class SemanticAtlas {
     ];
 
     for (const concept of coreConcepts) {
-      this._entities.set(concept.id, {
-        id: concept.id,
-        kind: "concept",
-        name: concept.name,
-        summary: concept.summary,
-        confidence: 1.0,
-        status: "active",
-        attributes: {},
-        created_at: Date.now(),
-        updated_at: Date.now(),
-      });
+      this.ensureEntity(concept.id, "concept", concept.name, concept.summary, { confidence: 1 });
+    }
+  }
+
+  hydrateEntity(entity: AtlasEntity): void {
+    this._entities.set(entity.id, entity);
+  }
+
+  hydrateAlias(entityId: string, alias: string): void {
+    const entity = this._entities.get(entityId);
+    if (!entity) return;
+    const aliases = Array.isArray(entity.attributes?.aliases) ? [...(entity.attributes.aliases as string[])] : [];
+    if (!aliases.includes(alias)) {
+      aliases.push(alias);
+    }
+    entity.attributes = { ...entity.attributes, aliases };
+  }
+
+  hydrateRelation(relation: AtlasRelation): void {
+    this._relations.set(relation.id, relation);
+  }
+
+  hydrateSource(source: AtlasSource): void {
+    this._sources.set(source.id, source);
+  }
+
+  private _persistEntity(entity: AtlasEntity): void {
+    persistAtlasEntity(this.memory, entity);
+    const aliases = entity.attributes?.aliases;
+    if (Array.isArray(aliases)) {
+      for (const alias of aliases) {
+        if (typeof alias === "string" && alias.trim()) {
+          persistAtlasAlias(this.memory, entity.id, alias.trim(), entity.created_at);
+        }
+      }
     }
   }
 
@@ -278,6 +307,7 @@ export class SemanticAtlas {
     };
 
     this._entities.set(id, entity);
+    this._persistEntity(entity);
 
     this.memory.add(
       "atlas_entity",
@@ -337,6 +367,7 @@ export class SemanticAtlas {
     };
 
     this._entities.set(id, entity);
+    this._persistEntity(entity);
 
     this.memory.add(
       "atlas_entity",
@@ -371,6 +402,7 @@ export class SemanticAtlas {
     };
 
     this._relations.set(id, relation);
+    persistAtlasRelation(this.memory, relation);
 
     this.memory.add(
       "atlas_relation",
@@ -408,6 +440,7 @@ export class SemanticAtlas {
     };
 
     this._sources.set(id, source);
+    persistAtlasSource(this.memory, source);
     return source;
   }
 
@@ -444,4 +477,8 @@ export function getAtlas(): SemanticAtlas {
     _atlas = new SemanticAtlas();
   }
   return _atlas;
+}
+
+export function resetAtlas(): void {
+  _atlas = null;
 }

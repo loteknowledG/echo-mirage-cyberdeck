@@ -1,4 +1,5 @@
 import { getMemory } from "../memory/core";
+import { writeMemoryRetrievalReceipt } from "../memory/retrieval-receipts";
 import { promises as fs, existsSync } from "fs";
 import path from "path";
 
@@ -311,6 +312,12 @@ export async function bootMuthur(config: Partial<MuthurBootConfig> = {}): Promis
   await recordRuntimeIdentity(memory, aiName, ideName);
 
   const { ensureEchoMirageAtlasSeed } = await import("../atlas/ensure-echo-mirage-seed");
+  const { loadAtlasFromStore } = await import("../atlas/atlas-store");
+  const atlas = (await import("../atlas/atlas")).getAtlas();
+  const loadedCount = await loadAtlasFromStore(atlas, memory);
+  if (loadedCount === 0) {
+    atlas.seedCoreConcepts();
+  }
   await ensureEchoMirageAtlasSeed();
 
   memory.flush();
@@ -357,7 +364,10 @@ export async function getDailyMemories(days: number = 7): Promise<import("../mem
   });
 }
 
-export async function buildMemoryContext(query?: string): Promise<string> {
+export async function buildMemoryContext(
+  query?: string,
+  options?: { clientContext?: string; workspaceRoot?: string }
+): Promise<string> {
   const memory = getMemory();
   await memory.ready();
 
@@ -376,14 +386,24 @@ export async function buildMemoryContext(query?: string): Promise<string> {
     }
   }
 
+  let shipHits: import("../memory/core").MemoryRecord[] = [];
   if (query) {
-    const hits = memory.query_similar(query, 5);
-    if (hits.length > 0) {
+    shipHits = memory.query_similar(query, 5);
+    if (shipHits.length > 0) {
       lines.push(`- Relevant to "${query.slice(0, 40)}":`);
-      for (const h of hits) {
-        lines.push(`  - ${h.type}: ${h.text.slice(0, 100)}`);
+      for (const h of shipHits) {
+        lines.push(`  - ${h.type}: ${h.text.slice(0, 100)} (score ${(h.score ?? 0).toFixed(3)})`);
       }
     }
+  }
+
+  if (query?.trim()) {
+    writeMemoryRetrievalReceipt({
+      query: query.trim(),
+      shipResults: shipHits,
+      clientContext: options?.clientContext,
+      workspaceRoot: options?.workspaceRoot,
+    });
   }
 
   try {
