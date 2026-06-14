@@ -1,6 +1,7 @@
 /** Client-safe document command intent detection. No fs, no server imports. */
 
 import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
+import { parseMemoryAtlasQuery } from "@/lib/memory-atlas/memory-atlas-query";
 
 export type DocumentOpenVerb = "open" | "read" | "show" | "view";
 
@@ -57,6 +58,7 @@ export function parseDocumentOpenIntent(input: string): DocumentOpenIntent | nul
   if (!trimmed) return null;
   if (parseOperatorObservationQuery(trimmed)) return null;
   if (parseFoundationQuery(trimmed)) return null;
+  if (parseMemoryAtlasQuery(trimmed)) return null;
 
   const match = trimmed.match(DOCUMENT_VERB_RE);
   if (!match) return null;

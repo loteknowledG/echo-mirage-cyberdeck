@@ -259,6 +259,7 @@ import {
   parseMuthurHelpIntent,
 } from "@/lib/muthur-help-text";
 import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
+import { parseMemoryAtlasQuery } from "@/lib/memory-atlas/memory-atlas-query";
 import { parseDocumentOpenIntent } from "@/lib/muthur-document-open-intent";
 import {
   CLIENT_BAKED_PROVIDER_KEYS,
@@ -4998,6 +4999,60 @@ export default function CyberdeckApp() {
           {
             role: "system",
             text: `FOUNDATION_RETRIEVAL // FAILED // ${err instanceof Error ? err.message : "unknown error"}`,
+          },
+        ]);
+      }
+      setStreamText("");
+      setStreamToolTrace("");
+      setIsStreaming(false);
+      composeStartedAtRef.current = null;
+      setMuthurStall(null);
+      return;
+    }
+
+    const memoryAtlasIntent = parseMemoryAtlasQuery(userMessage);
+    if (memoryAtlasIntent) {
+      try {
+        const res = await fetch("/api/muthur/memory-query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: userMessage }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(payload?.error || `Memory query failed (${res.status})`);
+        }
+        const payload = (await res.json()) as {
+          handled?: boolean;
+          response?: string;
+          memory_type?: string;
+          result?: Record<string, unknown>;
+        };
+        if (payload.handled && payload.response) {
+          setMessages((prev) => [...prev, { role: "assistant", text: payload.response! }]);
+          const resultId =
+            typeof payload.result?.id === "string"
+              ? payload.result.id
+              : Array.isArray(payload.result?.threads)
+                ? (payload.result.threads as Array<{ id?: string }>).map((t) => t.id).filter(Boolean).join(", ")
+                : "none";
+          const receiptLine = `MEMORY_ATLAS // type=${payload.memory_type ?? "unknown"} // id=${resultId}`;
+          setMuthurDiagnostics((current) => appendMuthurDiagnosticEntry(current, receiptLine));
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: "MEMORY_ATLAS // UNHANDLED // intent not recognized by server",
+            },
+          ]);
+        }
+      } catch (err) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: `MEMORY_ATLAS // FAILED // ${err instanceof Error ? err.message : "unknown error"}`,
           },
         ]);
       }
