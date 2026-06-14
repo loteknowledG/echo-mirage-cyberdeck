@@ -35,6 +35,13 @@ import {
   type MuthurUplinkMode,
 } from "@/lib/muthur-uplink-mode";
 import { messageReferencesLocalPath } from "@/lib/browser-intents";
+import {
+  buildProviderReceipt,
+  classifyProviderAuthFailure,
+  formatProviderReceiptHeader,
+  providerResponseHeaders,
+  resolveServerProviderCredentials,
+} from "@/lib/server/provider-credentials.server";
 
 const MUTHUR_COGNITION_DOCTRINE =
   "\n\nCOGNITION: You interpret operator intent and choose tools. The deck does not pre-run browser searches, file reads, or conversions from regex on the operator's message — call tools yourself (localfs, operator_browser, observe_operator_pane, etc.). Do not emit [GLYPH:...] unless the operator explicitly asked for a glyph render.";
@@ -322,21 +329,8 @@ function normalizeChatHistory(history: unknown, limit = 8): ChatHistoryMessage[]
     .slice(-limit);
 }
 
-const DEFAULT_PROVIDER_KEY_ENV: Record<string, string | undefined> = {
-  opencode: process.env.OPENCODE_API_KEY || process.env.ZEN_API_KEY || process.env.NEXT_PUBLIC_ZEN_API_KEY,
-  openai: process.env.OPENAI_API_KEY,
-  openrouter: process.env.OPENROUTER_API_KEY,
-};
-
 function resolveProviderApiKey(provider: string, suppliedApiKey: unknown): string {
-  if (typeof suppliedApiKey === "string" && suppliedApiKey.trim()) {
-    return suppliedApiKey.trim();
-  }
-  const envKey = DEFAULT_PROVIDER_KEY_ENV[provider];
-  if (typeof envKey === "string" && envKey.trim()) {
-    return envKey.trim();
-  }
-  return "";
+  return resolveServerProviderCredentials(provider, suppliedApiKey).apiKey;
 }
 
 function defaultModelForProvider(provider: string): string {
@@ -502,10 +496,36 @@ export async function POST(request: Request) {
     // User session: stream via selected provider (keys from client)
     if (provider && typeof message === "string" && message.trim()) {
       const endpoint = CHAT_URL[provider as string];
-      const resolvedApiKey = resolveProviderApiKey(String(provider), apiKey);
+      const providerId = String(provider);
+      const { apiKey: resolvedApiKey, credentialSource } = resolveServerProviderCredentials(
+        providerId,
+        apiKey,
+      );
       if (endpoint) {
+        const model =
+          (typeof modelFromBody === "string" && modelFromBody.trim()) || defaultModelForProvider(providerId);
+
         if (!resolvedApiKey) {
-          return NextResponse.json({ error: "API key required" }, { status: 401 });
+          const receipt = buildProviderReceipt({
+            provider: providerId,
+            model,
+            credentialSource: "none",
+            auth: "failed",
+            reason: "no_key",
+          });
+          return NextResponse.json(
+            {
+              error: "API key required",
+              code: "NO_PROVIDER_KEY",
+              credential_source: "none",
+              reason: "no_key",
+              receipt,
+            },
+            {
+              status: 401,
+              headers: providerResponseHeaders(receipt),
+            },
+          );
         }
         if (normalizedMsg === "providers" || normalizedMsg === "connect providers" || normalizedMsg === "provider") {
           return NextResponse.json({
@@ -540,11 +560,15 @@ export async function POST(request: Request) {
           });
         }
 
-        const model =
-          (typeof modelFromBody === "string" && modelFromBody.trim()) || defaultModelForProvider(provider);
-
         const serverMemoryCtx = await getMuthurMemoryContext(message, memoryContext);
         const memoryPrompt = buildMemoryPrompt(memoryContext, serverMemoryCtx);
+
+        const providerReceipt = buildProviderReceipt({
+          provider: providerId,
+          model,
+          credentialSource,
+          auth: "success",
+        });
 
         const { systemContent, toolsEnabled } = buildMuthurSystemContent({
           message,
@@ -570,6 +594,7 @@ export async function POST(request: Request) {
           registry: toolsEnabled ? await toolRegistryPrefetch : EMPTY_TOOL_REGISTRY,
           toolsEnabled,
           uplinkMode,
+          providerReceipt,
         });
       }
     }

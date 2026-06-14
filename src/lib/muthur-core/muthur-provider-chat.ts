@@ -45,12 +45,28 @@ function shouldTryStreamWithoutTools(status: number): boolean {
   return true;
 }
 
-function upstreamErrorResponse(status: number, raw: string): Response {
+import type { ProviderReceipt } from "@/lib/server/provider-credentials.server";
+import { classifyProviderAuthFailure } from "@/lib/server/provider-credentials.server";
+
+function upstreamErrorResponse(status: number, raw: string, receipt?: ProviderReceipt): Response {
   const detail = formatUplinkErrorDetail(status, raw);
-  return new Response(detail, {
-    status,
-    headers: PLAIN_HEADERS,
-  });
+  const headers: Record<string, string> = { ...PLAIN_HEADERS };
+  if (receipt) {
+    headers["X-Muthur-Provider-Receipt"] = JSON.stringify({
+      ...receipt,
+      auth: "failed",
+      reason: classifyProviderAuthFailure(status, raw),
+    });
+  }
+  return new Response(detail, { status, headers });
+}
+
+function mergeReceiptHeaders(
+  base: Record<string, string>,
+  receipt?: ProviderReceipt,
+): Record<string, string> {
+  if (!receipt) return base;
+  return { ...base, "X-Muthur-Provider-Receipt": JSON.stringify(receipt) };
 }
 
 function toolsUsedHeaders(
@@ -79,7 +95,10 @@ function toolsUsedHeaders(
   return headers;
 }
 
-function startEarlyUplinkStream(run: (write: (chunk: string) => void) => Promise<void>): Response {
+function startEarlyUplinkStream(
+  run: (write: (chunk: string) => void) => Promise<void>,
+  extraHeaders?: Record<string, string>,
+): Response {
   return new Response(
     new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -96,7 +115,7 @@ function startEarlyUplinkStream(run: (write: (chunk: string) => void) => Promise
         }
       },
     }),
-    { headers: PLAIN_HEADERS },
+    { headers: { ...PLAIN_HEADERS, ...extraHeaders } },
   );
 }
 
@@ -145,8 +164,9 @@ export async function muthurChatWithModelTools(options: {
   /** When false, stream a direct reply with no tool definitions (greetings, small talk). */
   toolsEnabled?: boolean;
   uplinkMode?: MuthurUplinkMode;
+  providerReceipt?: ProviderReceipt;
 }): Promise<Response> {
-  const { endpoint, apiKey, model, registry } = options;
+  const { endpoint, apiKey, model, registry, providerReceipt } = options;
   const uplinkMode = options.uplinkMode ?? "plan";
   const openAiTools = getMuthurOpenAiToolsForMode(uplinkMode);
   const toolsEnabled =
@@ -165,17 +185,20 @@ export async function muthurChatWithModelTools(options: {
       streamRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, fallbackMessages);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Upstream request failed";
-      return upstreamErrorResponse(502, msg);
+      return upstreamErrorResponse(502, msg, providerReceipt);
     }
     if (!streamRes.ok) {
       const errText = await streamRes.text().catch(() => "");
-      return upstreamErrorResponse(streamRes.status, errText);
+      return upstreamErrorResponse(streamRes.status, errText, providerReceipt);
     }
     return new Response(await streamOpenAiCompatibleResponse(streamRes), {
-      headers: {
-        ...PLAIN_HEADERS,
-        ...toolsUsedHeaders(toolsUsed, toolCtx),
-      },
+      headers: mergeReceiptHeaders(
+        {
+          ...PLAIN_HEADERS,
+          ...toolsUsedHeaders(toolsUsed, toolCtx),
+        },
+        providerReceipt,
+      ),
     });
   }
 
@@ -345,7 +368,7 @@ export async function muthurChatWithModelTools(options: {
         toolCtx.operatorBrowser,
       ),
     );
-  });
+  }, mergeReceiptHeaders({}, providerReceipt));
 }
 
 function stripDsmlFromAssistantText(text: string): string {

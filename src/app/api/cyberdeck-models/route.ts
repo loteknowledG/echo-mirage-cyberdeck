@@ -1,31 +1,12 @@
 import { NextResponse } from "next/server";
 import { fetchWithTimeout, MODEL_LIST_TIMEOUT_MS } from "@/lib/fetch-with-timeout";
-
-const MODEL_LIST_URL: Record<string, string> = {
-  opencode: "https://opencode.ai/zen/v1/models",
-  openai: "https://api.openai.com/v1/models",
-  openrouter: "https://openrouter.ai/api/v1/models",
-};
-
-const DEFAULT_PROVIDER_KEY_ENV: Record<string, string | undefined> = {
-  opencode: process.env.OPENCODE_API_KEY || process.env.ZEN_API_KEY || process.env.NEXT_PUBLIC_ZEN_API_KEY,
-  openai: process.env.OPENAI_API_KEY,
-  openrouter: process.env.OPENROUTER_API_KEY,
-};
-
-function resolveProviderApiKey(provider: string, suppliedApiKey: unknown): {
-  apiKey: string;
-  authSource: "user" | "default" | "none";
-} {
-  if (typeof suppliedApiKey === "string" && suppliedApiKey.trim()) {
-    return { apiKey: suppliedApiKey.trim(), authSource: "user" };
-  }
-  const envKey = DEFAULT_PROVIDER_KEY_ENV[provider];
-  if (typeof envKey === "string" && envKey.trim()) {
-    return { apiKey: envKey.trim(), authSource: "default" };
-  }
-  return { apiKey: "", authSource: "none" };
-}
+import {
+  buildProviderReceipt,
+  classifyProviderAuthFailure,
+  formatProviderReceiptHeader,
+  MODEL_LIST_URL,
+  resolveServerProviderCredentials,
+} from "@/lib/server/provider-credentials.server";
 
 export async function POST(request: Request) {
   let body: { provider?: unknown; apiKey?: unknown };
@@ -41,28 +22,67 @@ export async function POST(request: Request) {
 
   try {
     const { provider, apiKey } = body;
-    const url = MODEL_LIST_URL[provider as string];
+    const providerId = String(provider || "");
+    const url = MODEL_LIST_URL[providerId];
     if (!url) {
       return NextResponse.json({ error: "provider required" }, { status: 400 });
     }
 
-    const { apiKey: resolvedApiKey, authSource } = resolveProviderApiKey(String(provider), apiKey);
+    const { apiKey: resolvedApiKey, credentialSource } = resolveServerProviderCredentials(
+      providerId,
+      apiKey,
+    );
+
     if (!resolvedApiKey) {
+      const receipt = buildProviderReceipt({
+        provider: providerId,
+        credentialSource: "none",
+        auth: "failed",
+        reason: "no_key",
+      });
       return NextResponse.json(
-        { error: "provider key unavailable", code: "NO_PROVIDER_KEY", authSource },
-        { status: 400 },
+        {
+          error: "provider key unavailable",
+          code: "NO_PROVIDER_KEY",
+          credential_source: credentialSource,
+          receipt,
+        },
+        {
+          status: 400,
+          headers: { "X-Muthur-Provider-Receipt": formatProviderReceiptHeader(receipt) },
+        },
       );
     }
 
-    const upstream = await fetchWithTimeout(url, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${resolvedApiKey}` },
-    }, MODEL_LIST_TIMEOUT_MS);
+    const upstream = await fetchWithTimeout(
+      url,
+      {
+        method: "GET",
+        headers: { Authorization: `Bearer ${resolvedApiKey}` },
+      },
+      MODEL_LIST_TIMEOUT_MS,
+    );
 
     if (!upstream.ok) {
+      const reason = classifyProviderAuthFailure(upstream.status, await upstream.text().catch(() => ""));
+      const receipt = buildProviderReceipt({
+        provider: providerId,
+        credentialSource,
+        auth: "failed",
+        reason,
+      });
       return NextResponse.json(
-        { error: "upstream", status: upstream.status, authSource },
-        { status: upstream.status === 401 || upstream.status === 403 ? 401 : 502 },
+        {
+          error: "upstream",
+          status: upstream.status,
+          credential_source: credentialSource,
+          reason,
+          receipt,
+        },
+        {
+          status: upstream.status === 401 || upstream.status === 403 ? 401 : 502,
+          headers: { "X-Muthur-Provider-Receipt": formatProviderReceiptHeader(receipt) },
+        },
       );
     }
 
@@ -79,8 +99,23 @@ export async function POST(request: Request) {
       return af ? -1 : 1;
     });
     const data = sorted.slice(0, 50);
+    const receipt = buildProviderReceipt({
+      provider: providerId,
+      credentialSource,
+      auth: "success",
+      modelsAvailable: data.length,
+    });
 
-    return NextResponse.json({ data, authSource });
+    return NextResponse.json(
+      {
+        data,
+        credential_source: credentialSource,
+        model_count: data.length,
+        response_status: upstream.status,
+        receipt,
+      },
+      { headers: { "X-Muthur-Provider-Receipt": formatProviderReceiptHeader(receipt) } },
+    );
   } catch (err) {
     console.error("[api/cyberdeck-models]", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

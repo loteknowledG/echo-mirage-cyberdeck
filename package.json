@@ -46,6 +46,7 @@
     "probe:muthur-foundation-001": "tsx scripts/probe-muthur-foundation-001.ts",
     "probe:foundation-server-boundary": "tsx scripts/probe-foundation-server-boundary.ts",
     "probe:muthur-document-open": "tsx scripts/probe-muthur-document-open.ts",
+    "probe:provider-credentials": "tsx scripts/probe-provider-credentials.ts",
     "discover:continuity-artifacts": "tsx scripts/discover-continuity-artifacts.ts",
     "render:continuity-docs": "tsx scripts/render-continuity-docs.ts",
     "probe:muthur-lineage-discovery": "tsx scripts/probe-muthur-lineage-discovery.ts",

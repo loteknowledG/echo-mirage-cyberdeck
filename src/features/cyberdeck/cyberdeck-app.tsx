@@ -260,6 +260,13 @@ import {
 import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
 import { parseDocumentOpenIntent } from "@/lib/muthur-document-open-intent";
 import {
+  CLIENT_BAKED_PROVIDER_KEYS,
+  formatProviderReceiptDiagnostic,
+  providerHasUsableCredentials,
+  resolveOutboundProviderCredentials,
+  resolveProviderConnectionLabel,
+} from "@/lib/provider-credentials";
+import {
   PROVIDER_CLICK_ESCALATION_MS,
   PROVIDER_LINK_REFRESH_COOLDOWN_MS,
   loadProviderModelsCache,
@@ -305,14 +312,8 @@ const CyberdeckMarkdownPreview = dynamic(
 );
 
 const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
-const DEFAULT_CLIENT_PROVIDER_KEYS: Record<string, string> = {
-  opencode:
-    (process.env.NEXT_PUBLIC_OPENCODE_API_KEY ||
-      process.env.NEXT_PUBLIC_ZEN_API_KEY ||
-      "").trim(),
-  openrouter: (process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || "").trim(),
-  openai: (process.env.NEXT_PUBLIC_OPENAI_API_KEY || "").trim(),
-};
+/** @deprecated use CLIENT_BAKED_PROVIDER_KEYS */
+const DEFAULT_CLIENT_PROVIDER_KEYS = CLIENT_BAKED_PROVIDER_KEYS;
 
 const ENABLE_CARD_TABLE =
   process.env.NEXT_PUBLIC_ENABLE_CARD_TABLE === "true";
@@ -436,11 +437,7 @@ function providerHasClientKey(
   providerKeys: Record<string, string>,
   defaultKeyAvailableByProvider: Record<string, boolean>,
 ): boolean {
-  return Boolean(
-    providerKeys[providerId]?.trim() ||
-      DEFAULT_CLIENT_PROVIDER_KEYS[providerId] ||
-      defaultKeyAvailableByProvider[providerId],
-  );
+  return providerHasUsableCredentials(providerId, providerKeys, defaultKeyAvailableByProvider);
 }
 
 const GATEWAY_LINK_PARTS =
@@ -1507,6 +1504,11 @@ export default function CyberdeckApp() {
       : isConnected
         ? "connected"
         : "offline";
+  const providerConnectionLabel = resolveProviderConnectionLabel({
+    hasAuth: hasProviderAuth,
+    rateLimited: rateLimitedProviders.has(activeProvider),
+    fetchStatus: providerModelFetchStatus,
+  });
   const inactiveTextColor = "#7a7a7a";
   const inactiveSubtleTextColor = "#6a6a6a";
   const activeTextGlow = "0 0 8px rgba(0, 255, 0, 0.22)";
@@ -3947,8 +3949,7 @@ export default function CyberdeckApp() {
     async (provider: string, options?: { force?: boolean }) => {
       const force = options?.force === true;
       if (rateLimitedProviders.has(provider)) return;
-      const currentKey = (providerKeys[provider] || DEFAULT_CLIENT_PROVIDER_KEYS[provider] || "").trim();
-      if (!currentKey) return;
+      const outbound = resolveOutboundProviderCredentials(provider, providerKeys);
 
       const cachedFromState = modelCacheByProvider[provider];
       const cached =
@@ -3970,14 +3971,41 @@ export default function CyberdeckApp() {
         const res = await fetch("/api/cyberdeck-models", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ provider, apiKey: currentKey }),
+          body: JSON.stringify({
+            provider,
+            apiKey: outbound.apiKey || undefined,
+          }),
         });
+        const receiptHeader = res.headers.get("x-muthur-provider-receipt");
+        if (receiptHeader) {
+          try {
+            const receipt = JSON.parse(receiptHeader) as {
+              provider: string;
+              credential_source: string;
+              auth: string;
+              reason?: string;
+              model?: string;
+            };
+            setMuthurDiagnostics((current) =>
+              appendMuthurDiagnosticEntry(current, formatProviderReceiptDiagnostic(receipt)),
+            );
+          } catch {
+            /* ignore malformed receipt */
+          }
+        }
         if (!res.ok) {
           const errJson = (await res.json().catch(() => ({}))) as {
             authSource?: "user" | "default" | "none";
+            credential_source?: string;
             code?: string;
+            reason?: string;
           };
-          if (errJson.authSource === "none" || errJson.code === "NO_PROVIDER_KEY") {
+          if (
+            errJson.credential_source === "none" ||
+            errJson.authSource === "none" ||
+            errJson.code === "NO_PROVIDER_KEY" ||
+            errJson.reason === "no_key"
+          ) {
             setDefaultKeyAvailableByProvider((prev) => ({ ...prev, [provider]: false }));
             setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "idle" }));
             return;
@@ -4028,11 +4056,13 @@ export default function CyberdeckApp() {
         const json = (await res.json()) as {
           data?: { id: string }[];
           authSource?: "user" | "default";
+          credential_source?: string;
         };
         const raw = Array.isArray(json.data) ? json.data : [];
+        const credentialSource = json.credential_source ?? json.authSource;
         setDefaultKeyAvailableByProvider((prev) => ({
           ...prev,
-          [provider]: json.authSource === "default",
+          [provider]: credentialSource === "env" || credentialSource === "session_key" || credentialSource === "default",
         }));
         setModelCacheByProvider((prev) => ({ ...prev, [provider]: raw }));
         saveProviderModelsCache(provider, raw);
@@ -5278,6 +5308,7 @@ ${diff}`;
       const history = buildCyberdeckChatHistory(messages);
       const glyphContext = await buildGlyphContextSnapshot();
       const piScreenContext = formatPiScreenContextForMuthur(readPiScreenSnapshot());
+      const outboundCredentials = resolveOutboundProviderCredentials(activeProvider, providerKeys);
       let res: Response;
       try {
         res = await fetch("/api/cyberdeck-chat", {
@@ -5287,7 +5318,8 @@ ${diff}`;
           body: JSON.stringify({
             message: messageForApi,
             provider: activeProvider,
-            apiKey: providerKeys[activeProvider] || "",
+            apiKey: outboundCredentials.apiKey || undefined,
+            credentialSource: outboundCredentials.credentialSource,
             model: modelID,
             memoryContext,
             browserContext: browserContextForRequest,
@@ -5304,11 +5336,36 @@ ${diff}`;
 
       if (!res.ok) {
         let rawDetail = "";
+        let receiptReason = "";
+        const receiptHeader = res.headers.get("x-muthur-provider-receipt");
+        if (receiptHeader) {
+          try {
+            const receipt = JSON.parse(receiptHeader) as {
+              provider: string;
+              model?: string;
+              credential_source: string;
+              auth: string;
+              reason?: string;
+            };
+            receiptReason = receipt.reason ?? "";
+            setMuthurDiagnostics((current) =>
+              appendMuthurDiagnosticEntry(current, formatProviderReceiptDiagnostic(receipt)),
+            );
+          } catch {
+            /* ignore malformed receipt */
+          }
+        }
         try {
           const ct = res.headers.get("content-type") || "";
           if (ct.includes("application/json")) {
-            const payload = (await res.json()) as { error?: string; message?: string };
+            const payload = (await res.json()) as {
+              error?: string;
+              message?: string;
+              reason?: string;
+              receipt?: { reason?: string };
+            };
             rawDetail = String(payload?.error || payload?.message || "").trim();
+            receiptReason = receiptReason || payload?.reason || payload?.receipt?.reason || "";
           } else {
             rawDetail = (await res.text()).trim();
           }
@@ -5317,7 +5374,26 @@ ${diff}`;
         }
         const detail = formatUplinkErrorDetail(res.status, rawDetail);
         const statusLine = `API error ${res.status}`;
-        throw new Error(detail ? `${statusLine}: ${detail}` : statusLine);
+        const reasonSuffix = receiptReason ? ` // ${receiptReason.toUpperCase()}` : "";
+        throw new Error(detail ? `${statusLine}${reasonSuffix}: ${detail}` : `${statusLine}${reasonSuffix}`);
+      }
+
+      const providerReceiptHeader = res.headers.get("x-muthur-provider-receipt");
+      if (providerReceiptHeader) {
+        try {
+          const receipt = JSON.parse(providerReceiptHeader) as {
+            provider: string;
+            model?: string;
+            credential_source: string;
+            auth: string;
+            reason?: string;
+          };
+          setMuthurDiagnostics((current) =>
+            appendMuthurDiagnosticEntry(current, formatProviderReceiptDiagnostic(receipt)),
+          );
+        } catch {
+          /* ignore malformed receipt */
+        }
       }
 
       const muthurToolsHeader = res.headers.get("x-muthur-tools-used")?.trim() ?? "";
@@ -7551,15 +7627,21 @@ ${diff}`;
                       className="mb-2 font-mono text-[10px]"
                       style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}
                     >
+                      CONNECTION_STATUS: {providerConnectionLabel}
+                    </div>
+                    <div
+                      className="mb-2 font-mono text-[10px]"
+                      style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}
+                    >
                       AVAILABLE_MODELS:
                     </div>
                     {!hasProviderAuth ? (
                       <div className="font-mono text-[10px]" style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}>
-                        NO_KEY // ENTER_KEY_ABOVE_OR_PASTE_IN_CHAT
+                        NO KEY // ENTER_KEY_ABOVE_OR_PASTE_IN_CHAT
                       </div>
                     ) : rateLimitedProviders.has(activeProvider) ? (
                       <div className="font-mono text-[10px] text-amber-300" style={{ textShadow: "0 0 8px rgba(255, 170, 0, 0.28)" }}>
-                        RATE_LIMIT // OPERATOR_ACTION_REQUIRED
+                        QUOTA // RATE_LIMIT // OPERATOR_ACTION_REQUIRED
                       </div>
                     ) : providerModelFetchStatus === "retrieving" ? (
                       <div className="model-probe-wave font-mono text-[10px]" style={{ color: "#ffaa00" }}>
@@ -7567,11 +7649,11 @@ ${diff}`;
                       </div>
                     ) : providerModelFetchStatus === "invalid-key" ? (
                       <div className="font-mono text-[10px] text-red-400" style={{ textShadow: "0 0 8px rgba(255, 85, 85, 0.3)" }}>
-                        INVALID_KEY // AUTH_REJECTED
+                        AUTH FAILED // INVALID_KEY
                       </div>
                     ) : providerModelFetchStatus === "error" ? (
                       <div className="font-mono text-[10px] text-red-300" style={{ textShadow: "0 0 8px rgba(255, 122, 122, 0.3)" }}>
-                        UPLINK_ERROR // OPERATOR_ACTION_REQUIRED
+                        UNAVAILABLE // UPLINK_ERROR // OPERATOR_ACTION_REQUIRED
                       </div>
                     ) : modelList.length === 0 ? (
                       <div className="font-mono text-[10px]" style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}>
