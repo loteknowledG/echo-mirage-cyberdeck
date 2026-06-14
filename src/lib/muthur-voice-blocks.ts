@@ -3,14 +3,10 @@
  * for more context than a single sentence.
  */
 
+import { textForMuthurSpeech } from "@/lib/muthur-speech-text";
+
 function normalizeSpeechText(value: string): string {
-  const raw = typeof value === "string" ? value : "";
-  if (!raw.trim()) return "";
-  return raw
-    .replace(/#/g, "")
-    .replace(/[*\/\\]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return textForMuthurSpeech(value);
 }
 
 /** Split on blank lines; each block is flattened to a single spoken line. */

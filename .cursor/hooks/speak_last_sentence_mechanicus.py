@@ -244,6 +244,32 @@ def _strip_markdownish(text: str) -> str:
     return " ".join(t.split())
 
 
+_SEPARATOR_LINE_RE = re.compile(r"^[\s+\-=]+$")
+
+
+def _verbalize_separator_line(line: str) -> str | None:
+    s = line.strip()
+    if not s or not _SEPARATOR_LINE_RE.match(s):
+        return None
+    has_plus = "+" in s
+    has_dash = "-" in s
+    if has_plus and has_dash:
+        return "plus plus plus, dash dash dash"
+    if has_plus:
+        return "plus plus plus"
+    if has_dash:
+        return "dash dash dash"
+    return None
+
+
+def _verbalize_ascii_separators(text: str) -> str:
+    lines: list[str] = []
+    for line in text.splitlines():
+        verbal = _verbalize_separator_line(line)
+        lines.append(verbal if verbal else line)
+    return "\n".join(lines)
+
+
 def _read_stdin_text() -> str:
     """Read hook JSON from stdin; utf-8-sig strips BOM; binary-safe."""
     raw = sys.stdin.buffer.read()
@@ -325,7 +351,7 @@ def _extract_full_text(data: dict) -> str:
 def last_sentence(text: str) -> str:
     if not text or not text.strip():
         return ""
-    t = _strip_markdownish(text).strip()
+    t = _strip_markdownish(_verbalize_ascii_separators(text)).strip()
     if not t:
         return ""
     # Prefer the last non-empty line first (helps when payload includes sections).
@@ -344,7 +370,10 @@ def last_block(text: str) -> str:
     """Last paragraph (split on blank lines); more context than last_sentence."""
     if not text or not text.strip():
         return ""
-    t = _strip_markdownish(text).strip()
+    t = _verbalize_ascii_separators(text).strip()
+    if not t:
+        return ""
+    t = _strip_markdownish(t).strip()
     if not t:
         return ""
     parts = re.split(r"\n\s*\n+", t)
@@ -364,7 +393,7 @@ def full_response(text: str) -> str:
     """Entire assistant message: markdown-ish strip + speak-friendly whitespace; capped for TTS."""
     if not text or not text.strip():
         return ""
-    t = _strip_markdownish(text).strip()
+    t = _strip_markdownish(_verbalize_ascii_separators(text)).strip()
     if not t:
         return ""
     t = re.sub(r"\s+", " ", t).strip()

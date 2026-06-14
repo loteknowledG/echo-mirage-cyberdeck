@@ -40,6 +40,8 @@
     "probe:muthur-persistent-runtime": "tsx scripts/probe-muthur-persistent-runtime.ts",
     "probe:muthur-atlas-memory": "tsx scripts/probe-muthur-atlas-memory.ts",
     "probe:muthur-memory-phase1": "tsx scripts/probe-muthur-memory-phase1.ts",
+    "probe:muthur-command-console": "tsx scripts/probe-muthur-command-console.ts",
+    "probe:muthur-speech-text": "tsx scripts/probe-muthur-speech-text.ts",
     "probe:muthur-phases": "pnpm probe:muthur-phase-a && pnpm probe:muthur-phase-b && pnpm probe:muthur-phase-c && pnpm probe:muthur-operator-disk-save && pnpm probe:muthur-persistent-runtime && pnpm probe:muthur-atlas-memory",
     "probe:muthur-open-operator": "tsx scripts/probe-muthur-open-operator.ts",
     "probe:powerfist-muthur-tools": "tsx scripts/probe-powerfist-muthur-tools.ts",

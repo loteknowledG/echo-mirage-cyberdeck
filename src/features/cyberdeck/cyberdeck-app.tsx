@@ -45,6 +45,7 @@ import { RegistryShowroom } from "@/app/registry/registry-showroom";
 import { RegistryKitScrollFrame } from "@/app/registry/registry-kit-scroll-frame";
 import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
 import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
+import { textForMuthurSpeech } from "@/lib/muthur-speech-text";
 import type { CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
 import {
   loadComputerUse,
@@ -102,6 +103,18 @@ import {
   resolveMuthurCommittedDisplayText,
   splitMuthurStreamPayload,
 } from "@/lib/muthur-core/muthur-stream-payload";
+import {
+  extractMuthurProgressStatus,
+  resolveMuthurResponsePhase,
+  toolTraceToDiagnostic,
+} from "@/lib/muthur-core/muthur-command-console";
+import {
+  appendMuthurDiagnosticBatch,
+  createEmptyMuthurDiagnosticsState,
+  MUTHUR_RESPONSE_STALL_MS,
+  type MuthurDiagnosticsState,
+  type MuthurResponseStall,
+} from "@/lib/muthur-core/muthur-diagnostics-channel";
 import { parseOperatorConversionJson } from "@/lib/muthur-core/operator-conversion-ref";
 import { parseOperatorBrowserJson } from "@/lib/muthur-core/operator-browser-ref";
 import { parseOperatorOpenJson } from "@/lib/muthur-core/operator-open-file-ref";
@@ -204,7 +217,7 @@ import {
   MuthurCommandInput,
   type MuthurCommandInputHandle,
 } from "@/components/cyberdeck/muthur-command-input";
-import { ChatUserRoleLabel } from "@/components/cyberdeck/chat-user-role-label";
+import { MuthurCommandConsoleLog } from "@/components/cyberdeck/muthur-command-console-log";
 import {
   DEFAULT_CHAT_USER_DISPLAY_NAME,
   readChatUserDisplayName,
@@ -212,15 +225,6 @@ import {
 } from "@/lib/chat-user-display-name";
 import { setMuthurScreenSnapshot } from "@/lib/muthur-screen-context";
 import { formatPiScreenContextForMuthur, readPiScreenSnapshot } from "@/lib/pi-screen-context";
-import {
-  findLatestMuthurNotifyIndex,
-  getMuthurNotifyAsciiClass,
-  getMuthurNotifyAsciiLine,
-  getMuthurNotifyBurstClass,
-  getMuthurNotifyLiveClass,
-  getMuthurNotifySettledClass,
-  isMuthurNotifyMessage,
-} from "@/lib/muthur-notify-style";
 import { setMUTHURMode } from "@/lib/computer-use/control-lease";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { summarizeMuthurOperatorEdits } from "@/lib/muthur-operator-edit-summary";
@@ -776,13 +780,7 @@ function renderGatewayMessageText(text: string) {
 }
 
 function textForSpeech(value: string) {
-  const raw = typeof value === "string" ? value : "";
-  if (!raw.trim()) return "";
-  return raw
-    .replace(/[#*\/\\]+/g, " ")
-    .replace(/[\u2500-\u257F\u2590-\u259F\u25A0-\u25FF\u2600-\u26FF\u2700-\u27BF\u2B50\u25C6\u25C7\u25B2\u25B3\u2B1A-\u2B1C]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return textForMuthurSpeech(value);
 }
 
 function normalizeCustomTabGlyph(label: string, glyph?: string) {
@@ -1020,13 +1018,44 @@ export default function CyberdeckApp() {
 
   const [inputHistory, setInputHistory] = useState<string[]>([]);
   const [canSendInput, setCanSendInput] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessagesRaw] = useState<ChatMessage[]>([]);
+  const [muthurDiagnostics, setMuthurDiagnostics] = useState<MuthurDiagnosticsState>(() =>
+    createEmptyMuthurDiagnosticsState(),
+  );
+  const [muthurStall, setMuthurStall] = useState<MuthurResponseStall | null>(null);
+  const composeStartedAtRef = useRef<number | null>(null);
+  const setMessages = useCallback((updater: React.SetStateAction<ChatMessage[]>) => {
+    setMessagesRaw((prev) => {
+      const rawNext = typeof updater === "function" ? updater(prev) : updater;
+      if (!Array.isArray(rawNext)) return prev;
+
+      const newSystemLines: string[] = [];
+      const channelNext: ChatMessage[] = [];
+
+      for (let i = 0; i < rawNext.length; i += 1) {
+        const message = rawNext[i];
+        if (message.role === "system") {
+          const prior = prev[i];
+          if (!prior || prior.role !== "system" || prior.text !== message.text) {
+            newSystemLines.push(message.text);
+          }
+          continue;
+        }
+        channelNext.push(message);
+      }
+
+      if (newSystemLines.length > 0) {
+        setMuthurDiagnostics((current) => appendMuthurDiagnosticBatch(current, newSystemLines));
+      }
+
+      return channelNext;
+    });
+  }, []);
   const [chatUserDisplayName, setChatUserDisplayName] = useState(DEFAULT_CHAT_USER_DISPLAY_NAME);
   const [chatHydrated, setChatHydrated] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [streamToolTrace, setStreamToolTrace] = useState("");
-  const [muthurNotifyBurstIndex, setMuthurNotifyBurstIndex] = useState<number | null>(null);
   const [muthurUplinkMode, setMuthurUplinkMode] = useState<MuthurUplinkMode>(() => loadMuthurUplinkMode());
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
@@ -2109,7 +2138,14 @@ export default function CyberdeckApp() {
                 ? { toolTrace: item.toolTrace.trim() }
                 : {}),
             }));
-          setMessages(restored);
+          const legacySystemLines = restored
+            .filter((item) => item.role === "system")
+            .map((item) => item.text);
+          const channel = restored.filter((item) => item.role !== "system");
+          setMessagesRaw(channel);
+          if (legacySystemLines.length > 0) {
+            setMuthurDiagnostics((current) => appendMuthurDiagnosticBatch(current, legacySystemLines));
+          }
         }
       }
       const storedStreamText = window.localStorage.getItem(CHAT_STREAM_STORAGE_KEY);
@@ -3658,25 +3694,48 @@ export default function CyberdeckApp() {
     setDidHydrateProviderState(true);
   }, []);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamText]);
+  const muthurResponsePhase = useMemo(
+    () =>
+      resolveMuthurResponsePhase({
+        isStreaming,
+        streamText,
+        messages,
+        stalled: Boolean(muthurStall),
+      }),
+    [isStreaming, messages, muthurStall, streamText],
+  );
+  const muthurProgressStatus = useMemo(
+    () => extractMuthurProgressStatus(streamText),
+    [streamText],
+  );
 
-  const latestMuthurNotifyIndex = useMemo(() => findLatestMuthurNotifyIndex(messages), [messages]);
-
   useEffect(() => {
-    if (latestMuthurNotifyIndex < 0) {
-      setMuthurNotifyBurstIndex(null);
+    if (isStreaming || streamText.trim()) {
+      if (composeStartedAtRef.current == null) {
+        composeStartedAtRef.current = Date.now();
+      }
       return;
     }
-    setMuthurNotifyBurstIndex(latestMuthurNotifyIndex);
-    const timer = window.setTimeout(() => {
-      setMuthurNotifyBurstIndex((current) =>
-        current === latestMuthurNotifyIndex ? null : current,
-      );
-    }, 4000);
-    return () => window.clearTimeout(timer);
-  }, [latestMuthurNotifyIndex]);
+    composeStartedAtRef.current = null;
+    setMuthurStall(null);
+  }, [isStreaming, streamText]);
+
+  useEffect(() => {
+    if (!isStreaming && !streamText.trim()) return;
+
+    const timer = window.setInterval(() => {
+      const started = composeStartedAtRef.current;
+      if (started == null) return;
+      const elapsedMs = Date.now() - started;
+      if (elapsedMs < MUTHUR_RESPONSE_STALL_MS) return;
+      setMuthurStall({
+        phase: extractMuthurProgressStatus(streamText) || "MUTHUR uplink active",
+        elapsedMs,
+      });
+    }, 2_000);
+
+    return () => window.clearInterval(timer);
+  }, [isStreaming, streamText]);
 
   useEffect(() => {
     if (scanActivityActive) {
@@ -4724,6 +4783,9 @@ export default function CyberdeckApp() {
       setStreamText("");
       setStreamToolTrace("");
       setMessages([]);
+      setMuthurDiagnostics(createEmptyMuthurDiagnosticsState());
+      setMuthurStall(null);
+      composeStartedAtRef.current = null;
       setChatKeyboardHighlightIndex(null);
       setGeneratedUI(null);
       screenshotRef.current = null;
@@ -5230,177 +5292,18 @@ ${diff}`;
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
       persistMuthurShipMemoryTurn(userMessage, cleanedText || fullText);
 
-      const codingVerifyReceipt =
-        streamPayload.codingVerify ?? parseCodingVerifyHeader(res.headers.get("x-muthur-coding-verify"));
-      if (codingVerifyReceipt) {
-        const systemLines = [formatCodingVerifySystemLine(codingVerifyReceipt)];
-        if (codingVerifyReceipt.passed && muthurUplinkMode === "agent") {
-          systemLines.push(
-            "RUNTIME PATROL // queued after coding verify (tsc + /cyberdeck in background)",
-          );
-        }
-        setMessages((prev) => [
-          ...prev,
-          ...systemLines.map((text) => ({ role: "system" as const, text })),
-        ]);
-      }
-
-      if (!autoConvertedDocx) {
-        const operatorConversionRef =
-          streamPayload.operatorConversion ??
-          parseOperatorConversionJson(res.headers.get("x-muthur-operator-conversion"));
-        const convertPath =
-          operatorConversionRef?.sourcePath ||
-          (streamPayload.toolsUsed.includes("convert_document_to_markdown") && operatorLocalPath
-            ? operatorLocalPath
-            : "");
-        if (convertPath) {
-          const converted = await openConvertedMarkdownInOperator(convertPath, { edit: true });
-          if (converted) {
-            flushMuthurObservation();
-            await waitForOperatorDocumentReady(3000);
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "system",
-                text: `OPERATOR CONVERT // Opened markdown from ${convertPath} in the operator pane.`,
-              },
-            ]);
-          }
-        }
-      }
-
-      const operatorOpenRef =
-        streamPayload.operatorOpenFile ??
-        parseOperatorOpenJson(res.headers.get("x-muthur-operator-open"));
-      if (operatorOpenRef) {
-        const opened = await openWorkspaceFileInOperator(operatorOpenRef);
-        if (opened) {
-          flushMuthurObservation();
-          await waitForOperatorDocumentReady(3000);
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "system",
-              text: `OPERATOR OPEN // ${operatorOpenRef.fileName} // ${operatorOpenRef.filePath}`,
-            },
-          ]);
-        }
-      }
-
-      const operatorBrowserRef =
-        streamPayload.operatorBrowser ??
-        parseOperatorBrowserJson(res.headers.get("x-muthur-operator-browser"));
-      if (operatorBrowserRef) {
-        const actionResult = await performBrowserCommand(operatorBrowserRef);
-        const engineMatch = actionResult.match(/ENGINE:\s*([A-Z0-9_ -]+)/i);
-        if (engineMatch?.[1]) {
-          setOperatorBrowserEngine(engineMatch[1].trim().toUpperCase().replace(/\s+/g, "_"));
-        }
-        const captchaBlocked =
-          looksLikeCaptchaBlock(actionResult) || actionResult.includes("CAPTCHA_BLOCKED");
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: captchaBlocked
-              ? `BROWSER_BLOCKED // CAPTCHA // MANUAL_COMPLETION_REQUIRED\n${actionResult}`
-              : `BROWSER_ACTION // ${operatorBrowserRef.kind.toUpperCase()} // ${actionResult}`,
-          },
-        ]);
-      }
-
-      const editsToApply =
-        operatorEditsFromStream.length > 0 ? operatorEditsFromStream : operatorEdits;
-      let operatorEditApplied = false;
-      const operatorEditFileName =
-        operatorActiveFilePath?.split("/").pop() ||
-        operatorDroppedAsset?.name ||
-        "document";
-      if (editsToApply.length > 0) {
-        setOperatorDocMode("edit");
-        const editResult = await applyMuthurOperatorEdits(editsToApply);
-        if (editResult === "applied") {
-          operatorEditApplied = true;
-          const systemLines = ["OPERATOR EDIT // MUTHUR applied — Ctrl+Z to undo in the operator pane."];
-          if (shouldAutoCommitOperatorEdits(muthurUplinkMode)) {
-            if (
-              canSaveOperatorDocumentInPlace(
-                operatorActiveFilePath,
-                operatorDroppedAsset?.localFilePath,
-                operatorFolderRootsRef.current,
-              )
-            ) {
-              await saveOperatorDocInPlace();
-              systemLines.push(`OPERATOR SAVE // ${operatorEditFileName} // Agent auto-commit`);
-            } else {
-              systemLines.push(
-                `UNSAVED // ${operatorEditFileName} // no writable path for Agent auto-save`,
-              );
-            }
-          } else {
-            const unsavedHint =
-              muthurUplinkMode === "debug"
-                ? `UNSAVED // ${operatorEditFileName} — Debug mode: save when ready (Ctrl+S)`
-                : `UNSAVED // ${operatorEditFileName} — save when ready (Ctrl+S)`;
-            systemLines.push(unsavedHint);
-          }
-          setMessages((prev) => [
-            ...prev,
-            ...systemLines.map((text) => ({ role: "system" as const, text })),
-          ]);
-          if (!cleanedText.trim()) {
-            const summary = summarizeMuthurOperatorEdits(
-              editsToApply,
-              operatorEditFileName,
-              userMessage,
-            );
-            setMessages((prev) => {
-              const next = [...prev];
-              for (let i = next.length - 1; i >= 0; i--) {
-                const row = next[i];
-                if (row.role === "assistant" && !row.text.trim()) {
-                  next[i] = { ...row, text: summary };
-                  break;
-                }
-              }
-              return next;
-            });
-          }
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "system",
-              text: "OPERATOR EDIT // FAILED // MUTHUR could not apply the edit in the operator pane.",
-            },
-          ]);
-        }
-      }
-
-      if (
-        codingVerifyReceipt &&
-        !operatorEditApplied &&
-        operatorActiveFilePath?.trim()
-      ) {
-        const touchedPath = codingVerifyReceipt.touched_paths.find((touch) =>
-          pathsReferToSameOperatorFile(touch, operatorActiveFilePath),
+      if (toolsTrace) {
+        setMuthurDiagnostics((current) =>
+          appendMuthurDiagnosticBatch(current, [toolTraceToDiagnostic(toolsTrace).text]),
         );
-        if (touchedPath) {
-          const synced = await reloadOperatorDocumentFromWorkspacePath(touchedPath);
-          if (synced) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "system",
-                text: "OPERATOR SYNC // reloaded open file from disk after MUTHUR write.",
-              },
-            ]);
-          }
-        }
       }
 
+      // L-UI-001 P0: MUTHUR channel commits before post-stream diagnostics / operator I/O.
       setStreamText("");
+      setStreamToolTrace("");
+      setIsStreaming(false);
+      composeStartedAtRef.current = null;
+      setMuthurStall(null);
 
       if (activeProvider && modelID) {
         setVerifiedProviders((prev) => ({ ...prev, [activeProvider]: true }));
@@ -5453,6 +5356,178 @@ ${diff}`;
         const uiMatch = fullText.match(/\[UI\]([\s\S]*?)\[\/UI\]/);
         if (uiMatch) setGeneratedUI(uiMatch[1].trim());
       }
+
+      void (async () => {
+        const codingVerifyReceipt =
+          streamPayload.codingVerify ?? parseCodingVerifyHeader(res.headers.get("x-muthur-coding-verify"));
+        if (codingVerifyReceipt) {
+          const systemLines = [formatCodingVerifySystemLine(codingVerifyReceipt)];
+          if (codingVerifyReceipt.passed && muthurUplinkMode === "agent") {
+            systemLines.push(
+              "RUNTIME PATROL // queued after coding verify (tsc + /cyberdeck in background)",
+            );
+          }
+          setMessages((prev) => [
+            ...prev,
+            ...systemLines.map((text) => ({ role: "system" as const, text })),
+          ]);
+        }
+
+        if (!autoConvertedDocx) {
+          const operatorConversionRef =
+            streamPayload.operatorConversion ??
+            parseOperatorConversionJson(res.headers.get("x-muthur-operator-conversion"));
+          const convertPath =
+            operatorConversionRef?.sourcePath ||
+            (streamPayload.toolsUsed.includes("convert_document_to_markdown") && operatorLocalPath
+              ? operatorLocalPath
+              : "");
+          if (convertPath) {
+            const converted = await openConvertedMarkdownInOperator(convertPath, { edit: true });
+            if (converted) {
+              flushMuthurObservation();
+              await waitForOperatorDocumentReady(3000);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "system",
+                  text: `OPERATOR CONVERT // Opened markdown from ${convertPath} in the operator pane.`,
+                },
+              ]);
+            }
+          }
+        }
+
+        const operatorOpenRef =
+          streamPayload.operatorOpenFile ??
+          parseOperatorOpenJson(res.headers.get("x-muthur-operator-open"));
+        if (operatorOpenRef) {
+          const opened = await openWorkspaceFileInOperator(operatorOpenRef);
+          if (opened) {
+            flushMuthurObservation();
+            await waitForOperatorDocumentReady(3000);
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                text: `OPERATOR OPEN // ${operatorOpenRef.fileName} // ${operatorOpenRef.filePath}`,
+              },
+            ]);
+          }
+        }
+
+        const operatorBrowserRef =
+          streamPayload.operatorBrowser ??
+          parseOperatorBrowserJson(res.headers.get("x-muthur-operator-browser"));
+        if (operatorBrowserRef) {
+          const actionResult = await performBrowserCommand(operatorBrowserRef);
+          const engineMatch = actionResult.match(/ENGINE:\s*([A-Z0-9_ -]+)/i);
+          if (engineMatch?.[1]) {
+            setOperatorBrowserEngine(engineMatch[1].trim().toUpperCase().replace(/\s+/g, "_"));
+          }
+          const captchaBlocked =
+            looksLikeCaptchaBlock(actionResult) || actionResult.includes("CAPTCHA_BLOCKED");
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: captchaBlocked
+                ? `BROWSER_BLOCKED // CAPTCHA // MANUAL_COMPLETION_REQUIRED\n${actionResult}`
+                : `BROWSER_ACTION // ${operatorBrowserRef.kind.toUpperCase()} // ${actionResult}`,
+            },
+          ]);
+        }
+
+        const editsToApply =
+          operatorEditsFromStream.length > 0 ? operatorEditsFromStream : operatorEdits;
+        let operatorEditApplied = false;
+        const operatorEditFileName =
+          operatorActiveFilePath?.split("/").pop() ||
+          operatorDroppedAsset?.name ||
+          "document";
+        if (editsToApply.length > 0) {
+          setOperatorDocMode("edit");
+          const editResult = await applyMuthurOperatorEdits(editsToApply);
+          if (editResult === "applied") {
+            operatorEditApplied = true;
+            const systemLines = ["OPERATOR EDIT // MUTHUR applied — Ctrl+Z to undo in the operator pane."];
+            if (shouldAutoCommitOperatorEdits(muthurUplinkMode)) {
+              if (
+                canSaveOperatorDocumentInPlace(
+                  operatorActiveFilePath,
+                  operatorDroppedAsset?.localFilePath,
+                  operatorFolderRootsRef.current,
+                )
+              ) {
+                await saveOperatorDocInPlace();
+                systemLines.push(`OPERATOR SAVE // ${operatorEditFileName} // Agent auto-commit`);
+              } else {
+                systemLines.push(
+                  `UNSAVED // ${operatorEditFileName} // no writable path for Agent auto-save`,
+                );
+              }
+            } else {
+              const unsavedHint =
+                muthurUplinkMode === "debug"
+                  ? `UNSAVED // ${operatorEditFileName} — Debug mode: save when ready (Ctrl+S)`
+                  : `UNSAVED // ${operatorEditFileName} — save when ready (Ctrl+S)`;
+              systemLines.push(unsavedHint);
+            }
+            setMessages((prev) => [
+              ...prev,
+              ...systemLines.map((text) => ({ role: "system" as const, text })),
+            ]);
+            if (!cleanedText.trim()) {
+              const summary = summarizeMuthurOperatorEdits(
+                editsToApply,
+                operatorEditFileName,
+                userMessage,
+              );
+              setMessages((prev) => {
+                const next = [...prev];
+                for (let i = next.length - 1; i >= 0; i--) {
+                  const row = next[i];
+                  if (row.role === "assistant" && !row.text.trim()) {
+                    next[i] = { ...row, text: summary };
+                    break;
+                  }
+                }
+                return next;
+              });
+            }
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                text: "OPERATOR EDIT // FAILED // MUTHUR could not apply the edit in the operator pane.",
+              },
+            ]);
+          }
+        }
+
+        if (
+          codingVerifyReceipt &&
+          !operatorEditApplied &&
+          operatorActiveFilePath?.trim()
+        ) {
+          const touchedPath = codingVerifyReceipt.touched_paths.find((touch) =>
+            pathsReferToSameOperatorFile(touch, operatorActiveFilePath),
+          );
+          if (touchedPath) {
+            const synced = await reloadOperatorDocumentFromWorkspacePath(touchedPath);
+            if (synced) {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "system",
+                  text: "OPERATOR SYNC // reloaded open file from disk after MUTHUR write.",
+                },
+              ]);
+            }
+          }
+        }
+      })();
     } catch (err) {
       const msg = String(err);
       if (msg.includes("AbortError")) {
@@ -6957,164 +7032,25 @@ ${diff}`;
                   <EchoHeader />
                 </div>
               ) : null}
-              <div className="message-log space-y-3">
-                {messages.map((m, i) => {
-                  const isModelConnectedLine =
-                    m.role === "system" && typeof m.text === "string" && m.text.includes("MODEL_CONNECTED");
-                  const isSystemFailureLine =
-                    m.role === "system" &&
-                    typeof m.text === "string" &&
-                    /(failure|failuer|failed|invalid_key|auth_rejected|uplink_error|api\s*error|http_[45]\d{2}|empty_response|rate_limit)/i.test(
-                      m.text,
-                    );
-                  const muthurNotifyBurstClass =
-                    m.role === "system" &&
-                    typeof m.text === "string" &&
-                    i === muthurNotifyBurstIndex &&
-                    i === latestMuthurNotifyIndex
-                      ? getMuthurNotifyBurstClass(m.text)
-                      : null;
-                  const muthurNotifySettledClass =
-                    m.role === "system" &&
-                    typeof m.text === "string" &&
-                    isMuthurNotifyMessage(m.text) &&
-                    i === latestMuthurNotifyIndex &&
-                    !muthurNotifyBurstClass
-                      ? getMuthurNotifySettledClass(m.text)
-                      : null;
-                  const muthurNotifyAscii =
-                    m.role === "system" && typeof m.text === "string"
-                      ? getMuthurNotifyAsciiLine(m.text)
-                      : null;
-                  return (
-                    <div
-                      key={i}
-                      data-chat-row={i}
-                      className={`nav-row py-1 text-xs ${
-                        chatKeyboardHighlightIndex === i ? "nav-row-kb-hover" : ""
-                      }`}
-                    >
-                    {m.role === "user" ? (
-                      <ChatUserRoleLabel
-                        displayName={chatUserDisplayName}
-                        onDisplayNameChange={setChatUserDisplayName}
-                      />
-                    ) : (
-                      <span
-                        className={
-                          m.role === "assistant"
-                            ? "text-green-400"
-                            : m.role === "system"
-                              ? isModelConnectedLine
-                                ? "text-green-400"
-                                : isSystemFailureLine
-                                  ? "text-red-400"
-                                  : "text-amber-400/90"
-                              : "text-red-400"
-                        }
-                      >
-                        [
-                        {m.role === "assistant"
-                          ? "MUTHUR"
-                          : m.role === "system"
-                            ? "SYS"
-                            : "ERR"}
-                        ]{" "}
-                      </span>
-                    )}
-                    <span
-                      className={
-                        muthurNotifyBurstClass
-                          ? muthurNotifyBurstClass
-                          : muthurNotifySettledClass
-                            ? muthurNotifySettledClass
-                            : isModelConnectedLine
-                              ? "font-medium text-green-300"
-                              : isSystemFailureLine
-                                ? "font-medium text-red-300"
-                                : "text-gray-300"
-                      }
-                      style={
-                        muthurNotifyBurstClass || muthurNotifySettledClass
-                          ? undefined
-                          : isModelConnectedLine
-                            ? { textShadow: "0 0 10px rgba(34, 197, 94, 0.45)" }
-                            : isSystemFailureLine
-                              ? { textShadow: "0 0 8px rgba(248, 113, 113, 0.35)" }
-                              : undefined
-                      }
-                    >
-                      {m.role === "system" ? (
-                        <>
-                          {muthurNotifyAscii ? (
-                            <span className={getMuthurNotifyAsciiClass(m.text)}>{muthurNotifyAscii}</span>
-                          ) : null}
-                          <span className="whitespace-pre-wrap">{renderGatewayMessageText(m.text)}</span>
-                        </>
-                      ) : (
-                        <>
-                          {m.role === "assistant" && m.toolTrace ? (
-                            <span className="mb-0.5 block font-mono text-[10px] leading-snug text-amber-500/90">
-                              // TOOLS:{" "}
-                              {m.toolTrace
-                                .split(",")
-                                .map((t) => t.trim())
-                                .filter(Boolean)
-                                .join(" · ")}
-                            </span>
-                          ) : null}
-                          <span className="whitespace-pre-wrap">{m.text}</span>
-                        </>
-                      )}
-                    </span>
+              <MuthurCommandConsoleLog
+                messages={messages}
+                diagnosticsState={muthurDiagnostics}
+                streamText={streamText}
+                streamToolTrace={streamToolTrace}
+                isStreaming={isStreaming}
+                responseStall={muthurStall}
+                chatUserDisplayName={chatUserDisplayName}
+                onChatUserDisplayNameChange={setChatUserDisplayName}
+                chatKeyboardHighlightIndex={chatKeyboardHighlightIndex}
+                renderDiagnosticText={renderGatewayMessageText}
+                isMobileLayout={isMobileLayout}
+                echoHeader={
+                  <div className="mb-2">
+                    <EchoHeader />
                   </div>
-                  );
-                })}
-                {streamText && (() => {
-                  const progressLines = streamText
-                    .split("\n")
-                    .filter((line) => line.trim().startsWith("⏳ MUTHUR"));
-                  const streamProgressLine = progressLines.at(-1) ?? streamText;
-                  const streamLiveClass = getMuthurNotifyLiveClass(streamProgressLine);
-                  const streamAscii = streamLiveClass
-                    ? getMuthurNotifyAsciiLine(streamProgressLine)
-                    : null;
-                  return (
-                  <div
-                    data-chat-row={messages.length}
-                    className={`nav-row py-1 text-xs ${
-                      chatKeyboardHighlightIndex === messages.length ? "nav-row-kb-hover" : ""
-                    }`}
-                  >
-                    <span className="text-green-400">[MUTHUR] </span>
-                    <span className="text-gray-300">
-                      {streamToolTrace ? (
-                        <span className="mb-0.5 block font-mono text-[10px] leading-snug text-amber-500/90">
-                          // TOOLS:{" "}
-                          {streamToolTrace
-                            .split(",")
-                            .map((t) => t.trim())
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </span>
-                      ) : null}
-                      {streamAscii ? (
-                        <span className={getMuthurNotifyAsciiClass(streamText)}>{streamAscii}</span>
-                      ) : null}
-                      <span
-                        className={
-                          streamLiveClass ?? "text-green-300 whitespace-pre-wrap"
-                        }
-                      >
-                        {streamText}
-                      </span>
-                    </span>
-                    <span className="animate-pulse">█</span>
-                  </div>
-                  );
-                })()}
-                <div ref={messagesEndRef} />
-              </div>
+                }
+              />
+              <div ref={messagesEndRef} className="h-px" aria-hidden />
             </div>
 
             <footer className="cyberdeck-message-box realmorphism-host-surface shrink-0 border-t bg-black p-0">
@@ -7156,7 +7092,18 @@ ${diff}`;
                     {modelID
                       ? modelID.split("/").pop()
                       : "NO_MODEL"}{" "}
-                    {isStreaming ? "STREAMING" : ""}
+                    {muthurResponsePhase === "composing"
+                      ? "· MUTHUR composing…"
+                      : muthurResponsePhase === "stalled"
+                        ? "· MUTHUR response stalled"
+                        : muthurResponsePhase === "complete"
+                          ? "· MUTHUR complete"
+                          : isStreaming
+                            ? "STREAMING"
+                            : ""}
+                    {muthurProgressStatus ? (
+                      <span className="text-amber-400/80"> · {muthurProgressStatus.replace(/^⏳\s*/, "")}</span>
+                    ) : null}
                   </button>
                   <MuthurUplinkModeRoller
                     mode={muthurUplinkMode}
