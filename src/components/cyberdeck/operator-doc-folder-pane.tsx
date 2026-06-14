@@ -18,12 +18,24 @@ import { operatorFileIcon, operatorFolderIcon, operatorIconSrc } from "@/lib/ope
 import { cn } from "@/lib/utils";
 import { CodexIcon } from "@/components/codex-icon";
 import {
+  findFolderTreeNode,
   listDirectoryChildrenForRoot,
   mergeFolderTreeNodes,
   readFileFromFolderRoot,
+  resolveOperatorDiskAbsolutePath,
   type OperatorDocFolderRoot,
   type OperatorFolderTreeNode,
 } from "@/lib/operator-folder-nav";
+import {
+  absoluteToWorkspaceRelative,
+  validateFolderName,
+} from "@/lib/workspace-folder-validation";
+import {
+  createWorkspaceFolder,
+  fetchWorkspaceRoot,
+  OPERATOR_FILE_SAVED_EVENT,
+  type OperatorFileSavedDetail,
+} from "@/lib/workspace-create-folder";
 import {
   buildOperatorFolderSnapshot,
   supportsFileSystemDirectoryPicker,
@@ -192,6 +204,7 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
   const [replacingRootId, setReplacingRootId] = useState<string | null>(null);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<FolderContextMenu | null>(null);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [folderStateHydrated, setFolderStateHydrated] = useState(false);
   const treeScrollRef = useRef<HTMLDivElement | null>(null);
   const webkitDirectoryInputRef = useRef<HTMLInputElement | null>(null);
@@ -351,34 +364,138 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
     }
   }, [contextMenu]);
 
+  const refreshFolderAtPath = useCallback(
+    async (rootName: string, refreshPath: string, options?: { silent?: boolean }) => {
+      const root = roots.find((entry) => entry.name === rootName);
+      if (!root) return false;
+
+      const scrollTop = treeScrollRef.current?.scrollTop ?? 0;
+      setPathLoading(refreshPath, true);
+      try {
+        const nodes = await listDirectoryChildrenForRoot(root, refreshPath);
+        setTree((prev) => ({
+          ...prev,
+          [rootName]:
+            refreshPath === rootName
+              ? nodes
+              : mergeFolderTreeNodes(prev[rootName] || [], refreshPath, nodes),
+        }));
+        window.requestAnimationFrame(() => {
+          if (treeScrollRef.current) treeScrollRef.current.scrollTop = scrollTop;
+        });
+        if (!options?.silent) toast.success(`Refreshed ${refreshPath}.`);
+        return true;
+      } catch (error) {
+        if (!options?.silent) {
+          toast.error(error instanceof Error ? error.message : `Could not refresh ${refreshPath}.`);
+        }
+        return false;
+      } finally {
+        setPathLoading(refreshPath, false);
+      }
+    },
+    [roots, setPathLoading],
+  );
+
   const refreshContextMenuFolder = useCallback(async () => {
     if (!contextMenu) return;
     const { refreshPath, rootName } = contextMenu;
-    const root = roots.find((entry) => entry.name === rootName);
     setContextMenu(null);
-    if (!root) return;
+    await refreshFolderAtPath(rootName, refreshPath);
+  }, [contextMenu, refreshFolderAtPath]);
 
-    const scrollTop = treeScrollRef.current?.scrollTop ?? 0;
-    setPathLoading(refreshPath, true);
-    try {
-      const nodes = await listDirectoryChildrenForRoot(root, refreshPath);
-      setTree((prev) => ({
-        ...prev,
-        [rootName]:
-          refreshPath === rootName
-            ? nodes
-            : mergeFolderTreeNodes(prev[rootName] || [], refreshPath, nodes),
-      }));
-      window.requestAnimationFrame(() => {
-        if (treeScrollRef.current) treeScrollRef.current.scrollTop = scrollTop;
-      });
-      toast.success(`Refreshed ${refreshPath}.`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : `Could not refresh ${refreshPath}.`);
-    } finally {
-      setPathLoading(refreshPath, false);
+  const resolveCreateFolderTarget = useCallback((): {
+    root: OperatorDocFolderRoot;
+    logicalParentPath: string;
+  } | null => {
+    const diskRoot = roots.find((entry) => entry.diskPath);
+    if (!diskRoot) return null;
+
+    if (!selectedPath) {
+      return { root: diskRoot, logicalParentPath: diskRoot.name };
     }
-  }, [contextMenu, roots, setPathLoading]);
+
+    const rootName = selectedPath.split("/")[0];
+    const root = roots.find((entry) => entry.name === rootName && entry.diskPath);
+    if (!root) return null;
+
+    const rootNodes = tree[rootName];
+    const selectedNode = rootNodes ? findFolderTreeNode(rootNodes, selectedPath) : undefined;
+    const logicalParentPath =
+      selectedNode?.kind === "file" ? parentLogicalPath(selectedPath) : selectedPath;
+    return { root, logicalParentPath };
+  }, [roots, selectedPath, tree]);
+
+  const handleCreateFolder = useCallback(async () => {
+    const target = resolveCreateFolderTarget();
+    if (!target) {
+      toast.error("Select a workspace folder root with disk access to create folders.");
+      return;
+    }
+
+    const { root, logicalParentPath } = target;
+    const workspaceRoot = await fetchWorkspaceRoot();
+    if (!workspaceRoot) {
+      toast.error("Could not resolve workspace root.");
+      return;
+    }
+
+    const parentAbs = resolveOperatorDiskAbsolutePath(root, logicalParentPath);
+    if (!parentAbs) {
+      toast.error("Could not resolve parent folder path.");
+      return;
+    }
+
+    const workspaceParentPath = absoluteToWorkspaceRelative(workspaceRoot, parentAbs);
+    if (!workspaceParentPath && logicalParentPath !== root.name) {
+      toast.error("Parent folder must be inside the Echo Mirage workspace.");
+      return;
+    }
+
+    const folderName = window.prompt("Folder Name:");
+    if (folderName === null) return;
+
+    const nameValidation = validateFolderName(folderName);
+    if (!nameValidation.ok) {
+      toast.error(nameValidation.reason);
+      return;
+    }
+
+    setIsCreatingFolder(true);
+    try {
+      const result = await createWorkspaceFolder(workspaceParentPath ?? "", folderName);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+
+      const newLogicalPath = `${logicalParentPath}/${folderName}`;
+      const rootName = root.name;
+      setExpanded((prev) => new Set(prev).add(logicalParentPath).add(newLogicalPath));
+      await refreshFolderAtPath(rootName, logicalParentPath, { silent: true });
+      setSelectedPath(newLogicalPath);
+      toast.success(`Created folder ${newLogicalPath}.`);
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  }, [refreshFolderAtPath, resolveCreateFolderTarget]);
+
+  useEffect(() => {
+    const onFileSaved = (event: Event) => {
+      const logicalPath = (event as CustomEvent<OperatorFileSavedDetail>).detail?.logicalPath?.trim();
+      if (!logicalPath) return;
+
+      const rootName = logicalPath.split("/")[0];
+      const root = roots.find((entry) => entry.name === rootName);
+      if (!root) return;
+
+      const refreshPath = parentLogicalPath(logicalPath);
+      void refreshFolderAtPath(rootName, refreshPath, { silent: true });
+    };
+
+    window.addEventListener(OPERATOR_FILE_SAVED_EVENT, onFileSaved);
+    return () => window.removeEventListener(OPERATOR_FILE_SAVED_EVENT, onFileSaved);
+  }, [refreshFolderAtPath, roots]);
 
   const pickDirectoryRoot = useCallback(async (): Promise<OperatorDocFolderRoot | null> => {
     const bridge = window.echoMirageOpen;
@@ -571,6 +688,8 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
       const root = roots.find((entry) => entry.name === rootName);
       if (!root) return;
 
+      setSelectedPath(path);
+
       if (expanded.has(path)) {
         setExpanded((prev) => {
           const next = new Set(prev);
@@ -720,7 +839,7 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
           setIsPicking(false);
         }}
       />
-      <div className="border-b border-[#1c1c1c] p-2">
+      <div className="space-y-1 border-b border-[#1c1c1c] p-2">
         <CyberdeckControl
           control={{ size: "wide" }}
           onClick={() => void handleAddFolder()}
@@ -729,6 +848,16 @@ export function OperatorDocFolderPane({ onOpenFile, onRootsChange, className }: 
         >
           <CodexIcon icon={cdxIconAdd} className="h-3 w-3 shrink-0" />
           {isPicking && !replacingRootId ? "PICKING…" : "ADD FOLDER"}
+        </CyberdeckControl>
+        <CyberdeckControl
+          control={{ size: "wide" }}
+          onClick={() => void handleCreateFolder()}
+          disabled={isCreatingFolder || isPicking || !roots.some((root) => root.diskPath)}
+          className="w-full"
+          title="Create a folder under the selected workspace folder"
+        >
+          <CodexIcon icon={cdxIconAdd} className="h-3 w-3 shrink-0" />
+          {isCreatingFolder ? "CREATING…" : "+ FOLDER"}
         </CyberdeckControl>
       </div>
       <div ref={treeScrollRef} className="custom-scrollbar flex-1 overflow-y-auto py-1">

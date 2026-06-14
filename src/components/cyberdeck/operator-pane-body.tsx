@@ -1203,7 +1203,6 @@ export function CyberdeckOperatorPaneBody({
   const saveOperatorDocInPlaceAndMark = useCallback(async () => {
     if (!onSaveOperatorDocInPlace) return;
     await onSaveOperatorDocInPlace();
-    window.dispatchEvent(new CustomEvent("echo-mirage-operator-file-saved"));
   }, [onSaveOperatorDocInPlace]);
 
   useEffect(() => {

@@ -169,6 +169,7 @@ import {
   saveViaCadreApi,
   type OperatorSaveIntent,
 } from "@/lib/operator-save";
+import { OPERATOR_FILE_SAVED_EVENT } from "@/lib/workspace-create-folder";
 import { readOperatorPaneSaveText } from "@/lib/operator-workbench";
 import { get, set } from "idb-keyval";
 import {
@@ -3081,7 +3082,11 @@ export default function CyberdeckApp() {
       toast.error(result.error || "Could not save file.");
       return;
     }
-    window.dispatchEvent(new CustomEvent("echo-mirage-operator-file-saved"));
+    window.dispatchEvent(
+      new CustomEvent(OPERATOR_FILE_SAVED_EVENT, {
+        detail: { logicalPath: operatorActiveFilePath },
+      }),
+    );
     const savedName =
       result.filePath?.split(/[/\\]/).pop() ||
       operatorActiveFilePath.split(/[/\\]/).pop() ||

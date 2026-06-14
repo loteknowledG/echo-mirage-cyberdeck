@@ -370,6 +370,20 @@ export async function readFileFromFolderPath(
   }
 }
 
+export function findFolderTreeNode(
+  nodes: OperatorFolderTreeNode[],
+  path: string,
+): OperatorFolderTreeNode | undefined {
+  for (const node of nodes) {
+    if (node.path === path) return node;
+    if (node.children) {
+      const nested = findFolderTreeNode(node.children, path);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
 export function mergeFolderTreeNodes(
   rootNodes: OperatorFolderTreeNode[],
   path: string,
