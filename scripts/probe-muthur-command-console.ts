@@ -105,7 +105,10 @@ function testCompletionPhase(): void {
     resolveMuthurResponsePhase({
       isStreaming: false,
       streamText: "",
-      messages: [{ role: "assistant", text: "done" }],
+      messages: [
+        { role: "user", text: "status" },
+        { role: "assistant", text: "done" },
+      ],
     }),
     "complete",
   );

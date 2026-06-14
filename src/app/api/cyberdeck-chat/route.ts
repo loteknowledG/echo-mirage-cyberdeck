@@ -55,7 +55,8 @@ const MUTHUR_AVAILABLE_TOOLS_PROMPT =
   "\n2. git_status or git_diff to review changes." +
   "\n3. After file touches, MUTHUR auto-runs `git diff --stat` + `pnpm exec tsc --noEmit` and writes a receipt under `.muthur/receipts/coding/` — report PASS/FAIL from that receipt." +
   "\n4. You may still call workspace_exec for extra checks (lint, build) when asked." +
-  "\n\nIMPORTANT: When the user asks what is in the operator pane, call observe_operator_pane." +
+  "\n\nIMPORTANT: When the user asks what is currently visible in the operator pane, call observe_operator_pane." +
+  "\nWhen the user says open/read/show/view a specific file (e.g. L-ARCH-001.md), resolve that file — call open_operator_file with the path and localfs cat to read it. Do NOT call observe_operator_pane for document open commands." +
   "\nWhen they ask to edit a file and Monaco is not active, call open_operator_file with the path, then suggest_operator_edit (prefer replace_line_range for targeted edits). Edits apply immediately — confirm what changed; mention Ctrl+Z if they want to undo." +
   "\nWhen a file is already open in the operator pane, NEVER use localfs write on that file — only suggest_operator_edit." +
   "\nNever use justbash/find to locate the user's open document — use observe_operator_pane for the file already open in the operator pane.";

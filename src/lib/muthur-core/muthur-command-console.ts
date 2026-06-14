@@ -13,7 +13,7 @@ export type MuthurChatTurn = {
   diagnostics: MuthurChatMessage[];
 };
 
-export type MuthurResponsePhase = "idle" | "composing" | "complete" | "stalled";
+export type MuthurResponsePhase = "idle" | "composing" | "complete" | "failed" | "stalled";
 
 const DIAGNOSTIC_PREFIX_RE =
   /^\[(?:SYS|TOOLS|QUEUE|RENDER|HEALTH|ERR|UPLINK|OPERATOR|BROWSER|VERIFY|KEY|MODEL)/i;
@@ -119,12 +119,25 @@ export function resolveMuthurResponsePhase(args: {
   isStreaming: boolean;
   streamText: string;
   messages: MuthurChatMessage[];
+  failed?: boolean;
   stalled?: boolean;
 }): MuthurResponsePhase {
   if (args.stalled) return "stalled";
+  if (args.failed) return "failed";
   if (args.isStreaming || args.streamText.trim()) return "composing";
-  const hasAssistant = args.messages.some((message) => message.role === "assistant");
-  return hasAssistant ? "complete" : "idle";
+  const lastUserIndex = messagesFindLastUserIndex(args.messages);
+  const hasAssistantAfterLastUser =
+    lastUserIndex >= 0 &&
+    args.messages.slice(lastUserIndex + 1).some((message) => message.role === "assistant");
+  if (hasAssistantAfterLastUser) return "complete";
+  return "idle";
+}
+
+function messagesFindLastUserIndex(messages: MuthurChatMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].role === "user") return i;
+  }
+  return -1;
 }
 
 /** Commit assistant to channel state without waiting for diagnostics side effects. */

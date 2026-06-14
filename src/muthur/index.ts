@@ -21,4 +21,12 @@ export {
   type RelationType,
 } from "./atlas";
 
+export {
+  loadFoundationManifest,
+  getFoundationById,
+  verifyFoundationIntegrity,
+  type FoundationManifest,
+  type FoundationManifestEntry,
+} from "./foundations/foundation-store";
+
 export { MUTHUR_MEMORY_STORAGE_KEY, loadMuthurMemory, saveMuthurMemory, buildMuthurMemoryContext, type MuthurMemoryState } from "../lib/muthur-memory";

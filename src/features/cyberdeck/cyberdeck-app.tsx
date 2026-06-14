@@ -108,8 +108,10 @@ import {
   resolveMuthurResponsePhase,
   toolTraceToDiagnostic,
 } from "@/lib/muthur-core/muthur-command-console";
+import { partitionMuthurChannelUpdate } from "@/lib/muthur-core/muthur-response-channel";
 import {
   appendMuthurDiagnosticBatch,
+  appendMuthurDiagnosticEntry,
   createEmptyMuthurDiagnosticsState,
   MUTHUR_RESPONSE_STALL_MS,
   type MuthurDiagnosticsState,
@@ -255,6 +257,8 @@ import {
   parseMuthurClearChatIntent,
   parseMuthurHelpIntent,
 } from "@/lib/muthur-help-text";
+import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
+import { parseDocumentOpenIntent } from "@/lib/muthur-document-open-intent";
 import {
   PROVIDER_CLICK_ESCALATION_MS,
   PROVIDER_LINK_REFRESH_COOLDOWN_MS,
@@ -1023,32 +1027,19 @@ export default function CyberdeckApp() {
     createEmptyMuthurDiagnosticsState(),
   );
   const [muthurStall, setMuthurStall] = useState<MuthurResponseStall | null>(null);
+  const [muthurResponseFailed, setMuthurResponseFailed] = useState(false);
   const composeStartedAtRef = useRef<number | null>(null);
   const setMessages = useCallback((updater: React.SetStateAction<ChatMessage[]>) => {
     setMessagesRaw((prev) => {
       const rawNext = typeof updater === "function" ? updater(prev) : updater;
       if (!Array.isArray(rawNext)) return prev;
 
-      const newSystemLines: string[] = [];
-      const channelNext: ChatMessage[] = [];
-
-      for (let i = 0; i < rawNext.length; i += 1) {
-        const message = rawNext[i];
-        if (message.role === "system") {
-          const prior = prev[i];
-          if (!prior || prior.role !== "system" || prior.text !== message.text) {
-            newSystemLines.push(message.text);
-          }
-          continue;
-        }
-        channelNext.push(message);
+      const { channel, newDiagnostics } = partitionMuthurChannelUpdate(prev, rawNext);
+      if (newDiagnostics.length > 0) {
+        setMuthurDiagnostics((current) => appendMuthurDiagnosticBatch(current, newDiagnostics));
       }
 
-      if (newSystemLines.length > 0) {
-        setMuthurDiagnostics((current) => appendMuthurDiagnosticBatch(current, newSystemLines));
-      }
-
-      return channelNext;
+      return channel;
     });
   }, []);
   const [chatUserDisplayName, setChatUserDisplayName] = useState(DEFAULT_CHAT_USER_DISPLAY_NAME);
@@ -3700,9 +3691,10 @@ export default function CyberdeckApp() {
         isStreaming,
         streamText,
         messages,
+        failed: muthurResponseFailed,
         stalled: Boolean(muthurStall),
       }),
-    [isStreaming, messages, muthurStall, streamText],
+    [isStreaming, messages, muthurResponseFailed, muthurStall, streamText],
   );
   const muthurProgressStatus = useMemo(
     () => extractMuthurProgressStatus(streamText),
@@ -4785,6 +4777,7 @@ export default function CyberdeckApp() {
       setMessages([]);
       setMuthurDiagnostics(createEmptyMuthurDiagnosticsState());
       setMuthurStall(null);
+      setMuthurResponseFailed(false);
       composeStartedAtRef.current = null;
       setChatKeyboardHighlightIndex(null);
       setGeneratedUI(null);
@@ -4829,6 +4822,8 @@ export default function CyberdeckApp() {
     setIsStreaming(true);
     setStreamText(MUTHUR_UPLINK_PREPARING);
     setStreamToolTrace("");
+    setMuthurResponseFailed(false);
+    setMuthurStall(null);
     setGeneratedUI(null);
 
     const glyphCommand = resolveGlyphCommand(userMessage);
@@ -4932,6 +4927,103 @@ export default function CyberdeckApp() {
           : getMuthurHelpText(helpIntent.topic);
       setMessages((prev) => [...prev, { role: "assistant", text: helpText }]);
       setIsStreaming(false);
+      return;
+    }
+
+    const foundationIntent = parseFoundationQuery(userMessage);
+    if (foundationIntent) {
+      try {
+        const res = await fetch("/api/muthur/foundation-query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: userMessage }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(payload?.error || `Foundation query failed (${res.status})`);
+        }
+        const payload = (await res.json()) as {
+          handled?: boolean;
+          response?: string;
+        };
+        if (payload.handled && payload.response) {
+          setMessages((prev) => [...prev, { role: "assistant", text: payload.response! }]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: "FOUNDATION_RETRIEVAL // UNHANDLED // intent not recognized by server",
+            },
+          ]);
+        }
+      } catch (err) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: `FOUNDATION_RETRIEVAL // FAILED // ${err instanceof Error ? err.message : "unknown error"}`,
+          },
+        ]);
+      }
+      setStreamText("");
+      setStreamToolTrace("");
+      setIsStreaming(false);
+      composeStartedAtRef.current = null;
+      setMuthurStall(null);
+      return;
+    }
+
+    const documentOpenIntent = parseDocumentOpenIntent(userMessage);
+    if (documentOpenIntent) {
+      try {
+        const res = await fetch("/api/muthur/document-open", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: userMessage }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(payload?.error || `Document open failed (${res.status})`);
+        }
+        const payload = (await res.json()) as {
+          handled?: boolean;
+          response?: string;
+          operator_open?: { filePath: string; fileName: string; mode: "view" | "edit" };
+          receipt?: { resolved_file?: string | null; tool_chain?: string[] };
+        };
+        if (payload.handled && payload.response) {
+          if (payload.operator_open) {
+            await openWorkspaceFileInOperator(payload.operator_open);
+          }
+          setMessages((prev) => [...prev, { role: "assistant", text: payload.response! }]);
+          if (payload.receipt) {
+            const receiptLine = `DOCUMENT_OPEN // resolved=${payload.receipt.resolved_file ?? "none"} // tools=${(payload.receipt.tool_chain ?? []).join(" → ")}`;
+            setMuthurDiagnostics((current) => appendMuthurDiagnosticEntry(current, receiptLine));
+          }
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: "DOCUMENT_OPEN // UNHANDLED // intent not recognized by server",
+            },
+          ]);
+        }
+      } catch (err) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: `DOCUMENT_OPEN // FAILED // ${err instanceof Error ? err.message : "unknown error"}`,
+          },
+        ]);
+      }
+      setStreamText("");
+      setStreamToolTrace("");
+      setIsStreaming(false);
+      composeStartedAtRef.current = null;
+      setMuthurStall(null);
       return;
     }
 
@@ -5530,6 +5622,7 @@ ${diff}`;
       })();
     } catch (err) {
       const msg = String(err);
+      setMuthurResponseFailed(true);
       if (msg.includes("AbortError")) {
         setMessages((prev) => [
           ...prev,
@@ -7096,11 +7189,13 @@ ${diff}`;
                       ? "· MUTHUR composing…"
                       : muthurResponsePhase === "stalled"
                         ? "· MUTHUR response stalled"
-                        : muthurResponsePhase === "complete"
-                          ? "· MUTHUR complete"
-                          : isStreaming
-                            ? "STREAMING"
-                            : ""}
+                        : muthurResponsePhase === "failed"
+                          ? "· MUTHUR failed"
+                          : muthurResponsePhase === "complete"
+                            ? "· MUTHUR complete"
+                            : isStreaming
+                              ? "STREAMING"
+                              : ""}
                     {muthurProgressStatus ? (
                       <span className="text-amber-400/80"> · {muthurProgressStatus.replace(/^⏳\s*/, "")}</span>
                     ) : null}

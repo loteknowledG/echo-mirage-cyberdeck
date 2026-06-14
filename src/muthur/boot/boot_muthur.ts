@@ -1,5 +1,6 @@
 import { getMemory } from "../memory/core";
 import { writeMemoryRetrievalReceipt } from "../memory/retrieval-receipts";
+import { verifyFoundationIntegrity } from "../foundations/foundation-store";
 import { promises as fs, existsSync } from "fs";
 import path from "path";
 
@@ -84,6 +85,7 @@ export async function ensureMuthurDirs(workspaceRoot: string): Promise<void> {
     path.join(workspaceRoot, ".muthur", "screenshots"),
     path.join(workspaceRoot, ".muthur", "atlas"),
     path.join(workspaceRoot, ".muthur", "logs"),
+    path.join(workspaceRoot, ".muthur", "foundations"),
   ];
   for (const d of dirs) {
     try {
@@ -289,6 +291,11 @@ export async function bootMuthur(config: Partial<MuthurBootConfig> = {}): Promis
   }
 
   await ensureMuthurDirs(mergedConfig.workspaceRoot);
+
+  const foundationIntegrity = verifyFoundationIntegrity("foundation-001", mergedConfig.workspaceRoot);
+  if (!foundationIntegrity.ok && foundationIntegrity.expectedSha256) {
+    console.warn("[muthur-boot] Foundation-001 integrity check failed", foundationIntegrity);
+  }
 
   const memory = getMemory();
   await memory.ready();

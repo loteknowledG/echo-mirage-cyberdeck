@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "classification": "FOUNDATION",
+  "foundations": [
+    {
+      "id": "foundation-001",
+      "name": "lets-remember-something-ai",
+      "classification": "FOUNDATION",
+      "role": "origin-artifact",
+      "immutable": true,
+      "lineage_priority": "critical",
+      "source_system": "samus-manus",
+      "source_path": "skills/mind/hey-let-remember-something-ai.txt",
+      "destination_path": ".muthur/foundations/lets-remember-something-ai.txt",
+      "artifact_filename": "lets-remember-something-ai.txt",
+      "file_size_bytes": 151113,
+      "sha256": "42108fbce060426f04c55715009a8d23d30ea5cb7bcf4d23b7843450e5e15e69",
+      "preserved_at": "2026-06-07T00:00:00.000Z",
+      "version": 1,
+      "protected_from": [
+        "embedding",
+        "ranking",
+        "pruning",
+        "summarization",
+        "deduplication",
+        "garbage_collection",
+        "automatic_modification"
+      ],
+      "lineage_purpose": "Preserve continuity and lineage between Samus-Manus and MUTHUR; origin record for memory persistence, identity, and agency discussions."
+    }
+  ]
+}

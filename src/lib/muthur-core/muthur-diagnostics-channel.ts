@@ -4,6 +4,8 @@ export type MuthurDiagnosticEntry = {
   id: string;
   text: string;
   at: number;
+  /** Same-line duplicates collapsed into one entry (D8). */
+  repeatCount: number;
 };
 
 export type MuthurDiagnosticsState = {
@@ -50,12 +52,24 @@ export function appendMuthurDiagnosticEntry(
   const trimmed = text.trim();
   if (!trimmed) return state;
 
+  const last = state.entries.at(-1);
+  if (last && last.text === trimmed) {
+    const repeatCount = last.repeatCount + 1;
+    const entries = [...state.entries.slice(0, -1), { ...last, repeatCount, at: now }];
+    return { ...state, entries };
+  }
+
   const recent = countRecentEntries(state.entries, now);
   if (recent >= MUTHUR_DIAGNOSTICS_RATE_MAX) {
     return { ...state, rateLimitedCount: state.rateLimitedCount + 1 };
   }
 
-  const entry: MuthurDiagnosticEntry = { id: nextDiagnosticId(), text: trimmed, at: now };
+  const entry: MuthurDiagnosticEntry = {
+    id: nextDiagnosticId(),
+    text: trimmed,
+    at: now,
+    repeatCount: 1,
+  };
   let entries = [...state.entries, entry];
   let cappedCount = state.cappedCount;
 
@@ -76,8 +90,18 @@ export function appendMuthurDiagnosticBatch(
   return lines.reduce((current, line) => appendMuthurDiagnosticEntry(current, line, now), state);
 }
 
+export function formatDiagnosticEntryText(entry: MuthurDiagnosticEntry): string {
+  if (entry.repeatCount > 1) {
+    return `[SYS] Event repeated ${entry.repeatCount} times: ${entry.text}`;
+  }
+  return entry.text;
+}
+
 export function muthurDiagnosticsToChatMessages(state: MuthurDiagnosticsState): MuthurChatMessage[] {
-  return state.entries.map((entry) => ({ role: "system", text: entry.text }));
+  return state.entries.map((entry) => ({
+    role: "system",
+    text: formatDiagnosticEntryText(entry),
+  }));
 }
 
 export type MuthurDiagnosticsPresentation = {
@@ -90,7 +114,8 @@ export type MuthurDiagnosticsPresentation = {
 /** Collapse long diagnostic tails into a single summary line for the panel. */
 export function presentMuthurDiagnostics(state: MuthurDiagnosticsState): MuthurDiagnosticsPresentation {
   const suppressed = state.rateLimitedCount + state.cappedCount;
-  const totalCount = state.entries.length + suppressed;
+  const entryEventCount = state.entries.reduce((sum, entry) => sum + entry.repeatCount, 0);
+  const totalCount = entryEventCount + suppressed;
   const threshold = MUTHUR_DIAGNOSTICS_COLLAPSE_THRESHOLD;
 
   if (state.entries.length <= threshold) {
@@ -131,9 +156,13 @@ export type MuthurResponseStall = {
 };
 
 export function buildMuthurStallMessage(stall: MuthurResponseStall): string {
-  const phase = stall.phase.trim() || "MUTHUR uplink active";
-  const seconds = Math.max(1, Math.round(stall.elapsedMs / 1000));
-  return `MUTHUR response stalled // last phase: ${phase} // ${seconds}s`;
+  return buildStalledOperatorMessage(stall.phase, stall.elapsedMs);
+}
+
+function buildStalledOperatorMessage(phase: string, elapsedMs: number): string {
+  const cleanPhase = phase.trim().replace(/^⏳\s*/, "") || "MUTHUR uplink active";
+  const seconds = Math.max(1, Math.round(elapsedMs / 1000));
+  return `MUTHUR response stalled. Last phase: ${cleanPhase} (${seconds}s). Diagnostics available.`;
 }
 
 export function shouldFireMuthurComposeWatchdog(args: {
