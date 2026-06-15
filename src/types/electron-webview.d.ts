@@ -115,6 +115,15 @@ declare global {
       filePath?: string;
       error?: string;
     }>;
+    stageGifDrag?(options: {
+      base64: string;
+      fileName?: string;
+    }): Promise<{
+      ok: boolean;
+      filePath?: string;
+      error?: string;
+    }>;
+    startFileDrag?(filePath: string): void;
     openPath(filePath: string): Promise<{
       ok: boolean;
       error?: string;

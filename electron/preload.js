@@ -39,5 +39,8 @@ contextBridge.exposeInMainWorld('echoMirageOpen', {
     ipcRenderer.invoke('echo-mirage-open:write-operator-file', { rootPath, logicalPath, content }),
   writeBinaryFile: (filePath, base64) =>
     ipcRenderer.invoke('echo-mirage-open:write-binary-file', { filePath, base64 }),
+  stageGifDrag: (options) => ipcRenderer.invoke('echo-mirage-open:stage-gif-drag', options),
+  startFileDrag: (filePath) =>
+    ipcRenderer.send('echo-mirage-open:start-file-drag', { filePath: String(filePath || '') }),
   openPath: (filePath) => ipcRenderer.invoke('echo-mirage-open:open-path', { filePath }),
 });

@@ -1,7 +1,7 @@
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const path = require('path');
-const { app, BrowserWindow, Menu, shell, ipcMain, clipboard, dialog, protocol, net } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, clipboard, dialog, protocol, net, nativeImage } = require('electron');
 const { pathToFileURL } = require('url');
 
 if (!app.isPackaged && process.platform === 'win32') {
@@ -811,6 +811,46 @@ ipcMain.handle('echo-mirage-open:write-binary-file', async (_event, payload) => 
       ok: false,
       error: error instanceof Error ? error.message : 'Could not save binary file.',
     };
+  }
+});
+
+function sanitizeGifDragFileName(name) {
+  const trimmed = String(name || '').trim() || 'export.gif';
+  const base = path.basename(trimmed).replace(/[^\w.\-()+\s]/g, '_');
+  return /\.gif$/i.test(base) ? base : `${base}.gif`;
+}
+
+ipcMain.handle('echo-mirage-open:stage-gif-drag', async (_event, payload) => {
+  try {
+    const base64 = String(payload?.base64 || '');
+    if (!base64) {
+      return { ok: false, error: 'Missing GIF content.' };
+    }
+    const fileName = sanitizeGifDragFileName(payload?.fileName);
+    const filePath = path.join(app.getPath('temp'), `echo-mirage-drag-${Date.now()}-${fileName}`);
+    await fs.writeFile(filePath, Buffer.from(base64, 'base64'));
+    return { ok: true, filePath };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not stage GIF for drag.',
+    };
+  }
+});
+
+ipcMain.on('echo-mirage-open:start-file-drag', (event, payload) => {
+  try {
+    const filePath = path.resolve(String(payload?.filePath || ''));
+    if (!filePath || !fsSync.existsSync(filePath)) {
+      return;
+    }
+    const icon = nativeImage.createFromPath(filePath);
+    event.sender.startDrag({
+      file: filePath,
+      icon: icon.isEmpty() ? nativeImage.createEmpty() : icon,
+    });
+  } catch {
+    // Ignore drag failures — renderer falls back to HTML5 drag when possible.
   }
 });
 

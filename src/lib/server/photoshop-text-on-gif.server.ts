@@ -22,6 +22,8 @@ export type PhotoshopTextOnGifInput = {
   alignmentY?: PhotoshopTextAlignmentY;
   offsetX?: number;
   offsetY?: number;
+  positionX?: number;
+  positionY?: number;
 };
 
 export type PhotoshopTextOnGifResult =
@@ -234,18 +236,34 @@ export async function applyTextOnGifServer(
 
     const rows = layoutTextRows(ctx, input.text.trim(), width);
     const approximateLineHeight = ctx.measureText("M").width;
-    const { x, y } = resolveTextPosition({
-      width,
-      height,
-      rows,
-      alignmentX,
-      alignmentY,
-      offsetX,
-      offsetY,
-      rowGap,
-      approximateLineHeight,
-      ctx,
-    });
+
+    const useAbsolutePosition =
+      input.positionX != null &&
+      input.positionY != null &&
+      Number.isFinite(input.positionX) &&
+      Number.isFinite(input.positionY);
+
+    let x: number;
+    let y: number;
+    if (useAbsolutePosition) {
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      x = Math.max(0, Math.min(width, Math.round(input.positionX!)));
+      y = Math.max(0, Math.min(height, Math.round(input.positionY!)));
+    } else {
+      ({ x, y } = resolveTextPosition({
+        width,
+        height,
+        rows,
+        alignmentX,
+        alignmentY,
+        offsetX,
+        offsetY,
+        rowGap,
+        approximateLineHeight,
+        ctx,
+      }));
+    }
 
     const encoder = new GIFEncoder(width, height, "neuquant", false, frames.length);
     encoder.setRepeat(0);

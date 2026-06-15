@@ -260,6 +260,7 @@ import {
 } from "@/lib/muthur-help-text";
 import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
 import { parseMemoryAtlasQuery } from "@/lib/memory-atlas/memory-atlas-query";
+import { parseEntityAtlasQuery } from "@/lib/entity-atlas/entity-atlas-query";
 import { parseDocumentOpenIntent } from "@/lib/muthur-document-open-intent";
 import {
   CLIENT_BAKED_PROVIDER_KEYS,
@@ -409,6 +410,7 @@ const CUSTOM_TAB_KINDS = [
   "call-center",
   "photoshop",
   "db8",
+  "cadre",
   "catelog",
 ] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -511,6 +513,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Execution", kind: "muthur-execution", action: "convert" },
   { label: "Pi", kind: "pi", action: "convert" },
   { label: "DB8", kind: "db8", action: "convert" },
+  { label: "Cadre", kind: "cadre", action: "convert" },
   { label: "Settings", action: "settings-pane" },
 ] as CustomTabContextMenuAction[]).sort((a, b) =>
   a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
@@ -861,6 +864,9 @@ function normalizeCustomTabKind(kind: string) {
   if (nextKind === "debate" || nextKind === "debate-forum" || nextKind === "debate_forum") {
     return "db8" as CustomTabKind;
   }
+  if (nextKind === "cadre" || nextKind === "terminal-host" || nextKind === "terminal_host") {
+    return "cadre" as CustomTabKind;
+  }
   if (
     nextKind === "call-center" ||
     nextKind === "call_center" ||
@@ -906,6 +912,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "call-center") return "CC";
   if (kind === "photoshop") return "Ps";
   if (kind === "db8") return "8";
+  if (kind === "cadre") return "C";
   if (kind === "muthur-execution") return "E";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
@@ -923,6 +930,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "call-center") return "CALL CENTER";
   if (kind === "photoshop") return "PHOTOSHOP";
   if (kind === "db8") return "DB8";
+  if (kind === "cadre") return "CADRE";
   if (kind === "muthur-execution") return "EXECUTION";
   return kind.toUpperCase();
 }
@@ -5010,6 +5018,65 @@ export default function CyberdeckApp() {
       return;
     }
 
+    const entityAtlasIntent = parseEntityAtlasQuery(userMessage);
+    if (entityAtlasIntent) {
+      try {
+        const res = await fetch("/api/muthur/entity-query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: userMessage }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(payload?.error || `Entity query failed (${res.status})`);
+        }
+        const payload = (await res.json()) as {
+          handled?: boolean;
+          response?: string;
+          entity_type?: string;
+          result?: Record<string, unknown>;
+        };
+        if (payload.handled && payload.response) {
+          setMessages((prev) => [...prev, { role: "assistant", text: payload.response! }]);
+          const resultId =
+            typeof payload.result?.id === "string"
+              ? payload.result.id
+              : typeof payload.result?.anchor_id === "string"
+                ? payload.result.anchor_id
+                : Array.isArray(payload.result?.related)
+                  ? (payload.result.related as Array<{ id?: string }>)
+                      .map((entry) => entry.id)
+                      .filter(Boolean)
+                      .join(", ")
+                  : "none";
+          const receiptLine = `ENTITY_ATLAS // type=${payload.entity_type ?? "unknown"} // id=${resultId}`;
+          setMuthurDiagnostics((current) => appendMuthurDiagnosticEntry(current, receiptLine));
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: "ENTITY_ATLAS // UNHANDLED // intent not recognized by server",
+            },
+          ]);
+        }
+      } catch (err) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: `ENTITY_ATLAS // FAILED // ${err instanceof Error ? err.message : "unknown error"}`,
+          },
+        ]);
+      }
+      setStreamText("");
+      setStreamToolTrace("");
+      setIsStreaming(false);
+      composeStartedAtRef.current = null;
+      setMuthurStall(null);
+      return;
+    }
+
     const memoryAtlasIntent = parseMemoryAtlasQuery(userMessage);
     if (memoryAtlasIntent) {
       try {
@@ -6830,6 +6897,10 @@ ${diff}`;
 
       if (tab.kind === "drop-bay") {
         return shell(<ActivatedCyberdeckPane kind="drop-bay" />);
+      }
+
+      if (tab.kind === "cadre") {
+        return shell(<ActivatedCyberdeckPane kind="cadre" />);
       }
 
       if (tab.kind === "glyph-channel") {

@@ -67,6 +67,8 @@ export async function POST(req: NextRequest) {
       alignmentY: parseAlignmentY(form.get("alignmentY")),
       offsetX: parseNumber(form.get("offsetX")),
       offsetY: parseNumber(form.get("offsetY")),
+      positionX: parseNumber(form.get("positionX")),
+      positionY: parseNumber(form.get("positionY")),
     });
 
     if (!result.ok) {

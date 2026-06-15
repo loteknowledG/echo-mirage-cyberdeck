@@ -14,6 +14,9 @@ export type PhotoshopTextOnGifOptions = {
   alignmentY?: PhotoshopTextAlignmentY;
   offsetX?: number;
   offsetY?: number;
+  /** Absolute caption origin in GIF pixels (top-left). Overrides alignment when set. */
+  positionX?: number;
+  positionY?: number;
 };
 
 export type PhotoshopTextOnGifResponse =
@@ -22,6 +25,68 @@ export type PhotoshopTextOnGifResponse =
 
 export function isAnimatedGifFile(file: File): boolean {
   return file.type === "image/gif" || /\.gif$/i.test(file.name);
+}
+
+export type CaptionLayout = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+function parseFontSizePx(fontSize: string): number {
+  const match = fontSize.trim().match(/^(\d+(?:\.\d+)?)px$/i);
+  return match ? Number(match[1]) : 32;
+}
+
+/** Estimate caption box for preview drag + default placement (browser canvas). */
+export function measureCaptionLayout(
+  text: string,
+  fontSize: string,
+  imageWidth: number,
+  imageHeight: number,
+  alignmentX: PhotoshopTextAlignmentX = "center",
+  alignmentY: PhotoshopTextAlignmentY = "bottom",
+  offsetX = 10,
+  offsetY = 10,
+): CaptionLayout {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx || !text.trim() || imageWidth <= 0 || imageHeight <= 0) {
+    return { x: offsetX, y: offsetY, width: 0, height: parseFontSizePx(fontSize) };
+  }
+
+  const fontPx = parseFontSizePx(fontSize);
+  ctx.font = `${fontSize} Arial`;
+  const lineHeight = fontPx;
+  const rowGap = 5;
+  const words = text.trim().split(/\s+/);
+  const rows: string[] = [];
+  let current = words[0] ?? "";
+
+  for (let i = 1; i < words.length; i += 1) {
+    const candidate = `${current} ${words[i]}`;
+    if (ctx.measureText(candidate).width <= imageWidth - offsetX * 2) {
+      current = candidate;
+    } else {
+      rows.push(current);
+      current = words[i];
+    }
+  }
+  if (current) rows.push(current);
+
+  const width = Math.max(...rows.map((row) => ctx.measureText(row).width), 0);
+  const height = rows.length * lineHeight + Math.max(0, rows.length - 1) * rowGap;
+
+  let x = offsetX;
+  if (alignmentX === "center") x = Math.max(0, (imageWidth - width) / 2);
+  else if (alignmentX === "right") x = Math.max(0, imageWidth - width - offsetX);
+
+  let y = offsetY;
+  if (alignmentY === "middle") y = Math.max(0, (imageHeight - height) / 2);
+  else if (alignmentY === "bottom") y = Math.max(0, imageHeight - height - offsetY);
+
+  return { x, y, width, height };
 }
 
 export async function applyTextOnGifViaApi(
@@ -40,6 +105,8 @@ export async function applyTextOnGifViaApi(
   if (options.alignmentY) form.append("alignmentY", options.alignmentY);
   if (options.offsetX != null) form.append("offsetX", String(options.offsetX));
   if (options.offsetY != null) form.append("offsetY", String(options.offsetY));
+  if (options.positionX != null) form.append("positionX", String(options.positionX));
+  if (options.positionY != null) form.append("positionY", String(options.positionY));
 
   try {
     const res = await fetch("/api/photoshop/text-on-gif", {

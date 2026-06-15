@@ -20,6 +20,7 @@ export const CYBERDECK_PANE_KINDS = [
   "call-center",
   "photoshop",
   "db8",
+  "cadre",
 ] as const;
 
 export type CyberdeckPaneKind = (typeof CYBERDECK_PANE_KINDS)[number];
@@ -65,6 +66,7 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   "call-center": { label: "CALL CENTER", fetchHints: ["QUEUE", "INBOUND", "RESIDENT COMMS"] },
   photoshop: { label: "PHOTOSHOP", fetchHints: ["CANVAS", "LAYERS", "EXPORT"] },
   db8: { label: "DB8", fetchHints: ["CHAMBER", "DEBATE ROUND", "CONSENSUS"] },
+  cadre: { label: "CADRE", fetchHints: ["TERMINAL HOST", "RUNTIME REGISTRY", "OUTPUT STREAM"] },
 };
 
 const TAB_KIND_ALIASES: Record<string, CyberdeckPaneKind> = {

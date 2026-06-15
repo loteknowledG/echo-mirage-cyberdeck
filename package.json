@@ -49,6 +49,8 @@
     "probe:provider-credentials": "tsx scripts/probe-provider-credentials.ts",
     "probe:workspace-create-folder": "tsx scripts/probe-workspace-create-folder.ts",
     "probe:memory-atlas": "tsx scripts/probe-memory-atlas.ts",
+    "probe:entity-atlas": "tsx scripts/probe-entity-atlas.ts",
+    "probe:cadre-host": "tsx scripts/probe-cadre-host.ts",
     "probe:photoshop-text-on-gif": "tsx scripts/probe-photoshop-text-on-gif.ts",
     "discover:continuity-artifacts": "tsx scripts/discover-continuity-artifacts.ts",
     "render:continuity-docs": "tsx scripts/render-continuity-docs.ts",
