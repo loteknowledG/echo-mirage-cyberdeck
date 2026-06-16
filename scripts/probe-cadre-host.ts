@@ -63,23 +63,24 @@ async function testStartStopObserve(): Promise<void> {
   resetCadreRuntimeManagerForTests();
   const manager = getCadreRuntimeManager();
 
-  const started = await manager.startRuntime("codex");
+  const started = await manager.startRuntime("cursor");
   assert.equal(started.status, "running");
+  assert.equal(started.adapter, "stub-host");
   assert.ok(started.pid && started.pid > 0);
   assert.ok(started.startedAt);
 
   await new Promise((resolve) => setTimeout(resolve, 300));
-  const output = manager.getOutput("codex");
+  const output = manager.getOutput("cursor");
   assert.ok(output, "expected output bucket");
   assert.match(output!.stdout, /CADRE HOST STUB ONLINE/);
   assert.equal(output!.status, "running");
 
-  const stopped = await manager.stopRuntime("codex");
+  const stopped = await manager.stopRuntime("cursor");
   assert.ok(stopped);
   assert.equal(stopped!.status, "stopped");
   assert.equal(stopped!.pid, null);
 
-  console.log("  ok start/stop/output A2–A4");
+  console.log("  ok stub start/stop/output");
 }
 
 async function testRegistrySurvivesManagerAccess(): Promise<void> {

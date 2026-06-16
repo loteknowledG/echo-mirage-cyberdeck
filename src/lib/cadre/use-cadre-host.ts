@@ -34,6 +34,10 @@ function mergeRuntimeList(incoming: CadreRuntime[] | undefined, prev: CadreRunti
     terminalType: slot.terminalType,
     startedAt: null,
     pid: null,
+    adapter: slot.adapter,
+    readiness: "stopped",
+    readinessReason: "Not running",
+    lastReadinessAt: null,
   });
 }
 
@@ -42,10 +46,14 @@ export function useCadreHost() {
     CADRE_RUNTIME_SLOTS.map((slot) => ({
       id: slot.id,
       name: slot.name,
-      status: "stopped",
+      status: "stopped" as const,
       terminalType: slot.terminalType,
       startedAt: null,
       pid: null,
+      adapter: slot.adapter,
+      readiness: "stopped" as const,
+      readinessReason: "Not running",
+      lastReadinessAt: null,
     })),
   );
   const [outputById, setOutputById] = useState<CadreOutputMap>(emptyOutputMap);
@@ -114,6 +122,9 @@ export function useCadreHost() {
           stdout?: string;
           stderr?: string;
           status?: CadreRuntime["status"];
+          readiness?: CadreRuntime["readiness"];
+          readinessReason?: string;
+          lastReadinessAt?: string | null;
         };
         if (!payload.runtimeId) return;
         setOutputById((prev) => ({
@@ -123,10 +134,20 @@ export function useCadreHost() {
             stderr: payload.stderr ?? prev[payload.runtimeId!]?.stderr ?? "",
           },
         }));
-        if (payload.status) {
+        if (payload.status || payload.readiness) {
           setRuntimes((prev) =>
             prev.map((entry) =>
-              entry.id === payload.runtimeId ? { ...entry, status: payload.status! } : entry,
+              entry.id === payload.runtimeId
+                ? {
+                    ...entry,
+                    ...(payload.status ? { status: payload.status } : {}),
+                    ...(payload.readiness ? { readiness: payload.readiness } : {}),
+                    ...(payload.readinessReason ? { readinessReason: payload.readinessReason } : {}),
+                    ...(payload.lastReadinessAt !== undefined
+                      ? { lastReadinessAt: payload.lastReadinessAt }
+                      : {}),
+                  }
+                : entry,
             ),
           );
         }
@@ -153,6 +174,9 @@ export function useCadreHost() {
           runtimeId?: string;
           status?: CadreRuntime["status"];
           pid?: number | null;
+          readiness?: CadreRuntime["readiness"];
+          readinessReason?: string;
+          lastReadinessAt?: string | null;
         };
         if (!payload.runtimeId || !payload.status) return;
         setRuntimes((prev) =>
@@ -162,6 +186,12 @@ export function useCadreHost() {
                   ...entry,
                   status: payload.status!,
                   pid: payload.pid ?? entry.pid,
+                  readiness: payload.readiness ?? entry.readiness,
+                  readinessReason: payload.readinessReason ?? entry.readinessReason,
+                  lastReadinessAt:
+                    payload.lastReadinessAt !== undefined
+                      ? payload.lastReadinessAt
+                      : entry.lastReadinessAt,
                   startedAt:
                     payload.status === "running"
                       ? entry.startedAt ?? new Date().toISOString()

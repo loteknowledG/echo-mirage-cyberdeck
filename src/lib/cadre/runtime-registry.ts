@@ -6,6 +6,17 @@ export type CadreTerminalType = (typeof CADRE_TERMINAL_TYPES)[number];
 
 export type CadreRuntimeStatus = "starting" | "running" | "stopped";
 
+export type CadreRuntimeReadiness =
+  | "unknown"
+  | "starting"
+  | "blocked_update_prompt"
+  | "blocked_auth"
+  | "ready"
+  | "errored"
+  | "stopped";
+
+export type CadreRuntimeAdapterId = "codex-cli" | "stub-host";
+
 export type CadreRuntime = {
   id: string;
   name: string;
@@ -13,6 +24,10 @@ export type CadreRuntime = {
   terminalType: CadreTerminalType;
   startedAt: string | null;
   pid: number | null;
+  adapter: CadreRuntimeAdapterId;
+  readiness: CadreRuntimeReadiness;
+  readinessReason: string;
+  lastReadinessAt: string | null;
 };
 
 /** Registry row shape for server persistence and diagnostics. */
@@ -29,14 +44,25 @@ export type CadreRuntimeSlot = {
   id: CadreTerminalType;
   name: string;
   terminalType: CadreTerminalType;
+  adapter: CadreRuntimeAdapterId;
 };
 
 export const CADRE_RUNTIME_SLOTS: readonly CadreRuntimeSlot[] = [
-  { id: "codex", name: "CODEX", terminalType: "codex" },
-  { id: "cursor", name: "CURSOR", terminalType: "cursor" },
-  { id: "opencode", name: "OPENCODE", terminalType: "opencode" },
-  { id: "pi", name: "PI", terminalType: "pi" },
+  { id: "codex", name: "CODEX", terminalType: "codex", adapter: "codex-cli" },
+  { id: "cursor", name: "CURSOR", terminalType: "cursor", adapter: "stub-host" },
+  { id: "opencode", name: "OPENCODE", terminalType: "opencode", adapter: "stub-host" },
+  { id: "pi", name: "PI", terminalType: "pi", adapter: "stub-host" },
 ] as const;
+
+export const CADRE_RUNTIME_ADAPTER_BY_TYPE: Record<CadreTerminalType, CadreRuntimeAdapterId> =
+  Object.fromEntries(CADRE_RUNTIME_SLOTS.map((slot) => [slot.terminalType, slot.adapter])) as Record<
+    CadreTerminalType,
+    CadreRuntimeAdapterId
+  >;
+
+export function cadreAdapterForType(type: CadreTerminalType): CadreRuntimeAdapterId {
+  return CADRE_RUNTIME_ADAPTER_BY_TYPE[type];
+}
 
 export function isCadreTerminalType(value: unknown): value is CadreTerminalType {
   return typeof value === "string" && (CADRE_TERMINAL_TYPES as readonly string[]).includes(value);
@@ -57,7 +83,23 @@ export function defaultCadreRuntime(type: CadreTerminalType): CadreRuntime {
     terminalType: type,
     startedAt: null,
     pid: null,
+    adapter: slot.adapter,
+    readiness: "stopped",
+    readinessReason: "Not running",
+    lastReadinessAt: null,
   };
+}
+
+export function formatCadreReadinessLabel(readiness: CadreRuntimeReadiness): string {
+  return readiness.toUpperCase();
+}
+
+export function readinessTone(readiness: CadreRuntimeReadiness): "neutral" | "good" | "warn" | "bad" {
+  if (readiness === "ready") return "good";
+  if (readiness === "starting" || readiness === "unknown") return "neutral";
+  if (readiness === "blocked_update_prompt" || readiness === "blocked_auth") return "warn";
+  if (readiness === "errored") return "bad";
+  return "neutral";
 }
 
 export function toRegistryEntry(runtime: CadreRuntime): CadreRuntimeRegistryEntry {

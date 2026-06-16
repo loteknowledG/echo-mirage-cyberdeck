@@ -19,6 +19,8 @@ body,
   font-display: swap;
 }
 
+@import "perfect-scrollbar/css/perfect-scrollbar.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -993,22 +995,68 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   text-shadow: var(--deck-green-text-glow, 0 0 6px rgba(54, 255, 115, 0.32));
 }
 
-/* Custom Scrollbar for Cyberdeck */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+/* Custom Scrollbar for Cyberdeck — native fallback when Perfect Scrollbar is off */
+.custom-scrollbar:not([data-cyberdeck-ps]) {
+  scrollbar-width: auto;
+  scrollbar-color: #4a4a4a #111;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
+.custom-scrollbar:not([data-cyberdeck-ps])::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.custom-scrollbar:not([data-cyberdeck-ps])::-webkit-scrollbar-track {
   background: #111;
+  border-left: 1px solid #1a1a1a;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 3px;
+.custom-scrollbar:not([data-cyberdeck-ps])::-webkit-scrollbar-thumb {
+  background: #444;
+  border: 2px solid #111;
+  border-radius: 8px;
+  min-height: 48px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #555;
+.custom-scrollbar:not([data-cyberdeck-ps])::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+.custom-scrollbar:not([data-cyberdeck-ps])::-webkit-scrollbar-thumb:active {
+  background: #888;
+}
+
+/* Perfect Scrollbar (MDB-compatible) — wider rails/thumbs for easier grabbing */
+.custom-scrollbar[data-cyberdeck-ps] .ps__rail-y,
+.custom-scrollbar[data-cyberdeck-ps] .ps__rail-x {
+  opacity: 0.85;
+  background-color: #111 !important;
+}
+
+.custom-scrollbar[data-cyberdeck-ps] .ps__rail-y:hover,
+.custom-scrollbar[data-cyberdeck-ps] .ps__rail-x:hover,
+.custom-scrollbar[data-cyberdeck-ps] .ps__rail-y.ps--clicking,
+.custom-scrollbar[data-cyberdeck-ps] .ps__rail-x.ps--clicking {
+  opacity: 1;
+  background-color: #161616 !important;
+}
+
+.custom-scrollbar[data-cyberdeck-ps] .ps__thumb-y,
+.custom-scrollbar[data-cyberdeck-ps] .ps__thumb-x {
+  background-color: #4a4a4a !important;
+  border-radius: 8px;
+}
+
+.custom-scrollbar[data-cyberdeck-ps] .ps__thumb-y:hover,
+.custom-scrollbar[data-cyberdeck-ps] .ps__thumb-x:hover,
+.custom-scrollbar[data-cyberdeck-ps] .ps__thumb-y.ps--clicking,
+.custom-scrollbar[data-cyberdeck-ps] .ps__thumb-x.ps--clicking {
+  background-color: #777 !important;
+}
+
+.custom-scrollbar.ps--scrolling-y > .ps__rail-y,
+.custom-scrollbar.ps--scrolling-x > .ps__rail-x {
+  opacity: 1;
 }
 
 /* Scroll fade effect for terminal panels */

@@ -7,7 +7,7 @@ import {
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
 import { CyberdeckControl } from "@/components/cyberdeck/cyberdeck-control-button";
-import { formatCadreUptime, type CadreRuntime } from "@/lib/cadre/runtime-registry";
+import { formatCadreUptime, formatCadreReadinessLabel, readinessTone, type CadreRuntime } from "@/lib/cadre/runtime-registry";
 import { useCadreHost } from "@/lib/cadre/use-cadre-host";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,14 @@ function statusClass(status: CadreRuntime["status"]): string {
 
 function statusLabel(status: CadreRuntime["status"]): string {
   return status.toUpperCase();
+}
+
+function readinessClass(readiness: CadreRuntime["readiness"]): string {
+  const tone = readinessTone(readiness);
+  if (tone === "good") return "text-emerald-400";
+  if (tone === "warn") return "text-amber-400";
+  if (tone === "bad") return "text-red-400";
+  return "text-[#777]";
 }
 
 function RuntimeRow({
@@ -47,6 +55,9 @@ function RuntimeRow({
       </div>
       <div className="mt-1 text-[8px] text-[#555]">
         {runtime.pid ? `PID ${runtime.pid}` : "NO PROCESS"} // UPTIME {formatCadreUptime(runtime.startedAt)}
+      </div>
+      <div className={cn("mt-1 text-[8px] tracking-[0.08em]", readinessClass(runtime.readiness))}>
+        READINESS: {formatCadreReadinessLabel(runtime.readiness)}
       </div>
     </button>
   );
@@ -162,10 +173,20 @@ export function CyberdeckCadrePaneBody() {
                 RESTART
               </CyberdeckControl>
               {selectedRuntime ? (
-                <span className="ml-auto font-mono text-[9px] tracking-[0.08em] text-[#777]">
-                  {selectedRuntime.name} // {statusLabel(selectedRuntime.status)} // UPTIME{" "}
-                  {formatCadreUptime(selectedRuntime.startedAt)}
-                </span>
+                <div className="ml-auto flex flex-col items-end gap-0.5 font-mono text-[9px] tracking-[0.08em] text-[#777]">
+                  <span>
+                    {selectedRuntime.name} // {statusLabel(selectedRuntime.status)} // UPTIME{" "}
+                    {formatCadreUptime(selectedRuntime.startedAt)}
+                  </span>
+                  <span className={readinessClass(selectedRuntime.readiness)}>
+                    READINESS: {formatCadreReadinessLabel(selectedRuntime.readiness)}
+                  </span>
+                  {selectedRuntime.readinessReason ? (
+                    <span className="max-w-[280px] text-right text-[8px] text-[#666]">
+                      REASON: {selectedRuntime.readinessReason}
+                    </span>
+                  ) : null}
+                </div>
               ) : null}
             </div>
 

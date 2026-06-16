@@ -50,6 +50,9 @@ export async function GET(request: Request) {
             status: output.status,
             stdout: output.stdout,
             stderr: output.stderr,
+            readiness: runtime.readiness,
+            readinessReason: runtime.readinessReason,
+            lastReadinessAt: runtime.lastReadinessAt,
           })}\n\n`,
         );
       }

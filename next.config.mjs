@@ -95,6 +95,7 @@ const nextConfig = {
 		"@napi-rs/canvas",
 		"gif-frames",
 		"gif-encoder-2",
+		"node-pty",
 	],
 	webpack: (config, { dev, isServer }) => {
 		if (isServer) {

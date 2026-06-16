@@ -193,6 +193,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
+import { CyberdeckScrollbarHost } from "@/components/cyberdeck/cyberdeck-scrollbar-host";
 import { MORPHISM_ZONE_REALMORPHISM, paneToolbarMorphismZone } from "@/lib/cyberdeck/morphism-zones";
 import {
   CyberdeckControlButton,
@@ -7014,6 +7015,7 @@ ${diff}`;
       className="terminal-window box-border flex h-full min-h-0 w-full flex-1 overflow-hidden bg-background font-mono text-green-500 max-md:min-h-0 max-md:flex-col md:h-screen"
     >
       <DeckModeProvider mode={deckMode}>
+      <CyberdeckScrollbarHost />
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence
         uiStateStorageKey={UI_STATE_STORAGE_KEY}

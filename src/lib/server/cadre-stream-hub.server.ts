@@ -3,7 +3,15 @@
 export type CadreStreamEvent =
   | { type: "ready" }
   | { type: "output"; runtimeId: string; stream: "stdout" | "stderr"; line: string }
-  | { type: "status"; runtimeId: string; status: string; pid: number | null };
+  | {
+      type: "status";
+      runtimeId: string;
+      status: string;
+      pid: number | null;
+      readiness?: string;
+      readinessReason?: string;
+      lastReadinessAt?: string | null;
+    };
 
 type CadreStreamClient = {
   enqueue: (chunk: string) => void;
