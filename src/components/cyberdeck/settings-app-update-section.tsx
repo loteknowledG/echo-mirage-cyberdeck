@@ -6,9 +6,9 @@ import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-
 import {
   checkForAppUpdate,
   fetchAppReleaseVersion,
-  getStoredRunningVersion,
   promptForAppUpdate,
   restartAppForUpdate,
+  syncRunningReleaseVersion,
   type AppUpdateCheckResult,
 } from "@/lib/app-update-client";
 
@@ -41,7 +41,7 @@ export function SettingsAppUpdateSection() {
   const [result, setResult] = useState<AppUpdateCheckResult | null>(null);
 
   useEffect(() => {
-    const stored = getStoredRunningVersion();
+    const stored = syncRunningReleaseVersion();
     if (stored) {
       setRunningVersion(stored);
       return;
@@ -69,7 +69,7 @@ export function SettingsAppUpdateSection() {
   }, []);
 
   const handleRestart = useCallback(() => {
-    restartAppForUpdate();
+    void restartAppForUpdate();
   }, []);
 
   const latestVersion =

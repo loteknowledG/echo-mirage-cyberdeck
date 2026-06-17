@@ -32,6 +32,27 @@ export async function fetchAppReleaseVersion(): Promise<string | null> {
   }
 }
 
+export function getEmbeddedReleaseVersion(): string | null {
+  if (typeof document === "undefined") return null;
+
+  const fromHtml = document.documentElement.getAttribute("data-echo-mirage-release");
+  if (fromHtml?.trim()) return fromHtml.trim();
+
+  const meta = document.querySelector('meta[name="echo-mirage-release"]');
+  const fromMeta = meta?.getAttribute("content")?.trim();
+  return fromMeta || null;
+}
+
+/** Prefer the build baked into this page over sessionStorage. */
+export function syncRunningReleaseVersion(): string | null {
+  const embedded = getEmbeddedReleaseVersion();
+  if (embedded) {
+    setStoredRunningVersion(embedded);
+    return embedded;
+  }
+  return getStoredRunningVersion();
+}
+
 export function getStoredRunningVersion(): string | null {
   try {
     return window.sessionStorage.getItem(RUNNING_VERSION_STORAGE_KEY);
@@ -84,11 +105,18 @@ export function promptForAppUpdate(version: string, options?: { force?: boolean 
   );
 }
 
-export function restartAppForUpdate(waitingWorker?: ServiceWorker | null) {
+export async function restartAppForUpdate(waitingWorker?: ServiceWorker | null) {
+  const latest = await fetchAppReleaseVersion();
+  if (latest) {
+    setStoredRunningVersion(latest);
+    clearDismissedAppUpdate();
+  }
+
   if (waitingWorker) {
     waitingWorker.postMessage("SKIP_WAITING");
     return;
   }
+
   window.location.reload();
 }
 
@@ -116,7 +144,7 @@ export async function checkForAppUpdate(options?: {
     };
   }
 
-  const running = getStoredRunningVersion();
+  const running = syncRunningReleaseVersion();
   if (!running) {
     setStoredRunningVersion(latest);
     return { status: "up-to-date", running: latest, latest };

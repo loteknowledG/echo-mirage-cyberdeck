@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { Mrs_Saint_Delafield, Satisfy } from 'next/font/google';
 
+import { getAppReleaseVersion } from "@/lib/app-release-version.server";
+
 import './globals.css';
 
 import { ThemeProvider } from '@/components/providers/theme-provider';
@@ -42,10 +44,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const releaseVersion = getAppReleaseVersion();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-echo-mirage-release={releaseVersion}>
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <meta name="echo-mirage-release" content={releaseVersion} />
       </head>
       <body
         className={`${GeistSans.className} ${SignatureScript.variable} ${SatisfyScript.variable} h-screen overflow-y-hidden overflow-x-auto`}

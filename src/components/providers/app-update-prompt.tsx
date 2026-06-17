@@ -10,6 +10,7 @@ import {
   promptForAppUpdate,
   restartAppForUpdate,
   shouldPollForAppUpdates,
+  syncRunningReleaseVersion,
 } from "@/lib/app-update-client";
 
 const VERSION_CHECK_MS = 5 * 60_000;
@@ -28,11 +29,15 @@ export function AppUpdatePrompt() {
     const result = await checkForAppUpdate();
     if (result.status === "update-available") {
       showUpdate(result.latest);
+      return;
     }
+
+    promptVisibleRef.current = false;
+    setUpdateVersion(null);
   }, [showUpdate]);
 
   const restartForUpdate = useCallback(() => {
-    restartAppForUpdate(waitingWorkerRef.current);
+    void restartAppForUpdate(waitingWorkerRef.current);
   }, []);
 
   const dismissForNow = useCallback(() => {
@@ -100,9 +105,13 @@ export function AppUpdatePrompt() {
         const trackWaitingWorker = (worker: ServiceWorker | null) => {
           if (!worker || cancelled) return;
           waitingWorkerRef.current = worker;
-          void fetchAppReleaseVersion().then((version) => {
-            if (version) promptForAppUpdate(version);
-          });
+          void Promise.all([fetchAppReleaseVersion(), Promise.resolve(syncRunningReleaseVersion())]).then(
+            ([latest, running]) => {
+              if (latest && running && latest !== running) {
+                promptForAppUpdate(latest);
+              }
+            },
+          );
         };
 
         if (registration.waiting) {
