@@ -4,8 +4,11 @@ let fallbackClickAudio = null;
 let fallbackChirpAudio = null;
 let masterGainNode = null;
 let masterCompressorNode = null;
-let sonarIntervalId = null;
-let sonarLoopIntervalMs = 3200;
+const MUTHUR_TRANSMISSION_SONAR_URL = "/audio/muthur-transmission-sonar.mp3";
+let sonarSampleBuffer = null;
+let sonarSampleLoadPromise = null;
+let sonarLoopSource = null;
+let sonarLoopGain = null;
 let sonarLoopVolumeScale = 1;
 const KEYBOARD_EFFECTS_GAIN = 0.15;
 const KEYBOARD_NAV_GAIN = 0.5;
@@ -520,59 +523,80 @@ export function playSuccess() {
   playNetworkScanSound("success");
 }
 
-export function playCinematicSonarPing(timeOffset = 0, volumeScale = 1) {
-  if (!enabled) return;
-  const ctx = getCtx();
-  if (ctx.state === "suspended") ctx.resume().catch(() => {});
-  const t = Math.max(0, Number.isFinite(timeOffset) ? timeOffset : 0);
-  const s = Math.min(1.5, Math.max(0, Number.isFinite(volumeScale) ? volumeScale : 1));
-
-  // Main deep ping + subtle harmonic shimmer.
-  playTone({
-    freqStart: 520,
-    duration: 0.18,
-    type: "sine",
-    volume: 0.11 * s,
-  });
-  setTimeout(() => {
-    playTone({
-      freqStart: 1040,
-      duration: 0.12,
-      type: "sine",
-      volume: 0.04 * s,
-    });
-  }, 15 + t * 1000);
-
-  // Slow cinematic echoes.
-  setTimeout(() => {
-    playTone({
-      freqStart: 360,
-      duration: 0.35,
-      type: "triangle",
-      volume: 0.045 * s,
-    });
-  }, 900 + t * 1000);
-  setTimeout(() => {
-    playTone({
-      freqStart: 240,
-      duration: 0.6,
-      type: "sine",
-      volume: 0.025 * s,
-    });
-  }, 1800 + t * 1000);
-
-  // Long ambient tail.
-  setTimeout(() => {
-    playNoiseClick({
-      duration: 1.2,
-      volume: 0.015 * s,
-      filterFreq: 900,
-    });
-  }, 150 + t * 1000);
+async function loadSonarSample() {
+  if (sonarSampleBuffer) return sonarSampleBuffer;
+  if (!sonarSampleLoadPromise) {
+    sonarSampleLoadPromise = (async () => {
+      const res = await fetch(MUTHUR_TRANSMISSION_SONAR_URL);
+      if (!res.ok) {
+        throw new Error(`sonar sample fetch failed: ${res.status}`);
+      }
+      const arrayBuffer = await res.arrayBuffer();
+      const ctx = getCtx();
+      sonarSampleBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+      return sonarSampleBuffer;
+    })();
+  }
+  return sonarSampleLoadPromise;
 }
 
-export function playSonarPing(timeOffset = 0) {
-  playCinematicSonarPing(timeOffset);
+function stopSonarSampleLoop() {
+  if (sonarLoopSource) {
+    try {
+      sonarLoopSource.stop();
+    } catch {
+      /* already stopped */
+    }
+    sonarLoopSource.disconnect();
+    sonarLoopSource = null;
+  }
+  if (sonarLoopGain) {
+    sonarLoopGain.disconnect();
+    sonarLoopGain = null;
+  }
+}
+
+async function startSonarSampleLoop(volumeScale = 1) {
+  if (!enabled) return;
+  const s = Math.min(1.5, Math.max(0.05, Number.isFinite(volumeScale) ? volumeScale : 1));
+  const ctx = getCtx();
+  if (ctx.state === "suspended") {
+    await ctx.resume().catch(() => {});
+  }
+
+  if (sonarLoopSource && sonarLoopGain) {
+    if (sonarLoopVolumeScale !== s) {
+      sonarLoopGain.gain.setTargetAtTime(s, ctx.currentTime, 0.08);
+      sonarLoopVolumeScale = s;
+    }
+    return;
+  }
+
+  stopSonarSampleLoop();
+  sonarLoopVolumeScale = s;
+  void unlockKeyboardSfx();
+
+  try {
+    const buffer = await loadSonarSample();
+    sonarLoopGain = ctx.createGain();
+    sonarLoopGain.gain.value = s;
+    sonarLoopSource = ctx.createBufferSource();
+    sonarLoopSource.buffer = buffer;
+    sonarLoopSource.loop = true;
+    sonarLoopSource.connect(sonarLoopGain);
+    sonarLoopGain.connect(getOutputNode());
+    sonarLoopSource.start();
+  } catch {
+    stopSonarSampleLoop();
+  }
+}
+
+export function playCinematicSonarPing(_timeOffset = 0, volumeScale = 1) {
+  void startSonarSampleLoop(volumeScale);
+}
+
+export function playSonarPing(_timeOffset = 0) {
+  void startSonarSampleLoop(1);
 }
 
 export function playBleepBloop() {
@@ -808,30 +832,12 @@ export function playRaceReadySetGo() {
   }, 580);
 }
 
-export function startSonarLoop(interval = 3200, volumeScale = 1) {
-  const ms = Math.max(1200, Number.isFinite(interval) ? interval : 3200);
-  const s = Math.min(1.5, Math.max(0.05, Number.isFinite(volumeScale) ? volumeScale : 1));
-  if (sonarIntervalId && sonarLoopIntervalMs === ms && sonarLoopVolumeScale === s) {
-    return;
-  }
-  if (sonarIntervalId) {
-    window.clearInterval(sonarIntervalId);
-    sonarIntervalId = null;
-  }
-  sonarLoopIntervalMs = ms;
-  sonarLoopVolumeScale = s;
-  void unlockKeyboardSfx();
-  playCinematicSonarPing(0, s);
-  sonarIntervalId = window.setInterval(() => {
-    playCinematicSonarPing(0, s);
-  }, ms);
+export function startSonarLoop(_interval = 3200, volumeScale = 1) {
+  void startSonarSampleLoop(volumeScale);
 }
 
 export function stopSonarLoop() {
-  if (!sonarIntervalId) return;
-  window.clearInterval(sonarIntervalId);
-  sonarIntervalId = null;
-  sonarLoopIntervalMs = 3200;
+  stopSonarSampleLoop();
   sonarLoopVolumeScale = 1;
 }
 

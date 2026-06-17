@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   cdxIconCopy,
   cdxIconEdit,
@@ -62,6 +71,26 @@ import { get } from "idb-keyval";
 
 type EchoMirageClipboardApi = { readText?: () => Promise<string> };
 
+const GLYPH_COMPOSER_HEIGHT_STORAGE_KEY = "echo-mirage-glyph-composer-height-v1";
+const GLYPH_COMPOSER_DEFAULT_HEIGHT_PX = 248;
+const GLYPH_COMPOSER_MIN_HEIGHT_PX = 116;
+const GLYPH_COMPOSER_MAX_HEIGHT_PX = 420;
+
+function clampGlyphComposerHeight(height: number): number {
+  return Math.min(
+    GLYPH_COMPOSER_MAX_HEIGHT_PX,
+    Math.max(GLYPH_COMPOSER_MIN_HEIGHT_PX, Math.round(height)),
+  );
+}
+
+function readGlyphComposerHeight(): number {
+  if (typeof window === "undefined") return GLYPH_COMPOSER_DEFAULT_HEIGHT_PX;
+  const raw = window.localStorage.getItem(GLYPH_COMPOSER_HEIGHT_STORAGE_KEY);
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  if (!Number.isFinite(parsed)) return GLYPH_COMPOSER_DEFAULT_HEIGHT_PX;
+  return clampGlyphComposerHeight(parsed);
+}
+
 async function readEchoMirageClipboardText(): Promise<string> {
   const bridge = (window as Window & { echoMirageClipboard?: EchoMirageClipboardApi })
     .echoMirageClipboard;
@@ -99,6 +128,7 @@ export function CyberdeckGlyphChannelPaneBody() {
   const [rendering, setRendering] = useState(false);
   const [glyphModeOn, setGlyphModeOn] = useState(false);
   const [paneMode, setPaneMode] = useState<GlyphPaneMode>("view");
+  const [composerHeight, setComposerHeight] = useState(GLYPH_COMPOSER_DEFAULT_HEIGHT_PX);
   const [inputFocused, setInputFocused] = useState(false);
   const [cursorBlinkOn, setCursorBlinkOn] = useState(true);
   const [cursorLeft, setCursorLeft] = useState(0);
@@ -110,7 +140,22 @@ export function CyberdeckGlyphChannelPaneBody() {
   const caretMeasureRef = useRef<HTMLSpanElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const signalScrollRef = useRef<HTMLDivElement>(null);
+  const composerFooterRef = useRef<HTMLElement>(null);
   const scrollFigletAfterTextRef = useRef(false);
+
+  useEffect(() => {
+    setComposerHeight(readGlyphComposerHeight());
+  }, []);
+
+  const updateComposerHeight = useCallback((height: number) => {
+    const next = clampGlyphComposerHeight(height);
+    setComposerHeight(next);
+    try {
+      window.localStorage.setItem(GLYPH_COMPOSER_HEIGHT_STORAGE_KEY, String(next));
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const syncComposerCaret = useCallback(() => {
     const el = inputRef.current;
@@ -499,6 +544,86 @@ export function CyberdeckGlyphChannelPaneBody() {
     }
   }, [applyOutput, setPaneModeWithFocus]);
 
+  const startComposerResizeDrag = useCallback(
+    (clientY: number, eventType: "mouse" | "pointer") => {
+      const footer = composerFooterRef.current;
+      const bottom = footer?.getBoundingClientRect().bottom ?? window.innerHeight;
+      updateComposerHeight(bottom - clientY);
+
+      if (eventType === "mouse") {
+        const handleMouseMove = (moveEvent: globalThis.MouseEvent) => {
+          updateComposerHeight(bottom - moveEvent.clientY);
+        };
+        const handleMouseUp = () => {
+          window.removeEventListener("mousemove", handleMouseMove);
+          window.removeEventListener("mouseup", handleMouseUp);
+        };
+
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp, { once: true });
+        return;
+      }
+
+      const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
+        updateComposerHeight(bottom - moveEvent.clientY);
+      };
+      const handlePointerUp = () => {
+        window.removeEventListener("pointermove", handlePointerMove);
+        window.removeEventListener("pointerup", handlePointerUp);
+        window.removeEventListener("pointercancel", handlePointerUp);
+      };
+
+      window.addEventListener("pointermove", handlePointerMove);
+      window.addEventListener("pointerup", handlePointerUp, { once: true });
+      window.addEventListener("pointercancel", handlePointerUp, { once: true });
+    },
+    [updateComposerHeight],
+  );
+
+  const handleComposerResizePointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      startComposerResizeDrag(event.clientY, "pointer");
+    },
+    [startComposerResizeDrag],
+  );
+
+  const handleComposerResizeMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      startComposerResizeDrag(event.clientY, "mouse");
+    },
+    [startComposerResizeDrag],
+  );
+
+  const handleComposerResizeKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      const step = event.shiftKey ? 32 : 12;
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        updateComposerHeight(composerHeight + step);
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        updateComposerHeight(composerHeight - step);
+        return;
+      }
+      if (event.key === "Home") {
+        event.preventDefault();
+        updateComposerHeight(GLYPH_COMPOSER_MIN_HEIGHT_PX);
+        return;
+      }
+      if (event.key === "End") {
+        event.preventDefault();
+        updateComposerHeight(GLYPH_COMPOSER_MAX_HEIGHT_PX);
+      }
+    },
+    [composerHeight, updateComposerHeight],
+  );
+
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-black">
@@ -653,8 +778,28 @@ export function CyberdeckGlyphChannelPaneBody() {
           )}
         </div>
 
-        <footer className="cyberdeck-message-box w-full min-w-0 max-w-full shrink-0 bg-black p-0">
-          <div className="glyph-channel-composer rounded-sm border border-green-900/70 bg-black transition-colors focus-within:border-green-500/80 focus-within:shadow-[0_0_0_1px_rgba(34,197,94,0.45)_inset]">
+        <div
+          role="separator"
+          aria-label="Resize ASCII message area"
+          aria-orientation="horizontal"
+          aria-valuemin={GLYPH_COMPOSER_MIN_HEIGHT_PX}
+          aria-valuemax={GLYPH_COMPOSER_MAX_HEIGHT_PX}
+          aria-valuenow={composerHeight}
+          tabIndex={0}
+          onPointerDown={handleComposerResizePointerDown}
+          onMouseDown={handleComposerResizeMouseDown}
+          onKeyDown={handleComposerResizeKeyDown}
+          className="cyberdeck-chat-resizer group flex h-3 w-full cursor-row-resize items-center justify-center bg-black focus:outline-none"
+        >
+          <div className="h-px w-16 transition-colors group-focus-visible:bg-emerald-400" />
+        </div>
+
+        <footer
+          ref={composerFooterRef}
+          className="cyberdeck-message-box w-full min-w-0 max-w-full shrink-0 bg-black p-0"
+          style={{ height: composerHeight }}
+        >
+          <div className="glyph-channel-composer flex h-[calc(100%-16px)] flex-col rounded-sm border border-green-900/70 bg-black transition-colors focus-within:border-green-500/80 focus-within:shadow-[0_0_0_1px_rgba(34,197,94,0.45)_inset]">
             <div className="glyph-channel-composer__input-band relative flex min-w-0 items-center px-2 py-1.5">
               <span className="pointer-events-none absolute left-3 z-10 text-lg font-bold text-green-500">
                 $
@@ -718,7 +863,7 @@ export function CyberdeckGlyphChannelPaneBody() {
               ) : null}
             </div>
 
-            <div className="min-w-0 border-t border-[#1a1a1a]">
+            <div className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto border-t border-[#1a1a1a]">
               <div
                 className={cn(
                   "flex min-w-0 flex-nowrap items-end gap-1.5 px-2 py-1.5",

@@ -6,6 +6,7 @@ import './globals.css';
 
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
+import { AppUpdatePrompt } from '@/components/providers/app-update-prompt';
 import { ChunkReload } from '@/components/providers/chunk-reload';
 
 const SignatureScript = Mrs_Saint_Delafield({
@@ -53,6 +54,7 @@ export default async function RootLayout({
           <QueryProvider>
             <div className="app-min-width-wrapper min-h-screen bg-background">
               <ChunkReload />
+              <AppUpdatePrompt />
               {children}
               <script suppressHydrationWarning={true} />
             </div>

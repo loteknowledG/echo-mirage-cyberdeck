@@ -199,7 +199,6 @@ import {
   CyberdeckControlButton,
   CyberdeckMenuButton,
   CyberdeckPaneToolbarControl,
-  MuthurControlButton,
 } from "@/components/cyberdeck/cyberdeck-control-button";
 import { muthurVoiceControlOptions } from "@/lib/cyberdeck/muthur-depth-control";
 import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
@@ -374,7 +373,7 @@ const PROVIDER_RATE_LIMIT_COOLDOWN_MS = 90_000;
 const INPUT_HISTORY_KEY = "echo-mirage-chat-history-v1";
 const UI_STATE_STORAGE_KEY = "echo-mirage-ui-state-v1";
 
-/** Cinematic sonar gain while the deck talks to providers (see AudioEngine `startDeckSonarLoop` scale). */
+/** Transmission sonar loop gain (sample: `public/audio/muthur-transmission-sonar.mp3`). */
 const CYBERDECK_SONAR_VOL_SCAN = 0.52;
 const CYBERDECK_SONAR_VOL_CHAT_STREAM = 0.22;
 
@@ -7473,23 +7472,21 @@ ${diff}`;
                           {voiceBlockTotal > 1 ? `${voiceBlockFocusIndex + 1}/${voiceBlockTotal}` : `${voiceBlockTotal}`}
                         </span>
                         <CyberdeckControlTooltip label="Stop speech (Esc)" disabled={!voicePlaybackBusy}>
-                        <MuthurControlButton
-                          deckMode={deckMode}
+                        <CyberdeckPaneToolbarControl
                           control={{ size: "compact", amber: true }}
                           onClick={() => abortMotherSpeech()}
                           disabled={!voicePlaybackBusy}
                           aria-label="Stop speech"
                         >
                           ‖
-                        </MuthurControlButton>
+                        </CyberdeckPaneToolbarControl>
                         </CyberdeckControlTooltip>
                         <CyberdeckControlTooltip
                           label="Earlier paragraph (more context)"
                           disabled={voiceBlockFocusIndex <= 0}
                         >
-                        <MuthurControlButton
-                          deckMode={deckMode}
-                          control={{ size: "compact", signal: true }}
+                        <CyberdeckPaneToolbarControl
+                          control={{ size: "compact", signal: true, off: voiceBlockFocusIndex <= 0 }}
                           onClick={() => {
                             if (voiceBlockFocusIndex <= 0) return;
                             const next = voiceBlockFocusIndex - 1;
@@ -7500,11 +7497,10 @@ ${diff}`;
                           aria-label="Speak earlier paragraph"
                         >
                           ◀
-                        </MuthurControlButton>
+                        </CyberdeckPaneToolbarControl>
                         </CyberdeckControlTooltip>
                         <CyberdeckControlTooltip label="Replay entire last reply">
-                        <MuthurControlButton
-                          deckMode={deckMode}
+                        <CyberdeckPaneToolbarControl
                           control={{ size: "compact", signal: true }}
                           onClick={() => {
                             abortMotherSpeech();
@@ -7513,7 +7509,7 @@ ${diff}`;
                           aria-label="Replay full response"
                         >
                           ↻
-                        </MuthurControlButton>
+                        </CyberdeckPaneToolbarControl>
                         </CyberdeckControlTooltip>
                       </>
                     ) : null}

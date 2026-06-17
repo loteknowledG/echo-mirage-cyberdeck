@@ -10,6 +10,7 @@ import { emitSignal } from "@/lib/cyberdeck/signal-router";
 import type { Identity } from "@/lib/identity/identity-types";
 import { cn } from "@/lib/utils";
 import { DepthButton, DepthPanel } from "@/components/realmorphism";
+import { SettingsAppUpdateSection } from "@/components/cyberdeck/settings-app-update-section";
 
 const SWITCH_LEGACY_EMERALD =
   "data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]";
@@ -117,6 +118,7 @@ export function CyberdeckSettingsPaneBody({
               </div>
             </div>
           </section>
+          <SettingsAppUpdateSection />
           <section className="flex flex-col gap-2">
             <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">DEPTH PANEL LAB</div>
             <div data-deck-mode="ascii" className="max-w-md">
