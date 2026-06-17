@@ -3712,10 +3712,6 @@ export default function CyberdeckApp() {
       }),
     [isStreaming, messages, muthurResponseFailed, muthurStall, streamText],
   );
-  const muthurProgressStatus = useMemo(
-    () => extractMuthurProgressStatus(streamText),
-    [streamText],
-  );
 
   useEffect(() => {
     if (isStreaming || streamText.trim()) {
@@ -7404,9 +7400,6 @@ ${diff}`;
                             : isStreaming
                               ? "STREAMING"
                               : ""}
-                    {muthurProgressStatus ? (
-                      <span className="text-amber-400/80"> · {muthurProgressStatus.replace(/^⏳\s*/, "")}</span>
-                    ) : null}
                   </button>
                   <MuthurUplinkModeRoller
                     mode={muthurUplinkMode}

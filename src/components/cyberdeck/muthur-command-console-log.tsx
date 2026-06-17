@@ -6,6 +6,7 @@ import { ChatUserRoleLabel } from "@/components/cyberdeck/chat-user-role-label";
 import {
   buildMuthurResponseScrollKey,
   countMuthurWords,
+  extractMuthurProgressStatus,
   formatDiagnosticLabel,
   formatMuthurStreamBody,
   groupMuthurChatTurns,
@@ -27,6 +28,7 @@ import {
   getMuthurNotifySettledClass,
   isMuthurNotifyMessage,
 } from "@/lib/muthur-notify-style";
+import { MuthurNotifyLine } from "@/components/cyberdeck/muthur-notify-line";
 
 type MuthurCommandConsoleLogProps = {
   messages: MuthurChatMessage[];
@@ -87,7 +89,10 @@ export function MuthurCommandConsoleLog({
   const diagnosticsTotalCount =
     diagnosticsPresentation.totalCount + (streamToolTrace && isStreaming ? 1 : 0);
   const streamBody = formatMuthurStreamBody(streamText);
-  const scrollKey = buildMuthurResponseScrollKey(messages, streamText, isStreaming);
+  const progressStatus = extractMuthurProgressStatus(streamText);
+  const scrollKey = [buildMuthurResponseScrollKey(messages, streamText, isStreaming), progressStatus].join(
+    "|",
+  );
   const lastTurnId = turns.at(-1)?.id;
 
   useEffect(() => {
@@ -154,7 +159,15 @@ export function MuthurCommandConsoleLog({
           </div>
         ))}
 
-        {streamBody || isStreaming ? (
+        {progressStatus && isStreaming ? (
+          <MuthurNotifyLine
+            text={progressStatus}
+            live
+            renderText={renderDiagnosticText}
+          />
+        ) : null}
+
+        {streamBody || (isStreaming && !progressStatus) ? (
           <div
             data-chat-row={rowIndex++}
             data-muthur-response
