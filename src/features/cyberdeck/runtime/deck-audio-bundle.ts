@@ -8,6 +8,8 @@ export {
   playSystemSound,
   startSonarLoop,
   stopSonarLoop,
+  startUplinkSonarPingLoop,
+  stopUplinkSonarPingLoop,
   playBleepBloop,
   playWrongDoorShut,
   playDeclined,

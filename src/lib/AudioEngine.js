@@ -5,11 +5,17 @@ let fallbackChirpAudio = null;
 let masterGainNode = null;
 let masterCompressorNode = null;
 const MUTHUR_TRANSMISSION_SONAR_URL = "/audio/muthur-transmission-sonar.mp3";
+const MUTHUR_UPLINK_SONAR_PING_URL = "/audio/muthur-uplink-sonar-ping.mp3";
 let sonarSampleBuffer = null;
 let sonarSampleLoadPromise = null;
 let sonarLoopSource = null;
 let sonarLoopGain = null;
 let sonarLoopVolumeScale = 1;
+let uplinkSonarSampleBuffer = null;
+let uplinkSonarSampleLoadPromise = null;
+let uplinkSonarLoopSource = null;
+let uplinkSonarLoopGain = null;
+let uplinkSonarLoopVolumeScale = 1;
 const KEYBOARD_EFFECTS_GAIN = 0.15;
 const KEYBOARD_NAV_GAIN = 0.5;
 
@@ -597,6 +603,83 @@ export function playCinematicSonarPing(_timeOffset = 0, volumeScale = 1) {
 
 export function playSonarPing(_timeOffset = 0) {
   void startSonarSampleLoop(1);
+}
+
+async function loadUplinkSonarSample() {
+  if (uplinkSonarSampleBuffer) return uplinkSonarSampleBuffer;
+  if (!uplinkSonarSampleLoadPromise) {
+    uplinkSonarSampleLoadPromise = (async () => {
+      const res = await fetch(MUTHUR_UPLINK_SONAR_PING_URL);
+      if (!res.ok) {
+        throw new Error(`uplink sonar sample fetch failed: ${res.status}`);
+      }
+      const arrayBuffer = await res.arrayBuffer();
+      const ctx = getCtx();
+      uplinkSonarSampleBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+      return uplinkSonarSampleBuffer;
+    })();
+  }
+  return uplinkSonarSampleLoadPromise;
+}
+
+function stopUplinkSonarSampleLoop() {
+  if (uplinkSonarLoopSource) {
+    try {
+      uplinkSonarLoopSource.stop();
+    } catch {
+      /* already stopped */
+    }
+    uplinkSonarLoopSource.disconnect();
+    uplinkSonarLoopSource = null;
+  }
+  if (uplinkSonarLoopGain) {
+    uplinkSonarLoopGain.disconnect();
+    uplinkSonarLoopGain = null;
+  }
+}
+
+async function startUplinkSonarSampleLoop(volumeScale = 1) {
+  if (!enabled) return;
+  const s = Math.min(1.5, Math.max(0.05, Number.isFinite(volumeScale) ? volumeScale : 1));
+  const ctx = getCtx();
+  if (ctx.state === "suspended") {
+    await ctx.resume().catch(() => {});
+  }
+
+  if (uplinkSonarLoopSource && uplinkSonarLoopGain) {
+    if (uplinkSonarLoopVolumeScale !== s) {
+      uplinkSonarLoopGain.gain.setTargetAtTime(s, ctx.currentTime, 0.08);
+      uplinkSonarLoopVolumeScale = s;
+    }
+    return;
+  }
+
+  stopUplinkSonarSampleLoop();
+  uplinkSonarLoopVolumeScale = s;
+  void unlockKeyboardSfx();
+
+  try {
+    const buffer = await loadUplinkSonarSample();
+    uplinkSonarLoopGain = ctx.createGain();
+    uplinkSonarLoopGain.gain.value = s;
+    uplinkSonarLoopSource = ctx.createBufferSource();
+    uplinkSonarLoopSource.buffer = buffer;
+    uplinkSonarLoopSource.loop = true;
+    uplinkSonarLoopSource.connect(uplinkSonarLoopGain);
+    uplinkSonarLoopGain.connect(getOutputNode());
+    uplinkSonarLoopSource.start();
+  } catch {
+    stopUplinkSonarSampleLoop();
+  }
+}
+
+export function startUplinkSonarPingLoop(volumeScale = 0.55) {
+  void startUplinkSonarSampleLoop(volumeScale);
+}
+
+export function stopUplinkSonarPingLoop() {
+  stopUplinkSonarSampleLoop();
+  uplinkSonarLoopVolumeScale = 1;
 }
 
 export function playBleepBloop() {

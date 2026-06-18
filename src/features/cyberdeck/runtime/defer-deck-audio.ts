@@ -39,6 +39,18 @@ export function playDeckBleepBloop(...args: Parameters<DeckAudioModule["playBlee
   void loadDeckAudio().then((audio) => audio.playBleepBloop(...args));
 }
 
+export function startDeckUplinkSonarPing(
+  ...args: Parameters<DeckAudioModule["startUplinkSonarPingLoop"]>
+) {
+  void loadDeckAudio().then((audio) => audio.startUplinkSonarPingLoop(...args));
+}
+
+export function stopDeckUplinkSonarPing(
+  ...args: Parameters<DeckAudioModule["stopUplinkSonarPingLoop"]>
+) {
+  void loadDeckAudio().then((audio) => audio.stopUplinkSonarPingLoop(...args));
+}
+
 export function playDeckWrongDoorShut(...args: Parameters<DeckAudioModule["playWrongDoorShut"]>) {
   void loadDeckAudio().then((audio) => audio.playWrongDoorShut(...args));
 }

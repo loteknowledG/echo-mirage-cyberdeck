@@ -53,7 +53,6 @@ import {
 import {
   bindDeckKeyboardSfx,
   loadDeckAudio,
-  playDeckBleepBloop,
   playDeckDeclined,
   playDeckDroidDizzy400,
   playDeckDroidDizzy401,
@@ -62,6 +61,8 @@ import {
   playDeckWrongDoorShut,
   playDeckNavigationSound,
   playDeckSystemSound,
+  startDeckUplinkSonarPing,
+  stopDeckUplinkSonarPing,
   unlockDeckKeyboardSfx,
 } from "@/features/cyberdeck/runtime/defer-deck-audio";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
@@ -1204,7 +1205,6 @@ export default function CyberdeckApp() {
   const operatorBrowserRef = useRef<HTMLWebViewElement | null>(null);
   const operatorNameInputRef = useRef<HTMLInputElement | null>(null);
   const networkFeedbackDelayRef = useRef<number | null>(null);
-  const networkFeedbackRepeatRef = useRef<number | null>(null);
   const offlineAutoOpenedRef = useRef(false);
   const startupRailResolvedRef = useRef(false);
   const prevConnectionStateRef = useRef<"offline" | "connecting" | "connected">("offline");
@@ -3738,30 +3738,22 @@ export default function CyberdeckApp() {
     if (isStreaming) {
       if (networkFeedbackDelayRef.current == null) {
         networkFeedbackDelayRef.current = window.setTimeout(() => {
-          playDeckBleepBloop();
-          networkFeedbackRepeatRef.current = window.setInterval(() => {
-            playDeckBleepBloop();
-          }, 7000);
+          networkFeedbackDelayRef.current = null;
+          startDeckUplinkSonarPing();
         }, 2800);
       }
     } else {
+      stopDeckUplinkSonarPing();
       if (networkFeedbackDelayRef.current !== null) {
         window.clearTimeout(networkFeedbackDelayRef.current);
         networkFeedbackDelayRef.current = null;
-      }
-      if (networkFeedbackRepeatRef.current !== null) {
-        window.clearInterval(networkFeedbackRepeatRef.current);
-        networkFeedbackRepeatRef.current = null;
       }
     }
     return () => {
+      stopDeckUplinkSonarPing();
       if (networkFeedbackDelayRef.current !== null) {
         window.clearTimeout(networkFeedbackDelayRef.current);
         networkFeedbackDelayRef.current = null;
-      }
-      if (networkFeedbackRepeatRef.current !== null) {
-        window.clearInterval(networkFeedbackRepeatRef.current);
-        networkFeedbackRepeatRef.current = null;
       }
     };
   }, [isStreaming]);
