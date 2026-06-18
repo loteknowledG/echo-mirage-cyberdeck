@@ -105,7 +105,6 @@ import {
 } from "@/lib/muthur-core/muthur-stream-payload";
 import {
   extractMuthurProgressStatus,
-  resolveMuthurResponsePhase,
   toolTraceToDiagnostic,
 } from "@/lib/muthur-core/muthur-command-console";
 import { partitionMuthurChannelUpdate } from "@/lib/muthur-core/muthur-response-channel";
@@ -3700,18 +3699,6 @@ export default function CyberdeckApp() {
     if (bootModels?.length) setModelList(bootModels);
     setDidHydrateProviderState(true);
   }, []);
-
-  const muthurResponsePhase = useMemo(
-    () =>
-      resolveMuthurResponsePhase({
-        isStreaming,
-        streamText,
-        messages,
-        failed: muthurResponseFailed,
-        stalled: Boolean(muthurStall),
-      }),
-    [isStreaming, messages, muthurResponseFailed, muthurStall, streamText],
-  );
 
   useEffect(() => {
     if (isStreaming || streamText.trim()) {
@@ -7386,20 +7373,7 @@ ${diff}`;
                     } cursor-pointer hover:underline`}
                     title="Open provider connection panel"
                   >
-                    {modelID
-                      ? modelID.split("/").pop()
-                      : "NO_MODEL"}{" "}
-                    {muthurResponsePhase === "composing"
-                      ? "· MUTHUR composing…"
-                      : muthurResponsePhase === "stalled"
-                        ? "· MUTHUR response stalled"
-                        : muthurResponsePhase === "failed"
-                          ? "· MUTHUR failed"
-                          : muthurResponsePhase === "complete"
-                            ? "· MUTHUR complete"
-                            : isStreaming
-                              ? "STREAMING"
-                              : ""}
+                    {modelID ? modelID.split("/").pop() : "NO_MODEL"}
                   </button>
                   <MuthurUplinkModeRoller
                     mode={muthurUplinkMode}
