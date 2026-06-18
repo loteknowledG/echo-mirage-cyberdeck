@@ -4,6 +4,8 @@ import figlet from "figlet";
 
 const CUSTOM_FONT_DIR = path.join(process.cwd(), "assets", "figlet-fonts");
 
+figlet.defaults({ fontPath: CUSTOM_FONT_DIR });
+
 let customFontNames: string[] | null = null;
 let customFontsLoaded = false;
 
@@ -14,9 +16,15 @@ function resolveFigletPackageFontFile(fontName: string): string | null {
     const direct = path.join(fontPath, `${fontName}.flf`);
     if (fs.existsSync(direct)) return direct;
     const target = fontName.toLowerCase();
-    const match = fs
-      .readdirSync(fontPath)
-      .find((file) => file.endsWith(".flf") && file.replace(/\.flf$/i, "").toLowerCase() === target);
+    let entries: string[];
+    try {
+      entries = fs.readdirSync(fontPath);
+    } catch {
+      return null;
+    }
+    const match = entries.find(
+      (file) => file.endsWith(".flf") && file.replace(/\.flf$/i, "").toLowerCase() === target,
+    );
     return match ? path.join(fontPath, match) : null;
   } catch {
     return null;
@@ -72,6 +80,11 @@ function resolveCustomFontFile(fontName: string): string | null {
     .readdirSync(CUSTOM_FONT_DIR)
     .find((file) => file.endsWith(".flf") && file.replace(/\.flf$/i, "").toLowerCase() === target);
   return match ? path.join(CUSTOM_FONT_DIR, match) : null;
+}
+
+/** Absolute path to assets/figlet-fonts/{name}.flf when present. */
+export function resolveCustomFigletFontFile(fontName: string): string | null {
+  return resolveCustomFontFile(fontName);
 }
 
 /** Parse one custom font into figlet.js when needed for render. */

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 try:
@@ -15,15 +16,39 @@ except ImportError:
     )
     sys.exit(2)
 
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+ASSETS_FONT_DIR = os.path.join(REPO_ROOT, "assets", "figlet-fonts")
+
+
+def _font_file_in_assets(font: str) -> str | None:
+    for ext in ("flf", "tlf"):
+        candidate = os.path.join(ASSETS_FONT_DIR, f"{font}.{ext}")
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
 
 def cmd_list() -> None:
-    fonts = sorted(pyfiglet.FigletFont.getFonts(), key=str.casefold)
-    json.dump({"ok": True, "fonts": fonts}, sys.stdout)
+    fonts = set(pyfiglet.FigletFont.getFonts())
+    if os.path.isdir(ASSETS_FONT_DIR):
+        for name in os.listdir(ASSETS_FONT_DIR):
+            if name.endswith((".flf", ".tlf")):
+                fonts.add(name.rsplit(".", 1)[0])
+    ordered = sorted(fonts, key=str.casefold)
+    json.dump({"ok": True, "fonts": ordered}, sys.stdout)
 
 
 def cmd_render(font: str, text: str) -> None:
     try:
-        out = pyfiglet.figlet_format(text, font=font)
+        if _font_file_in_assets(font):
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(ASSETS_FONT_DIR)
+                out = pyfiglet.figlet_format(text, font=font)
+            finally:
+                os.chdir(old_cwd)
+        else:
+            out = pyfiglet.figlet_format(text, font=font)
     except Exception as exc:  # noqa: BLE001
         json.dump({"ok": False, "error": str(exc)}, sys.stderr)
         sys.exit(1)

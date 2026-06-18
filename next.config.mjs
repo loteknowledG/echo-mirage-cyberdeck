@@ -29,10 +29,6 @@ const piWebUiPdfjsLoader = path.join(
 	projectRoot,
 	"scripts/pi-attachment-utils-loader.cjs",
 );
-const figletPackageRoot = path.dirname(require.resolve("figlet"));
-const figletFontsGlob = path
-	.join(figletPackageRoot, "fonts", "**", "*")
-	.replace(/\\/g, "/");
 
 /** @type {import('next').NextConfig} */
 const RUNTIME_WATCH_IGNORE = [
@@ -87,8 +83,8 @@ const nextConfig = {
 		webpackMemoryOptimizations: true,
 	},
 	outputFileTracingIncludes: {
-		"/api/glyph/render": [figletFontsGlob, "./assets/figlet-fonts/**"],
-		"/api/glyph/fonts": [figletFontsGlob, "./assets/figlet-fonts/**"],
+		"/api/glyph/*": ["./assets/figlet-fonts/**"],
+		"/*": ["./assets/figlet-fonts/**"],
 	},
 	// Treat as external in the Node.js server runtime (native / optional / E2E-only).
 	serverExternalPackages: [
