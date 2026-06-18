@@ -1,10 +1,8 @@
 import figlet from "figlet";
-import { promisify } from "util";
 import { DEFAULT_FIGLET_FONT } from "@/lib/figlet-fonts";
+import { BUNDLED_FIGLET_FONTS } from "@/lib/figlet-font-manifest";
 import { listCustomFigletFontNamesFromDisk } from "@/lib/figlet-custom-fonts.server";
 import { isPyfigletAvailable, listPyfigletFonts } from "@/lib/pyfiglet.server";
-
-const listFigletFontsAsync = promisify(figlet.fonts.bind(figlet)) as () => Promise<string[]>;
 
 export { DEFAULT_FIGLET_FONT };
 
@@ -22,11 +20,26 @@ function mergeFontLists(bundled: readonly string[], custom: readonly string[]): 
   return merged.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
+async function readBundledFigletFontNames(): Promise<string[]> {
+  try {
+    const names = await new Promise<string[]>((resolve, reject) => {
+      figlet.fonts((err, fonts) => {
+        if (err) reject(err);
+        else resolve(fonts ?? []);
+      });
+    });
+    if (names.length > 0) return names;
+  } catch {
+    /* Vercel/serverless: figlet npm fonts/ dir is often missing from the trace */
+  }
+  return [...BUNDLED_FIGLET_FONTS];
+}
+
 /** Sorted fonts: figlet.js bundled + assets/figlet-fonts + pyfiglet (when installed). */
 export async function listFigletFonts(): Promise<string[]> {
   if (cachedFonts) return cachedFonts;
   const custom = listCustomFigletFontNamesFromDisk();
-  const bundled = await listFigletFontsAsync();
+  const bundled = await readBundledFigletFontNames();
   let merged = mergeFontLists(bundled, custom);
   if (await isPyfigletAvailable()) {
     merged = mergeFontLists(merged, await listPyfigletFonts());

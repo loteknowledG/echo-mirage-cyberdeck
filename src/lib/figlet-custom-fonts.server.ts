@@ -7,6 +7,45 @@ const CUSTOM_FONT_DIR = path.join(process.cwd(), "assets", "figlet-fonts");
 let customFontNames: string[] | null = null;
 let customFontsLoaded = false;
 
+function resolveFigletPackageFontFile(fontName: string): string | null {
+  try {
+    const fontPath = figlet.defaults().fontPath;
+    if (!fontPath || !fs.existsSync(fontPath)) return null;
+    const direct = path.join(fontPath, `${fontName}.flf`);
+    if (fs.existsSync(direct)) return direct;
+    const target = fontName.toLowerCase();
+    const match = fs
+      .readdirSync(fontPath)
+      .find((file) => file.endsWith(".flf") && file.replace(/\.flf$/i, "").toLowerCase() === target);
+    return match ? path.join(fontPath, match) : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseFigletFontFile(filePath: string, fontName: string): boolean {
+  try {
+    const data = fs.readFileSync(filePath, "utf8");
+    const parsedName = path.basename(filePath, ".flf");
+    figlet.parseFont(parsedName, data);
+    return Boolean(figlet.figFonts[parsedName] ?? figlet.figFonts[fontName]);
+  } catch {
+    return false;
+  }
+}
+
+/** Load a .flf from assets/figlet-fonts or the figlet npm fonts directory. */
+export function loadFigletFont(fontName: string): boolean {
+  if (figlet.figFonts[fontName]) return true;
+
+  const customPath = resolveCustomFontFile(fontName);
+  if (customPath && parseFigletFontFile(customPath, fontName)) return true;
+
+  const packagePath = resolveFigletPackageFontFile(fontName);
+  if (packagePath && parseFigletFontFile(packagePath, fontName)) return true;
+
+  return false;
+}
 /** Font names from assets/figlet-fonts/*.flf (no parsing — safe for /api/glyph/fonts). */
 export function listCustomFigletFontNamesFromDisk(): string[] {
   if (customFontNames) return customFontNames;
@@ -37,19 +76,8 @@ function resolveCustomFontFile(fontName: string): string | null {
 
 /** Parse one custom font into figlet.js when needed for render. */
 export function loadCustomFigletFont(fontName: string): boolean {
-  if (figlet.figFonts[fontName]) return true;
-  const filePath = resolveCustomFontFile(fontName);
-  if (!filePath) return false;
-  try {
-    const data = fs.readFileSync(filePath, "utf8");
-    const parsedName = path.basename(filePath, ".flf");
-    figlet.parseFont(parsedName, data);
-    return Boolean(figlet.figFonts[parsedName] ?? figlet.figFonts[fontName]);
-  } catch {
-    return false;
-  }
+  return loadFigletFont(fontName);
 }
-
 /** Eager-load all custom fonts (legacy; avoid on font list API). */
 export function ensureCustomFigletFontsLoaded(): readonly string[] {
   if (customFontsLoaded) return listCustomFigletFontNamesFromDisk();

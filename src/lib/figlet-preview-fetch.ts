@@ -33,8 +33,11 @@ export async function fetchFigletPreviewText(font: string, text: string): Promis
         decorate: false,
       }),
     });
-    const payload = (await res.json()) as { ok?: boolean; output?: string };
-    const output = payload.ok && payload.output ? payload.output.trimEnd() : font;
+    const payload = (await res.json()) as { ok?: boolean; output?: string; error?: string };
+    if (!payload.ok || typeof payload.output !== 'string' || !payload.output.trim()) {
+      throw new Error(payload.error?.trim() || `Figlet preview failed (HTTP ${res.status})`);
+    }
+    const output = payload.output.trimEnd();
     cache.set(key, output);
     return output;
   })();

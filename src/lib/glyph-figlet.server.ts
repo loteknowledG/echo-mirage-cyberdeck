@@ -4,7 +4,7 @@ import {
   listFigletFonts,
   resolveFigletFontName,
 } from "@/lib/figlet-fonts.server";
-import { loadCustomFigletFont } from "@/lib/figlet-custom-fonts.server";
+import { loadFigletFont } from "@/lib/figlet-custom-fonts.server";
 import { isPyfigletAvailable, renderPyfigletText } from "@/lib/pyfiglet.server";
 
 export { DEFAULT_FIGLET_FONT, resolveFigletFontName };
@@ -34,8 +34,7 @@ function renderWithFigletJs(text: string, fontName: string): Promise<string> {
 
 /** figlet.js lists many fonts before they are parsed into memory — load from disk when needed. */
 function ensureFigletJsFontLoaded(fontName: string): boolean {
-  if (figlet.figFonts[fontName]) return true;
-  if (loadCustomFigletFont(fontName)) return true;
+  if (loadFigletFont(fontName)) return true;
 
   const loadSync = (figlet as FigletNode).loadFontSync;
   if (!loadSync) return false;

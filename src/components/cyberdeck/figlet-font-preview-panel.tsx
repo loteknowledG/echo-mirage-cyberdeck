@@ -53,12 +53,20 @@ export function FigletFontPreviewPanel({
 
     let cancelled = false;
     setLoading(true);
-    void fetchFigletPreviewText(font, previewText).then((rendered) => {
-      if (!cancelled) {
-        setOutput(rendered);
-        setLoading(false);
-      }
-    });
+    void fetchFigletPreviewText(font, previewText)
+      .then((rendered) => {
+        if (!cancelled) {
+          setOutput(rendered);
+          setLoading(false);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          const reason = error instanceof Error ? error.message : 'Preview failed';
+          setOutput(`⟁ preview failed\n${reason}`);
+          setLoading(false);
+        }
+      });
     return () => {
       cancelled = true;
     };

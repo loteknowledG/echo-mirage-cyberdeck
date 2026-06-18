@@ -893,7 +893,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                       variant="toolbar"
                       font={settings.figletFont}
                       text={composer.trim() || "ECHO MIRAGE"}
-                      className="flex-1"
+                      className="min-w-[5.5rem] flex-1"
                     />
                   </div>
                 ) : null}
