@@ -63,6 +63,7 @@ import {
   playDeckSystemSound,
   startDeckUplinkSonarPing,
   stopDeckUplinkSonarPing,
+  setDeckUplinkSonarVolume,
   unlockDeckKeyboardSfx,
 } from "@/features/cyberdeck/runtime/defer-deck-audio";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
@@ -200,7 +201,12 @@ import {
   CyberdeckPaneToolbarControl,
 } from "@/components/cyberdeck/cyberdeck-control-button";
 import { muthurVoiceControlOptions } from "@/lib/cyberdeck/muthur-depth-control";
+import {
+  getInitialUplinkSonarVolume,
+  saveUplinkSonarVolume,
+} from "@/lib/cyberdeck/uplink-sonar-volume";
 import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
+import { MuthurComposerAudioKnobs } from "@/components/cyberdeck/muthur-composer-audio-knobs";
 import { MuthurUplinkModeRoller } from "@/components/cyberdeck/muthur-uplink-mode-roller";
 import { isMuted, playBeep, setMuted } from "@/lib/deck-audio";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
@@ -1118,6 +1124,7 @@ export default function CyberdeckApp() {
   const [voiceBlockFocusIndex, setVoiceBlockFocusIndex] = useState(0);
   const [voiceBlockTotal, setVoiceBlockTotal] = useState(0);
   const [voiceDial, setVoiceDial] = useState<MuthurVoiceDialState>(getInitialMuthurVoiceDials);
+  const [sonarVolume, setSonarVolume] = useState(getInitialUplinkSonarVolume);
   const [voiceHealth, setVoiceHealth] = useState<"idle" | "backend" | "fallback" | "off">("idle");
   const [muthurMemory, setMuthurMemory] = useState<MuthurMemoryState>(() => createEmptyMuthurMemory());
   const [muthurMemoryHydrated, setMuthurMemoryHydrated] = useState(false);
@@ -2058,6 +2065,19 @@ export default function CyberdeckApp() {
     if (!master) return;
     master.gain.value = muthurMasterGain(voiceDial.volume);
   }, [voiceDial.volume]);
+
+  useEffect(() => {
+    setDeckUplinkSonarVolume(sonarVolume);
+  }, [sonarVolume]);
+
+  const handleVoiceVolumeChange = useCallback((volume: number) => {
+    setVoiceDial((prev) => ({ ...prev, volume }));
+  }, []);
+
+  const handleSonarVolumeChange = useCallback((volume: number) => {
+    setSonarVolume(volume);
+    saveUplinkSonarVolume(volume);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -7324,6 +7344,14 @@ ${diff}`;
                 <div className="muthur-composer-controls px-1">
                   <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <div data-morphism={paneToolbarMorphismZone(deckMode)}>
+                    <MuthurComposerAudioKnobs
+                      voiceVolume={voiceDial.volume}
+                      onVoiceVolumeChange={handleVoiceVolumeChange}
+                      sonarVolume={sonarVolume}
+                      onSonarVolumeChange={handleSonarVolumeChange}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleModelLabelClick("s")}

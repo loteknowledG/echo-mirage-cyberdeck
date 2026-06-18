@@ -16,6 +16,7 @@ let uplinkSonarSampleLoadPromise = null;
 let uplinkSonarLoopSource = null;
 let uplinkSonarLoopGain = null;
 let uplinkSonarLoopVolumeScale = 1;
+let uplinkSonarPreferredVolume = 0.55;
 const KEYBOARD_EFFECTS_GAIN = 0.15;
 const KEYBOARD_NAV_GAIN = 0.5;
 
@@ -673,8 +674,26 @@ async function startUplinkSonarSampleLoop(volumeScale = 1) {
   }
 }
 
-export function startUplinkSonarPingLoop(volumeScale = 0.55) {
-  void startUplinkSonarSampleLoop(volumeScale);
+export function startUplinkSonarPingLoop(volumeScale) {
+  const resolved =
+    volumeScale === undefined
+      ? uplinkSonarPreferredVolume
+      : Math.min(1.5, Math.max(0.05, Number.isFinite(volumeScale) ? volumeScale : uplinkSonarPreferredVolume));
+  void startUplinkSonarSampleLoop(resolved);
+}
+
+export function setUplinkSonarVolume(volumeScale) {
+  const s = Math.min(1.5, Math.max(0.05, Number.isFinite(volumeScale) ? volumeScale : uplinkSonarPreferredVolume));
+  uplinkSonarPreferredVolume = s;
+  if (uplinkSonarLoopSource && uplinkSonarLoopGain) {
+    const ctx = getCtx();
+    uplinkSonarLoopGain.gain.setTargetAtTime(s, ctx.currentTime, 0.08);
+    uplinkSonarLoopVolumeScale = s;
+  }
+}
+
+export function getUplinkSonarVolume() {
+  return uplinkSonarPreferredVolume;
 }
 
 export function stopUplinkSonarPingLoop() {

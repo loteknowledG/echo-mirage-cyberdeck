@@ -10,6 +10,8 @@ export {
   stopSonarLoop,
   startUplinkSonarPingLoop,
   stopUplinkSonarPingLoop,
+  setUplinkSonarVolume,
+  getUplinkSonarVolume,
   playBleepBloop,
   playWrongDoorShut,
   playDeclined,

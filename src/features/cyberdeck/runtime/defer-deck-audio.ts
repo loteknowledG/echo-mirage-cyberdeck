@@ -51,6 +51,12 @@ export function stopDeckUplinkSonarPing(
   void loadDeckAudio().then((audio) => audio.stopUplinkSonarPingLoop(...args));
 }
 
+export function setDeckUplinkSonarVolume(
+  ...args: Parameters<DeckAudioModule["setUplinkSonarVolume"]>
+) {
+  void loadDeckAudio().then((audio) => audio.setUplinkSonarVolume(...args));
+}
+
 export function playDeckWrongDoorShut(...args: Parameters<DeckAudioModule["playWrongDoorShut"]>) {
   void loadDeckAudio().then((audio) => audio.playWrongDoorShut(...args));
 }
