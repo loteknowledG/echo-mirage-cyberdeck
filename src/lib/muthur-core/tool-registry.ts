@@ -19,6 +19,16 @@ import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 const WORKSPACE_ROOT = path.resolve(process.cwd());
 const WORKSPACE_MOUNT = "/workspace";
 
+function resolveLocalFsPath(targetPath: string): string {
+  const normalized = targetPath.replace(/\\/g, "/");
+  if (normalized === WORKSPACE_MOUNT) return WORKSPACE_ROOT;
+  if (normalized.startsWith(`${WORKSPACE_MOUNT}/`)) {
+    const rel = normalized.slice(WORKSPACE_MOUNT.length + 1);
+    return path.join(WORKSPACE_ROOT, ...rel.split("/"));
+  }
+  return path.resolve(targetPath);
+}
+
 function isPathInsideWorkspace(targetPath: string): boolean {
   const root = path.resolve(WORKSPACE_ROOT);
   const abs = path.resolve(targetPath);
@@ -98,38 +108,40 @@ async function runLocalFs(call: ToolCall): Promise<ToolResult> {
   }
 
   try {
+    const resolvedPath = resolveLocalFsPath(targetPath);
+
     if (action === "ls") {
-      const entries = await fs.readdir(targetPath, { withFileTypes: true });
+      const entries = await fs.readdir(resolvedPath, { withFileTypes: true });
       const lines = entries.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name));
       return {
         ok: true,
         output: {
           action,
-          path: targetPath,
+          path: resolvedPath,
           entries: lines,
         },
       };
     }
 
     if (action === "cat") {
-      const content = await fs.readFile(targetPath, "utf8");
+      const content = await fs.readFile(resolvedPath, "utf8");
       return {
         ok: true,
         output: {
           action,
-          path: targetPath,
+          path: resolvedPath,
           content,
         },
       };
     }
 
     if (action === "stat") {
-      const stats = await fs.stat(targetPath);
+      const stats = await fs.stat(resolvedPath);
       return {
         ok: true,
         output: {
           action,
-          path: targetPath,
+          path: resolvedPath,
           isDirectory: stats.isDirectory(),
           size: stats.size,
           modifiedAt: stats.mtime.toISOString(),

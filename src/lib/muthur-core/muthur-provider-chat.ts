@@ -5,7 +5,11 @@ import { executeMuthurChatTool } from "@/lib/muthur-core/execute-openai-tool";
 import { getMuthurOpenAiToolsForMode } from "@/lib/muthur-core/openai-tool-definitions";
 import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
 import { appendMuthurStreamFooters } from "@/lib/muthur-core/muthur-stream-payload";
-import { dsmlCallsToOpenAiToolCalls, parseDsmlToolCalls, stripDsmlToolMarkup } from "@/lib/muthur-core/parse-dsml-tool-calls";
+import {
+  inlineCallsToOpenAiToolCalls,
+  parseInlineToolCalls,
+  stripInlineToolMarkup,
+} from "@/lib/muthur-core/parse-inline-tool-calls";
 import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
 import { maybeFinalizeCodingVerify } from "@/lib/muthur-core/coding-verify.server";
 import {
@@ -270,11 +274,11 @@ export async function muthurChatWithModelTools(options: {
 
       let toolCalls = msg.tool_calls;
       const rawContent = typeof msg.content === "string" ? msg.content : "";
-      if ((!Array.isArray(toolCalls) || toolCalls.length === 0) && rawContent.includes("DSML")) {
-        const dsmlCalls = parseDsmlToolCalls(rawContent);
-        if (dsmlCalls.length > 0) {
-          write(`⏳ MUTHUR // parsed DSML tools: ${dsmlCalls.map((c) => c.name).join(", ")}\n`);
-          toolCalls = dsmlCallsToOpenAiToolCalls(dsmlCalls);
+      if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
+        const inlineCalls = parseInlineToolCalls(rawContent);
+        if (inlineCalls.length > 0) {
+          write(`⏳ MUTHUR // parsed inline tools: ${inlineCalls.map((c) => c.name).join(", ")}\n`);
+          toolCalls = inlineCallsToOpenAiToolCalls(inlineCalls);
         }
       }
 
@@ -316,7 +320,7 @@ export async function muthurChatWithModelTools(options: {
 
       await maybeFinalizeCodingVerify(toolCtx, write);
 
-      const text = stripDsmlFromAssistantText(rawContent);
+      const text = stripInlineToolsFromAssistantText(rawContent);
       if (text.trim()) {
         write("\n");
         write(
@@ -371,6 +375,6 @@ export async function muthurChatWithModelTools(options: {
   }, mergeReceiptHeaders({}, providerReceipt));
 }
 
-function stripDsmlFromAssistantText(text: string): string {
-  return stripDsmlToolMarkup(text);
+function stripInlineToolsFromAssistantText(text: string): string {
+  return stripInlineToolMarkup(text);
 }
