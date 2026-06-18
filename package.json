@@ -51,6 +51,7 @@
     "probe:memory-atlas": "tsx scripts/probe-memory-atlas.ts",
     "probe:entity-atlas": "tsx scripts/probe-entity-atlas.ts",
     "probe:cadre-host": "tsx scripts/probe-cadre-host.ts",
+    "probe:cadre-events": "tsx scripts/probe-cadre-events.ts",
     "probe:codex-runtime-adapter": "tsx scripts/probe-codex-runtime-adapter.ts",
     "probe:codex-readiness-detector": "tsx scripts/probe-codex-readiness-detector.ts",
     "probe:photoshop-text-on-gif": "tsx scripts/probe-photoshop-text-on-gif.ts",

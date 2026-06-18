@@ -12,6 +12,7 @@ export type SignalSource =
   | "system"
   | "ui"
   | "muthur"
+  | "cadre"
   | "health";
 
 export type SignalSeverity = "info" | "success" | "warning" | "error";

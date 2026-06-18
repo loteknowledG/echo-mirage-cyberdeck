@@ -62,8 +62,6 @@ import {
   playDeckWrongDoorShut,
   playDeckNavigationSound,
   playDeckSystemSound,
-  startDeckSonarLoop,
-  stopDeckSonarLoop,
   unlockDeckKeyboardSfx,
 } from "@/features/cyberdeck/runtime/defer-deck-audio";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
@@ -108,6 +106,7 @@ import {
   toolTraceToDiagnostic,
 } from "@/lib/muthur-core/muthur-command-console";
 import { partitionMuthurChannelUpdate } from "@/lib/muthur-core/muthur-response-channel";
+import { CADRE_MUTHUR_ARCHIVE_EVENT } from "@/lib/cadre/cadre-event-bus";
 import {
   appendMuthurDiagnosticBatch,
   appendMuthurDiagnosticEntry,
@@ -371,10 +370,6 @@ const MODEL_PROBE_MIN_INTERVAL_MS = 15_000;
 const PROVIDER_RATE_LIMIT_COOLDOWN_MS = 90_000;
 const INPUT_HISTORY_KEY = "echo-mirage-chat-history-v1";
 const UI_STATE_STORAGE_KEY = "echo-mirage-ui-state-v1";
-
-/** Transmission sonar loop gain (sample: `public/audio/muthur-transmission-sonar.mp3`). */
-const CYBERDECK_SONAR_VOL_SCAN = 0.52;
-const CYBERDECK_SONAR_VOL_CHAT_STREAM = 0.22;
 
 type CyberdeckUiState = {
   server: (typeof SERVER_IDS)[number];
@@ -1210,8 +1205,6 @@ export default function CyberdeckApp() {
   const operatorNameInputRef = useRef<HTMLInputElement | null>(null);
   const networkFeedbackDelayRef = useRef<number | null>(null);
   const networkFeedbackRepeatRef = useRef<number | null>(null);
-  const chatSonarDelayRef = useRef<number | null>(null);
-  const chatSonarActiveRef = useRef(false);
   const offlineAutoOpenedRef = useRef(false);
   const startupRailResolvedRef = useRef(false);
   const prevConnectionStateRef = useRef<"offline" | "connecting" | "connected">("offline");
@@ -1525,6 +1518,19 @@ export default function CyberdeckApp() {
   const inactiveTextGlow = "0 0 6px rgba(180, 180, 180, 0.14)";
 
   useDeckAudioBridge();
+
+  useEffect(() => {
+    const onCadreArchive = (event: Event) => {
+      const detail = (event as CustomEvent<{ text?: string }>).detail;
+      const text = typeof detail?.text === "string" ? detail.text.trim() : "";
+      if (!text) return;
+      setMuthurDiagnostics((current) => appendMuthurDiagnosticEntry(current, text));
+      setMessagesRaw((prev) => [...prev, { role: "assistant", text }]);
+    };
+
+    window.addEventListener(CADRE_MUTHUR_ARCHIVE_EVENT, onCadreArchive);
+    return () => window.removeEventListener(CADRE_MUTHUR_ARCHIVE_EVENT, onCadreArchive);
+  }, []);
 
   useEffect(() => {
     if (!ENABLE_AUTOMATION) return;
@@ -3729,23 +3735,7 @@ export default function CyberdeckApp() {
   }, [isStreaming, streamText]);
 
   useEffect(() => {
-    if (scanActivityActive) {
-      startDeckSonarLoop(3200, CYBERDECK_SONAR_VOL_SCAN);
-    } else {
-      stopDeckSonarLoop();
-    }
-    return () => stopDeckSonarLoop();
-  }, [scanActivityActive]);
-
-  useEffect(() => {
     if (isStreaming) {
-      if (chatSonarDelayRef.current == null) {
-        chatSonarDelayRef.current = window.setTimeout(() => {
-          startDeckSonarLoop(3200, CYBERDECK_SONAR_VOL_CHAT_STREAM);
-          chatSonarActiveRef.current = true;
-          chatSonarDelayRef.current = null;
-        }, 7000);
-      }
       if (networkFeedbackDelayRef.current == null) {
         networkFeedbackDelayRef.current = window.setTimeout(() => {
           playDeckBleepBloop();
@@ -3755,17 +3745,6 @@ export default function CyberdeckApp() {
         }, 2800);
       }
     } else {
-      if (chatSonarDelayRef.current !== null) {
-        window.clearTimeout(chatSonarDelayRef.current);
-        chatSonarDelayRef.current = null;
-      }
-      if (chatSonarActiveRef.current && !scanActivityActive) {
-        stopDeckSonarLoop();
-      }
-      chatSonarActiveRef.current = false;
-      if (scanActivityActive) {
-        startDeckSonarLoop(3200, CYBERDECK_SONAR_VOL_SCAN);
-      }
       if (networkFeedbackDelayRef.current !== null) {
         window.clearTimeout(networkFeedbackDelayRef.current);
         networkFeedbackDelayRef.current = null;
@@ -3776,10 +3755,6 @@ export default function CyberdeckApp() {
       }
     }
     return () => {
-      if (chatSonarDelayRef.current !== null) {
-        window.clearTimeout(chatSonarDelayRef.current);
-        chatSonarDelayRef.current = null;
-      }
       if (networkFeedbackDelayRef.current !== null) {
         window.clearTimeout(networkFeedbackDelayRef.current);
         networkFeedbackDelayRef.current = null;
@@ -3788,12 +3763,8 @@ export default function CyberdeckApp() {
         window.clearInterval(networkFeedbackRepeatRef.current);
         networkFeedbackRepeatRef.current = null;
       }
-      if (chatSonarActiveRef.current && !scanActivityActive) {
-        stopDeckSonarLoop();
-      }
-      chatSonarActiveRef.current = false;
     };
-  }, [isStreaming, scanActivityActive]);
+  }, [isStreaming]);
 
   // After keys hydrate: prompt only when this provider truly has no client key (gateway field handles entry).
   useEffect(() => {

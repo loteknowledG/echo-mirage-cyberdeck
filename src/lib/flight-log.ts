@@ -301,6 +301,17 @@ export function signalToFlightLog(
       const reason = readString(payload, "reason");
       return { actor: "HEALTH", action: `status change ${from} → ${to}`, result: reason ?? "—", severity };
     }
+    case "cadre:runtime_started":
+    case "cadre:runtime_stopped":
+    case "cadre:verification_pass":
+    case "cadre:verification_fail":
+    case "cadre:readiness_changed":
+    case "cadre:host_error":
+    case "cadre:host_ready": {
+      const actor = readString(payload, "actor") ?? "CADRE";
+      const message = readString(payload, "message") ?? signal.type;
+      return { actor, action: message, result: signal.type.replace(/^cadre:/, "").toUpperCase(), severity };
+    }
     default:
       return null;
   }

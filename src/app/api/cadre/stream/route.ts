@@ -1,4 +1,5 @@
 import { cadreStreamHub } from "@/lib/server/cadre-stream-hub.server";
+import { listCadreEvents } from "@/lib/server/cadre-event-log.server";
 import { getCadreRuntimeManager } from "@/lib/server/cadre-runtime-manager.server";
 
 export const runtime = "nodejs";
@@ -38,6 +39,10 @@ export async function GET(request: Request) {
 
       cadreStreamHub.subscribe(client);
       client.enqueue(`event: ready\ndata: ${JSON.stringify({ type: "ready" })}\n\n`);
+
+      for (const event of listCadreEvents(80)) {
+        client.enqueue(`event: cadre_event\ndata: ${JSON.stringify({ type: "cadre_event", event })}\n\n`);
+      }
 
       const runtimes = manager.listRuntimes().filter((entry) => !runtimeId || entry.id === runtimeId);
       for (const runtime of runtimes) {

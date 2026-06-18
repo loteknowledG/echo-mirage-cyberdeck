@@ -1,7 +1,10 @@
 // SERVER ONLY — cadre terminal output SSE hub.
 
+import type { CadreEvent } from "@/lib/cadre/cadre-events";
+
 export type CadreStreamEvent =
   | { type: "ready" }
+  | { type: "cadre_event"; event: CadreEvent }
   | { type: "output"; runtimeId: string; stream: "stdout" | "stderr"; line: string }
   | {
       type: "status";

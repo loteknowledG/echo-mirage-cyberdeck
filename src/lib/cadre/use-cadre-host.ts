@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isCadreEvent } from "@/lib/cadre/cadre-events";
+import { ingestCadreEvent } from "@/lib/cadre/cadre-event-bus";
 import type { CadreRuntime } from "@/lib/cadre/runtime-registry";
 import { CADRE_RUNTIME_SLOTS } from "@/lib/cadre/runtime-registry";
 
@@ -89,7 +91,30 @@ export function useCadreHost() {
       throw new Error(data.error ?? `Failed to load cadre runtimes (${res.status})`);
     }
     setRuntimes((prev) => mergeRuntimeList(data.runtimes, prev));
-    if (data.ready) setReadyMessage(data.ready);
+    if (data.ready) {
+      setReadyMessage(data.ready);
+      ingestCadreEvent({
+        type: "host_ready",
+        actor: "CADRE",
+        message: data.ready,
+        severity: "success",
+        archive: false,
+      });
+    }
+  }, []);
+
+  const hydrateCadreEvents = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cadre/events?limit=80", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { events?: unknown[] };
+      if (!Array.isArray(data.events)) return;
+      for (const entry of data.events) {
+        if (isCadreEvent(entry)) ingestCadreEvent(entry);
+      }
+    } catch {
+      /* optional hydration */
+    }
   }, []);
 
   useEffect(() => {
@@ -100,6 +125,7 @@ export function useCadreHost() {
       setError(null);
       try {
         await refreshRuntimes();
+        await hydrateCadreEvents();
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Cadre host unavailable");
@@ -113,7 +139,26 @@ export function useCadreHost() {
 
     const source = new EventSource("/api/cadre/stream");
     source.addEventListener("ready", () => {
-      if (!cancelled) setConnected(true);
+      if (!cancelled) {
+        setConnected(true);
+        ingestCadreEvent({
+          type: "stream_connected",
+          actor: "CADRE",
+          message: "Cadre activity stream connected",
+          severity: "info",
+          archive: false,
+        });
+      }
+    });
+    source.addEventListener("cadre_event", (event) => {
+      try {
+        const payload = JSON.parse(event.data) as { event?: unknown };
+        if (payload.event && isCadreEvent(payload.event)) {
+          ingestCadreEvent(payload.event);
+        }
+      } catch {
+        /* ignore malformed cadre event */
+      }
     });
     source.addEventListener("snapshot", (event) => {
       try {
@@ -207,15 +252,31 @@ export function useCadreHost() {
       }
     });
     source.onerror = () => {
-      if (!cancelled) setConnected(false);
+      if (!cancelled) {
+        setConnected(false);
+        ingestCadreEvent({
+          type: "stream_disconnected",
+          actor: "CADRE",
+          message: "Cadre activity stream disconnected",
+          severity: "warning",
+          archive: false,
+        });
+      }
     };
 
     return () => {
       cancelled = true;
       source.close();
       setConnected(false);
+      ingestCadreEvent({
+        type: "stream_disconnected",
+        actor: "CADRE",
+        message: "Cadre activity stream closed",
+        severity: "info",
+        archive: false,
+      });
     };
-  }, [appendOutput, refreshRuntimes]);
+  }, [appendOutput, hydrateCadreEvents, refreshRuntimes]);
 
   const startRuntime = useCallback(
     async (runtimeId: string) => {

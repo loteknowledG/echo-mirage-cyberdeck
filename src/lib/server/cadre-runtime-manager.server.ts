@@ -25,7 +25,9 @@ import {
   startingCodexReadiness,
   stoppedCodexReadiness,
 } from "@/lib/server/cadre/codex-readiness-detector.server";
+import { appendCadreEventLog } from "@/lib/server/cadre-event-log.server";
 import { cadreStreamHub } from "@/lib/server/cadre-stream-hub.server";
+import { runtimeIdToActor, type CadreEventSeverity } from "@/lib/cadre/cadre-events";
 
 const OUTPUT_LINE_LIMIT = 500;
 const STUB_SCRIPT = path.join(process.cwd(), "scripts", "cadre-runtime-host-stub.mjs");
@@ -87,6 +89,15 @@ class CadreRuntimeManager {
       return this.snapshot(runtime);
     }
 
+    this.emitCadreEvent({
+      type: "runtime_start_requested",
+      actor: runtimeIdToActor(runtime),
+      runtimeId: runtime,
+      message: `${slot.name} runtime starting`,
+      severity: "info",
+      archive: false,
+    });
+
     entry.status = "starting";
     entry.startedAt = new Date().toISOString();
     entry.pid = null;
@@ -119,6 +130,13 @@ class CadreRuntimeManager {
           lastReadinessAt: new Date().toISOString(),
         });
         this.publishStatus(runtime);
+        this.emitCadreEvent({
+          type: "host_error",
+          actor: runtimeIdToActor(runtime),
+          runtimeId: runtime,
+          message: error instanceof Error ? error.message : "Cadre host failed to start",
+          severity: "error",
+        });
         throw error;
       }
     } else {
@@ -140,6 +158,14 @@ class CadreRuntimeManager {
     entry.status = "running";
     this.refreshReadiness(runtime);
     this.publishStatus(runtime);
+    this.emitCadreEvent({
+      type: "runtime_started",
+      actor: runtimeIdToActor(runtime),
+      runtimeId: runtime,
+      message: `${slot.name} runtime online`,
+      severity: "success",
+      meta: { pid: entry.pid },
+    });
     return this.snapshot(runtime);
   }
 
@@ -148,6 +174,15 @@ class CadreRuntimeManager {
     if (!type) return null;
     const entry = this.runtimes.get(type);
     if (!entry) return null;
+
+    this.emitCadreEvent({
+      type: "runtime_stop_requested",
+      actor: runtimeIdToActor(type),
+      runtimeId: type,
+      message: `${entry.name} runtime stopping`,
+      severity: "info",
+      archive: false,
+    });
 
     if (entry.process?.kind === "codex") {
       const handle = entry.process.handle;
@@ -182,14 +217,32 @@ class CadreRuntimeManager {
     );
     this.appendLine(type, "stdout", `[CADRE] ${entry.name} stopped by operator`);
     this.publishStatus(type);
+    this.emitCadreEvent({
+      type: "runtime_stopped",
+      actor: runtimeIdToActor(type),
+      runtimeId: type,
+      message: `${entry.name} runtime stopped`,
+      severity: "info",
+    });
     return this.snapshot(type);
   }
 
   async restartRuntime(runtimeId: string): Promise<CadreRuntime | null> {
-    await this.stopRuntime(runtimeId);
     const type = this.resolveType(runtimeId);
     if (!type) return null;
-    return this.startRuntime(type);
+    const entry = this.runtimes.get(type);
+    this.emitCadreEvent({
+      type: "runtime_restart_requested",
+      actor: runtimeIdToActor(type),
+      runtimeId: type,
+      message: entry ? `${entry.name} runtime restart requested` : "Runtime restart requested",
+      severity: "warning",
+      archive: false,
+    });
+    await this.stopRuntime(runtimeId);
+    const resolved = this.resolveType(runtimeId);
+    if (!resolved) return null;
+    return this.startRuntime(resolved);
   }
 
   resetForTests(): void {
@@ -243,9 +296,52 @@ class CadreRuntimeManager {
   ): void {
     const entry = this.runtimes.get(type);
     if (!entry) return;
+
+    const previous = entry.readiness;
     entry.readiness = snapshot.readiness;
     entry.readinessReason = snapshot.readinessReason;
     entry.lastReadinessAt = snapshot.lastReadinessAt;
+
+    if (previous === snapshot.readiness) return;
+
+    const actor = runtimeIdToActor(type);
+    let severity: CadreEventSeverity = "info";
+    let verification: "pass" | "fail" | "pending" | undefined;
+    if (snapshot.readiness === "ready") {
+      severity = "success";
+      verification = "pass";
+    } else if (snapshot.readiness === "errored") {
+      severity = "error";
+      verification = "fail";
+    } else if (
+      snapshot.readiness === "blocked_auth" ||
+      snapshot.readiness === "blocked_update_prompt"
+    ) {
+      severity = "warning";
+    }
+
+    this.emitCadreEvent({
+      type:
+        snapshot.readiness === "ready"
+          ? "verification_pass"
+          : snapshot.readiness === "errored"
+            ? "verification_fail"
+            : "readiness_changed",
+      actor,
+      runtimeId: type,
+      message: `${entry.name} readiness: ${snapshot.readiness.replaceAll("_", " ")}`,
+      severity,
+      verification,
+      meta: { readiness: snapshot.readiness, reason: snapshot.readinessReason },
+    });
+  }
+
+  private emitCadreEvent(
+    input: Parameters<typeof appendCadreEventLog>[0],
+  ): ReturnType<typeof appendCadreEventLog> {
+    const event = appendCadreEventLog(input);
+    cadreStreamHub.publish({ type: "cadre_event", event });
+    return event;
   }
 
   private refreshReadiness(type: CadreTerminalType): void {
@@ -316,6 +412,13 @@ class CadreRuntimeManager {
       });
       this.applyReadiness(type, detected);
       this.publishStatus(type);
+      this.emitCadreEvent({
+        type: "runtime_stopped",
+        actor: runtimeIdToActor(type),
+        runtimeId: type,
+        message: `${entry.name} process exited (${reason})`,
+        severity: exitCode && exitCode !== 0 ? "error" : "info",
+      });
     });
   }
 
@@ -348,6 +451,13 @@ class CadreRuntimeManager {
         lastReadinessAt: new Date().toISOString(),
       });
       this.publishStatus(type);
+      this.emitCadreEvent({
+        type: "runtime_stopped",
+        actor: runtimeIdToActor(type),
+        runtimeId: type,
+        message: `${entry.name} process exited (${reason})`,
+        severity: code && code !== 0 ? "error" : "info",
+      });
     });
   }
 
