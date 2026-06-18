@@ -11,6 +11,7 @@ import type { Identity } from "@/lib/identity/identity-types";
 import { cn } from "@/lib/utils";
 import { DepthButton, DepthPanel } from "@/components/realmorphism";
 import { SettingsAppUpdateSection } from "@/components/cyberdeck/settings-app-update-section";
+import { MuthurComposerAudioKnobs } from "@/components/cyberdeck/muthur-composer-audio-knobs";
 
 const SWITCH_LEGACY_EMERALD =
   "data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]";
@@ -21,6 +22,10 @@ type CyberdeckSettingsPaneBodyProps = {
   audioMuted: boolean;
   onAudioMuteToggle: () => void;
   identity: Identity | null;
+  voiceVolume: number;
+  onVoiceVolumeChange: (volume: number) => void;
+  sonarVolume: number;
+  onSonarVolumeChange: (volume: number) => void;
 };
 
 /** SETTINGS rail / `settings` command surface. */
@@ -30,6 +35,10 @@ export function CyberdeckSettingsPaneBody({
   audioMuted,
   onAudioMuteToggle,
   identity,
+  voiceVolume,
+  onVoiceVolumeChange,
+  sonarVolume,
+  onSonarVolumeChange,
 }: CyberdeckSettingsPaneBodyProps) {
   return (
     <div className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4">
@@ -100,6 +109,20 @@ export function CyberdeckSettingsPaneBody({
           <section className="flex flex-col gap-2">
             <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">DECK AUDIO</div>
             <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">
+              <div className="mb-4 border-b border-[#1c1c1c] pb-4">
+                <div className="mb-3 text-[9px] tracking-[0.06em] text-[#8a8a8a]">LEVELS</div>
+                <p className="mb-3 text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
+                  MUTHUR voice output and uplink sonar ping loop. Drag or scroll a dial to adjust.
+                </p>
+                <MuthurComposerAudioKnobs
+                  compact={false}
+                  voiceVolume={voiceVolume}
+                  onVoiceVolumeChange={onVoiceVolumeChange}
+                  sonarVolume={sonarVolume}
+                  onSonarVolumeChange={onSonarVolumeChange}
+                  className="justify-start gap-4"
+                />
+              </div>
 <div className="flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3 first:border-t-0 first:pt-0">
                 <div className="min-w-0">
                   <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">AUDIO OUTPUT</div>

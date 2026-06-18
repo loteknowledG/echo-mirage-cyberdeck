@@ -9,6 +9,7 @@ type MuthurComposerAudioKnobsProps = {
   onVoiceVolumeChange: (volume: number) => void;
   sonarVolume: number;
   onSonarVolumeChange: (volume: number) => void;
+  compact?: boolean;
   className?: string;
 };
 
@@ -21,12 +22,16 @@ export function MuthurComposerAudioKnobs({
   onVoiceVolumeChange,
   sonarVolume,
   onSonarVolumeChange,
+  compact = true,
   className,
 }: MuthurComposerAudioKnobsProps) {
+  const knobShellClass = compact ? "origin-bottom scale-[0.72]" : "";
+  const knobClass = compact ? "w-14" : "w-16";
+
   return (
     <div className={cn("flex items-end gap-1.5", className)}>
       <div
-        className="origin-bottom scale-[0.72]"
+        className={knobShellClass}
         style={{ touchAction: "none" }}
         onPointerDown={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
@@ -46,11 +51,11 @@ export function MuthurComposerAudioKnobs({
           theme="dark"
           showReadout={false}
           showLabel
-          className="w-14"
+          className={knobClass}
         />
       </div>
       <div
-        className="origin-bottom scale-[0.72]"
+        className={knobShellClass}
         style={{ touchAction: "none" }}
         onPointerDown={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
@@ -70,7 +75,7 @@ export function MuthurComposerAudioKnobs({
           theme="dark"
           showReadout={false}
           showLabel
-          className="w-14"
+          className={knobClass}
         />
       </div>
     </div>

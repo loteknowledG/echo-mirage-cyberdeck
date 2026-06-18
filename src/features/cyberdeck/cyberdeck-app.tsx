@@ -206,7 +206,6 @@ import {
   saveUplinkSonarVolume,
 } from "@/lib/cyberdeck/uplink-sonar-volume";
 import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
-import { MuthurComposerAudioKnobs } from "@/components/cyberdeck/muthur-composer-audio-knobs";
 import { MuthurUplinkModeRoller } from "@/components/cyberdeck/muthur-uplink-mode-roller";
 import { isMuted, playBeep, setMuted } from "@/lib/deck-audio";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
@@ -6775,6 +6774,10 @@ ${diff}`;
             audioMuted={audioMuted}
             onAudioMuteToggle={toggleAudioMuted}
             identity={identity}
+            voiceVolume={voiceDial.volume}
+            onVoiceVolumeChange={handleVoiceVolumeChange}
+            sonarVolume={sonarVolume}
+            onSonarVolumeChange={handleSonarVolumeChange}
           />,
         );
       }
@@ -6969,6 +6972,10 @@ ${diff}`;
       updateCustomTab,
       voiceEnabled,
       voiceHealth,
+      voiceDial.volume,
+      handleVoiceVolumeChange,
+      sonarVolume,
+      handleSonarVolumeChange,
     ],
   );
 
@@ -7344,14 +7351,6 @@ ${diff}`;
                 <div className="muthur-composer-controls px-1">
                   <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <div data-morphism={paneToolbarMorphismZone(deckMode)}>
-                    <MuthurComposerAudioKnobs
-                      voiceVolume={voiceDial.volume}
-                      onVoiceVolumeChange={handleVoiceVolumeChange}
-                      sonarVolume={sonarVolume}
-                      onSonarVolumeChange={handleSonarVolumeChange}
-                    />
-                  </div>
                   <button
                     type="button"
                     onClick={() => handleModelLabelClick("s")}
@@ -7885,6 +7884,10 @@ ${diff}`;
                     audioMuted={audioMuted}
                     onAudioMuteToggle={toggleAudioMuted}
                     identity={identity}
+                    voiceVolume={voiceDial.volume}
+                    onVoiceVolumeChange={handleVoiceVolumeChange}
+                    sonarVolume={sonarVolume}
+                    onSonarVolumeChange={handleSonarVolumeChange}
                   />
               </div>
             </CyberdeckFixedServerPane>
