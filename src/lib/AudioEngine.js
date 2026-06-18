@@ -706,6 +706,8 @@ export function playBleepBloop() {
   const ctx = getCtx();
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
 
+  const scale = uplinkSonarPreferredVolume / 0.55;
+
   // Tiny, polite status cue for long-running network waits.
   const scheduleTone = (delayMs, opts) => {
     setTimeout(() => {
@@ -717,17 +719,17 @@ export function playBleepBloop() {
     freqStart: 720,
     duration: 0.06,
     type: "sine",
-    volume: 0.042,
+    volume: 0.042 * scale,
   });
   scheduleTone(120, {
     freqStart: 520,
     duration: 0.08,
     type: "triangle",
-    volume: 0.034,
+    volume: 0.034 * scale,
   });
 
   // Keep fallback subtle as well.
-  playFallbackClip("click", 0.12);
+  playFallbackClip("click", 0.12 * scale);
 }
 
 export function playWrongDoorShut() {

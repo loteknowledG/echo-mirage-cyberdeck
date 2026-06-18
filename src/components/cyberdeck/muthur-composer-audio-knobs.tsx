@@ -59,10 +59,10 @@ export function MuthurComposerAudioKnobs({
         style={{ touchAction: "none" }}
         onPointerDown={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
-        title={`Sonar ping ${sonarScaleToKnob(sonarVolume)}%`}
+        title={`Uplink bleep bloop ${sonarScaleToKnob(sonarVolume)}%`}
       >
         <Knob
-          label="SONAR"
+          label="UPLINK"
           unit="%"
           min={0}
           max={100}

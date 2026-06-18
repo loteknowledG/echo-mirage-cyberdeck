@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { ChatUserRoleLabel } from "@/components/cyberdeck/chat-user-role-label";
 import {
-  buildMuthurResponseScrollKey,
   countMuthurWords,
   extractMuthurProgressStatus,
   formatDiagnosticLabel,
@@ -79,7 +78,7 @@ export function MuthurCommandConsoleLog({
   echoHeader,
 }: MuthurCommandConsoleLogProps) {
   const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
-  const latestResponseRef = useRef<HTMLDivElement>(null);
+  const lastDiagnosticsCountRef = useRef(0);
   const turns = useMemo(() => groupMuthurChatTurns(messages), [messages]);
   const diagnosticsPresentation = useMemo(
     () => presentMuthurDiagnostics(diagnosticsState),
@@ -90,18 +89,18 @@ export function MuthurCommandConsoleLog({
     diagnosticsPresentation.totalCount + (streamToolTrace && isStreaming ? 1 : 0);
   const streamBody = formatMuthurStreamBody(streamText);
   const progressStatus = extractMuthurProgressStatus(streamText);
-  const scrollKey = [buildMuthurResponseScrollKey(messages, streamText, isStreaming), progressStatus].join(
-    "|",
-  );
-  const lastTurnId = turns.at(-1)?.id;
 
   useEffect(() => {
-    latestResponseRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, [scrollKey]);
-
-  useEffect(() => {
-    if (diagnosticsTotalCount === 0) setDiagnosticsExpanded(false);
-  }, [diagnosticsTotalCount]);
+    if (diagnosticsTotalCount === 0) {
+      setDiagnosticsExpanded(false);
+      lastDiagnosticsCountRef.current = 0;
+      return;
+    }
+    if (isStreaming || diagnosticsTotalCount > lastDiagnosticsCountRef.current) {
+      setDiagnosticsExpanded(true);
+    }
+    lastDiagnosticsCountRef.current = diagnosticsTotalCount;
+  }, [diagnosticsTotalCount, isStreaming]);
 
   let rowIndex = 0;
 
@@ -138,11 +137,6 @@ export function MuthurCommandConsoleLog({
               <div
                 data-chat-row={rowIndex++}
                 data-muthur-response
-                ref={
-                  !streamBody && !isStreaming && turn.id === lastTurnId
-                    ? latestResponseRef
-                    : undefined
-                }
                 className={`nav-row py-1 text-xs ${
                   chatKeyboardHighlightIndex === rowIndex - 1 ? "nav-row-kb-hover" : ""
                 } ${isLongMuthurResponse(turn.assistant.text) ? "muthur-long-response" : ""}`}
@@ -172,7 +166,6 @@ export function MuthurCommandConsoleLog({
             data-chat-row={rowIndex++}
             data-muthur-response
             data-muthur-latest-response
-            ref={latestResponseRef}
             className={`nav-row py-1 text-xs ${
               chatKeyboardHighlightIndex === rowIndex - 1 ? "nav-row-kb-hover" : ""
             } ${isLongMuthurResponse(streamBody) ? "muthur-long-response" : ""}`}

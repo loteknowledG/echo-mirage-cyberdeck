@@ -115,6 +115,35 @@ export function buildMuthurResponseScrollKey(
   ].join(":");
 }
 
+/** Scroll key for the full chat column (messages, stream, progress, diagnostics). */
+export function buildMuthurChatScrollKey(args: {
+  messages: MuthurChatMessage[];
+  streamText: string;
+  isStreaming: boolean;
+  streamToolTrace: string;
+  diagnosticsEntryCount: number;
+  lastDiagnosticId?: string;
+  lastDiagnosticRepeatCount?: number;
+  responseStallElapsedMs?: number;
+}): string {
+  const last = args.messages.at(-1);
+  const streamBody = formatMuthurStreamBody(args.streamText);
+  const progressStatus = extractMuthurProgressStatus(args.streamText);
+  return [
+    args.messages.length,
+    last?.role ?? "",
+    last?.text.length ?? 0,
+    streamBody.length,
+    progressStatus,
+    args.isStreaming ? 1 : 0,
+    args.streamToolTrace,
+    args.diagnosticsEntryCount,
+    args.lastDiagnosticId ?? "",
+    args.lastDiagnosticRepeatCount ?? 0,
+    args.responseStallElapsedMs ?? 0,
+  ].join(":");
+}
+
 export function resolveMuthurResponsePhase(args: {
   isStreaming: boolean;
   streamText: string;

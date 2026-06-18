@@ -61,8 +61,7 @@ import {
   playDeckWrongDoorShut,
   playDeckNavigationSound,
   playDeckSystemSound,
-  startDeckUplinkSonarPing,
-  stopDeckUplinkSonarPing,
+  playDeckBleepBloop,
   setDeckUplinkSonarVolume,
   unlockDeckKeyboardSfx,
 } from "@/features/cyberdeck/runtime/defer-deck-audio";
@@ -104,6 +103,7 @@ import {
   splitMuthurStreamPayload,
 } from "@/lib/muthur-core/muthur-stream-payload";
 import {
+  buildMuthurChatScrollKey,
   extractMuthurProgressStatus,
   toolTraceToDiagnostic,
 } from "@/lib/muthur-core/muthur-command-console";
@@ -1054,6 +1054,7 @@ export default function CyberdeckApp() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [streamToolTrace, setStreamToolTrace] = useState("");
+  const [chatPinnedToBottom, setChatPinnedToBottom] = useState(true);
   const [muthurUplinkMode, setMuthurUplinkMode] = useState<MuthurUplinkMode>(() => loadMuthurUplinkMode());
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
@@ -1211,6 +1212,7 @@ export default function CyberdeckApp() {
   const operatorBrowserRef = useRef<HTMLWebViewElement | null>(null);
   const operatorNameInputRef = useRef<HTMLInputElement | null>(null);
   const networkFeedbackDelayRef = useRef<number | null>(null);
+  const networkFeedbackRepeatRef = useRef<number | null>(null);
   const offlineAutoOpenedRef = useRef(false);
   const startupRailResolvedRef = useRef(false);
   const prevConnectionStateRef = useRef<"offline" | "connecting" | "connected">("offline");
@@ -3753,23 +3755,59 @@ export default function CyberdeckApp() {
     return () => window.clearInterval(timer);
   }, [isStreaming, streamText]);
 
+  const muthurChatScrollKey = useMemo(() => {
+    const lastDiag = muthurDiagnostics.entries.at(-1);
+    return buildMuthurChatScrollKey({
+      messages,
+      streamText,
+      isStreaming,
+      streamToolTrace,
+      diagnosticsEntryCount: muthurDiagnostics.entries.length,
+      lastDiagnosticId: lastDiag?.id,
+      lastDiagnosticRepeatCount: lastDiag?.repeatCount,
+      responseStallElapsedMs: muthurStall?.elapsedMs,
+    });
+  }, [messages, streamText, isStreaming, streamToolTrace, muthurDiagnostics, muthurStall]);
+
+  useLayoutEffect(() => {
+    if (!chatPinnedToBottom) return;
+    const el = messageScrollRef.current;
+    if (!el) return;
+    const scrollToBottom = (behavior: ScrollBehavior) => {
+      el.scrollTo({ top: el.scrollHeight, behavior });
+    };
+    scrollToBottom(isStreaming ? "auto" : "smooth");
+    if (!isStreaming) return;
+    const frame = requestAnimationFrame(() => scrollToBottom("auto"));
+    return () => cancelAnimationFrame(frame);
+  }, [muthurChatScrollKey, chatPinnedToBottom, isStreaming]);
+
   useEffect(() => {
     if (isStreaming) {
       if (networkFeedbackDelayRef.current == null) {
         networkFeedbackDelayRef.current = window.setTimeout(() => {
           networkFeedbackDelayRef.current = null;
-          startDeckUplinkSonarPing();
+          playDeckBleepBloop();
+          networkFeedbackRepeatRef.current = window.setInterval(() => {
+            playDeckBleepBloop();
+          }, 7000);
         }, 2800);
       }
     } else {
-      stopDeckUplinkSonarPing();
+      if (networkFeedbackRepeatRef.current !== null) {
+        window.clearInterval(networkFeedbackRepeatRef.current);
+        networkFeedbackRepeatRef.current = null;
+      }
       if (networkFeedbackDelayRef.current !== null) {
         window.clearTimeout(networkFeedbackDelayRef.current);
         networkFeedbackDelayRef.current = null;
       }
     }
     return () => {
-      stopDeckUplinkSonarPing();
+      if (networkFeedbackRepeatRef.current !== null) {
+        window.clearInterval(networkFeedbackRepeatRef.current);
+        networkFeedbackRepeatRef.current = null;
+      }
       if (networkFeedbackDelayRef.current !== null) {
         window.clearTimeout(networkFeedbackDelayRef.current);
         networkFeedbackDelayRef.current = null;
@@ -4827,6 +4865,7 @@ export default function CyberdeckApp() {
     const tabCommand = parseCustomTabCommand(userMessage);
     setInputHistory((prev) => [...prev, userMessage]);
     messageInputRef.current?.clear();
+    setChatPinnedToBottom(true);
     setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
     setIsStreaming(true);
     setStreamText(MUTHUR_UPLINK_PREPARING);
@@ -7300,6 +7339,13 @@ ${diff}`;
               ref={messageScrollRef}
               tabIndex={-1}
               className="cyberdeck-chat-content custom-scrollbar flex min-h-0 flex-1 basis-0 flex-col overflow-y-auto p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
+              onScroll={(event) => {
+                const el = event.currentTarget;
+                const threshold = 48;
+                setChatPinnedToBottom(
+                  el.scrollHeight - el.scrollTop - el.clientHeight <= threshold,
+                );
+              }}
             >
               {isMobileLayout ? (
                 <div className="mb-2">

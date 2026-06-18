@@ -112,7 +112,7 @@ export function CyberdeckSettingsPaneBody({
               <div className="mb-4 border-b border-[#1c1c1c] pb-4">
                 <div className="mb-3 text-[9px] tracking-[0.06em] text-[#8a8a8a]">LEVELS</div>
                 <p className="mb-3 text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
-                  MUTHUR voice output and uplink sonar ping loop. Drag or scroll a dial to adjust.
+                  MUTHUR voice output and uplink bleep bloop cue. Drag or scroll a dial to adjust.
                 </p>
                 <MuthurComposerAudioKnobs
                   compact={false}
