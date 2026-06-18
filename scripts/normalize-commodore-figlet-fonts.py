@@ -14,7 +14,7 @@ except ImportError:
         "(pip install -r requirements-glyph.txt)",
         file=sys.stderr,
     )
-    sys.exit(0)
+    sys.exit(1)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FONT_DIR = REPO_ROOT / "assets" / "figlet-fonts"

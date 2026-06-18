@@ -47,7 +47,7 @@ export async function renderFigletText(text: string, font?: string): Promise<str
       return renderPyfigletText(text, fontName);
     }
     throw new Error(
-      `Font "${fontName}" needs pyfiglet (Commodore/custom). Works in compiled Echo Mirage; installed PWA cannot run Python on the server.`,
+      `Font "${fontName}" could not be loaded. Run pnpm fonts:normalize locally, or redeploy after a successful Vercel build.`,
     );
   }
 
