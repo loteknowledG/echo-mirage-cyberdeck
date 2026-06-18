@@ -1,13 +1,7 @@
-import figlet from "figlet";
-import fs from "fs";
-import path from "path";
-import { createRequire } from "module";
 import { DEFAULT_FIGLET_FONT } from "@/lib/figlet-fonts";
 import { BUNDLED_FIGLET_FONTS } from "@/lib/figlet-font-manifest";
 import { listCustomFigletFontNamesFromDisk } from "@/lib/figlet-custom-fonts.server";
 import { isPyfigletAvailable, listPyfigletFonts } from "@/lib/pyfiglet.server";
-
-const require = createRequire(import.meta.url);
 
 export { DEFAULT_FIGLET_FONT };
 
@@ -26,21 +20,6 @@ function mergeFontLists(bundled: readonly string[], custom: readonly string[]): 
 }
 
 async function readBundledFigletFontNames(): Promise<string[]> {
-  const npmFontPath = path.join(path.dirname(require.resolve("figlet")), "fonts");
-  const canScanNpmFonts = fs.existsSync(npmFontPath);
-  if (canScanNpmFonts) {
-    try {
-      const names = await new Promise<string[]>((resolve, reject) => {
-        figlet.fonts((err, fonts) => {
-          if (err) reject(err);
-          else resolve(fonts ?? []);
-        });
-      });
-      if (names.length > 0) return names;
-    } catch {
-      /* serverless: npm fonts/ often missing from the trace */
-    }
-  }
   return [...BUNDLED_FIGLET_FONTS];
 }
 
