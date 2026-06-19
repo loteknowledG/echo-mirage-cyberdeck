@@ -21,7 +21,6 @@ const PANE_IMPORTS: Record<CyberdeckPaneKind, () => Promise<CyberdeckPaneModule>
   "drop-bay": () => import("@/features/cyberdeck/pane-loaders/drop-bay"),
   "glyph-channel": () => import("@/features/cyberdeck/pane-loaders/glyph-channel"),
   "rola-dex": () => import("@/features/cyberdeck/pane-loaders/rola-dex"),
-  "sound-profile": () => import("@/features/cyberdeck/pane-loaders/sound-profile"),
   tunes: () => import("@/features/cyberdeck/pane-loaders/tunes"),
   "test-pane": () => import("@/features/cyberdeck/pane-loaders/test-pane"),
   "call-center": () => import("@/features/cyberdeck/pane-loaders/call-center"),

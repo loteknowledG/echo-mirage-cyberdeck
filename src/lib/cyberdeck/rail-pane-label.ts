@@ -15,7 +15,6 @@ const FIXED_SERVER_PANE_LABELS: Record<string, string> = {
 const RAIL_KIND_DISPLAY: Partial<Record<CyberdeckPaneKind, string>> = {
   "glyph-channel": "ASCII",
   "voice-lab": "VOICE",
-  "sound-profile": "SOUND",
   tunes: "TUNES",
   "rola-dex": "POWERFIST",
   "test-pane": "TEST",

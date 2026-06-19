@@ -2,7 +2,7 @@
 
 const AUDIO_MUTED_KEY = "echo-mirage-audio-muted-v1";
 
-let muted = true;
+let muted = false;
 let context: AudioContext | null = null;
 let hasLoadedMuteState = false;
 
@@ -11,9 +11,14 @@ function ensureMuteStateLoaded() {
   hasLoadedMuteState = true;
   if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
   try {
-    muted = window.localStorage.getItem(AUDIO_MUTED_KEY) !== "0";
+    const stored = window.localStorage.getItem(AUDIO_MUTED_KEY);
+    if (stored === null) {
+      muted = false;
+      return;
+    }
+    muted = stored !== "0";
   } catch {
-    muted = true;
+    muted = false;
   }
 }
 

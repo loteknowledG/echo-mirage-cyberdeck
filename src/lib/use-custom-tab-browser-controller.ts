@@ -21,7 +21,6 @@ type CustomTabBrowserKind =
   | "flight-log"
   | "glyph-channel"
   | "rola-dex"
-  | "sound-profile"
   | "tunes";
 
 type CustomTabBrowserState = {

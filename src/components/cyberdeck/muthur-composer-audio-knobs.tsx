@@ -9,6 +9,8 @@ type MuthurComposerAudioKnobsProps = {
   onVoiceVolumeChange: (volume: number) => void;
   sonarVolume: number;
   onSonarVolumeChange: (volume: number) => void;
+  deckSfxMuted: boolean;
+  onDeckSfxMutedChange: (muted: boolean) => void;
   compact?: boolean;
   className?: string;
 };
@@ -22,6 +24,8 @@ export function MuthurComposerAudioKnobs({
   onVoiceVolumeChange,
   sonarVolume,
   onSonarVolumeChange,
+  deckSfxMuted,
+  onDeckSfxMutedChange,
   compact = true,
   className,
 }: MuthurComposerAudioKnobsProps) {
@@ -71,6 +75,31 @@ export function MuthurComposerAudioKnobs({
           onValueChange={(next) => onSonarVolumeChange(knobToSonarScale(next))}
           wheelMultiplier={1.2}
           dragMultiplier={1.5}
+          size="sm"
+          theme="dark"
+          showReadout={false}
+          showLabel
+          className={knobClass}
+        />
+      </div>
+      <div
+        className={knobShellClass}
+        style={{ touchAction: "none" }}
+        onPointerDown={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
+        title={`Keyboard SFX ${deckSfxMuted ? "off — click dial to enable" : "on — click dial to mute"}`}
+      >
+        <Knob
+          label="KEYS"
+          unit="%"
+          min={0}
+          max={100}
+          step={100}
+          value={deckSfxMuted ? 0 : 100}
+          active={!deckSfxMuted}
+          onActiveChange={(active) => onDeckSfxMutedChange(!active)}
+          onValueChange={(next) => onDeckSfxMutedChange(next <= 0)}
+          clickTogglesActive
           size="sm"
           theme="dark"
           showReadout={false}

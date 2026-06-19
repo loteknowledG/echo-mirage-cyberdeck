@@ -72,7 +72,7 @@ function playTone({
   crunch = false,
   at,
 }) {
-  if (!enabled) return;
+  if (!enabled || isDeckAudioMuted()) return;
 
   const ctx = getCtx();
   const t = typeof at === "number" && Number.isFinite(at) ? at : ctx.currentTime;
@@ -199,11 +199,13 @@ const MEMORIZE_LETTER_SEMITONES = [
 const MEMORIZE_ROOT_HZ = 220;
 
 function isDeckAudioMuted() {
-  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return true;
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return false;
   try {
-    return window.localStorage.getItem("echo-mirage-audio-muted-v1") !== "0";
+    const stored = window.localStorage.getItem("echo-mirage-audio-muted-v1");
+    if (stored === null) return false;
+    return stored !== "0";
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -242,6 +244,7 @@ export function playMemorizeKeySound(key, options = {}) {
 }
 
 function playFallbackClip(kind, volume = 0.4) {
+  if (isDeckAudioMuted()) return;
   if (typeof Audio === "undefined") return;
   const v = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 0.4));
   try {

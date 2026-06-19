@@ -47,7 +47,6 @@ export function isSubsystemEnabledAtBoot(
     | "catalog"
     | "operators"
     | "flight-log"
-    | "sound-profile"
     | "rola-dex",
 ): boolean {
   if (mode === "full") return true;

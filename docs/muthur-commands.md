@@ -65,7 +65,7 @@ Optional prefix: `/tab` or `tab:`
 | `clear tab` · `reset tab` · `clear tab state` | Reset tab state |
 | `delete tab` · `remove tab` · `close tab` | Close active custom tab |
 
-**`<kind>` values:** `blank`, `document`, `web`, `settings`, `connection`, `pi`, `diagnostics`, `catalog`, `operators`, `memory-atlas`, `voice-lab`, `flight-log`, `glyph-channel`, `rola-dex`, `sound-profile` (aliases: `diagnostic`, `catelog`, `glyph`, `preview`, `roladex`, `soundprofile`).
+**`<kind>` values:** `blank`, `document`, `web`, `settings`, `connection`, `pi`, `diagnostics`, `catalog`, `operators`, `memory-atlas`, `voice-lab`, `flight-log`, `glyph-channel`, `rola-dex`, `tunes` (aliases: `diagnostic`, `catelog`, `glyph`, `preview`, `roladex`, `sound-profile`, `soundprofile`, `music`).
 
 ---
 

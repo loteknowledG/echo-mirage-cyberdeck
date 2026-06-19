@@ -20,7 +20,7 @@ type CyberdeckSettingsPaneBodyProps = {
   voiceEnabled: boolean;
   onVoiceToggle: () => void;
   audioMuted: boolean;
-  onAudioMuteToggle: () => void;
+  onAudioMutedChange: (muted: boolean) => void;
   identity: Identity | null;
   voiceVolume: number;
   onVoiceVolumeChange: (volume: number) => void;
@@ -33,7 +33,7 @@ export function CyberdeckSettingsPaneBody({
   voiceEnabled,
   onVoiceToggle,
   audioMuted,
-  onAudioMuteToggle,
+  onAudioMutedChange,
   identity,
   voiceVolume,
   onVoiceVolumeChange,
@@ -112,7 +112,8 @@ export function CyberdeckSettingsPaneBody({
               <div className="mb-4 border-b border-[#1c1c1c] pb-4">
                 <div className="mb-3 text-[9px] tracking-[0.06em] text-[#8a8a8a]">LEVELS</div>
                 <p className="mb-3 text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
-                  MUTHUR voice output and uplink bleep bloop cue. Drag or scroll a dial to adjust.
+                  MUTHUR voice, uplink bleep bloop, and keyboard/UI cues. Drag a level dial to adjust;
+                  click KEYS to mute or unmute deck sound effects.
                 </p>
                 <MuthurComposerAudioKnobs
                   compact={false}
@@ -120,23 +121,9 @@ export function CyberdeckSettingsPaneBody({
                   onVoiceVolumeChange={onVoiceVolumeChange}
                   sonarVolume={sonarVolume}
                   onSonarVolumeChange={onSonarVolumeChange}
+                  deckSfxMuted={audioMuted}
+                  onDeckSfxMutedChange={onAudioMutedChange}
                   className="justify-start gap-4"
-                />
-              </div>
-<div className="flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3 first:border-t-0 first:pt-0">
-                <div className="min-w-0">
-                  <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">AUDIO OUTPUT</div>
-                  <div className="mt-0.5 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
-                    Live: SFX allowed. Muted: full silence.
-                  </div>
-                </div>
-                <Switch
-                  checked={!audioMuted}
-                  onCheckedChange={() => {
-                    onAudioMuteToggle();
-                  }}
-                  aria-label={audioMuted ? "Unmute deck audio" : "Mute deck audio"}
-                  className={cn("realmorphism-switch shrink-0", SWITCH_LEGACY_EMERALD)}
                 />
               </div>
             </div>

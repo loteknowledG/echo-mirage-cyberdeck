@@ -404,7 +404,6 @@ const CUSTOM_TAB_KINDS = [
   "drop-bay",
   "glyph-channel",
   "rola-dex",
-  "sound-profile",
   "tunes",
   "test-pane",
   "realmorphism-kit",
@@ -508,7 +507,6 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Kit", action: "kit-pane" },
   { label: "Powerfist", kind: "rola-dex", action: "convert" },
-  { label: "Sound Profile", kind: "sound-profile", action: "convert" },
   { label: "Tunes", kind: "tunes", action: "convert" },
   { label: "Test", kind: "test-pane", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
@@ -850,7 +848,7 @@ function normalizeCustomTabKind(kind: string) {
     nextKind === "sound_profile" ||
     nextKind === "soundprofile"
   ) {
-    return "sound-profile" as CustomTabKind;
+    return "tunes" as CustomTabKind;
   }
   if (nextKind === "tunes" || nextKind === "music" || nextKind === "dj") {
     return "tunes" as CustomTabKind;
@@ -912,7 +910,6 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "drop-bay") return "⬇";
   if (kind === "glyph-channel") return "⟁";
   if (kind === "rola-dex") return "#";
-  if (kind === "sound-profile") return "♪";
   if (kind === "tunes") return "♫";
   if (kind === "test-pane") return "T";
   if (kind === "call-center") return "CC";
@@ -931,7 +928,6 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "drop-bay") return "DROP BAY";
   if (kind === "glyph-channel") return "⟁ GLYPH";
   if (kind === "rola-dex") return "Rola Dex";
-  if (kind === "sound-profile") return "Sound Profile";
   if (kind === "tunes") return "Tunes";
   if (kind === "test-pane") return "Test";
   if (kind === "call-center") return "CALL CENTER";
@@ -1567,17 +1563,18 @@ export default function CyberdeckApp() {
     });
   }, []);
 
-  const toggleAudioMuted = useCallback(() => {
-    const nextMuted = !audioMuted;
-    setMuted(nextMuted);
-    setAudioMutedState(nextMuted);
-    if (!nextMuted) {
+  const toggleAudioMuted = useCallback((nextMuted?: boolean) => {
+    const resolvedMuted = typeof nextMuted === "boolean" ? nextMuted : !audioMuted;
+    setMuted(resolvedMuted);
+    setAudioMutedState(resolvedMuted);
+    if (!resolvedMuted) {
       playBeep();
+      void unlockDeckKeyboardSfx();
     }
     emitSignal({
       source: "audio",
       type: "setting_changed",
-      payload: { key: "muted", value: nextMuted },
+      payload: { key: "muted", value: resolvedMuted },
       severity: "info",
     });
   }, [audioMuted]);
@@ -6547,7 +6544,6 @@ ${diff}`;
       | "voice-lab"
       | "glyph-channel"
       | "rola-dex"
-      | "sound-profile"
       | "tunes"
       | "settings") => {
       const customTabs = useCyberdeckTabStore.getState().customTabs;
@@ -6599,7 +6595,6 @@ ${diff}`;
         target !== "voice-lab" &&
         target !== "glyph-channel" &&
         target !== "rola-dex" &&
-        target !== "sound-profile" &&
         target !== "tunes" &&
         target !== "settings"
       ) {
@@ -6820,7 +6815,7 @@ ${diff}`;
             voiceEnabled={voiceEnabled}
             onVoiceToggle={toggleVoiceEnabled}
             audioMuted={audioMuted}
-            onAudioMuteToggle={toggleAudioMuted}
+            onAudioMutedChange={toggleAudioMuted}
             identity={identity}
             voiceVolume={voiceDial.volume}
             onVoiceVolumeChange={handleVoiceVolumeChange}
@@ -6942,18 +6937,7 @@ ${diff}`;
         );
       }
 
-      if (tab.kind === "sound-profile") {
-        return (
-          <div
-            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
-            data-pointer-target="sound-profile"
-          >
-            <ActivatedCyberdeckPane kind="sound-profile" />
-          </div>
-        );
-      }
-
-      if (tab.kind === "tunes") {
+      if (tab.kind === "tunes" || String(tab.kind) === "sound-profile") {
         return (
           <div
             className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
@@ -7948,7 +7932,7 @@ ${diff}`;
                     voiceEnabled={voiceEnabled}
                     onVoiceToggle={toggleVoiceEnabled}
                     audioMuted={audioMuted}
-                    onAudioMuteToggle={toggleAudioMuted}
+                    onAudioMutedChange={toggleAudioMuted}
                     identity={identity}
                     voiceVolume={voiceDial.volume}
                     onVoiceVolumeChange={handleVoiceVolumeChange}

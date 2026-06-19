@@ -7,10 +7,12 @@ import 'realmorphism/styles/kit.css';
 
 import { FigletFontPreviewPanel } from '@/components/cyberdeck/figlet-font-preview-panel';
 import { FigletFontPreviewSlide } from '@/components/cyberdeck/figlet-font-preview-slide';
+import { RealmorphismDesignScratchpad } from '@/components/realmorphism/realmorphism-design-scratchpad';
 import { DEFAULT_FIGLET_FONT } from '@/lib/figlet-fonts';
 import { prefetchGlyphCatalogs } from '@/lib/glyph-catalog-queries';
 import { useFigletFontCatalog } from '@/lib/use-figlet-font-catalog';
 import { useOnelineArtCatalog } from '@/lib/use-oneline-art-catalog';
+import { cn } from '@/lib/utils';
 
 const installCommands = [
   {
@@ -72,18 +74,31 @@ export function RegistryShowroom({ variant = 'page' }: RegistryShowroomProps) {
   );
 
   return (
-    <KitShowroom
-      variant={variant}
-      badgeLabel="Echo Mirage Registry"
-      installCommands={installCommands}
-      textCatalog={textCatalog.length > 0 ? textCatalog : undefined}
-      figlet={{
-        fonts: pickerFonts.length > 0 ? pickerFonts : undefined,
-        defaultFont: DEFAULT_FIGLET_FONT,
-        previewText: 'ECHO',
-        renderWheelPreview,
-        renderDetailPreview,
-      }}
-    />
+    <div
+      data-registry-showroom-shell
+      className={cn(
+        'theme-realmorphism bg-[#060708] text-[#e8efeb]',
+        variant === 'embedded'
+          ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden'
+          : 'h-screen overflow-y-auto overflow-x-hidden',
+      )}
+    >
+      <KitShowroom
+        variant="embedded"
+        badgeLabel="Echo Mirage Registry"
+        installCommands={installCommands}
+        textCatalog={textCatalog.length > 0 ? textCatalog : undefined}
+        figlet={{
+          fonts: pickerFonts.length > 0 ? pickerFonts : undefined,
+          defaultFont: DEFAULT_FIGLET_FONT,
+          previewText: 'ECHO',
+          renderWheelPreview,
+          renderDetailPreview,
+        }}
+      />
+      <div data-morphism="realmorphism" className="mx-auto w-full min-w-0 max-w-6xl px-3 pb-10 sm:px-4 lg:px-0">
+        <RealmorphismDesignScratchpad className="px-1 sm:px-0" />
+      </div>
+    </div>
   );
 }
