@@ -211,7 +211,35 @@ import {
   saveDeckSfxVolume,
 } from "@/lib/cyberdeck/deck-sfx-volume";
 import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
+import { MuthurCommanderStatus } from "@/components/cyberdeck/muthur-commander-status";
+import { MuthurDelegationPanel } from "@/components/cyberdeck/muthur-delegation-panel";
 import { MuthurUplinkModeRoller } from "@/components/cyberdeck/muthur-uplink-mode-roller";
+import {
+  formatDelegationCancelledLine,
+  formatDelegationDispatchedLine,
+  formatDelegationPreparedLine,
+  formatDelegationResultLine,
+} from "@/lib/muthur/delegation/muthur-delegation-events";
+import {
+  advanceMissionForDelegationDispatch,
+  advanceMissionForDelegationResult,
+  advanceMissionWhenDelegationsClear,
+} from "@/lib/muthur/delegation/muthur-delegation-lifecycle";
+import { formatMuthurDelegationPackageMessage } from "@/lib/muthur/delegation/muthur-delegation-package";
+import {
+  cancelMuthurDelegation,
+  createMuthurDelegation,
+  listDelegationsForMission,
+  loadMuthurDelegations,
+  markDelegationDispatched,
+  recordDelegationResult,
+  replaceDelegation,
+  saveMuthurDelegations,
+} from "@/lib/muthur/delegation/muthur-delegation-store";
+import type {
+  MuthurDelegationAssignment,
+  MuthurDelegationWorkerId,
+} from "@/lib/muthur/delegation/muthur-delegation-types";
 import { playBeep } from "@/lib/deck-audio";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
 import { useDebouncedEffect } from "@/lib/use-debounced-effect";
@@ -243,10 +271,33 @@ import { summarizeMuthurOperatorEdits } from "@/lib/muthur-operator-edit-summary
 import {
   getMuthurUplinkModeMeta,
   loadMuthurUplinkMode,
+  normalizeMuthurUplinkMode,
   saveMuthurUplinkMode,
   shouldAutoCommitOperatorEdits,
   type MuthurUplinkMode,
 } from "@/lib/muthur-uplink-mode";
+import {
+  createMuthurMission,
+  loadMuthurMission,
+  saveMuthurMission,
+} from "@/lib/muthur/mission/muthur-mission-store";
+import {
+  canExecuteCommanderMissionWork,
+  isOperationalMuthurMission,
+  type MuthurMission,
+} from "@/lib/muthur/mission/muthur-mission-types";
+import {
+  activateMission,
+  setMissionReady,
+  type MissionLifecycleResult,
+} from "@/lib/muthur/mission/muthur-mission-lifecycle";
+import {
+  formatMuthurCommanderActivatedLine,
+  formatMuthurCommanderArchiveLine,
+  formatMuthurMissionCreatedLine,
+  formatMuthurModeChangedLine,
+} from "@/lib/muthur/mission/muthur-commander-events";
+import { getMuthurCommanderPosture } from "@/lib/muthur/mission/muthur-commander-posture";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 import {
   POWERFIST_STACK_CHANNEL,
@@ -1060,6 +1111,10 @@ export default function CyberdeckApp() {
   const [streamToolTrace, setStreamToolTrace] = useState("");
   const [chatPinnedToBottom, setChatPinnedToBottom] = useState(true);
   const [muthurUplinkMode, setMuthurUplinkMode] = useState<MuthurUplinkMode>(() => loadMuthurUplinkMode());
+  const [muthurMission, setMuthurMission] = useState<MuthurMission | null>(() => loadMuthurMission());
+  const [muthurDelegations, setMuthurDelegations] = useState<MuthurDelegationAssignment[]>(() =>
+    loadMuthurDelegations(),
+  );
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
@@ -1563,6 +1618,172 @@ export default function CyberdeckApp() {
       setOrchestration(bundle);
     });
   }, []);
+
+  const archiveMuthurHistoryLine = useCallback(
+    (line: string) => {
+      setMessages((prev) => [...prev, { role: "system", text: line }]);
+    },
+    [setMessages],
+  );
+
+  const handleMuthurUplinkModeChange = useCallback(
+    (next: MuthurUplinkMode) => {
+      const resolved = normalizeMuthurUplinkMode(next);
+      if (resolved === muthurUplinkMode) return;
+
+      if (resolved === "commander") {
+        const posture = getMuthurCommanderPosture("commander", muthurMission) ?? "AWAITING_MISSION";
+        if (posture === "AWAITING_MISSION" && !muthurMission) {
+          archiveMuthurHistoryLine(
+            formatMuthurCommanderArchiveLine("muthur_commander_awaiting_mission"),
+          );
+        }
+        archiveMuthurHistoryLine(
+          formatMuthurCommanderActivatedLine({
+            posture,
+            title: muthurMission?.title,
+          }),
+        );
+      } else if (muthurUplinkMode === "commander") {
+        archiveMuthurHistoryLine(
+          formatMuthurCommanderArchiveLine("muthur_commander_stood_down", { to: resolved }),
+        );
+      }
+
+      archiveMuthurHistoryLine(formatMuthurModeChangedLine(muthurUplinkMode, resolved));
+      setMuthurUplinkMode(resolved);
+    },
+    [archiveMuthurHistoryLine, muthurMission, muthurUplinkMode],
+  );
+
+  const handleCreateMuthurMission = useCallback(
+    (input: { title: string; objective: string }) => {
+      const draft = createMuthurMission(input);
+      const ready = setMissionReady(draft);
+
+      setMuthurMission(ready.mission);
+      archiveMuthurHistoryLine(formatMuthurMissionCreatedLine(draft));
+      if (ready.ok) {
+        archiveMuthurHistoryLine(ready.archiveLine);
+      }
+    },
+    [archiveMuthurHistoryLine],
+  );
+
+  const handleStartMuthurMission = useCallback(() => {
+    if (!muthurMission) return;
+    const activated = activateMission(
+      muthurMission.status === "draft" ? setMissionReady(muthurMission).mission : muthurMission,
+    );
+    if (!activated.ok) {
+      archiveMuthurHistoryLine(activated.archiveLine);
+      return;
+    }
+    setMuthurMission(activated.mission);
+    archiveMuthurHistoryLine(activated.archiveLine);
+  }, [archiveMuthurHistoryLine, muthurMission]);
+
+  useEffect(() => {
+    saveMuthurMission(muthurMission);
+  }, [muthurMission]);
+
+  useEffect(() => {
+    saveMuthurDelegations(muthurDelegations);
+  }, [muthurDelegations]);
+
+  const applyMissionLifecycleResult = useCallback(
+    (result: MissionLifecycleResult | null) => {
+      if (!result) return;
+      setMuthurMission(result.mission);
+      archiveMuthurHistoryLine(result.archiveLine);
+    },
+    [archiveMuthurHistoryLine],
+  );
+
+  const handleCreateMuthurDelegation = useCallback(
+    (input: {
+      workerId: MuthurDelegationWorkerId;
+      title: string;
+      objective: string;
+      context: string;
+      acceptanceCriteria: string[];
+    }) => {
+      if (!isOperationalMuthurMission(muthurMission)) return;
+      const assignment = createMuthurDelegation({
+        mission: muthurMission,
+        workerId: input.workerId,
+        title: input.title,
+        objective: input.objective,
+        context: input.context,
+        acceptanceCriteria: input.acceptanceCriteria,
+      });
+      setMuthurDelegations((current) => [assignment, ...current]);
+      archiveMuthurHistoryLine(formatDelegationPreparedLine(assignment));
+    },
+    [archiveMuthurHistoryLine, muthurMission],
+  );
+
+  const handleDispatchMuthurDelegation = useCallback(
+    async (assignmentId: string): Promise<string | null> => {
+      if (!isOperationalMuthurMission(muthurMission)) return null;
+      const current = muthurDelegations.find((entry) => entry.id === assignmentId);
+      if (!current || current.status !== "draft") return null;
+
+      const dispatched = markDelegationDispatched(current);
+      const nextDelegations = replaceDelegation(muthurDelegations, dispatched);
+      setMuthurDelegations(nextDelegations);
+      archiveMuthurHistoryLine(formatDelegationDispatchedLine(dispatched));
+
+      const missionAssignments = listDelegationsForMission(nextDelegations, muthurMission.id);
+      const lifecycle = advanceMissionForDelegationDispatch(muthurMission, missionAssignments);
+      applyMissionLifecycleResult(lifecycle);
+
+      const missionForPackage = lifecycle?.mission ?? muthurMission;
+      return formatMuthurDelegationPackageMessage({
+        mission: missionForPackage,
+        assignment: dispatched,
+      });
+    },
+    [applyMissionLifecycleResult, muthurDelegations, muthurMission, archiveMuthurHistoryLine],
+  );
+
+  const handleRecordMuthurDelegationResult = useCallback(
+    (assignmentId: string, input: { success: boolean; summary: string }) => {
+      if (!muthurMission) return;
+      const current = muthurDelegations.find((entry) => entry.id === assignmentId);
+      if (!current) return;
+
+      const recorded = recordDelegationResult(current, input);
+      const nextDelegations = replaceDelegation(muthurDelegations, recorded);
+      setMuthurDelegations(nextDelegations);
+      archiveMuthurHistoryLine(formatDelegationResultLine(recorded, input.success));
+
+      const missionAssignments = listDelegationsForMission(nextDelegations, muthurMission.id);
+      applyMissionLifecycleResult(
+        advanceMissionForDelegationResult(muthurMission, missionAssignments, input.success),
+      );
+    },
+    [applyMissionLifecycleResult, muthurDelegations, muthurMission, archiveMuthurHistoryLine],
+  );
+
+  const handleCancelMuthurDelegation = useCallback(
+    (assignmentId: string) => {
+      if (!muthurMission) return;
+      const current = muthurDelegations.find((entry) => entry.id === assignmentId);
+      if (!current) return;
+
+      const cancelled = cancelMuthurDelegation(current);
+      const nextDelegations = replaceDelegation(muthurDelegations, cancelled);
+      setMuthurDelegations(nextDelegations);
+      archiveMuthurHistoryLine(formatDelegationCancelledLine(cancelled));
+
+      const missionAssignments = listDelegationsForMission(nextDelegations, muthurMission.id);
+      applyMissionLifecycleResult(
+        advanceMissionWhenDelegationsClear(muthurMission, missionAssignments),
+      );
+    },
+    [applyMissionLifecycleResult, muthurDelegations, muthurMission, archiveMuthurHistoryLine],
+  );
 
   const handleDeckSfxVolumeChange = useCallback((volume: number) => {
     setDeckSfxVolumeState((prev) => {
@@ -5468,6 +5689,7 @@ ${diff}`;
             history,
             operatorContext,
             uplinkMode: muthurUplinkMode,
+            commanderMissionActive: canExecuteCommanderMissionWork(muthurMission),
           }),
         });
       } finally {
@@ -7421,7 +7643,7 @@ ${diff}`;
                   <MuthurUplinkModeRoller
                     mode={muthurUplinkMode}
                     disabled={isStreaming}
-                    onChange={setMuthurUplinkMode}
+                    onChange={handleMuthurUplinkModeChange}
                   />
                   </div>
                   <div
@@ -7571,6 +7793,26 @@ ${diff}`;
                     </CyberdeckPaneTooltipProvider>
                   </div>
                   </div>
+                  <MuthurCommanderStatus
+                    mode={muthurUplinkMode}
+                    mission={muthurMission}
+                    disabled={isStreaming}
+                    onCreateMission={handleCreateMuthurMission}
+                    onStartMission={handleStartMuthurMission}
+                    className="mt-1"
+                  />
+                  {muthurUplinkMode === "commander" ? (
+                    <MuthurDelegationPanel
+                      mission={muthurMission}
+                      assignments={muthurDelegations}
+                      disabled={isStreaming}
+                      onCreateDelegation={handleCreateMuthurDelegation}
+                      onDispatchDelegation={handleDispatchMuthurDelegation}
+                      onRecordDelegationResult={handleRecordMuthurDelegationResult}
+                      onCancelDelegation={handleCancelMuthurDelegation}
+                      className="mt-1"
+                    />
+                  ) : null}
                 </div>
               </div>
             </footer>

@@ -7,6 +7,7 @@ import {
   CyberdeckPaneTooltipProvider,
 } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
 import {
+  MUTHUR_UPLINK_MODE_SELECTOR,
   MUTHUR_UPLINK_MODES,
   getMuthurUplinkModeMeta,
   normalizeMuthurUplinkMode,
@@ -16,7 +17,8 @@ import {
 const UPLINK_MODE_GLYPHS: Record<MuthurUplinkMode, string> = {
   ask: "?",
   plan: "P",
-  agent: "E",
+  agent: "A",
+  commander: "C",
   debug: "D",
 };
 
@@ -35,9 +37,17 @@ export function MuthurUplinkModeRoller({
   const resolvedMode = normalizeMuthurUplinkMode(mode);
   const activeMeta = getMuthurUplinkModeMeta(resolvedMode);
 
+  const selectorMeta = useMemo(
+    () =>
+      MUTHUR_UPLINK_MODE_SELECTOR.map((id) => MUTHUR_UPLINK_MODES.find((entry) => entry.id === id)).filter(
+        (entry): entry is (typeof MUTHUR_UPLINK_MODES)[number] => Boolean(entry),
+      ),
+    [],
+  );
+
   const items = useMemo(
     () =>
-      MUTHUR_UPLINK_MODES.map((entry) => ({
+      selectorMeta.map((entry) => ({
         value: entry.id,
         label: entry.label.toUpperCase(),
         slide: (
@@ -46,8 +56,10 @@ export function MuthurUplinkModeRoller({
           </span>
         ),
       })),
-    [],
+    [selectorMeta],
   );
+
+  const pickerValue = MUTHUR_UPLINK_MODE_SELECTOR.includes(resolvedMode) ? resolvedMode : "agent";
 
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
@@ -55,10 +67,10 @@ export function MuthurUplinkModeRoller({
         <div className={disabled ? "pointer-events-none opacity-40" : undefined}>
           <CyberdeckRollingPicker
             items={items}
-            value={resolvedMode}
+            value={pickerValue}
             onChange={(next) => onChange(normalizeMuthurUplinkMode(next))}
             ariaLabel="MUTHUR uplink mode"
-            viewportClassName="h-7 min-w-[3rem] w-auto max-w-[4.75rem]"
+            viewportClassName="h-7 min-w-[3rem] w-auto max-w-[5.25rem]"
             alwaysShowLabel
             showTextWhileScrolling
             loop

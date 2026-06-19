@@ -3,7 +3,7 @@ import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { executeMuthurChatTool } from "@/lib/muthur-core/execute-openai-tool";
 import { getMuthurOpenAiToolsForMode } from "@/lib/muthur-core/openai-tool-definitions";
-import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
+import type { MuthurUplinkMode, MuthurUplinkToolContext } from "@/lib/muthur-uplink-mode";
 import { appendMuthurStreamFooters } from "@/lib/muthur-core/muthur-stream-payload";
 import {
   inlineCallsToOpenAiToolCalls,
@@ -168,11 +168,16 @@ export async function muthurChatWithModelTools(options: {
   /** When false, stream a direct reply with no tool definitions (greetings, small talk). */
   toolsEnabled?: boolean;
   uplinkMode?: MuthurUplinkMode;
+  commanderMissionActive?: boolean;
   providerReceipt?: ProviderReceipt;
 }): Promise<Response> {
   const { endpoint, apiKey, model, registry, providerReceipt } = options;
   const uplinkMode = options.uplinkMode ?? "plan";
-  const openAiTools = getMuthurOpenAiToolsForMode(uplinkMode);
+  const toolContext: MuthurUplinkToolContext | undefined =
+    typeof options.commanderMissionActive === "boolean"
+      ? { missionActive: options.commanderMissionActive }
+      : undefined;
+  const openAiTools = getMuthurOpenAiToolsForMode(uplinkMode, toolContext);
   const toolsEnabled =
     options.toolsEnabled !== false &&
     ENABLE_AUTOMATION &&

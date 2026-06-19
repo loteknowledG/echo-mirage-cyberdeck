@@ -1,4 +1,4 @@
-import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
+import type { MuthurUplinkMode, MuthurUplinkToolContext } from "@/lib/muthur-uplink-mode";
 import { isToolAllowedForUplinkMode } from "@/lib/muthur-uplink-mode";
 
 /**
@@ -311,8 +311,8 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   },
 ];
 
-export function getMuthurOpenAiToolsForMode(mode: MuthurUplinkMode) {
+export function getMuthurOpenAiToolsForMode(mode: MuthurUplinkMode, context?: MuthurUplinkToolContext) {
   return MUTHUR_OPENAI_TOOLS.filter((tool) =>
-    isToolAllowedForUplinkMode(mode, tool.function.name),
+    isToolAllowedForUplinkMode(mode, tool.function.name, context),
   );
 }

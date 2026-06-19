@@ -222,14 +222,19 @@ function buildMuthurSystemContent(args: {
   message: string;
   operatorContext: OperatorChatContext | null;
   uplinkMode: MuthurUplinkMode;
+  commanderMissionActive?: boolean;
   memoryPrompt: string;
   browserPrompt: string;
   glyphPrompt: string;
   glyphDoctrine: string;
 }): { systemContent: string; toolsEnabled: boolean } {
+  const toolContext =
+    typeof args.commanderMissionActive === "boolean"
+      ? { missionActive: args.commanderMissionActive }
+      : undefined;
   const toolsEnabled =
     shouldEnableMuthurTools(args.message) &&
-    shouldEnableToolsForUplinkMode(args.uplinkMode, args.message);
+    shouldEnableToolsForUplinkMode(args.uplinkMode, args.message, toolContext);
   const needsOperator = messageNeedsOperatorContext(args.message, args.operatorContext);
 
   let systemContent =
@@ -374,9 +379,11 @@ export async function POST(request: Request) {
       history,
       operatorContext: operatorContextRaw,
       uplinkMode: uplinkModeRaw,
+      commanderMissionActive: commanderMissionActiveRaw,
     } = body;
     const operatorContext = parseOperatorChatContext(operatorContextRaw);
     const uplinkMode = normalizeMuthurUplinkMode(uplinkModeRaw);
+    const commanderMissionActive = commanderMissionActiveRaw === true;
     const chatHistory = normalizeChatHistory(history);
     const toolRegistryPrefetch = ENABLE_AUTOMATION
       ? resolveToolRegistry()
@@ -574,6 +581,7 @@ export async function POST(request: Request) {
           message,
           operatorContext,
           uplinkMode,
+          commanderMissionActive,
           memoryPrompt,
           browserPrompt,
           glyphPrompt,
@@ -594,6 +602,7 @@ export async function POST(request: Request) {
           registry: toolsEnabled ? await toolRegistryPrefetch : EMPTY_TOOL_REGISTRY,
           toolsEnabled,
           uplinkMode,
+          commanderMissionActive,
           providerReceipt,
         });
       }
@@ -657,6 +666,7 @@ export async function POST(request: Request) {
       message: userMessage,
       operatorContext,
       uplinkMode,
+      commanderMissionActive,
       memoryPrompt: fallbackMemoryPrompt,
       browserPrompt,
       glyphPrompt,
@@ -678,6 +688,7 @@ export async function POST(request: Request) {
         registry: toolsEnabled ? await resolveToolRegistry() : EMPTY_TOOL_REGISTRY,
         toolsEnabled,
         uplinkMode,
+        commanderMissionActive,
       });
     }
 
