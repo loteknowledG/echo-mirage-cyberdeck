@@ -7161,7 +7161,7 @@ ${diff}`;
                     closeRailTabContextMenu();
                   }}
                 >
-                  Delete
+                  Close
                 </CyberdeckMenuButton>
               </>
             )}
