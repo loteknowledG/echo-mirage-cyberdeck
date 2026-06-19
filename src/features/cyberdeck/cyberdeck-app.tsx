@@ -405,6 +405,7 @@ const CUSTOM_TAB_KINDS = [
   "glyph-channel",
   "rola-dex",
   "sound-profile",
+  "tunes",
   "test-pane",
   "realmorphism-kit",
   "call-center",
@@ -508,6 +509,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Kit", action: "kit-pane" },
   { label: "Powerfist", kind: "rola-dex", action: "convert" },
   { label: "Sound Profile", kind: "sound-profile", action: "convert" },
+  { label: "Tunes", kind: "tunes", action: "convert" },
   { label: "Test", kind: "test-pane", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
   { label: "Execution", kind: "muthur-execution", action: "convert" },
@@ -850,6 +852,9 @@ function normalizeCustomTabKind(kind: string) {
   ) {
     return "sound-profile" as CustomTabKind;
   }
+  if (nextKind === "tunes" || nextKind === "music" || nextKind === "dj") {
+    return "tunes" as CustomTabKind;
+  }
   if (
     nextKind === "realmorphism-kit" ||
     nextKind === "realmorphism_kit" ||
@@ -908,6 +913,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "glyph-channel") return "⟁";
   if (kind === "rola-dex") return "#";
   if (kind === "sound-profile") return "♪";
+  if (kind === "tunes") return "♫";
   if (kind === "test-pane") return "T";
   if (kind === "call-center") return "CC";
   if (kind === "photoshop") return "Ps";
@@ -926,6 +932,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "glyph-channel") return "⟁ GLYPH";
   if (kind === "rola-dex") return "Rola Dex";
   if (kind === "sound-profile") return "Sound Profile";
+  if (kind === "tunes") return "Tunes";
   if (kind === "test-pane") return "Test";
   if (kind === "call-center") return "CALL CENTER";
   if (kind === "photoshop") return "PHOTOSHOP";
@@ -1000,7 +1007,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|test-pane|test|call-center|callcenter|call_center|photoshop|photo-shop|photo_shop)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|tunes|music|test-pane|test|call-center|callcenter|call_center|photoshop|photo-shop|photo_shop)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -6541,6 +6548,7 @@ ${diff}`;
       | "glyph-channel"
       | "rola-dex"
       | "sound-profile"
+      | "tunes"
       | "settings") => {
       const customTabs = useCyberdeckTabStore.getState().customTabs;
       const existing = customTabs.find((tab) => tab.kind === target);
@@ -6592,6 +6600,7 @@ ${diff}`;
         target !== "glyph-channel" &&
         target !== "rola-dex" &&
         target !== "sound-profile" &&
+        target !== "tunes" &&
         target !== "settings"
       ) {
         return;
@@ -6940,6 +6949,17 @@ ${diff}`;
             data-pointer-target="sound-profile"
           >
             <ActivatedCyberdeckPane kind="sound-profile" />
+          </div>
+        );
+      }
+
+      if (tab.kind === "tunes") {
+        return (
+          <div
+            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
+            data-pointer-target="tunes"
+          >
+            <ActivatedCyberdeckPane kind="tunes" />
           </div>
         );
       }

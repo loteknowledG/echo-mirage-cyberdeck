@@ -17,6 +17,9 @@ importers:
       '@eigenpal/docx-editor-react':
         specifier: ^1.3.1
         version: 1.3.1(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(ai@6.0.168(zod@3.25.76))(prosemirror-commands@1.7.1)(prosemirror-dropcursor@1.8.2)(prosemirror-history@1.5.0)(prosemirror-keymap@1.2.3)(prosemirror-model@1.25.7)(prosemirror-state@1.4.4)(prosemirror-tables@1.8.5)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@ghostery/adblocker-electron':
+        specifier: ^2.18.0
+        version: 2.18.0(electron@41.3.0)
       '@lexical/react':
         specifier: ^0.39.0
         version: 0.39.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(yjs@13.6.30)
@@ -939,6 +942,28 @@ packages:
 
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
+
+  '@ghostery/adblocker-content@2.18.0':
+    resolution: {integrity: sha512-hO+SHBKzx8PBqppjO6Haj0d4h+4RUQ+0tpVZjs9wUgxLKZlvvYzlQ9sAHilzIT5ixSn+8LSlrYm+ngf2ugH9XQ==}
+
+  '@ghostery/adblocker-electron-preload@2.18.0':
+    resolution: {integrity: sha512-dtUmIAFfiZowbW+NDQtUy+sceQYl4XfJhnKycBWEWeljQ67EVQgFKbfbkEK4Tr3jmP+GxEUp8dYKzwT05b3gdw==}
+    peerDependencies:
+      electron: '>11'
+
+  '@ghostery/adblocker-electron@2.18.0':
+    resolution: {integrity: sha512-q8tvkJ247ysebswlT+Ak2OrP4rWqI1Ql4BePR6cbJHh05C0FVak9fnynFw4A5AZyk1+S3eOaoNIOID6yQ20HLA==}
+    peerDependencies:
+      electron: '>11'
+
+  '@ghostery/adblocker-extended-selectors@2.18.0':
+    resolution: {integrity: sha512-oeSb/1liYplCq76rrPDmR7A69kNB6WsWjPfcsJFkrPip+WUd83Xbc+I5fnZ36Id3IOyegozZG1ucr3ywwC7OyQ==}
+
+  '@ghostery/adblocker@2.18.0':
+    resolution: {integrity: sha512-u0XWX+kZtBTqjfa+saNXMI2ZLzaoeT3tASjDuBqQ3WYKquLh15Z3nCBIPruT63nMRr41MZLwB8F6jZPIhsM3dA==}
+
+  '@ghostery/url-parser@1.3.1':
+    resolution: {integrity: sha512-QKqGi+7aDQ4RcyHyCwgEk6B9vWnsBP4Q7htaN0zPJV3ATqTKEQDtSTb9c/AN586oJUDs24YXKcwFYwNweY/YjQ==}
 
   '@google/genai@1.51.0':
     resolution: {integrity: sha512-vTZZF3CSimN7cn2zsLpW2p5WF0eZa5Gz69ITMPCNHpPrDlAstOfGifSfi0p/s9Z9400f7xJRkgvkQNrcM7pJ6w==}
@@ -2314,6 +2339,24 @@ packages:
 
   '@radix-ui/rect@1.1.1':
     resolution: {integrity: sha512-HPwpGIzkl28mWyZqG52jiqDJ12waP11Pa1lGoiyUkIEuMLBP0oeK/C89esbXrxsky5we7dfd8U58nm0SgAWpVw==}
+
+  '@remusao/guess-url-type@2.1.0':
+    resolution: {integrity: sha512-zI3dlTUxpjvx2GCxp9nLOSK5yEIqDCpxlAVGwb2Y49RKkS72oeNaxxo+VWS5+XQ5+Mf8Zfp9ZXIlk+G5eoEN8A==}
+
+  '@remusao/small@2.1.0':
+    resolution: {integrity: sha512-Y1kyjZp7JU7dXdyOdxHVNfoTr1XLZJTyQP36/esZUU/WRWq9XY0PV2HsE3CsIHuaTf4pvgWv2pvzvnZ//UHIJQ==}
+
+  '@remusao/smaz-compress@2.2.0':
+    resolution: {integrity: sha512-TXpTPgILRUYOt2rEe0+9PC12xULPvBqeMpmipzB9A7oM4fa9Ztvy9lLYzPTd7tiQEeoNa1pmxihpKfJtsxnM/w==}
+
+  '@remusao/smaz-decompress@2.2.0':
+    resolution: {integrity: sha512-ERAPwxPaA0/yg4hkNU7T2S+lnp9jj1sApcQMtOyROvOQyo+Zuh6Hn/oRcXr8mmjlYzyRaC7E6r3mT1nrdHR6pg==}
+
+  '@remusao/smaz@2.2.0':
+    resolution: {integrity: sha512-eSd3Qs0ELP/e7tU1SI5RWXcCn9KjDgvBY+KtWbL4i2QvvHhJOfdIt4v0AA3S5BbLWAr5dCEC7C4LUfogDm6q/Q==}
+
+  '@remusao/trie@2.1.0':
+    resolution: {integrity: sha512-Er3Q8q0/2OcCJPQYJOPLmCuqO0wu7cav3SPtpjlxSbjFi1x+A1pZkkLD6c9q2rGEkGW/tkrRzfrhNMt8VQjzXg==}
 
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
@@ -6623,6 +6666,12 @@ packages:
     resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
     engines: {node: '>=12.0.0'}
 
+  tldts-core@7.4.3:
+    resolution: {integrity: sha512-27ep5H9PzdBrNd5OFM/j3WCU8F3kPwM9D0BOaOf7uYfxMJfyr0K5Tjj69Gri+sZlh2WXd5buIm47NuPF29CDiw==}
+
+  tldts-experimental@7.4.3:
+    resolution: {integrity: sha512-C7+TxJdmrhTA2fs1VvOcGrnFhK1qvOgYIAFJ0Q9L5GaoQ7QkR0TLm9ooXTgF4d4xgL6qm6qYtiYN3AX0DWwgBA==}
+
   to-regex-range@5.0.1:
     resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
     engines: {node: '>=8.0'}
@@ -7973,6 +8022,38 @@ snapshots:
       tabbable: 6.4.0
 
   '@floating-ui/utils@0.2.11': {}
+
+  '@ghostery/adblocker-content@2.18.0':
+    dependencies:
+      '@ghostery/adblocker-extended-selectors': 2.18.0
+
+  '@ghostery/adblocker-electron-preload@2.18.0(electron@41.3.0)':
+    dependencies:
+      '@ghostery/adblocker-content': 2.18.0
+      electron: 41.3.0
+
+  '@ghostery/adblocker-electron@2.18.0(electron@41.3.0)':
+    dependencies:
+      '@ghostery/adblocker': 2.18.0
+      '@ghostery/adblocker-electron-preload': 2.18.0(electron@41.3.0)
+      electron: 41.3.0
+      tldts-experimental: 7.4.3
+
+  '@ghostery/adblocker-extended-selectors@2.18.0': {}
+
+  '@ghostery/adblocker@2.18.0':
+    dependencies:
+      '@ghostery/adblocker-content': 2.18.0
+      '@ghostery/adblocker-extended-selectors': 2.18.0
+      '@ghostery/url-parser': 1.3.1
+      '@remusao/guess-url-type': 2.1.0
+      '@remusao/small': 2.1.0
+      '@remusao/smaz': 2.2.0
+      tldts-experimental: 7.4.3
+
+  '@ghostery/url-parser@1.3.1':
+    dependencies:
+      tldts-experimental: 7.4.3
 
   '@google/genai@1.51.0':
     dependencies:
@@ -9402,6 +9483,23 @@ snapshots:
       '@types/react-dom': 18.3.7(@types/react@18.3.28)
 
   '@radix-ui/rect@1.1.1': {}
+
+  '@remusao/guess-url-type@2.1.0': {}
+
+  '@remusao/small@2.1.0': {}
+
+  '@remusao/smaz-compress@2.2.0':
+    dependencies:
+      '@remusao/trie': 2.1.0
+
+  '@remusao/smaz-decompress@2.2.0': {}
+
+  '@remusao/smaz@2.2.0':
+    dependencies:
+      '@remusao/smaz-compress': 2.2.0
+      '@remusao/smaz-decompress': 2.2.0
+
+  '@remusao/trie@2.1.0': {}
 
   '@rtsao/scc@1.1.0': {}
 
@@ -14679,6 +14777,12 @@ snapshots:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
+
+  tldts-core@7.4.3: {}
+
+  tldts-experimental@7.4.3:
+    dependencies:
+      tldts-core: 7.4.3
 
   to-regex-range@5.0.1:
     dependencies:

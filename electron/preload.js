@@ -28,6 +28,16 @@ contextBridge.exposeInMainWorld('echoMirageSave', {
     ipcRenderer.invoke('echo-mirage-save:show-binary-dialog', options),
 });
 
+contextBridge.exposeInMainWorld('echoMirageMediaProtection', {
+  getStatus: () => ipcRenderer.invoke('echo-mirage-media-protection:status'),
+  setEnabled: (enabled) => ipcRenderer.invoke('echo-mirage-media-protection:set-enabled', enabled),
+  subscribe: (callback) => {
+    const listener = (_event, status) => callback(status);
+    ipcRenderer.on('echo-mirage-media-protection:status-changed', listener);
+    return () => ipcRenderer.removeListener('echo-mirage-media-protection:status-changed', listener);
+  },
+});
+
 contextBridge.exposeInMainWorld('echoMirageOpen', {
   pickConvertDocument: () => ipcRenderer.invoke('echo-mirage-open:pick-convert-document'),
   pickOperatorFolder: () => ipcRenderer.invoke('echo-mirage-open:pick-operator-folder'),

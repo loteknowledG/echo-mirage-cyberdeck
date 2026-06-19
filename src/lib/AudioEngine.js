@@ -70,11 +70,12 @@ function playTone({
   type = "square",
   volume = 0.14,
   crunch = false,
+  at,
 }) {
   if (!enabled) return;
 
   const ctx = getCtx();
-  const t = ctx.currentTime;
+  const t = typeof at === "number" && Number.isFinite(at) ? at : ctx.currentTime;
 
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
 
@@ -707,29 +708,24 @@ export function playBleepBloop() {
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
 
   const scale = uplinkSonarPreferredVolume / 0.55;
+  const t0 = ctx.currentTime + 0.01;
 
-  // Tiny, polite status cue for long-running network waits.
-  const scheduleTone = (delayMs, opts) => {
-    setTimeout(() => {
-      playTone(opts);
-    }, delayMs);
-  };
-
-  scheduleTone(0, {
-    freqStart: 720,
-    duration: 0.06,
+  // High sharp "bleep" then a lower descending "bloop" — scheduled on the audio clock.
+  playTone({
+    at: t0,
+    freqStart: 920,
+    duration: 0.07,
+    type: "square",
+    volume: 0.058 * scale,
+  });
+  playTone({
+    at: t0 + 0.14,
+    freqStart: 340,
+    freqEnd: 220,
+    duration: 0.13,
     type: "sine",
-    volume: 0.042 * scale,
+    volume: 0.072 * scale,
   });
-  scheduleTone(120, {
-    freqStart: 520,
-    duration: 0.08,
-    type: "triangle",
-    volume: 0.034 * scale,
-  });
-
-  // Keep fallback subtle as well.
-  playFallbackClip("click", 0.12 * scale);
 }
 
 export function playWrongDoorShut() {

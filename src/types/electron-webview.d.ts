@@ -130,11 +130,26 @@ declare global {
     }>;
   }
 
+  interface EchoMirageMediaProtectionBridge {
+    getStatus(): Promise<
+      "unavailable" | "disabled" | "initializing" | "enabled" | "failed"
+    >;
+    setEnabled(enabled: boolean): Promise<
+      "unavailable" | "disabled" | "initializing" | "enabled" | "failed"
+    >;
+    subscribe(
+      callback: (
+        status: "unavailable" | "disabled" | "initializing" | "enabled" | "failed",
+      ) => void,
+    ): () => void;
+  }
+
   interface Window {
     echoMirageClipboard?: EchoMirageClipboardBridge;
     echoMirageBrowser?: EchoMirageBrowserBridge;
     echoMirageSave?: EchoMirageSaveBridge;
     echoMirageOpen?: EchoMirageOpenBridge;
+    echoMirageMediaProtection?: EchoMirageMediaProtectionBridge;
   }
 }
 

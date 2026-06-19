@@ -134,7 +134,7 @@ delete tab · close tab
 
 Kinds: document, web, settings, voice-lab, glyph-channel,
 memory-atlas, flight-log, diagnostics, pi, db8, catalog, operators,
-rola-dex, sound-profile, connection, blank`,
+rola-dex, sound-profile, tunes, music, connection, blank`,
 
   glyph: `[MUTHUR HELP // GLYPH / ASCII]
 

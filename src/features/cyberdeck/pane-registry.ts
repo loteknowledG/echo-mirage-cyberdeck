@@ -16,6 +16,7 @@ export const CYBERDECK_PANE_KINDS = [
   "glyph-channel",
   "rola-dex",
   "sound-profile",
+  "tunes",
   "test-pane",
   "call-center",
   "photoshop",
@@ -62,6 +63,7 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   "glyph-channel": { label: "GLYPH CHANNEL", fetchHints: ["GLYPH BUS", "RENDER"] },
   "rola-dex": { label: "ROLA-DEX", fetchHints: ["DEX", "CAROUSEL"] },
   "sound-profile": { label: "SOUND PROFILE", fetchHints: ["PROFILE", "SFX"] },
+  tunes: { label: "TUNES", fetchHints: ["PLAYLIST", "QUEUE", "PROVIDERS"] },
   "test-pane": { label: "TEST", fetchHints: ["EMBLA", "4-WAY"] },
   "call-center": { label: "CALL CENTER", fetchHints: ["QUEUE", "INBOUND", "RESIDENT COMMS"] },
   photoshop: { label: "PHOTOSHOP", fetchHints: ["CANVAS", "LAYERS", "EXPORT"] },
@@ -76,6 +78,8 @@ const TAB_KIND_ALIASES: Record<string, CyberdeckPaneKind> = {
   "execution-pane": "muthur-execution",
   muthur_execution: "muthur-execution",
   dropbay: "drop-bay",
+  music: "tunes",
+  tunes: "tunes",
 };
 
 export function normalizeCyberdeckPaneKind(kind: string): CyberdeckPaneKind | null {

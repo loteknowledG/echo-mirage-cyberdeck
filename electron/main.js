@@ -3,6 +3,12 @@ const fsSync = require('fs');
 const path = require('path');
 const { app, BrowserWindow, Menu, shell, ipcMain, clipboard, dialog, protocol, net, nativeImage } = require('electron');
 const { pathToFileURL } = require('url');
+const {
+  initializeMediaProtection,
+  getMediaProtectionStatus,
+  setMediaProtectionEnabled,
+  setMediaProtectionMainWindow,
+} = require('./media-protection');
 
 if (!app.isPackaged && process.platform === 'win32') {
   // Dev-only: reduce GPU/network subprocess crashes while hot-reloading a heavy page.
@@ -471,6 +477,9 @@ async function createWindow() {
   if (!app.isPackaged && process.env.CYBERDECK_ELECTRON_FORCE_RELOAD === '1') {
     setupDevRendererReload(win);
   }
+
+  setMediaProtectionMainWindow(win);
+  return win;
 }
 
 function setupDevRendererReload(win) {
@@ -601,6 +610,13 @@ ipcMain.handle('echo-mirage-clipboard:read-text', async () => clipboard.readText
 ipcMain.handle('echo-mirage-clipboard:write-text', async (_event, text) => {
   clipboard.writeText(String(text || ''));
   return { ok: true };
+});
+
+ipcMain.handle('echo-mirage-media-protection:status', async () => getMediaProtectionStatus());
+
+ipcMain.handle('echo-mirage-media-protection:set-enabled', async (_event, enabled) => {
+  setMediaProtectionEnabled(Boolean(enabled));
+  return getMediaProtectionStatus();
 });
 
 ipcMain.handle('echo-mirage-open:pick-convert-document', async () => {
@@ -1113,8 +1129,9 @@ ipcMain.handle('computer-use:run-action', async (_event, action) => {
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   registerEchoMirageFileProtocol();
+  await initializeMediaProtection();
   return createWindow();
 });
 
