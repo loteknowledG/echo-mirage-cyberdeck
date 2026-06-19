@@ -1,38 +1,10 @@
 "use client";
 
-const AUDIO_MUTED_KEY = "echo-mirage-audio-muted-v1";
+import { getDeckSfxVolume } from "@/lib/cyberdeck/deck-sfx-volume";
 
-let muted = false;
 let context: AudioContext | null = null;
-let hasLoadedMuteState = false;
-
-function ensureMuteStateLoaded() {
-  if (hasLoadedMuteState) return;
-  hasLoadedMuteState = true;
-  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
-  try {
-    const stored = window.localStorage.getItem(AUDIO_MUTED_KEY);
-    if (stored === null) {
-      muted = false;
-      return;
-    }
-    muted = stored !== "0";
-  } catch {
-    muted = false;
-  }
-}
-
-function persistMuted() {
-  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
-  try {
-    window.localStorage.setItem(AUDIO_MUTED_KEY, muted ? "1" : "0");
-  } catch {
-    /* ignore */
-  }
-}
 
 function ensureContext() {
-  ensureMuteStateLoaded();
   if (typeof window === "undefined" || typeof AudioContext === "undefined") return null;
   if (!context) context = new AudioContext();
   if (context.state === "suspended") {
@@ -41,8 +13,13 @@ function ensureContext() {
   return context;
 }
 
+function deckSfxScale() {
+  return getDeckSfxVolume();
+}
+
 function playTone(type: OscillatorType, hz: number, durationMs: number, gainValue: number) {
-  if (isMuted()) return;
+  const scale = deckSfxScale();
+  if (scale <= 0) return;
   const ctx = ensureContext();
   if (!ctx) return;
   const oscillator = ctx.createOscillator();
@@ -51,7 +28,7 @@ function playTone(type: OscillatorType, hz: number, durationMs: number, gainValu
   oscillator.type = type;
   oscillator.frequency.setValueAtTime(hz, ctx.currentTime);
   gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(gainValue, ctx.currentTime + fadeInMs / 1000);
+  gain.gain.linearRampToValueAtTime(gainValue * scale, ctx.currentTime + fadeInMs / 1000);
   gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durationMs / 1000);
   oscillator.connect(gain);
   gain.connect(ctx.destination);
@@ -60,7 +37,8 @@ function playTone(type: OscillatorType, hz: number, durationMs: number, gainValu
 }
 
 export function playClick() {
-  if (isMuted()) return;
+  const scale = deckSfxScale();
+  if (scale <= 0) return;
   const ctx = ensureContext();
   if (!ctx) return;
   const osc = ctx.createOscillator();
@@ -72,7 +50,7 @@ export function playClick() {
   filter.type = "lowpass";
   filter.frequency.setValueAtTime(400, ctx.currentTime);
   gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(0.025, ctx.currentTime + 0.003);
+  gain.gain.linearRampToValueAtTime(0.025 * scale, ctx.currentTime + 0.003);
   gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.06);
   osc.connect(filter);
   filter.connect(gain);
@@ -87,17 +65,4 @@ export function playBack() {
 
 export function playBeep() {
   playTone("square", 880, 80, 0.015);
-}
-
-export function isMuted() {
-  ensureMuteStateLoaded();
-  return muted;
-}
-
-export function setMuted(nextMuted: boolean) {
-  muted = nextMuted;
-  persistMuted();
-  if (!muted) {
-    ensureContext();
-  }
 }

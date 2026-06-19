@@ -63,6 +63,7 @@ import {
   playDeckSystemSound,
   playDeckBleepBloop,
   setDeckUplinkSonarVolume,
+  setDeckSfxVolume,
   unlockDeckKeyboardSfx,
 } from "@/features/cyberdeck/runtime/defer-deck-audio";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
@@ -205,9 +206,13 @@ import {
   getInitialUplinkSonarVolume,
   saveUplinkSonarVolume,
 } from "@/lib/cyberdeck/uplink-sonar-volume";
+import {
+  getInitialDeckSfxVolume,
+  saveDeckSfxVolume,
+} from "@/lib/cyberdeck/deck-sfx-volume";
 import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
 import { MuthurUplinkModeRoller } from "@/components/cyberdeck/muthur-uplink-mode-roller";
-import { isMuted, playBeep, setMuted } from "@/lib/deck-audio";
+import { playBeep } from "@/lib/deck-audio";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
 import { useDebouncedEffect } from "@/lib/use-debounced-effect";
 import { cn } from "@/lib/utils";
@@ -395,7 +400,6 @@ const CUSTOM_TAB_KINDS = [
   "connection",
   "pi",
   "diagnostics",
-  "muthur-execution",
   "catalog",
   "operators",
   "memory-atlas",
@@ -510,7 +514,6 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Tunes", kind: "tunes", action: "convert" },
   { label: "Test", kind: "test-pane", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
-  { label: "Execution", kind: "muthur-execution", action: "convert" },
   { label: "Pi", kind: "pi", action: "convert" },
   { label: "DB8", kind: "db8", action: "convert" },
   { label: "Cadre", kind: "cadre", action: "convert" },
@@ -813,7 +816,7 @@ function normalizeCustomTabKind(kind: string) {
     nextKind === "execution" ||
     nextKind === "execution-pane"
   ) {
-    return "muthur-execution" as CustomTabKind;
+    return "diagnostics" as CustomTabKind;
   }
   if (nextKind === "memoryatlas" || nextKind === "memory_atlas") {
     return "memory-atlas" as CustomTabKind;
@@ -916,7 +919,6 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "photoshop") return "Ps";
   if (kind === "db8") return "8";
   if (kind === "cadre") return "C";
-  if (kind === "muthur-execution") return "E";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
@@ -934,7 +936,6 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "photoshop") return "PHOTOSHOP";
   if (kind === "db8") return "DB8";
   if (kind === "cadre") return "CADRE";
-  if (kind === "muthur-execution") return "EXECUTION";
   return kind.toUpperCase();
 }
 
@@ -1128,6 +1129,7 @@ export default function CyberdeckApp() {
   const [voiceBlockTotal, setVoiceBlockTotal] = useState(0);
   const [voiceDial, setVoiceDial] = useState<MuthurVoiceDialState>(getInitialMuthurVoiceDials);
   const [sonarVolume, setSonarVolume] = useState(getInitialUplinkSonarVolume);
+  const [deckSfxVolume, setDeckSfxVolumeState] = useState(getInitialDeckSfxVolume);
   const [voiceHealth, setVoiceHealth] = useState<"idle" | "backend" | "fallback" | "off">("idle");
   const [muthurMemory, setMuthurMemory] = useState<MuthurMemoryState>(() => createEmptyMuthurMemory());
   const [muthurMemoryHydrated, setMuthurMemoryHydrated] = useState(false);
@@ -1137,7 +1139,6 @@ export default function CyberdeckApp() {
   const [heapTextDraft, setHeapTextDraft] = useState("");
   const [heapHydrated, setHeapHydrated] = useState(false);
   const [deckMode, setDeckMode] = useState<DeckMode>(() => loadDeckMode());
-  const [audioMuted, setAudioMutedState] = useState<boolean>(() => isMuted());
   const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [orchestration, setOrchestration] = useState<OrchestrationBundle | null>(null);
@@ -1563,21 +1564,21 @@ export default function CyberdeckApp() {
     });
   }, []);
 
-  const toggleAudioMuted = useCallback((nextMuted?: boolean) => {
-    const resolvedMuted = typeof nextMuted === "boolean" ? nextMuted : !audioMuted;
-    setMuted(resolvedMuted);
-    setAudioMutedState(resolvedMuted);
-    if (!resolvedMuted) {
-      playBeep();
-      void unlockDeckKeyboardSfx();
-    }
+  const handleDeckSfxVolumeChange = useCallback((volume: number) => {
+    setDeckSfxVolumeState((prev) => {
+      if (prev <= 0 && volume > 0) {
+        playBeep();
+      }
+      return volume;
+    });
+    saveDeckSfxVolume(volume);
     emitSignal({
       source: "audio",
       type: "setting_changed",
-      payload: { key: "muted", value: resolvedMuted },
+      payload: { key: "deck_sfx_volume", value: volume },
       severity: "info",
     });
-  }, [audioMuted]);
+  }, []);
 
   const playModelTestErrorSound = useCallback((line: string) => {
     if (line.includes("VALID_RESPONSE")) {
@@ -2074,6 +2075,10 @@ export default function CyberdeckApp() {
   useEffect(() => {
     setDeckUplinkSonarVolume(sonarVolume);
   }, [sonarVolume]);
+
+  useEffect(() => {
+    setDeckSfxVolume(deckSfxVolume);
+  }, [deckSfxVolume]);
 
   const handleVoiceVolumeChange = useCallback((volume: number) => {
     setVoiceDial((prev) => ({ ...prev, volume }));
@@ -6814,8 +6819,8 @@ ${diff}`;
             kind="settings"
             voiceEnabled={voiceEnabled}
             onVoiceToggle={toggleVoiceEnabled}
-            audioMuted={audioMuted}
-            onAudioMutedChange={toggleAudioMuted}
+            deckSfxVolume={deckSfxVolume}
+            onDeckSfxVolumeChange={handleDeckSfxVolumeChange}
             identity={identity}
             voiceVolume={voiceDial.volume}
             onVoiceVolumeChange={handleVoiceVolumeChange}
@@ -6854,10 +6859,6 @@ ${diff}`;
             chatCount={messages.length + (streamText ? 1 : 0)}
           />,
         );
-      }
-
-      if (tab.kind === "muthur-execution") {
-        return shell(<ActivatedCyberdeckPane kind="muthur-execution" />);
       }
 
       if (tab.kind === "pi") {
@@ -7019,6 +7020,8 @@ ${diff}`;
       handleVoiceVolumeChange,
       sonarVolume,
       handleSonarVolumeChange,
+      deckSfxVolume,
+      handleDeckSfxVolumeChange,
     ],
   );
 
@@ -7931,8 +7934,8 @@ ${diff}`;
                     kind="settings"
                     voiceEnabled={voiceEnabled}
                     onVoiceToggle={toggleVoiceEnabled}
-                    audioMuted={audioMuted}
-                    onAudioMutedChange={toggleAudioMuted}
+                    deckSfxVolume={deckSfxVolume}
+                    onDeckSfxVolumeChange={handleDeckSfxVolumeChange}
                     identity={identity}
                     voiceVolume={voiceDial.volume}
                     onVoiceVolumeChange={handleVoiceVolumeChange}

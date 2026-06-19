@@ -1,3 +1,8 @@
+import {
+  getDeckSfxVolume as readDeckSfxVolume,
+  setDeckSfxVolumeRuntime,
+} from "@/lib/cyberdeck/deck-sfx-volume";
+
 let audioCtx = null;
 let enabled = true;
 let fallbackClickAudio = null;
@@ -71,8 +76,14 @@ function playTone({
   volume = 0.14,
   crunch = false,
   at,
+  applyDeckSfx = true,
 }) {
-  if (!enabled || isDeckAudioMuted()) return;
+  if (!enabled) return;
+  if (applyDeckSfx) {
+    const sfxScale = readDeckSfxVolume();
+    if (sfxScale <= 0) return;
+    volume *= sfxScale;
+  }
 
   const ctx = getCtx();
   const t = typeof at === "number" && Number.isFinite(at) ? at : ctx.currentTime;
@@ -110,6 +121,9 @@ function playTone({
 
 function playNoiseClick({ duration = 0.02, volume = 0.07, filterFreq = 2600 }) {
   if (!enabled) return;
+  const sfxScale = readDeckSfxVolume();
+  if (sfxScale <= 0) return;
+  volume *= sfxScale;
 
   const ctx = getCtx();
   const t = ctx.currentTime;
@@ -198,15 +212,8 @@ const MEMORIZE_LETTER_SEMITONES = [
 ];
 const MEMORIZE_ROOT_HZ = 220;
 
-function isDeckAudioMuted() {
-  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return false;
-  try {
-    const stored = window.localStorage.getItem("echo-mirage-audio-muted-v1");
-    if (stored === null) return false;
-    return stored !== "0";
-  } catch {
-    return false;
-  }
+function isDeckSfxSilent() {
+  return readDeckSfxVolume() <= 0;
 }
 
 function memorizePitchHz(key) {
@@ -230,7 +237,7 @@ function memorizePitchHz(key) {
 
 /** Stable pitch per key for MUTHUR chat — same character always same tone. */
 export function playMemorizeKeySound(key, options = {}) {
-  if (!enabled || isDeckAudioMuted()) return;
+  if (!enabled || isDeckSfxSilent()) return;
   const hz = memorizePitchHz(key);
   if (!hz) return;
   const volume = (options.volume ?? 1) * 2.6 * KEYBOARD_EFFECTS_GAIN;
@@ -244,9 +251,10 @@ export function playMemorizeKeySound(key, options = {}) {
 }
 
 function playFallbackClip(kind, volume = 0.4) {
-  if (isDeckAudioMuted()) return;
+  if (isDeckSfxSilent()) return;
+  const sfxScale = readDeckSfxVolume();
   if (typeof Audio === "undefined") return;
-  const v = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 0.4));
+  const v = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 0.4)) * sfxScale;
   try {
     const base = "/chime_quiet.wav";
     const ref = kind === "chirp" || kind === "lock" ? "chirp" : "click";
@@ -700,6 +708,22 @@ export function getUplinkSonarVolume() {
   return uplinkSonarPreferredVolume;
 }
 
+export function setDeckSfxVolume(volumeScale) {
+  const s = setDeckSfxVolumeRuntime(
+    typeof volumeScale === "number" && Number.isFinite(volumeScale)
+      ? volumeScale
+      : readDeckSfxVolume(),
+  );
+  if (s > 0) {
+    void unlockKeyboardSfx();
+  }
+  return s;
+}
+
+export function getDeckSfxVolume() {
+  return readDeckSfxVolume();
+}
+
 export function stopUplinkSonarPingLoop() {
   stopUplinkSonarSampleLoop();
   uplinkSonarLoopVolumeScale = 1;
@@ -720,6 +744,7 @@ export function playBleepBloop() {
     duration: 0.07,
     type: "square",
     volume: 0.058 * scale,
+    applyDeckSfx: false,
   });
   playTone({
     at: t0 + 0.14,
@@ -728,6 +753,7 @@ export function playBleepBloop() {
     duration: 0.13,
     type: "sine",
     volume: 0.072 * scale,
+    applyDeckSfx: false,
   });
 }
 

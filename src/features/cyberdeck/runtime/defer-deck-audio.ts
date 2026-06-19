@@ -81,6 +81,12 @@ export function playDeckRaceReadySetGo(...args: Parameters<DeckAudioModule["play
   void loadDeckAudio().then((audio) => audio.playRaceReadySetGo(...args));
 }
 
+export function setDeckSfxVolume(
+  ...args: Parameters<DeckAudioModule["setDeckSfxVolume"]>
+) {
+  void loadDeckAudio().then((audio) => audio.setDeckSfxVolume(...args));
+}
+
 export function unlockDeckKeyboardSfx() {
   void loadDeckAudio().then((audio) => audio.unlockKeyboardSfx());
 }

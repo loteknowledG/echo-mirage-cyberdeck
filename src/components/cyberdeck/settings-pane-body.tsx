@@ -19,8 +19,8 @@ const SWITCH_LEGACY_EMERALD =
 type CyberdeckSettingsPaneBodyProps = {
   voiceEnabled: boolean;
   onVoiceToggle: () => void;
-  audioMuted: boolean;
-  onAudioMutedChange: (muted: boolean) => void;
+  deckSfxVolume: number;
+  onDeckSfxVolumeChange: (volume: number) => void;
   identity: Identity | null;
   voiceVolume: number;
   onVoiceVolumeChange: (volume: number) => void;
@@ -32,8 +32,8 @@ type CyberdeckSettingsPaneBodyProps = {
 export function CyberdeckSettingsPaneBody({
   voiceEnabled,
   onVoiceToggle,
-  audioMuted,
-  onAudioMutedChange,
+  deckSfxVolume,
+  onDeckSfxVolumeChange,
   identity,
   voiceVolume,
   onVoiceVolumeChange,
@@ -112,8 +112,7 @@ export function CyberdeckSettingsPaneBody({
               <div className="mb-4 border-b border-[#1c1c1c] pb-4">
                 <div className="mb-3 text-[9px] tracking-[0.06em] text-[#8a8a8a]">LEVELS</div>
                 <p className="mb-3 text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
-                  MUTHUR voice, uplink bleep bloop, and keyboard/UI cues. Drag a level dial to adjust;
-                  click KEYS to mute or unmute deck sound effects.
+                  MUTHUR voice, uplink bleep bloop, and keyboard/UI cues. Drag or scroll a dial to adjust.
                 </p>
                 <MuthurComposerAudioKnobs
                   compact={false}
@@ -121,8 +120,8 @@ export function CyberdeckSettingsPaneBody({
                   onVoiceVolumeChange={onVoiceVolumeChange}
                   sonarVolume={sonarVolume}
                   onSonarVolumeChange={onSonarVolumeChange}
-                  deckSfxMuted={audioMuted}
-                  onDeckSfxMutedChange={onAudioMutedChange}
+                  deckSfxVolume={deckSfxVolume}
+                  onDeckSfxVolumeChange={onDeckSfxVolumeChange}
                   className="justify-start gap-4"
                 />
               </div>

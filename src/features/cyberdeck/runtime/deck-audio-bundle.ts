@@ -12,6 +12,8 @@ export {
   stopUplinkSonarPingLoop,
   setUplinkSonarVolume,
   getUplinkSonarVolume,
+  setDeckSfxVolume,
+  getDeckSfxVolume,
   playBleepBloop,
   playWrongDoorShut,
   playDeclined,

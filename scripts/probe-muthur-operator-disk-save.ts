@@ -25,7 +25,7 @@ async function resolveProbeBaseUrl(): Promise<string | null> {
     /* optional */
   }
   try {
-    const res = await fetch("http://127.0.0.1:3050/api/muthur/execution", { cache: "no-store" });
+    const res = await fetch("http://127.0.0.1:3050/api/muthur/health", { cache: "no-store" });
     if (res.ok) return "http://127.0.0.1:3050";
   } catch {
     /* down */

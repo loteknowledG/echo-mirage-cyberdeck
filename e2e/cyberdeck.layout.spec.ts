@@ -162,18 +162,10 @@ test.describe("Cyberdeck responsive split layout", () => {
     expectComposerAttachedToDivider(returned);
   });
 
-  test("custom tab menu omits retired MUTHUR execution surface", async ({ page }) => {
+  test("custom tab menu omits retired execution surface", async ({ page }) => {
     await openCyberdeck(page, MOBILE_VIEWPORT);
 
-    let executionPolls = 0;
-    page.on("request", (request) => {
-      if (new URL(request.url()).pathname === "/api/muthur/execution" && request.method() === "GET") {
-        executionPolls += 1;
-      }
-    });
-
     await openCustomTabContextMenu(page);
-    await expect(page.getByRole("menuitem", { name: "MUTHUR Execution" })).toHaveCount(0);
-    expect(executionPolls).toBe(0);
+    await expect(page.getByRole("menuitem", { name: "Execution" })).toHaveCount(0);
   });
 });

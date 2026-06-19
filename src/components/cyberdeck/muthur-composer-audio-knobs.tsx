@@ -1,6 +1,10 @@
 "use client";
 
 import { Knob } from "@/components/ui/knob";
+import {
+  deckSfxScaleToKnob,
+  knobToDeckSfxScale,
+} from "@/lib/cyberdeck/deck-sfx-volume";
 import { knobToSonarScale, sonarScaleToKnob } from "@/lib/cyberdeck/uplink-sonar-volume";
 import { cn } from "@/lib/utils";
 
@@ -9,8 +13,8 @@ type MuthurComposerAudioKnobsProps = {
   onVoiceVolumeChange: (volume: number) => void;
   sonarVolume: number;
   onSonarVolumeChange: (volume: number) => void;
-  deckSfxMuted: boolean;
-  onDeckSfxMutedChange: (muted: boolean) => void;
+  deckSfxVolume: number;
+  onDeckSfxVolumeChange: (volume: number) => void;
   compact?: boolean;
   className?: string;
 };
@@ -24,8 +28,8 @@ export function MuthurComposerAudioKnobs({
   onVoiceVolumeChange,
   sonarVolume,
   onSonarVolumeChange,
-  deckSfxMuted,
-  onDeckSfxMutedChange,
+  deckSfxVolume,
+  onDeckSfxVolumeChange,
   compact = true,
   className,
 }: MuthurComposerAudioKnobsProps) {
@@ -87,19 +91,18 @@ export function MuthurComposerAudioKnobs({
         style={{ touchAction: "none" }}
         onPointerDown={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
-        title={`Keyboard SFX ${deckSfxMuted ? "off — click dial to enable" : "on — click dial to mute"}`}
+        title={`Keyboard SFX ${deckSfxScaleToKnob(deckSfxVolume)}%`}
       >
         <Knob
           label="KEYS"
           unit="%"
           min={0}
           max={100}
-          step={100}
-          value={deckSfxMuted ? 0 : 100}
-          active={!deckSfxMuted}
-          onActiveChange={(active) => onDeckSfxMutedChange(!active)}
-          onValueChange={(next) => onDeckSfxMutedChange(next <= 0)}
-          clickTogglesActive
+          step={1}
+          value={deckSfxScaleToKnob(deckSfxVolume)}
+          onValueChange={(next) => onDeckSfxVolumeChange(knobToDeckSfxScale(next))}
+          wheelMultiplier={1.2}
+          dragMultiplier={1.5}
           size="sm"
           theme="dark"
           showReadout={false}

@@ -149,13 +149,6 @@ export async function ensureEchoMirageAtlasSeed(): Promise<{ entityCount: number
   });
   await ensureAtlasFileSource(cyberdeck.id, "src/components/cyberdeck/cyberdeck-server-rail.tsx", "server-rail");
 
-  await ensureAtlasFileSource(execution.id, "src/lib/muthur/runtime/persistent-runtime.server.ts", "runtime", {
-    isPrimary: true,
-    authority: "canonical",
-  });
-  await ensureAtlasFileSource(execution.id, "src/components/cyberdeck/muthur-execution-pane-body.tsx", "execution-pane");
-  await ensureAtlasFileSource(execution.id, "src/app/api/muthur/runtime/route.ts", "runtime-api");
-
   await ensureAtlasFileSource(memoryAtlas.id, "src/muthur/atlas/atlas.ts", "atlas.ts", {
     isPrimary: true,
     authority: "canonical",
