@@ -185,6 +185,19 @@
   overflow: visible;
 }
 
+/* Composer toolbar — keep signal/amber readable but not neon against the input well */
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls [data-morphism="asciimorphism"] .ascii-morph-btn.is-signal,
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls [data-morphism="asciimorphism"] .ascii-morph-btn.is-amber {
+  opacity: 0.82;
+}
+
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls [data-morphism="asciimorphism"] .ascii-morph-btn.is-signal
+  .ascii-morph-btn-shadow,
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls [data-morphism="asciimorphism"] .ascii-morph-btn.is-amber
+  .ascii-morph-btn-shadow {
+  opacity: 0.42;
+}
+
 [data-deck-mode="ascii"] .depth-panel[data-glow="true"] .depth-panel__face {
   text-shadow: none;
   box-shadow: none;

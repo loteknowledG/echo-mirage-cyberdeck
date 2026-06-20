@@ -2,6 +2,7 @@
 
 import { useEffect, type MouseEvent, type RefObject, type WheelEvent } from "react";
 import { motion, useMotionValue, type PanInfo } from "motion/react";
+import { CadreRailIcon } from "@/components/cyberdeck/cadre-rail-icon";
 import { RailAsciiButton } from "@/components/cyberdeck/rail-ascii-button";
 import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import {
@@ -53,6 +54,13 @@ export function CyberdeckServerRail({
   const customTabs = useCyberdeckTabStore((s) => s.customTabs);
   const dragX = useMotionValue(0);
   const dragY = useMotionValue(0);
+
+  const railIconForCustomTab = (tab: { kind: string }) => {
+    if (tab.kind === "cadre") {
+      return <CadreRailIcon />;
+    }
+    return undefined;
+  };
 
   const handleRailDrag = (
     _event: globalThis.PointerEvent | globalThis.MouseEvent | TouchEvent,
@@ -168,6 +176,7 @@ export function CyberdeckServerRail({
         >
           <RailAsciiButton
             glyph={railGlyphForCustomTab(tab)}
+            icon={railIconForCustomTab(tab)}
             isPushed={selectedRailTabId === tab.id}
             className={`ascii-btn${selectedRailTabId === tab.id ? " is-pushed" : ""}${
               navRailContext === "tabs" && serverKeyboardHighlightId === tab.id

@@ -35,6 +35,21 @@ function railFaceRows(symbol) {
   return [`┌───┐`, `│ ${s} │`, `└───┘`];
 }
 
+/** Empty interior — icon overlay sits in the middle row. */
+function railIconFaceRows() {
+  return [`┌───┐`, `│   │`, `└───┘`];
+}
+
+function railIconShadowRows() {
+  const rows = railIconFaceRows();
+  return [
+    " ".repeat(rows[0].length),
+    `${" ".repeat(rows[1].length)}${SHADOW_CHAR}`,
+    `${" ".repeat(rows[2].length)}${SHADOW_CHAR}`,
+    railBottomShadow(),
+  ];
+}
+
 /** Dialer keypad interior width — digit + letter row inside one ASCII box. */
 const DIALER_KEY_INTERIOR = 5;
 
@@ -102,6 +117,9 @@ export const art = {
     const s = railTabSymbol(symbol);
     return `┌───┐\n│ ${s} │\n└───┘`;
   },
+  /** Rail tab with react-icon overlay — blank cell, same box metrics as glyph tabs. */
+  iconFace: () => railIconFaceRows().join("\n"),
+  iconShadow: () => railIconShadowRows().join("\n"),
   dialerKeyFace: (digit, subLabel = "") => dialerKeyFaceRows(digit, subLabel).join("\n"),
   dialerKeyShadow: (digit, subLabel = "") => dialerKeyShadowRows(digit, subLabel).join("\n"),
 };

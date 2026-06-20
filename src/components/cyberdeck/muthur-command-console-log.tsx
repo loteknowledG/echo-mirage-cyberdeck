@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { ChatUserRoleLabel } from "@/components/cyberdeck/chat-user-role-label";
 import {
@@ -87,7 +87,6 @@ export function MuthurCommandConsoleLog({
   cognitionStatusLine,
 }: MuthurCommandConsoleLogProps) {
   const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
-  const lastDiagnosticsCountRef = useRef(0);
   const turns = useMemo(() => groupMuthurChatTurns(messages), [messages]);
   const diagnosticsPresentation = useMemo(
     () => presentMuthurDiagnostics(diagnosticsState),
@@ -102,14 +101,8 @@ export function MuthurCommandConsoleLog({
   useEffect(() => {
     if (diagnosticsTotalCount === 0 && !cognitionStatusLine) {
       setDiagnosticsExpanded(false);
-      lastDiagnosticsCountRef.current = 0;
-      return;
     }
-    if (isStreaming || diagnosticsTotalCount > lastDiagnosticsCountRef.current || cognitionStatusLine) {
-      setDiagnosticsExpanded(true);
-    }
-    lastDiagnosticsCountRef.current = diagnosticsTotalCount;
-  }, [cognitionStatusLine, diagnosticsTotalCount, isStreaming]);
+  }, [cognitionStatusLine, diagnosticsTotalCount]);
 
   let rowIndex = 0;
 

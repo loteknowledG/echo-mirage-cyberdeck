@@ -7725,7 +7725,7 @@ ${diff}`;
                   />
                   </div>
                   <div
-                    className="flex shrink-0 items-center gap-2"
+                    className="flex shrink-0 flex-wrap items-center justify-end gap-x-2 gap-y-1"
                     data-morphism={paneToolbarMorphismZone(deckMode)}
                   >
                     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
@@ -7734,7 +7734,6 @@ ${diff}`;
                       control={muthurVoiceControlOptions(voiceEnabled, voiceHealth)}
                       onClick={toggleVoiceEnabled}
                       aria-label={voiceEnabled ? "Voice on" : "Voice off"}
-                      aria-pressed={voiceEnabled}
                     >
                       {voiceEnabled ? (
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
@@ -7783,12 +7782,15 @@ ${diff}`;
                         </span>
                         <CyberdeckControlTooltip label="Stop speech (Esc)" disabled={!voicePlaybackBusy}>
                         <CyberdeckPaneToolbarControl
-                          control={{ size: "compact", amber: true }}
+                          control={{ size: "icon", amber: true }}
                           onClick={() => abortMotherSpeech()}
                           disabled={!voicePlaybackBusy}
                           aria-label="Stop speech"
                         >
-                          ‖
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
+                            <path d="M8 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                            <path d="M16 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          </svg>
                         </CyberdeckPaneToolbarControl>
                         </CyberdeckControlTooltip>
                         <CyberdeckControlTooltip
@@ -7796,7 +7798,7 @@ ${diff}`;
                           disabled={voiceBlockFocusIndex <= 0}
                         >
                         <CyberdeckPaneToolbarControl
-                          control={{ size: "compact", signal: true, off: voiceBlockFocusIndex <= 0 }}
+                          control={{ size: "icon", signal: true, off: voiceBlockFocusIndex <= 0 }}
                           onClick={() => {
                             if (voiceBlockFocusIndex <= 0) return;
                             const next = voiceBlockFocusIndex - 1;
@@ -7806,19 +7808,42 @@ ${diff}`;
                           disabled={voiceBlockFocusIndex <= 0}
                           aria-label="Speak earlier paragraph"
                         >
-                          ◀
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
+                            <path
+                              d="M14 7L9 12L14 17"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
                         </CyberdeckPaneToolbarControl>
                         </CyberdeckControlTooltip>
                         <CyberdeckControlTooltip label="Replay entire last reply">
                         <CyberdeckPaneToolbarControl
-                          control={{ size: "compact", signal: true }}
+                          control={{ size: "icon", signal: true }}
                           onClick={() => {
                             abortMotherSpeech();
                             replayFullLastAssistant();
                           }}
                           aria-label="Replay full response"
                         >
-                          ↻
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
+                            <path
+                              d="M6 8V4L2 8L6 12V9C8.5 9 11 10.5 12 13C12.5 11.5 13.5 10 15 9.2"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <path
+                              d="M18 16V20L22 16L18 12V15C15.5 15 13 13.5 12 11C11.5 12.5 10.5 14 9 14.8"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
                         </CyberdeckPaneToolbarControl>
                         </CyberdeckControlTooltip>
                       </>

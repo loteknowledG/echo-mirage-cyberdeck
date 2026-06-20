@@ -58,7 +58,11 @@ export function CyberdeckControlTooltip({
   disabled = false,
   side = "top",
 }: CyberdeckControlTooltipProps) {
-  const trigger = disabled ? <span className="inline-flex">{children}</span> : children;
+  const trigger = disabled ? (
+    <span className="ascii-morph-btn-tooltip-wrap">{children}</span>
+  ) : (
+    children
+  );
 
   return (
     <CyberdeckPaneTooltip label={label} side={side}>

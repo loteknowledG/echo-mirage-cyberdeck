@@ -3,8 +3,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import {
   renderAsciiMorphFace,
-  renderAsciiMorphShadowBottom,
-  renderAsciiMorphShadowSide,
+  renderAsciiMorphShadow,
 } from "@/lib/ascii-morph-button-art";
 import { cn } from "@/lib/utils";
 
@@ -62,8 +61,7 @@ export function AsciiMorphButton({
   const iconOverlay = !glyph && !textLabel && children != null;
   const options = artOptions({ glyph, label: textLabel, cols });
   const face = renderAsciiMorphFace(options);
-  const shadowSide = renderAsciiMorphShadowSide(options);
-  const shadowBottom = renderAsciiMorphShadowBottom(options);
+  const shadow = renderAsciiMorphShadow(options);
 
   return (
     <button
@@ -78,10 +76,9 @@ export function AsciiMorphButton({
     >
       <div className="ascii-morph-btn-stack">
         {!isPushed ? (
-          <div className="ascii-morph-btn-shadow-stack" aria-hidden>
-            <pre className="ascii-morph-btn-shadow-side">{shadowSide}</pre>
-            <pre className="ascii-morph-btn-shadow-bottom">{shadowBottom}</pre>
-          </div>
+          <pre className="ascii-morph-btn-shadow" aria-hidden>
+            {shadow}
+          </pre>
         ) : null}
         <div className="ascii-morph-btn-face">
           <pre className="ascii-morph-btn-frame">{face}</pre>

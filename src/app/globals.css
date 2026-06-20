@@ -485,12 +485,12 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   color: #9aa7ff;
 }
 
-.cyberdeck-server-rail cyberdeck-rail-tab:hover .ascii-btn .ascii-btn-face {
+.cyberdeck-server-rail cyberdeck-rail-tab:hover .ascii-btn .ascii-btn-face-shell {
   transform: translateY(-4px) translateX(-2px);
   text-shadow: 0 0 10px rgba(114, 137, 218, 0.35);
 }
 
-.cyberdeck-server-rail cyberdeck-rail-tab:hover .ascii-btn.is-pushed .ascii-btn-face {
+.cyberdeck-server-rail cyberdeck-rail-tab:hover .ascii-btn.is-pushed .ascii-btn-face-shell {
   color: #36ff73;
   text-shadow: 0 0 12px rgba(54, 255, 115, 0.38);
 }
@@ -516,8 +516,13 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 }
 
 .cyberdeck-server-rail .ascii-btn-shadow,
-.cyberdeck-server-rail .ascii-btn-face {
+.cyberdeck-server-rail .ascii-btn-face-shell {
   grid-area: 1 / 1;
+  margin: 0;
+  font: inherit;
+}
+
+.cyberdeck-server-rail .ascii-btn-face {
   margin: 0;
   white-space: pre;
   background: transparent;
@@ -525,12 +530,9 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   font: inherit;
 }
 
-.cyberdeck-server-rail .ascii-btn-shadow {
-  color: inherit;
-  opacity: 0.72;
-}
-
-.cyberdeck-server-rail .ascii-btn-face {
+.cyberdeck-server-rail .ascii-btn-face-shell {
+  display: inline-grid;
+  place-items: center;
   text-shadow: none;
   transition:
     color 60ms ease,
@@ -539,12 +541,58 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   will-change: transform;
 }
 
+.cyberdeck-server-rail .ascii-btn-face-shell--icon {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  vertical-align: top;
+}
+
+.cyberdeck-server-rail .ascii-btn-face-shell--icon .ascii-btn-face {
+  display: block;
+  line-height: 1.1;
+}
+
+.cyberdeck-server-rail .ascii-btn-face {
+  grid-area: 1 / 1;
+}
+
+.cyberdeck-server-rail .ascii-btn-icon {
+  grid-area: 1 / 1;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: inherit;
+}
+
+.cyberdeck-server-rail .ascii-btn-face-shell--icon .ascii-btn-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+}
+
+.cyberdeck-server-rail .ascii-btn-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cyberdeck-server-rail .ascii-btn-shadow {
+  color: inherit;
+  opacity: 0.72;
+}
+
 .cyberdeck-server-rail .ascii-btn.is-pushed {
   color: #00ff00;
   opacity: 1;
 }
 
-.cyberdeck-server-rail .ascii-btn.is-pushed .ascii-btn-face {
+.cyberdeck-server-rail .ascii-btn.is-pushed .ascii-btn-face-shell {
   text-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
 }
 
@@ -554,17 +602,17 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   opacity: 1;
 }
 
-.cyberdeck-server-rail cyberdeck-rail-tab .ascii-btn.server-rail-kb-hover .ascii-btn-face {
+.cyberdeck-server-rail cyberdeck-rail-tab .ascii-btn.server-rail-kb-hover .ascii-btn-face-shell {
   transform: translateY(-4px) translateX(-2px);
   text-shadow: 0 0 10px rgba(114, 137, 218, 0.35);
 }
 
-.cyberdeck-server-rail cyberdeck-rail-tab .ascii-btn.server-rail-kb-hover.is-pushed .ascii-btn-face {
+.cyberdeck-server-rail cyberdeck-rail-tab .ascii-btn.server-rail-kb-hover.is-pushed .ascii-btn-face-shell {
   color: #36ff73;
   text-shadow: 0 0 12px rgba(54, 255, 115, 0.38);
 }
 
-.cyberdeck-server-rail .ascii-btn:active .ascii-btn-face {
+.cyberdeck-server-rail .ascii-btn:active .ascii-btn-face-shell {
   transform: translateY(4px) translateX(2px);
   transition-duration: 80ms;
 }
@@ -804,9 +852,9 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 /* Pane chrome toolbars — separate from rail (.ascii-morph-btn) */
 [data-morphism="asciimorphism"] .ascii-morph-btn {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 0 0.65em 0.55em 0;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -816,10 +864,19 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   font-family: var(--font-mono, ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace);
   margin: 0;
   opacity: 0.82;
+  overflow: visible;
+  flex-shrink: 0;
+  vertical-align: top;
   box-sizing: border-box;
   font-variant-ligatures: none;
   -webkit-font-smoothing: none;
   text-rendering: geometricPrecision;
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn-tooltip-wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+  vertical-align: top;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn:disabled {
@@ -848,11 +905,13 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn-stack {
+  position: relative;
   display: inline-grid;
   place-items: start;
+  isolation: isolate;
 }
 
-[data-morphism="asciimorphism"] .ascii-morph-btn-shadow-stack,
+[data-morphism="asciimorphism"] .ascii-morph-btn-shadow,
 [data-morphism="asciimorphism"] .ascii-morph-btn-face,
 [data-morphism="asciimorphism"] .ascii-morph-btn-frame {
   grid-area: 1 / 1;
@@ -860,16 +919,16 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   font: inherit;
 }
 
-[data-morphism="asciimorphism"] .ascii-morph-btn-shadow-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+[data-morphism="asciimorphism"] .ascii-morph-btn-shadow {
+  z-index: 0;
   color: inherit;
-  opacity: 0.72;
+  opacity: 1;
+  white-space: pre;
+  background: transparent;
+  border: 0;
+  line-height: 1;
 }
 
-[data-morphism="asciimorphism"] .ascii-morph-btn-shadow-side,
-[data-morphism="asciimorphism"] .ascii-morph-btn-shadow-bottom,
 [data-morphism="asciimorphism"] .ascii-morph-btn-frame {
   margin: 0;
   white-space: pre;
@@ -879,19 +938,14 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   line-height: 1;
 }
 
-[data-morphism="asciimorphism"] .ascii-morph-btn-shadow-bottom {
-  transform: translateX(-0.09ch);
-}
-
 [data-morphism="asciimorphism"] .ascii-morph-btn-face {
+  z-index: 1;
+  position: relative;
   display: inline-grid;
-  place-items: start;
+  place-items: center;
+  transform: translate(0, -2px);
   text-shadow: none;
-  transition:
-    color 60ms ease,
-    text-shadow 60ms ease,
-    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn-content {
@@ -920,26 +974,40 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   font-size: 10px;
 }
 
+[data-morphism="asciimorphism"] .ascii-morph-btn--icon,
+[data-morphism="asciimorphism"] .ascii-morph-btn--toolbar,
+[data-morphism="asciimorphism"] .ascii-morph-btn--send {
+  font-size: 10px;
+}
+
 [data-morphism="asciimorphism"] .ascii-morph-btn--tile {
   font-size: 11px;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-signal {
-  color: #00ff00;
-  opacity: 1;
+  color: var(--deck-depth-ink-signal, #36ff73);
+  opacity: 0.88;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-signal .ascii-morph-btn-face {
-  text-shadow: var(--deck-green-text-glow, 0 0 6px rgba(54, 255, 115, 0.32));
+  text-shadow: 0 0 4px rgba(54, 255, 115, 0.18);
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn.is-signal .ascii-morph-btn-shadow {
+  opacity: 0.5;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-amber {
-  color: #ffbf4d;
-  opacity: 1;
+  color: var(--deck-depth-ink-amber, #c9a24a);
+  opacity: 0.88;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-amber .ascii-morph-btn-face {
   text-shadow: none;
+}
+
+[data-morphism="asciimorphism"] .ascii-morph-btn.is-amber .ascii-morph-btn-shadow {
+  opacity: 0.5;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-critical {
@@ -951,49 +1019,43 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   opacity: 0.45;
 }
 
-[data-morphism="asciimorphism"] .ascii-morph-btn:hover .ascii-morph-btn-face {
-  transform: translateY(-4px) translateX(-2px);
-  text-shadow: none;
+[data-morphism="asciimorphism"] .ascii-morph-btn:hover:not(:disabled):not(.is-pushed) .ascii-morph-btn-face {
+  transform: translate(-2px, -6px);
 }
 
-[data-morphism="asciimorphism"] .ascii-morph-btn:hover {
+[data-morphism="asciimorphism"] .ascii-morph-btn:hover:not(.is-signal):not(.is-amber):not(.is-critical):not(:disabled) {
   color: #9aa7ff;
 }
 
-[data-morphism="asciimorphism"] .ascii-morph-btn.is-signal:hover .ascii-morph-btn-face {
-  color: #36ff73;
-  text-shadow: var(--deck-green-text-glow, 0 0 6px rgba(54, 255, 115, 0.32));
+[data-morphism="asciimorphism"] .ascii-morph-btn:hover:not(.is-signal):not(.is-amber):not(.is-critical):not(:disabled)
+  .ascii-morph-btn-face {
+  text-shadow: none;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn:active .ascii-morph-btn-face {
-  transform: translateY(4px) translateX(2px);
+  transform: translate(1px, 2px);
   transition-duration: 80ms;
 }
 
-[data-morphism="asciimorphism"] .ascii-morph-btn:active .ascii-morph-btn-shadow-stack {
+[data-morphism="asciimorphism"] .ascii-morph-btn:active .ascii-morph-btn-shadow {
   visibility: hidden;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed .ascii-morph-btn-face {
-  transform: translateY(4px) translateX(2px);
+  transform: translate(1px, 2px);
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed.is-signal {
-  color: #00ff00;
-  opacity: 1;
+  color: var(--deck-depth-ink-signal, #36ff73);
+  opacity: 0.88;
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed.is-signal .ascii-morph-btn-face {
-  text-shadow: var(--deck-green-text-glow, 0 0 6px rgba(54, 255, 115, 0.32));
+  text-shadow: 0 0 4px rgba(54, 255, 115, 0.18);
 }
 
 [data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed:hover .ascii-morph-btn-face {
-  transform: translateY(4px) translateX(2px);
-}
-
-[data-morphism="asciimorphism"] .ascii-morph-btn.is-pushed.is-signal:hover .ascii-morph-btn-face {
-  color: #36ff73;
-  text-shadow: var(--deck-green-text-glow, 0 0 6px rgba(54, 255, 115, 0.32));
+  transform: translate(1px, 2px);
 }
 
 /* Custom Scrollbar for Cyberdeck — native fallback when Perfect Scrollbar is off */
