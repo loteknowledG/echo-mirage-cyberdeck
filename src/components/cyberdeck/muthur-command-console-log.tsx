@@ -40,8 +40,6 @@ type MuthurCommandConsoleLogProps = {
   onChatUserDisplayNameChange: (name: string) => void;
   chatKeyboardHighlightIndex: number | null;
   renderDiagnosticText?: (text: string) => ReactNode;
-  isMobileLayout?: boolean;
-  echoHeader?: ReactNode;
   cognitionStatusLine?: string | null;
 };
 
@@ -86,8 +84,6 @@ export function MuthurCommandConsoleLog({
   onChatUserDisplayNameChange,
   chatKeyboardHighlightIndex,
   renderDiagnosticText,
-  isMobileLayout,
-  echoHeader,
   cognitionStatusLine,
 }: MuthurCommandConsoleLogProps) {
   const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
@@ -119,7 +115,6 @@ export function MuthurCommandConsoleLog({
 
   return (
     <>
-      {isMobileLayout ? echoHeader : null}
       {responseStall ? (
         <div
           data-muthur-stall

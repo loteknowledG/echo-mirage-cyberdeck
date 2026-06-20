@@ -7675,13 +7675,7 @@ ${diff}`;
                 onChatUserDisplayNameChange={setChatUserDisplayName}
                 chatKeyboardHighlightIndex={chatKeyboardHighlightIndex}
                 renderDiagnosticText={renderGatewayMessageText}
-                isMobileLayout={isMobileLayout}
                 cognitionStatusLine={muthurCognitionStatusLine}
-                echoHeader={
-                  <div className="mb-2">
-                    <EchoHeader />
-                  </div>
-                }
               />
               <div ref={messagesEndRef} className="h-px" aria-hidden />
             </div>

@@ -97,6 +97,40 @@ try {
   /* no previous session file */
 }
 await writeDevState(false);
+
+async function ensureDevDistDir() {
+  const distRoot = path.join(root, nextDistDir);
+  const devManifestPath = path.join(distRoot, 'dev', 'routes-manifest.json');
+  const productionBuildIdPath = path.join(distRoot, 'BUILD_ID');
+
+  let devManifestExists = false;
+  try {
+    await fs.access(devManifestPath);
+    devManifestExists = true;
+  } catch {
+    devManifestExists = false;
+  }
+
+  if (devManifestExists) return;
+
+  let productionBuildExists = false;
+  try {
+    await fs.access(productionBuildIdPath);
+    productionBuildExists = true;
+  } catch {
+    productionBuildExists = false;
+  }
+
+  if (!productionBuildExists) return;
+
+  process.stderr.write(
+    `[dev] stale production cache at ${nextDistDir} — clearing before dev startup\n`,
+  );
+  await fs.rm(distRoot, { recursive: true, force: true });
+}
+
+await ensureDevDistDir();
+
 const nextEnvPath = path.join(root, 'next-env.d.ts');
 const tsconfigPath = path.join(root, 'tsconfig.json');
 
