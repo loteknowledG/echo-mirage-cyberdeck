@@ -1,5 +1,5 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
-import { Type } from "typebox";
+import { Type } from "@mariozechner/pi-ai";
 import type { PiComputerUseCommandAction } from "./pi-computer-use-types";
 
 const piComputerUseSchema = Type.Object({

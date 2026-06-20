@@ -1,5 +1,4 @@
-import { Type } from "typebox";
-import type { Tool, ToolCall } from "@mariozechner/pi-ai";
+import { Type, type Tool, type ToolCall } from "@mariozechner/pi-ai";
 import { executePiComputerUseCommand } from "@/lib/pi/pi-computer-use-manager";
 import { getPiComputerUseStatus } from "@/lib/pi/pi-computer-use-status";
 import type { PiComputerUseCommand, PiComputerUseCommandAction } from "@/lib/pi/pi-computer-use-types";
