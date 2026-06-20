@@ -185,17 +185,20 @@
   overflow: visible;
 }
 
-/* Composer toolbar — keep signal/amber readable but not neon against the input well */
-[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls [data-morphism="asciimorphism"] .ascii-morph-btn.is-signal,
-[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls [data-morphism="asciimorphism"] .ascii-morph-btn.is-amber {
-  opacity: 0.82;
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls .muthur-depth-control {
+  flex-shrink: 0;
 }
 
-[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls [data-morphism="asciimorphism"] .ascii-morph-btn.is-signal
-  .ascii-morph-btn-shadow,
-[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls [data-morphism="asciimorphism"] .ascii-morph-btn.is-amber
-  .ascii-morph-btn-shadow {
-  opacity: 0.42;
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-posture-roller {
+  --panel-face: #050505;
+  --panel-border: #1a1a1a;
+  --panel-side: #222;
+  --panel-bottom: #181818;
+}
+
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-posture-roller .depth-panel__face {
+  border-radius: 0;
+  background: #000;
 }
 
 [data-deck-mode="ascii"] .depth-panel[data-glow="true"] .depth-panel__face {

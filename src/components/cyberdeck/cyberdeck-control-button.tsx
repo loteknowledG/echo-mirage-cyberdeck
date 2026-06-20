@@ -80,6 +80,22 @@ export function CyberdeckPaneToolbarControl({
   );
 }
 
+/** MUTHUR composer / message-box — mechanical DepthButton in ascii deck mode (CONNECT style). */
+export function CyberdeckComposerControl({
+  control,
+  children,
+  className,
+  type = "button",
+  ...props
+}: Omit<CyberdeckControlButtonProps, "deckMode" | "depth" | "glow">) {
+  const deckMode = useDeckMode();
+  return (
+    <CyberdeckControlButton deckMode={deckMode} control={control} className={className} type={type} {...props}>
+      {children}
+    </CyberdeckControlButton>
+  );
+}
+
 /** Fixed asciimorphism chrome — ASCII ▓ ground + lifting face (rail only). */
 export function CyberdeckAsciimorphismControl({
   control,

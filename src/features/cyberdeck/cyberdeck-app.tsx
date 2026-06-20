@@ -195,11 +195,11 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
 import { CyberdeckScrollbarHost } from "@/components/cyberdeck/cyberdeck-scrollbar-host";
-import { MORPHISM_ZONE_REALMORPHISM, paneToolbarMorphismZone } from "@/lib/cyberdeck/morphism-zones";
+import { MORPHISM_ZONE_REALMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import {
+  CyberdeckComposerControl,
   CyberdeckControlButton,
   CyberdeckMenuButton,
-  CyberdeckPaneToolbarControl,
 } from "@/components/cyberdeck/cyberdeck-control-button";
 import { muthurVoiceControlOptions } from "@/lib/cyberdeck/muthur-depth-control";
 import {
@@ -7813,11 +7813,11 @@ ${diff}`;
                   </div>
                   <div
                     className="flex shrink-0 flex-wrap items-center justify-end gap-x-2 gap-y-1"
-                    data-morphism={paneToolbarMorphismZone(deckMode)}
+                    data-morphism="realmorphism"
                   >
                     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
                     <CyberdeckControlTooltip label={voiceEnabled ? "Voice on" : "Voice off"}>
-                    <CyberdeckPaneToolbarControl
+                    <CyberdeckComposerControl
                       control={muthurVoiceControlOptions(voiceEnabled, voiceHealth)}
                       onClick={toggleVoiceEnabled}
                       aria-label={voiceEnabled ? "Voice on" : "Voice off"}
@@ -7857,7 +7857,7 @@ ${diff}`;
                           <path d="M21 9L15 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                           </svg>
                         )}
-                    </CyberdeckPaneToolbarControl>
+                    </CyberdeckComposerControl>
                     </CyberdeckControlTooltip>
                     {voiceEnabled && voiceBlockTotal > 0 ? (
                       <>
@@ -7868,7 +7868,7 @@ ${diff}`;
                           {voiceBlockTotal > 1 ? `${voiceBlockFocusIndex + 1}/${voiceBlockTotal}` : `${voiceBlockTotal}`}
                         </span>
                         <CyberdeckControlTooltip label="Stop speech (Esc)" disabled={!voicePlaybackBusy}>
-                        <CyberdeckPaneToolbarControl
+                        <CyberdeckComposerControl
                           control={{ size: "icon", amber: true }}
                           onClick={() => abortMotherSpeech()}
                           disabled={!voicePlaybackBusy}
@@ -7878,13 +7878,13 @@ ${diff}`;
                             <path d="M8 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                             <path d="M16 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                           </svg>
-                        </CyberdeckPaneToolbarControl>
+                        </CyberdeckComposerControl>
                         </CyberdeckControlTooltip>
                         <CyberdeckControlTooltip
                           label="Earlier paragraph (more context)"
                           disabled={voiceBlockFocusIndex <= 0}
                         >
-                        <CyberdeckPaneToolbarControl
+                        <CyberdeckComposerControl
                           control={{ size: "icon", signal: true, off: voiceBlockFocusIndex <= 0 }}
                           onClick={() => {
                             if (voiceBlockFocusIndex <= 0) return;
@@ -7904,10 +7904,10 @@ ${diff}`;
                               strokeLinejoin="round"
                             />
                           </svg>
-                        </CyberdeckPaneToolbarControl>
+                        </CyberdeckComposerControl>
                         </CyberdeckControlTooltip>
                         <CyberdeckControlTooltip label="Replay entire last reply">
-                        <CyberdeckPaneToolbarControl
+                        <CyberdeckComposerControl
                           control={{ size: "icon", signal: true }}
                           onClick={() => {
                             abortMotherSpeech();
@@ -7931,13 +7931,13 @@ ${diff}`;
                               strokeLinejoin="round"
                             />
                           </svg>
-                        </CyberdeckPaneToolbarControl>
+                        </CyberdeckComposerControl>
                         </CyberdeckControlTooltip>
                       </>
                     ) : null}
                     {!isStreaming ? (
                       <CyberdeckControlTooltip label="Send" disabled={!canSendInput}>
-                      <CyberdeckPaneToolbarControl
+                      <CyberdeckComposerControl
                         control={{ size: "send", signal: canSendInput, off: !canSendInput }}
                         onClick={() => void handleSend()}
                         disabled={!canSendInput}
@@ -7960,11 +7960,11 @@ ${diff}`;
                           />
                           <path d="M11.3 13.7L20.4 3.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                         </svg>
-                      </CyberdeckPaneToolbarControl>
+                      </CyberdeckComposerControl>
                       </CyberdeckControlTooltip>
                     ) : (
                       <CyberdeckControlTooltip label="Stop">
-                      <CyberdeckPaneToolbarControl
+                      <CyberdeckComposerControl
                         control={{
                           size: "send",
                           amber: true,
@@ -7977,7 +7977,7 @@ ${diff}`;
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
                           <rect x="6.5" y="6.5" width="11" height="11" rx="1.2" />
                         </svg>
-                      </CyberdeckPaneToolbarControl>
+                      </CyberdeckComposerControl>
                       </CyberdeckControlTooltip>
                     )}
                     </CyberdeckPaneTooltipProvider>

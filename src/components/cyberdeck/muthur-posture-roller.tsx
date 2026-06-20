@@ -6,6 +6,8 @@ import {
   CyberdeckPaneTooltip,
   CyberdeckPaneTooltipProvider,
 } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
+import { DepthPanel } from "@/components/realmorphism";
+import { useDeckMode } from "@/lib/deck-mode";
 import {
   MUTHUR_POSTURE_SELECTOR,
   MUTHUR_POSTURES,
@@ -32,6 +34,7 @@ export function MuthurPostureRoller({
   disabled = false,
   onChange,
 }: MuthurPostureRollerProps) {
+  const deckMode = useDeckMode();
   const resolvedPosture = normalizeMuthurPosture(posture);
   const activeMeta = getMuthurPostureMeta(resolvedPosture);
 
@@ -57,21 +60,34 @@ export function MuthurPostureRoller({
     [selectorMeta],
   );
 
+  const picker = (
+    <CyberdeckRollingPicker
+      items={items}
+      value={resolvedPosture}
+      onChange={(next) => onChange(normalizeMuthurPosture(next))}
+      ariaLabel="MUTHUR posture"
+      viewportClassName="h-8 min-w-[4.25rem] w-auto max-w-[5.5rem]"
+      alwaysShowLabel
+      showTextWhileScrolling
+      loop
+    />
+  );
+
+  const rollerBody =
+    deckMode === "ascii" ? (
+      <DepthPanel variant="inset" depth={4} className="muthur-posture-roller shrink-0">
+        <div className="flex items-center justify-center px-1.5 py-0.5 font-mono text-[9px] tracking-[0.06em] text-[#bdbdbd]">
+          {picker}
+        </div>
+      </DepthPanel>
+    ) : (
+      picker
+    );
+
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
       <CyberdeckPaneTooltip label={activeMeta.title} side="top">
-        <div className={disabled ? "pointer-events-none opacity-40" : undefined}>
-          <CyberdeckRollingPicker
-            items={items}
-            value={resolvedPosture}
-            onChange={(next) => onChange(normalizeMuthurPosture(next))}
-            ariaLabel="MUTHUR posture"
-            viewportClassName="h-7 min-w-[3rem] w-auto max-w-[5.25rem]"
-            alwaysShowLabel
-            showTextWhileScrolling
-            loop
-          />
-        </div>
+        <div className={disabled ? "pointer-events-none opacity-40" : undefined}>{rollerBody}</div>
       </CyberdeckPaneTooltip>
     </CyberdeckPaneTooltipProvider>
   );
