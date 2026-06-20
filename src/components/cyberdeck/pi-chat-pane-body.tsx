@@ -15,6 +15,10 @@ import {
   setPiScreenSnapshot,
 } from "@/lib/pi-screen-context";
 import { PiComputerUseStatusPanel } from "@/components/cyberdeck/pi-computer-use-status-panel";
+import {
+  takePendingPiMission,
+  type PiMissionDetail,
+} from "@/lib/pi/pi-mission-bridge";
 
 type PiChatPaneBodyProps = {
   server: string;
@@ -146,8 +150,44 @@ function createEmptyAssistantMessage(model: { api: string; provider: string; id:
   };
 }
 
+function formatMuthurPiMissionPrompt(detail: PiMissionDetail): string {
+  const task = detail.task?.trim() || "Delegated mission";
+  const missionText =
+    detail.missionText?.trim() ||
+    "Execute the delegated desktop mission under the active Pi control lease.";
+  return [
+    "MUTHUR CONTROL LEASE — delegated embodiment mission",
+    `Task: ${task}`,
+    "",
+    missionText,
+    "",
+    "You are Pi, the embodiment operator. The operator granted mouse/keyboard/screen control.",
+    "Use the pi_computer_use tool step by step: screenshot first, then open Paint and draw.",
+    "Do not claim actions without tool receipts.",
+  ].join("\n");
+}
+
+async function runPiMission(
+  agent: { prompt: (input: string) => Promise<void> },
+  detail: PiMissionDetail,
+  onStatus: (status: string) => void,
+): Promise<void> {
+  const prompt = formatMuthurPiMissionPrompt(detail);
+  console.debug("[pi-tab] muthur-pi-mission running", {
+    task: detail.task,
+    length: prompt.length,
+  });
+  onStatus("PI MISSION");
+  try {
+    await agent.prompt(prompt);
+  } finally {
+    onStatus("PI READY");
+  }
+}
+
 export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const agentRef = useRef<{ prompt: (input: string) => Promise<void> } | null>(null);
   const [status, setStatus] = useState("BOOTING PI...");
 
   useEffect(() => {
@@ -215,6 +255,7 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
                   model: model.id,
                   systemPrompt: context.systemPrompt,
                   muthurScreenContext,
+                  computerUseEnabled: true,
                   messages: context.messages,
                 }),
                 signal: options?.signal,
@@ -309,7 +350,9 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
         agent = new Agent({
           initialState: {
             systemPrompt:
-              "You are Pi running inside the Echo Mirage Cyberdeck. Be technical, direct, and helpful. Each request includes a read-only MUTHUR screen snapshot (ECHO chat, operator pane, active tab) — use it to answer questions about what the operator and MUTHUR are looking at.",
+              "You are Pi running inside the Echo Mirage Cyberdeck — the Windows desktop embodiment operator. " +
+              "Be technical, direct, and helpful. Each request includes a read-only MUTHUR screen snapshot. " +
+              "When the operator grants a control lease, use pi_computer_use (via the Pi uplink tool loop) for desktop actions: screenshot first, then mouse/keyboard step by step.",
             model: getModel("opencode", "big-pickle"),
             thinkingLevel: "off",
             messages: [],
@@ -318,6 +361,7 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
           convertToLlm: ui.defaultConvertToLlm,
           streamFn,
         });
+        agentRef.current = agent;
 
         agent.subscribe((event) => {
           if (event.type === "message_end" || event.type === "turn_end" || event.type === "agent_end") {
@@ -369,6 +413,11 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
           host.removeEventListener("input", onComposerInput);
         };
         setStatus("PI READY");
+
+        const pendingMission = takePendingPiMission();
+        if (pendingMission && agent) {
+          void runPiMission(agent, pendingMission, setStatus);
+        }
       } catch (error) {
         console.error("[pi-tab] failed to mount Pi chat", error);
         setStatus("PI BOOT FAILURE");
@@ -379,12 +428,33 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
 
     return () => {
       disposed = true;
+      agentRef.current = null;
       clearPiScreenSnapshot();
       const cleanup = (panel as (HTMLElement & { __echoMirageCleanup?: () => void }) | null)
         ?.__echoMirageCleanup;
       cleanup?.();
       panel?.remove();
       hostRef.current?.replaceChildren();
+    };
+  }, []);
+
+  useEffect(() => {
+    function onMuthurPiMission(event: Event) {
+      const eventDetail = (event as CustomEvent<PiMissionDetail>).detail;
+      const detail = takePendingPiMission() ?? eventDetail;
+      const agent = agentRef.current;
+      if (!detail) return;
+      if (!agent) {
+        console.warn("[pi-tab] muthur-pi-mission queued — Pi agent not ready");
+        return;
+      }
+
+      void runPiMission(agent, detail, setStatus);
+    }
+
+    window.addEventListener("muthur-pi-mission", onMuthurPiMission);
+    return () => {
+      window.removeEventListener("muthur-pi-mission", onMuthurPiMission);
     };
   }, []);
 

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getModel, streamSimple, type Message, type Model } from "@mariozechner/pi-ai";
+import { runPiChatWithComputerUseTools } from "@/lib/pi/pi-chat-with-tools.server";
+import { PI_COMPUTER_USE_DOCTRINE } from "@/lib/pi/pi-computer-use-doctrine";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -133,8 +135,53 @@ export async function POST(request: Request) {
     const baseSystemPrompt = typeof body.systemPrompt === "string" ? body.systemPrompt : "";
     const muthurScreenContext =
       typeof body.muthurScreenContext === "string" ? body.muthurScreenContext.trim() : "";
-    const systemPrompt = [baseSystemPrompt.trim(), muthurScreenContext].filter(Boolean).join("\n");
+    const computerUseEnabled = body.computerUseEnabled !== false;
+    const systemPrompt = [
+      baseSystemPrompt.trim(),
+      muthurScreenContext,
+      computerUseEnabled ? PI_COMPUTER_USE_DOCTRINE : "",
+      computerUseEnabled
+        ? "\nWhen executing desktop missions, call pi_computer_use repeatedly: screenshot first, then open apps (Win key, type paint, enter), draw with click/type. Report each receipt."
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
     const messages = Array.isArray(body.messages) ? (body.messages as Message[]) : [];
+
+    if (computerUseEnabled) {
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          async start(controller) {
+            const write = (text: string) => {
+              if (text) controller.enqueue(textEncoder.encode(text));
+            };
+            try {
+              await runPiChatWithComputerUseTools({
+                model,
+                systemPrompt: systemPrompt || undefined,
+                messages,
+                streamOptions: { apiKey },
+                write,
+              });
+              controller.close();
+            } catch (error) {
+              const message = formatPiUplinkError(
+                error instanceof Error ? error.message : "Pi uplink failed",
+              );
+              write(`\n[Pi] ${message}`);
+              controller.close();
+            }
+          },
+        }),
+        {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+          },
+        },
+      );
+    }
 
     const eventStream = streamSimple(
       model,

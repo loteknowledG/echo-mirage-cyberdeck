@@ -44,6 +44,7 @@ export class PiComputerUseMacAdapter implements ComputerUseAdapter {
     return {
       actor: "pi",
       platform: this.platform,
+      hostPlatform: this.platform,
       backend: this.backendId,
       status: "SCAFFOLD",
       computerUse: "SCAFFOLD",

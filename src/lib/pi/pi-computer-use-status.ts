@@ -87,6 +87,7 @@ export function buildPiComputerUseStatus(
   return {
     actor: "pi",
     platform,
+    hostPlatform: platform,
     backend,
     status,
     computerUse: status,

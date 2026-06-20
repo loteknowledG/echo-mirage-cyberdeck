@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import type { PiComputerUseStatus } from "@/lib/pi/pi-computer-use-types";
+import {
+  detectOperatorPlatform,
+  describeHostOperatorMismatch,
+} from "@/lib/pi/pi-operator-platform";
 import { formatPiPlatformLabel } from "@/lib/pi/pi-platform-resolver";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +56,7 @@ function readinessClassName(status: PiComputerUseStatus["status"]): string {
 export function PiComputerUseStatusPanel({ className }: PiComputerUseStatusPanelProps) {
   const [status, setStatus] = useState<PiComputerUseStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const operatorPlatform = detectOperatorPlatform();
 
   useEffect(() => {
     let cancelled = false;
@@ -80,9 +85,13 @@ export function PiComputerUseStatusPanel({ className }: PiComputerUseStatusPanel
     };
   }, []);
 
-  const platformLabel = status ? formatPiPlatformLabel(status.platform) : "…";
+  const hostPlatform = status?.hostPlatform ?? status?.platform;
+  const hostLabel = hostPlatform ? formatPiPlatformLabel(hostPlatform) : "…";
+  const operatorLabel = formatPiPlatformLabel(operatorPlatform);
   const readinessLabel = status ? formatReadinessLabel(status.status) : "…";
   const backendLabel = status ? formatBackendLabel(status.backend) : "…";
+  const hostMismatchNote =
+    hostPlatform && describeHostOperatorMismatch(hostPlatform, operatorPlatform);
 
   return (
     <section
@@ -101,7 +110,10 @@ export function PiComputerUseStatusPanel({ className }: PiComputerUseStatusPanel
       ) : (
         <div className="space-y-0.5">
           <div>
-            Platform: <span className="text-emerald-300/90">{platformLabel}</span>
+            Host (Node): <span className="text-emerald-300/90">{hostLabel}</span>
+          </div>
+          <div>
+            Operator: <span className="text-[#bdbdbd]">{operatorLabel}</span>
           </div>
           <div>
             Backend: <span className="text-[#bdbdbd]">{backendLabel}</span>
@@ -127,6 +139,10 @@ export function PiComputerUseStatusPanel({ className }: PiComputerUseStatusPanel
               <div>{capabilityMark(status?.capabilities.scroll ?? false)} Scroll</div>
             </div>
           </div>
+
+          {hostMismatchNote ? (
+            <div className="pt-1 text-amber-200/80">{hostMismatchNote}</div>
+          ) : null}
 
           {status?.lastError ? (
             <div className="pt-1 text-amber-200/80">Error: {status.lastError}</div>

@@ -269,6 +269,7 @@ import { setMUTHURMode } from "@/lib/computer-use/control-lease";
 import { detectComputerUseMission } from "@/lib/muthur/control/computer-use-intent";
 import { usePiControlLease } from "@/lib/muthur/control/use-pi-control-lease";
 import type { PiControlLeaseRequest } from "@/lib/muthur/control/pi-control-lease-types";
+import { queuePiMission } from "@/lib/pi/pi-mission-bridge";
 import { MuthurControlLeaseHost } from "@/components/cyberdeck/muthur-control-lease-host";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { summarizeMuthurOperatorEdits } from "@/lib/muthur-operator-edit-summary";
@@ -7420,11 +7421,7 @@ ${diff}`;
                 `CONTROL GRANTED // ${lease.task} // operator: Pi // lease: ${lease.leaseId}`,
               ),
             );
-            window.dispatchEvent(
-              new CustomEvent("muthur-pi-mission", {
-                detail: { missionText: lease.missionText, task: lease.task },
-              }),
-            );
+            queuePiMission({ missionText: lease.missionText, task: lease.task });
           }
         }}
         onDeny={async () => {

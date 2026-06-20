@@ -59,6 +59,7 @@ function buildStatus(): PiComputerUseStatus {
   return {
     actor: "pi",
     platform,
+    hostPlatform: platform,
     backend: "windows-use",
     status: readiness,
     computerUse: readiness,

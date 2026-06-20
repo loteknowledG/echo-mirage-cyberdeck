@@ -36,6 +36,7 @@ async function loadAdapterForPlatform(platform: PiPlatform): Promise<ComputerUse
         getStatus: () => ({
           actor: "pi",
           platform,
+          hostPlatform: platform,
           backend: "none",
           status: "UNAVAILABLE",
           computerUse: "UNAVAILABLE",

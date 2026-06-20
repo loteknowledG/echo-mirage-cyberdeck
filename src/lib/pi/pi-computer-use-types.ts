@@ -91,7 +91,9 @@ export type PiComputerUseReadiness =
 
 export interface PiComputerUseStatus {
   actor: "pi";
+  /** Node host where Pi computer-use executes (process.platform). */
   platform: PiPlatform;
+  hostPlatform: PiPlatform;
   backend: PiComputerUseBackend;
   status: PiComputerUseReadiness;
   /** @deprecated Use `status` — kept for existing callers */
