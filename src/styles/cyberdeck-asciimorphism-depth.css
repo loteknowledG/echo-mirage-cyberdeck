@@ -189,6 +189,44 @@
   flex-shrink: 0;
 }
 
+/* Composer controls — ascii-morphism lift on hover (face up/left, walls stay put) */
+[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls .muthur-depth-control .depth-panel__face {
+  transition:
+    color 120ms ease,
+    text-shadow 120ms ease,
+    border-color 120ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+[data-deck-mode="ascii"]
+  .cyberdeck-message-box
+  .muthur-composer-controls
+  .muthur-depth-control:hover:not(:disabled):not([aria-pressed="true"]):not(.is-latched):not(:active)
+  .depth-panel__face {
+  transform: translate(-2px, -6px);
+}
+
+[data-deck-mode="ascii"]
+  .cyberdeck-message-box
+  .muthur-composer-controls
+  .muthur-depth-control:active:not(:disabled)
+  .depth-panel__face {
+  transform: translate(var(--panel-depth), var(--panel-depth));
+  transition-duration: 80ms;
+}
+
+[data-deck-mode="ascii"]
+  .cyberdeck-message-box
+  .muthur-composer-controls
+  .muthur-depth-control:active:not(:disabled)::before,
+[data-deck-mode="ascii"]
+  .cyberdeck-message-box
+  .muthur-composer-controls
+  .muthur-depth-control:active:not(:disabled)::after {
+  opacity: 0;
+}
+
 [data-deck-mode="ascii"] .cyberdeck-message-box .muthur-posture-roller {
   --panel-face: #050505;
   --panel-border: #1a1a1a;
