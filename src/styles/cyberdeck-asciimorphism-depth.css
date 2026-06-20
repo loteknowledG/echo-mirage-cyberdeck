@@ -181,16 +181,16 @@
   border-radius: 0;
 }
 
-[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls {
+[data-deck-mode="ascii"] .deck-pane-depth-toolbar {
   overflow: visible;
 }
 
-[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls .muthur-depth-control {
+[data-deck-mode="ascii"] .deck-pane-depth-toolbar .muthur-depth-control {
   flex-shrink: 0;
 }
 
-/* Composer controls — ascii-morphism lift on hover (face up/left, walls stay put) */
-[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-controls .muthur-depth-control .depth-panel__face {
+/* Depth toolbar controls — ascii-morphism lift on hover (face up/left, walls stay put) */
+[data-deck-mode="ascii"] .deck-pane-depth-toolbar .muthur-depth-control .depth-panel__face {
   transition:
     color 120ms ease,
     text-shadow 120ms ease,
@@ -200,16 +200,14 @@
 }
 
 [data-deck-mode="ascii"]
-  .cyberdeck-message-box
-  .muthur-composer-controls
+  .deck-pane-depth-toolbar
   .muthur-depth-control:hover:not(:disabled):not([aria-pressed="true"]):not(.is-latched):not(:active)
   .depth-panel__face {
   transform: translate(-2px, -6px);
 }
 
 [data-deck-mode="ascii"]
-  .cyberdeck-message-box
-  .muthur-composer-controls
+  .deck-pane-depth-toolbar
   .muthur-depth-control:active:not(:disabled)
   .depth-panel__face {
   transform: translate(var(--panel-depth), var(--panel-depth));
@@ -217,12 +215,10 @@
 }
 
 [data-deck-mode="ascii"]
-  .cyberdeck-message-box
-  .muthur-composer-controls
+  .deck-pane-depth-toolbar
   .muthur-depth-control:active:not(:disabled)::before,
 [data-deck-mode="ascii"]
-  .cyberdeck-message-box
-  .muthur-composer-controls
+  .deck-pane-depth-toolbar
   .muthur-depth-control:active:not(:disabled)::after {
   opacity: 0;
 }

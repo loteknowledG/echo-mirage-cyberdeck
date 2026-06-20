@@ -6,8 +6,8 @@ import { BsFileEarmarkWord } from "react-icons/bs";
 import { LuRefreshCw } from "react-icons/lu";
 import { CyberdeckControlTooltip } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
 import {
+  CyberdeckComposerControl,
   CyberdeckMenuButton,
-  CyberdeckPaneToolbarControl,
 } from "@/components/cyberdeck/cyberdeck-control-button";
 import {
   DropdownMenu,
@@ -76,7 +76,7 @@ export function OperatorConvertPicker({
     >
       <CyberdeckControlTooltip label="Convert" disabled={disabled}>
         <DropdownMenuTrigger asChild disabled={disabled}>
-          <CyberdeckPaneToolbarControl
+          <CyberdeckComposerControl
             control={{ size: "toolbar", signal: open && !disabled }}
             aria-label="Convert"
             aria-haspopup="menu"
@@ -85,7 +85,7 @@ export function OperatorConvertPicker({
             className="disabled:cursor-not-allowed disabled:opacity-30"
           >
             <LuRefreshCw className="h-3.5 w-3.5" aria-hidden />
-          </CyberdeckPaneToolbarControl>
+          </CyberdeckComposerControl>
         </DropdownMenuTrigger>
       </CyberdeckControlTooltip>
       <DropdownMenuContent align="end" sideOffset={6} className={CONVERT_MENU_PANEL_CLASS}>

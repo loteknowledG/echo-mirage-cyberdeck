@@ -6,8 +6,8 @@ import { BsFileEarmarkWord } from "react-icons/bs";
 import { LuShare } from "react-icons/lu";
 import { CyberdeckControlTooltip } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
 import {
+  CyberdeckComposerControl,
   CyberdeckMenuButton,
-  CyberdeckPaneToolbarControl,
 } from "@/components/cyberdeck/cyberdeck-control-button";
 import {
   DropdownMenu,
@@ -55,7 +55,7 @@ export function OperatorExportPicker({ disabled = false, onExport }: OperatorExp
     >
       <CyberdeckControlTooltip label="Export" disabled={disabled}>
         <DropdownMenuTrigger asChild disabled={disabled}>
-          <CyberdeckPaneToolbarControl
+          <CyberdeckComposerControl
             control={{ size: "toolbar", signal: open && !disabled }}
             aria-label="Export"
             aria-haspopup="menu"
@@ -64,7 +64,7 @@ export function OperatorExportPicker({ disabled = false, onExport }: OperatorExp
             className="disabled:cursor-not-allowed disabled:opacity-30"
           >
             <LuShare className="h-3.5 w-3.5" aria-hidden />
-          </CyberdeckPaneToolbarControl>
+          </CyberdeckComposerControl>
         </DropdownMenuTrigger>
       </CyberdeckControlTooltip>
       <DropdownMenuContent

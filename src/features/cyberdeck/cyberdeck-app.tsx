@@ -7788,7 +7788,7 @@ ${diff}`;
                     />
                   </div>
                 </MuthurComposerShell>
-                <div className="muthur-composer-controls px-1">
+                <div className="muthur-composer-controls deck-pane-depth-toolbar px-1">
                   <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                   <button

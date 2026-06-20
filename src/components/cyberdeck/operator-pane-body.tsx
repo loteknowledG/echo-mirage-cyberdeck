@@ -43,11 +43,10 @@ import {
 import { cn } from "@/lib/utils";
 import {
   CyberdeckActionButton,
+  CyberdeckComposerControl,
   CyberdeckControl,
-  CyberdeckPaneToolbarControl,
 } from "@/components/cyberdeck/cyberdeck-control-button";
 import { LEGACY_SWITCH_EMERALD } from "@/lib/cyberdeck/realmorphism-control";
-import { paneToolbarMorphismZone } from "@/lib/cyberdeck/morphism-zones";
 import { useDeckMode } from "@/lib/deck-mode";
 import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
 import { CodexIcon } from "@/components/codex-icon";
@@ -206,7 +205,7 @@ function OperatorToolbarIconButton({
   children: ReactNode;
 }) {
   const button = (
-    <CyberdeckPaneToolbarControl
+    <CyberdeckComposerControl
       control={{ size: "toolbar", signal: pressed }}
       onClick={onClick}
       disabled={disabled}
@@ -218,7 +217,7 @@ function OperatorToolbarIconButton({
       )}
     >
       {children}
-    </CyberdeckPaneToolbarControl>
+    </CyberdeckComposerControl>
   );
 
   return (
@@ -240,7 +239,7 @@ function OperatorFileHistoryNav({
   onForward: () => void;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-0.5">
+    <div className="deck-pane-depth-toolbar flex shrink-0 items-center gap-0.5">
       <OperatorToolbarIconButton label="Previous file" onClick={onBack} disabled={!canBack}>
         <CodexIcon icon={cdxIconArrowPrevious} className="h-3.5 w-3.5" />
       </OperatorToolbarIconButton>
@@ -263,7 +262,7 @@ function OperatorViewEditControls({
   const deckMode = useDeckMode();
 
   return (
-    <div className="flex shrink-0 items-center gap-1">
+    <div className="deck-pane-depth-toolbar flex shrink-0 items-center gap-1">
       <OperatorToolbarIconButton
         label="View"
         pressed={operatorDocMode === "view"}
@@ -411,7 +410,7 @@ function OperatorDocumentHeaderControls({
   onToggleFolderPane: () => void;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-1">
+    <div className="deck-pane-depth-toolbar flex shrink-0 items-center gap-1">
       <OperatorViewEditControls
         operatorDocMode={operatorDocMode}
         onCommitOperatorDocName={onCommitOperatorDocName}
@@ -592,8 +591,8 @@ function OperatorDocumentToolStrip({
 
   return (
     <div
-      data-morphism={paneToolbarMorphismZone(deckMode)}
-      className="z-10 flex w-full min-w-0 shrink-0 flex-wrap items-center justify-end gap-1.5 overflow-hidden border-b border-[#141414] bg-black px-3 py-2"
+      data-morphism="realmorphism"
+      className="deck-pane-depth-toolbar z-10 flex w-full min-w-0 shrink-0 flex-wrap items-center justify-end gap-1.5 overflow-hidden border-b border-[#141414] bg-black px-3 py-2"
     >
       {binaryPreview ? (
         <>
@@ -1454,7 +1453,7 @@ export function CyberdeckOperatorPaneBody({
           }
           right={
             operatorSurfaceMode === "browser" ? (
-              <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.08em]">
+              <div className="deck-pane-depth-toolbar flex items-center gap-2 font-mono text-[9px] tracking-[0.08em]">
                 <OperatorReturnToDocumentButton onClick={returnToDocumentMode} />
                 <span className="text-emerald-200">LIVE WEB</span>
                 <span className="rounded border border-[#2d2d2d] px-2 py-0.5 text-[#8a8a8a]">
@@ -1480,8 +1479,8 @@ export function CyberdeckOperatorPaneBody({
         />
         {operatorSurfaceMode === "browser" ? (
           <div
-            data-morphism={paneToolbarMorphismZone(deckMode)}
-            className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
+            data-morphism="realmorphism"
+            className="deck-pane-depth-toolbar flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 border-b border-[#141414] bg-black px-3 py-2"
           >
             <OperatorReturnToDocumentButton onClick={returnToDocumentMode} />
             <OperatorToolbarIconButton
