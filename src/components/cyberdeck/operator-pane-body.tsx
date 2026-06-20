@@ -23,7 +23,6 @@ import { Streamdown } from "streamdown";
 import { OperatorDocFolderPane } from "@/components/cyberdeck/operator-doc-folder-pane";
 import type { OperatorDocFolderRoot } from "@/lib/operator-folder-nav";
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderTitle } from "@/components/cyberdeck/pane-header";
-import { Switch } from "@/components/ui/switch";
 import { OperatorDocTypeMenu } from "@/components/cyberdeck/operator-doc-type-menu";
 import type { OperatorExportFormat } from "@/components/cyberdeck/operator-export-picker";
 import {
@@ -46,7 +45,6 @@ import {
   CyberdeckComposerControl,
   CyberdeckControl,
 } from "@/components/cyberdeck/cyberdeck-control-button";
-import { LEGACY_SWITCH_EMERALD } from "@/lib/cyberdeck/realmorphism-control";
 import { useDeckMode } from "@/lib/deck-mode";
 import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
 import { CodexIcon } from "@/components/codex-icon";
@@ -195,6 +193,7 @@ function OperatorToolbarIconButton({
   disabled = false,
   className = "",
   pressed = false,
+  toggle = false,
   children,
 }: {
   label: string;
@@ -202,16 +201,19 @@ function OperatorToolbarIconButton({
   disabled?: boolean;
   className?: string;
   pressed?: boolean;
+  /** Mode toggle — icon stays on face (top-left), not in the handle well when selected. */
+  toggle?: boolean;
   children: ReactNode;
 }) {
   const button = (
     <CyberdeckComposerControl
-      control={{ size: "toolbar", signal: pressed }}
+      control={{ size: toggle ? "micro" : "toolbar", signal: pressed }}
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      aria-pressed={pressed}
+      aria-pressed={toggle ? pressed : undefined}
       className={cn(
+        toggle && "is-depth-toggle",
         disabled && "disabled:cursor-not-allowed disabled:opacity-30",
         className,
       )}
@@ -259,43 +261,26 @@ function OperatorViewEditControls({
   onCommitOperatorDocName: () => void;
   onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
 }) {
-  const deckMode = useDeckMode();
-
   return (
-    <div className="deck-pane-depth-toolbar flex shrink-0 items-center gap-1">
+    <div className="deck-pane-depth-toolbar flex shrink-0 items-center gap-0.5">
       <OperatorToolbarIconButton
         label="View"
+        toggle
         pressed={operatorDocMode === "view"}
         onClick={() => {
           onCommitOperatorDocName();
           onSetOperatorDocMode("view");
         }}
       >
-        <CodexIcon icon={cdxIconEye} className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconEye} className="h-3 w-3" />
       </OperatorToolbarIconButton>
-      <CyberdeckPaneTooltip label={operatorDocMode === "edit" ? "Switch to view" : "Switch to edit"}>
-        <span className="inline-flex">
-          <Switch
-            checked={operatorDocMode === "edit"}
-            onCheckedChange={(checked) => {
-              if (!checked) {
-                onCommitOperatorDocName();
-                onSetOperatorDocMode("view");
-                return;
-              }
-              onSetOperatorDocMode("edit");
-            }}
-            aria-label="Toggle operator view edit mode"
-            className={cn("realmorphism-switch shrink-0", deckMode === "ascii" && LEGACY_SWITCH_EMERALD)}
-          />
-        </span>
-      </CyberdeckPaneTooltip>
       <OperatorToolbarIconButton
         label="Edit"
+        toggle
         pressed={operatorDocMode === "edit"}
         onClick={() => onSetOperatorDocMode("edit")}
       >
-        <CodexIcon icon={cdxIconEdit} className="h-3.5 w-3.5" />
+        <CodexIcon icon={cdxIconEdit} className="h-3 w-3" />
       </OperatorToolbarIconButton>
     </div>
   );

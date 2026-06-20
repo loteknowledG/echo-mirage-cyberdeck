@@ -191,7 +191,6 @@ import { EchoHeader } from "@/components/cyberdeck/echo-header";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
 import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-tab";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
 import { CyberdeckScrollbarHost } from "@/components/cyberdeck/cyberdeck-scrollbar-host";
@@ -7818,9 +7817,11 @@ ${diff}`;
                     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
                     <CyberdeckControlTooltip label={voiceEnabled ? "Voice on" : "Voice off"}>
                     <CyberdeckComposerControl
+                      className="is-depth-toggle"
                       control={muthurVoiceControlOptions(voiceEnabled, voiceHealth)}
                       onClick={toggleVoiceEnabled}
                       aria-label={voiceEnabled ? "Voice on" : "Voice off"}
+                      aria-pressed={voiceEnabled}
                     >
                       {voiceEnabled ? (
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">

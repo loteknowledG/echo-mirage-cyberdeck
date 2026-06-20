@@ -100,24 +100,24 @@
   color: var(--deck-depth-ink-critical);
 }
 
-[data-deck-mode="ascii"] .deck-depth-control[aria-pressed="true"] .depth-panel__face,
-[data-deck-mode="ascii"] .deck-depth-control.is-latched .depth-panel__face,
-[data-deck-mode="ascii"] .muthur-depth-control[aria-pressed="true"] .depth-panel__face,
-[data-deck-mode="ascii"] .muthur-depth-control.is-latched .depth-panel__face {
+[data-deck-mode="ascii"] .deck-depth-control[aria-pressed="true"]:not(.is-depth-toggle) .depth-panel__face,
+[data-deck-mode="ascii"] .deck-depth-control.is-latched:not(.is-depth-toggle) .depth-panel__face,
+[data-deck-mode="ascii"] .muthur-depth-control[aria-pressed="true"]:not(.is-depth-toggle) .depth-panel__face,
+[data-deck-mode="ascii"] .muthur-depth-control.is-latched:not(.is-depth-toggle) .depth-panel__face {
   transform: translate(var(--panel-depth), var(--panel-depth));
   color: var(--deck-depth-ink-signal);
   text-shadow: var(--deck-green-text-glow);
   box-shadow: none;
 }
 
-[data-deck-mode="ascii"] .deck-depth-control[aria-pressed="true"]::before,
-[data-deck-mode="ascii"] .deck-depth-control[aria-pressed="true"]::after,
-[data-deck-mode="ascii"] .deck-depth-control.is-latched::before,
-[data-deck-mode="ascii"] .deck-depth-control.is-latched::after,
-[data-deck-mode="ascii"] .muthur-depth-control[aria-pressed="true"]::before,
-[data-deck-mode="ascii"] .muthur-depth-control[aria-pressed="true"]::after,
-[data-deck-mode="ascii"] .muthur-depth-control.is-latched::before,
-[data-deck-mode="ascii"] .muthur-depth-control.is-latched::after {
+[data-deck-mode="ascii"] .deck-depth-control[aria-pressed="true"]:not(.is-depth-toggle)::before,
+[data-deck-mode="ascii"] .deck-depth-control[aria-pressed="true"]:not(.is-depth-toggle)::after,
+[data-deck-mode="ascii"] .deck-depth-control.is-latched:not(.is-depth-toggle)::before,
+[data-deck-mode="ascii"] .deck-depth-control.is-latched:not(.is-depth-toggle)::after,
+[data-deck-mode="ascii"] .muthur-depth-control[aria-pressed="true"]:not(.is-depth-toggle)::before,
+[data-deck-mode="ascii"] .muthur-depth-control[aria-pressed="true"]:not(.is-depth-toggle)::after,
+[data-deck-mode="ascii"] .muthur-depth-control.is-latched:not(.is-depth-toggle)::before,
+[data-deck-mode="ascii"] .muthur-depth-control.is-latched:not(.is-depth-toggle)::after {
   opacity: 0;
 }
 
@@ -130,6 +130,36 @@
 [data-deck-mode="ascii"] .muthur-depth-control.block.w-full .depth-panel__face {
   width: 100%;
   box-sizing: border-box;
+}
+
+/* Depth toggles — selected icon stays on the face (top-left), not in the handle well */
+[data-deck-mode="ascii"] .deck-depth-control.is-depth-toggle,
+[data-deck-mode="ascii"] .muthur-depth-control.is-depth-toggle {
+  --panel-depth: 3px;
+}
+
+[data-deck-mode="ascii"] .is-depth-toggle[aria-pressed="true"] .depth-panel__face {
+  transform: none;
+  color: var(--deck-depth-ink-signal);
+  text-shadow: var(--deck-green-text-glow);
+}
+
+[data-deck-mode="ascii"] .is-depth-toggle[aria-pressed="true"][data-posture="amber"] .depth-panel__face {
+  color: var(--deck-depth-ink-amber);
+}
+
+[data-deck-mode="ascii"] .is-depth-toggle[aria-pressed="true"]::before,
+[data-deck-mode="ascii"] .is-depth-toggle[aria-pressed="true"]::after {
+  opacity: 1;
+}
+
+[data-deck-mode="ascii"] .deck-pane-depth-toolbar .is-depth-toggle:active:not(:disabled) .depth-panel__face {
+  transform: translate(var(--panel-depth), var(--panel-depth));
+}
+
+[data-deck-mode="ascii"] .deck-pane-depth-toolbar .is-depth-toggle:active:not(:disabled)::before,
+[data-deck-mode="ascii"] .deck-pane-depth-toolbar .is-depth-toggle:active:not(:disabled)::after {
+  opacity: 0;
 }
 
 /* Settings depth lab + module panels in ascii content mode */

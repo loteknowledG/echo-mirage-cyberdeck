@@ -24,7 +24,6 @@ import {
   CyberdeckPaneHeader,
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useDeckMode } from "@/lib/deck-mode";
 import {
@@ -638,35 +637,27 @@ export function CyberdeckGlyphChannelPaneBody() {
           </div>
         }
         right={
-          <div className="deck-pane-depth-toolbar flex items-center gap-1">
+          <div className="deck-pane-depth-toolbar flex items-center gap-0.5">
             <CyberdeckControlTooltip label="View">
               <CyberdeckComposerControl
-                control={{ size: "toolbar", signal: paneMode === "view" }}
+                className="is-depth-toggle"
+                control={{ size: "micro", signal: paneMode === "view" }}
                 onClick={() => setPaneModeWithFocus("view")}
                 aria-label="View mode"
                 aria-pressed={paneMode === "view"}
               >
-                <CodexIcon icon={cdxIconEye} className="h-3.5 w-3.5" />
+                <CodexIcon icon={cdxIconEye} className="h-3 w-3" />
               </CyberdeckComposerControl>
             </CyberdeckControlTooltip>
-            <Switch
-              checked={paneMode === "edit"}
-              onCheckedChange={(checked) => setPaneModeWithFocus(checked ? "edit" : "view")}
-              aria-label="Toggle ASCII edit mode"
-              className={cn(
-                "realmorphism-switch",
-                deckMode === "ascii" &&
-                  "data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]",
-              )}
-            />
             <CyberdeckControlTooltip label="Edit">
               <CyberdeckComposerControl
-                control={{ size: "toolbar", signal: paneMode === "edit" }}
+                className="is-depth-toggle"
+                control={{ size: "micro", signal: paneMode === "edit" }}
                 onClick={() => setPaneModeWithFocus("edit")}
                 aria-label="Edit mode"
                 aria-pressed={paneMode === "edit"}
               >
-                <CodexIcon icon={cdxIconEdit} className="h-3.5 w-3.5" />
+                <CodexIcon icon={cdxIconEdit} className="h-3 w-3" />
               </CyberdeckComposerControl>
             </CyberdeckControlTooltip>
           </div>
