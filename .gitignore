@@ -164,6 +164,9 @@ dist
 .tmp/
 /.muthur/runtime
 
+# Pi computer-use Python venv (L-PI-001A)
+.venv-pi/
+
 # Property Manager case evidence (runtime; folder scaffold stays tracked)
 data/property-manager/cases/*
 !data/property-manager/cases/.gitkeep

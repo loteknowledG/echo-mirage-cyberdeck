@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  executePiComputerUseCommand,
-} from "@/lib/pi/pi-computer-use-manager";
+import { executePiComputerUseCommand } from "@/lib/pi/pi-computer-use-manager";
 import { getPiComputerUseStatus } from "@/lib/pi/pi-computer-use-status";
 import type { PiComputerUseCommand } from "@/lib/pi/pi-computer-use-types";
 
@@ -20,13 +18,14 @@ function isPiComputerUseCommand(value: unknown): value is PiComputerUseCommand {
     action === "type" ||
     action === "hotkey" ||
     action === "scroll" ||
-    action === "move"
+    action === "move" ||
+    action === "active_window"
   );
 }
 
 export async function POST(request: Request) {
   const status = getPiComputerUseStatus();
-  if (status.computerUse !== "READY") {
+  if (status.status !== "READY") {
     return NextResponse.json(
       {
         error: "PI computer use is not ready on this platform",
@@ -48,5 +47,16 @@ export async function POST(request: Request) {
   }
 
   const receipt = await executePiComputerUseCommand(body);
+  if (receipt.status === "blocked") {
+    return NextResponse.json(
+      {
+        error: receipt.error ?? "PI computer use execution denied",
+        receipt,
+        status,
+      },
+      { status: 403 },
+    );
+  }
+
   return NextResponse.json({ receipt, status });
 }

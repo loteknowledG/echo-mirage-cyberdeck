@@ -96,6 +96,9 @@ function toolsUsedHeaders(
   if (toolCtx.codingVerify) {
     headers["X-Muthur-Coding-Verify"] = JSON.stringify(toolCtx.codingVerify);
   }
+  if (toolCtx.piControlLeaseRequest) {
+    headers["X-Muthur-Pi-Control-Request"] = JSON.stringify(toolCtx.piControlLeaseRequest);
+  }
   return headers;
 }
 

@@ -1,3 +1,4 @@
+import { assertPiControlLeaseForExecution } from "@/lib/muthur/control/pi-control-lease-gate";
 import type {
   ComputerUseAdapter,
   PiComputerUseCommand,
@@ -6,11 +7,14 @@ import type {
   PiPlatform,
 } from "./pi-computer-use-types";
 import { resolvePiComputerUseBackend, resolvePiPlatform } from "./pi-platform-resolver";
-import { getPiComputerUseStatus } from "./pi-computer-use-status";
 
 export { getPiComputerUseStatus } from "./pi-computer-use-status";
 
 let cachedAdapter: ComputerUseAdapter | null = null;
+
+export type PiComputerUseExecutionOptions = {
+  probeBypass?: boolean;
+};
 
 async function loadAdapterForPlatform(platform: PiPlatform): Promise<ComputerUseAdapter> {
   const backend = resolvePiComputerUseBackend(platform);
@@ -33,15 +37,18 @@ async function loadAdapterForPlatform(platform: PiPlatform): Promise<ComputerUse
           actor: "pi",
           platform,
           backend: "none",
+          status: "UNAVAILABLE",
           computerUse: "UNAVAILABLE",
           capabilities: {
             screenshot: false,
+            activeWindow: false,
             mouse: false,
             keyboard: false,
             scroll: false,
           },
         }),
         screenshot: unavailable.screenshot.bind(unavailable),
+        activeWindow: unavailable.activeWindow.bind(unavailable),
         click: unavailable.click.bind(unavailable),
         doubleClick: unavailable.doubleClick.bind(unavailable),
         type: unavailable.type.bind(unavailable),
@@ -52,7 +59,10 @@ async function loadAdapterForPlatform(platform: PiPlatform): Promise<ComputerUse
           platform,
           backend: "none",
           screenshotOk: false,
+          activeWindowOk: false,
           mouseMoveOk: false,
+          mouseMoveSkipped: true,
+          windowsUseImportOk: false,
           message: `Computer use unavailable on ${platform}`,
         }),
       };
@@ -66,17 +76,14 @@ export async function resolvePiComputerUseAdapter(
   return loadAdapterForPlatform(platform);
 }
 
-export async function getPiComputerUseAdapter(): Promise<ComputerUseAdapter> {
+async function getPiComputerUseAdapter(): Promise<ComputerUseAdapter> {
   if (!cachedAdapter) {
     cachedAdapter = await loadAdapterForPlatform(resolvePiPlatform());
   }
   return cachedAdapter;
 }
 
-/**
- * Explicit invocation only — PI computer use never runs autonomously.
- */
-export async function executePiComputerUseCommand(
+async function executePiComputerUseCommandInternal(
   command: PiComputerUseCommand,
 ): Promise<PiComputerUseReceipt> {
   const adapter = await getPiComputerUseAdapter();
@@ -84,6 +91,8 @@ export async function executePiComputerUseCommand(
   switch (command.action) {
     case "screenshot":
       return adapter.screenshot();
+    case "active_window":
+      return adapter.activeWindow();
     case "click":
       return adapter.click({
         x: command.x ?? 0,
@@ -97,7 +106,11 @@ export async function executePiComputerUseCommand(
         button: command.button,
       });
     case "type":
-      return adapter.type({ text: command.text ?? "" });
+      return adapter.type({
+        text: command.text ?? "",
+        x: command.x,
+        y: command.y,
+      });
     case "hotkey":
       return adapter.hotkey({ keys: command.keys ?? [] });
     case "move":
@@ -114,7 +127,40 @@ export async function executePiComputerUseCommand(
   }
 }
 
-export async function probePiComputerUse(): Promise<PiComputerUseProbeResult> {
+/**
+ * Lease-guarded Pi execution boundary. No desktop action runs without an active
+ * Pi control lease unless an explicit non-production probe bypass is enabled.
+ */
+export async function executePiComputerUseCommand(
+  command: PiComputerUseCommand,
+  options?: PiComputerUseExecutionOptions,
+): Promise<PiComputerUseReceipt> {
+  const gate = assertPiControlLeaseForExecution(command, options);
+  if (!gate.allowed) {
+    return gate.denialReceipt!;
+  }
+  return executePiComputerUseCommandInternal(command);
+}
+
+/** Readiness probe — does not perform input actions; lease bypass allowed for diagnostics only. */
+export async function probePiComputerUse(
+  options?: PiComputerUseExecutionOptions,
+): Promise<PiComputerUseProbeResult> {
+  const gate = assertPiControlLeaseForExecution({ action: "screenshot" }, options);
+  if (!gate.allowed) {
+    return {
+      platform: resolvePiPlatform(),
+      backend: resolvePiComputerUseBackend(resolvePiPlatform()),
+      screenshotOk: false,
+      activeWindowOk: false,
+      mouseMoveOk: false,
+      mouseMoveSkipped: true,
+      windowsUseImportOk: false,
+      message: gate.reason ?? "Pi probe blocked — no active control lease",
+      receipt: gate.denialReceipt,
+    };
+  }
+
   const adapter = await getPiComputerUseAdapter();
   return adapter.probe();
 }

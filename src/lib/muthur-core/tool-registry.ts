@@ -14,6 +14,13 @@ import {
   runGitStatus,
   runWorkspaceExec,
 } from "@/lib/muthur-core/workspace-tools.server";
+import {
+  createPiControlLeaseRequest,
+  getPiControlLeaseSnapshot,
+  isPiControlLeaseActive,
+} from "@/lib/muthur/control/pi-control-lease-store";
+import { detectComputerUseMission } from "@/lib/muthur/control/computer-use-intent";
+import type { PiControlCapability } from "@/lib/muthur/control/pi-control-lease-types";
 import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
@@ -502,6 +509,82 @@ async function runSuggestOperatorEdit(call: ToolCall): Promise<ToolResult> {
   };
 }
 
+async function runRequestPiControlLease(call: ToolCall): Promise<ToolResult> {
+  const task = typeof call.args.task === "string" ? call.args.task.trim() : "";
+  const reason = typeof call.args.reason === "string" ? call.args.reason.trim() : "";
+  const missionText =
+    typeof call.args.missionText === "string" ? call.args.missionText.trim() : "";
+  const detected =
+    detectComputerUseMission(missionText || task) ??
+    (task
+      ? {
+          task,
+          taskSlug: task.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+          reason: reason || "Computer use required to complete mission.",
+          capabilities: ["mouse", "keyboard", "screen", "scroll"] satisfies PiControlCapability[],
+          missionText: missionText || task,
+        }
+      : null);
+
+  if (!detected) {
+    return { ok: false, error: "task or missionText required for Pi control lease request" };
+  }
+
+  const pendingRequest = createPiControlLeaseRequest({
+    ...detected,
+    capabilities: [...detected.capabilities],
+    reason: reason || detected.reason,
+    missionText: missionText || detected.missionText,
+  });
+  if (call.executionContext) {
+    call.executionContext.piControlLeaseRequest = pendingRequest;
+  }
+
+  return {
+    ok: true,
+    output: {
+      status: "CONTROL_REQUEST_PENDING",
+      operator: "pi",
+      pendingRequest,
+      message:
+        "Control lease request queued for operator approval. Awaiting [Grant Control] in the Echo Mirage UI.",
+    },
+  };
+}
+
+async function runDelegatePiComputerUse(call: ToolCall): Promise<ToolResult> {
+  const snapshot = getPiControlLeaseSnapshot();
+  if (!isPiControlLeaseActive() || !snapshot.activeLease) {
+    return {
+      ok: false,
+      error:
+        "No active Pi control lease. Call request_pi_control_lease and wait for operator grant first.",
+    };
+  }
+
+  const instructions =
+    typeof call.args.instructions === "string"
+      ? call.args.instructions.trim()
+      : snapshot.activeLease.missionText;
+  if (call.executionContext) {
+    call.executionContext.piMissionDelegated = true;
+  }
+
+  return {
+    ok: true,
+    output: {
+      status: "PI_MISSION_DELEGATED",
+      leaseId: snapshot.activeLease.leaseId,
+      operator: "pi",
+      task: snapshot.activeLease.task,
+      instructions,
+      capabilities: snapshot.activeLease.capabilities,
+      message:
+        "Mission delegated to Pi embodiment operator. Pi will execute via computer-use under the active lease.",
+    },
+  };
+}
+
 export function createMuthurToolRegistry(): ToolRegistry {
   return {
     tools: {
@@ -579,6 +662,18 @@ export function createMuthurToolRegistry(): ToolRegistry {
         description:
           "Converts a local .md or .markdown file to PDF using md-to-pdf (Puppeteer). Writes output beside the source file when possible.",
         run: runExportMarkdownToPdf,
+      },
+      request_pi_control_lease: {
+        name: "request_pi_control_lease",
+        description:
+          "Request operator approval for a temporary Pi control lease (mouse, keyboard, screen) before desktop embodiment missions. Pi is the preferred computer-use operator.",
+        run: runRequestPiControlLease,
+      },
+      delegate_pi_computer_use: {
+        name: "delegate_pi_computer_use",
+        description:
+          "Delegate an approved computer-use mission to Pi under the active control lease. Call only after the operator grants control.",
+        run: runDelegatePiComputerUse,
       },
     },
   };

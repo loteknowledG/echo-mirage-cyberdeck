@@ -34,6 +34,8 @@ import {
   shouldEnableToolsForPosture,
   type MuthurPosture,
 } from "@/lib/muthur/muthur-posture";
+import { MUTHUR_PI_CONTROL_DOCTRINE } from "@/lib/muthur/control/muthur-control-doctrine";
+import { PI_COMPUTER_USE_DOCTRINE } from "@/lib/pi/pi-computer-use-doctrine";
 import { messageReferencesLocalPath } from "@/lib/browser-intents";
 import {
   buildProviderReceipt,
@@ -57,6 +59,8 @@ const MUTHUR_AVAILABLE_TOOLS_PROMPT =
   "\n- git_status / git_diff: REAL disk — inspect repo changes after coding." +
   "\n- justbash: EPHEMERAL mirror only — rg/ls/cat search; writes do NOT persist. Never use for pnpm, git, or file changes." +
   "\n- clock: Server date/time." +
+  "\n- request_pi_control_lease: Request operator grant for Pi desktop embodiment (mouse/keyboard/screen) before computer-use missions." +
+  "\n- delegate_pi_computer_use: Delegate approved missions to Pi under an active control lease." +
   "\n\nCODING ECHO MIRAGE (Phase A + B):" +
   "\n1. localfs write (or suggest_operator_edit for open operator files) to change code." +
   "\n2. git_status or git_diff to review changes." +
@@ -247,6 +251,10 @@ function buildMuthurSystemContent(args: {
   }
 
   systemContent += MUTHUR_COGNITION_DOCTRINE;
+  if (toolsEnabled) {
+    systemContent += MUTHUR_PI_CONTROL_DOCTRINE;
+    systemContent += PI_COMPUTER_USE_DOCTRINE;
+  }
 
   if (messageReferencesLocalPath(args.message)) {
     systemContent +=

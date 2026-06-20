@@ -1,0 +1,4 @@
+# Echo Mirage Pi computer-use (Windows) — install into .venv-pi
+# python -m venv .venv-pi && .venv-pi\Scripts\pip install -r requirements-pi.txt
+windows-use>=0.8.1
+mistralai==1.9.11

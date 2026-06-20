@@ -7,6 +7,8 @@ import * as uiVerification from "./ui-verification";
 import * as indicateLayer from "./indicate-layer";
 import { getActionScope } from "./capability-registry";
 import { getCurrentOwner, checkActionPermission, emitControlDenied } from "./control-lease";
+import { isPiProbeLeaseBypassEnabled } from "@/lib/muthur/control/pi-control-lease-gate";
+import { isPiControlLeaseActive } from "@/lib/muthur/control/pi-control-lease-store";
 import { narrate } from "./narration";
 
 const safetyGuard = createSafetyGuard();
@@ -218,9 +220,28 @@ export async function runComputerUseAction(
     };
   }
 
+  const actionScope = getActionScope(action.name);
+  if (
+    (actionScope === "input" || actionScope === "control") &&
+    !isPiProbeLeaseBypassEnabled() &&
+    !isPiControlLeaseActive()
+  ) {
+    const denialReason =
+      "PI_LEASE_REQUIRED: desktop input requires an active Pi control lease";
+    emitControlDenied({ reason: denialReason });
+    narrate("OWNERSHIP_DENIED");
+    return {
+      success: false,
+      action: action.name,
+      status: "error",
+      error: denialReason,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - start,
+    };
+  }
+
   const owner = getCurrentOwner();
   if (owner !== "USER") {
-    const actionScope = getActionScope(action.name);
     const permission = checkActionPermission(actionScope);
     if (!permission.allowed) {
       const denialReason = permission.reason ?? `Scope "${actionScope}" is not permitted under current lease (owner: ${owner})`;

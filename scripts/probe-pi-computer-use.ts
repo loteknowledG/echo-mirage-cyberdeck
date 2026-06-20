@@ -1,4 +1,12 @@
 import assert from "node:assert/strict";
+import { detectComputerUseMission } from "../src/lib/muthur/control/computer-use-intent";
+import {
+  createPiControlLeaseRequest,
+  grantPiControlLease,
+  isPiControlLeaseActive,
+  resetPiControlLeaseForTests,
+  userRetakePiControl,
+} from "../src/lib/muthur/control/pi-control-lease-store";
 import {
   executePiComputerUseCommand,
   probePiComputerUse,
@@ -12,6 +20,8 @@ import {
 } from "../src/lib/pi/pi-platform-resolver";
 
 async function main() {
+  resetPiControlLeaseForTests();
+
   const platform = resolvePiPlatform();
   const backend = resolvePiComputerUseBackend(platform);
 
@@ -28,33 +38,53 @@ async function main() {
 
   if (platform !== "windows") {
     console.log(`[probe] non-Windows platform — skipping live desktop actions`);
-    console.log(`[probe] computerUse=${status.computerUse}`);
+    console.log(`[probe] status=${status.status}`);
     console.log("probe-pi-computer-use: PASS");
     return;
   }
 
-  assert.equal(status.computerUse, "READY");
+  assert.equal(status.status, "READY");
   assert.ok(status.capabilities.screenshot);
+  assert.ok(status.capabilities.activeWindow);
   assert.ok(status.capabilities.mouse);
   assert.ok(status.capabilities.keyboard);
   assert.ok(status.capabilities.scroll);
 
+  const denied = await executePiComputerUseCommand({ action: "screenshot" });
+  assert.equal(denied.status, "blocked");
+  console.log("[probe] execution denied without lease");
+
+  const mission = detectComputerUseMission("probe pi computer use readiness");
+  createPiControlLeaseRequest(mission!);
+  const granted = grantPiControlLease(60_000);
+  assert.equal(granted.granted, true);
+  assert.ok(isPiControlLeaseActive());
+
   const screenshot = await executePiComputerUseCommand({ action: "screenshot" });
-  assert.equal(screenshot.action, "pi.screenshot");
+  assert.equal(screenshot.capability, "screenshot");
   assert.equal(screenshot.status, "success");
   assert.ok(screenshot.data?.base64);
-  assert.ok((screenshot.data?.width ?? 0) > 0);
-  assert.ok((screenshot.data?.height ?? 0) > 0);
+  assert.ok((screenshot.data?.width as number | undefined ?? 0) > 0);
+  assert.ok((screenshot.data?.height as number | undefined ?? 0) > 0);
   console.log(
     `[probe] screenshot ok ${screenshot.data?.width}x${screenshot.data?.height} (${screenshot.durationMs}ms)`,
   );
+
+  const activeWindow = await executePiComputerUseCommand({ action: "active_window" });
+  assert.equal(activeWindow.capability, "active_window");
+  assert.equal(activeWindow.status, "success");
+  console.log(`[probe] active window ok — ${activeWindow.summary}`);
 
   const probe = await probePiComputerUse();
   assert.equal(probe.platform, "windows");
   assert.equal(probe.backend, "windows-use");
   assert.equal(probe.screenshotOk, true);
-  assert.equal(probe.mouseMoveOk, true);
+  assert.equal(probe.activeWindowOk, true);
+  assert.equal(probe.mouseMoveSkipped, true);
   console.log(`[probe] ${probe.message}`);
+
+  userRetakePiControl("probe_cleanup");
+  assert.equal(isPiControlLeaseActive(), false);
 
   console.log("probe-pi-computer-use: PASS");
 }

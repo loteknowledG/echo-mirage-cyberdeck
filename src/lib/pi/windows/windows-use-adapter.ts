@@ -1,100 +1,76 @@
-import { createActionReceipt, createScreenshotReceipt } from "../pi-computer-use-receipts";
+import { createPiComputerUseReceipt } from "../pi-computer-use-receipts";
 import type {
-  ActionReceipt,
   ClickRequest,
   ComputerUseAdapter,
   HotkeyRequest,
   MoveRequest,
   PiComputerUseProbeResult,
+  PiComputerUseReceipt,
   PiComputerUseStatus,
   ScrollRequest,
-  ScreenshotReceipt,
   TypeRequest,
 } from "../pi-computer-use-types";
 import { formatPiPlatformLabel, resolvePiPlatform } from "../pi-platform-resolver";
-
-type NutModule = typeof import("@nut-tree-fork/nut-js");
-type ScreenshotModule = typeof import("node-screenshots");
+import {
+  checkWindowsUseBackend,
+  invokeWindowsUseBridge,
+  isWindowsUseBridgeAvailable,
+  PI_WINDOWS_USE_REMEDIATION,
+} from "./windows-use-python-bridge.server";
 
 const READY_CAPABILITIES = {
   screenshot: true,
+  activeWindow: true,
   mouse: true,
   keyboard: true,
   scroll: true,
 } as const;
 
-async function loadNutJs(): Promise<NutModule> {
-  return import("@nut-tree-fork/nut-js");
+const UNAVAILABLE_CAPABILITIES = {
+  screenshot: false,
+  activeWindow: false,
+  mouse: false,
+  keyboard: false,
+  scroll: false,
+} as const;
+
+function buildReadinessStatus(): PiComputerUseStatus["status"] {
+  if (process.platform !== "win32") {
+    return "UNAVAILABLE";
+  }
+  if (!isWindowsUseBridgeAvailable()) {
+    return "NOT_INSTALLED";
+  }
+  const check = checkWindowsUseBackend();
+  if (check.ok) {
+    return "READY";
+  }
+  return "FAILED";
 }
 
-async function loadNodeScreenshots(): Promise<ScreenshotModule> {
-  return import("node-screenshots");
-}
+function buildStatus(): PiComputerUseStatus {
+  const platform = resolvePiPlatform();
+  const readiness = buildReadinessStatus();
+  const check =
+    readiness === "READY" || readiness === "FAILED"
+      ? checkWindowsUseBackend()
+      : null;
 
-function resolveNutKey(nut: NutModule, keyName: string): NutModule["Key"][keyof NutModule["Key"]] {
-  const keyMap: Record<string, string> = {
-    ctrl: "LeftControl",
-    control: "LeftControl",
-    shift: "LeftShift",
-    alt: "LeftAlt",
-    meta: "LeftWin",
-    win: "LeftWin",
-    windows: "LeftWin",
-    enter: "Return",
-    return: "Return",
-    tab: "Tab",
-    escape: "Escape",
-    esc: "Escape",
-    backspace: "Backspace",
-    delete: "Delete",
-    space: "Space",
-    up: "Up",
-    down: "Down",
-    left: "Left",
-    right: "Right",
-    home: "Home",
-    end: "End",
-    pageup: "PageUp",
-    pagedown: "PageDown",
-    f1: "F1",
-    f2: "F2",
-    f3: "F3",
-    f4: "F4",
-    f5: "F5",
-    f6: "F6",
-    f7: "F7",
-    f8: "F8",
-    f9: "F9",
-    f10: "F10",
-    f11: "F11",
-    f12: "F12",
+  return {
+    actor: "pi",
+    platform,
+    backend: "windows-use",
+    status: readiness,
+    computerUse: readiness,
+    capabilities:
+      readiness === "READY" ? { ...READY_CAPABILITIES } : { ...UNAVAILABLE_CAPABILITIES },
+    remediation:
+      readiness === "NOT_INSTALLED" || readiness === "FAILED"
+        ? PI_WINDOWS_USE_REMEDIATION
+        : undefined,
+    lastError:
+      readiness === "FAILED" ? check?.receipt.error ?? check?.spawnError : undefined,
   };
-
-  const normalized = keyName.toLowerCase().trim();
-  const mapped = keyMap[normalized] ?? keyName;
-  const key = nut.Key[mapped as keyof typeof nut.Key];
-  if (key !== undefined) {
-    return key;
-  }
-  if (mapped.length === 1) {
-    const upper = mapped.toUpperCase();
-    const single = nut.Key[upper as keyof typeof nut.Key];
-    if (single !== undefined) {
-      return single;
-    }
-  }
-  throw new Error(`Unknown key: "${keyName}"`);
-}
-
-function nutButton(nut: NutModule, button: ClickRequest["button"]) {
-  switch (button ?? "left") {
-    case "right":
-      return nut.Button.RIGHT;
-    case "middle":
-      return nut.Button.MIDDLE;
-    default:
-      return nut.Button.LEFT;
-  }
 }
 
 export class WindowsUseAdapter implements ComputerUseAdapter {
@@ -102,212 +78,96 @@ export class WindowsUseAdapter implements ComputerUseAdapter {
   readonly platform = resolvePiPlatform();
 
   getStatus(): PiComputerUseStatus {
-    return {
-      actor: "pi",
-      platform: this.platform,
-      backend: this.backendId,
-      computerUse: "READY",
-      capabilities: { ...READY_CAPABILITIES },
-    };
+    return buildStatus();
   }
 
-  async screenshot(): Promise<ScreenshotReceipt> {
-    const start = Date.now();
-    try {
-      const { Monitor } = await loadNodeScreenshots();
-      const monitors = Monitor.all();
-      const primary = monitors.find((monitor) => monitor.isPrimary()) ?? monitors[0];
-      if (!primary) {
-        return createScreenshotReceipt({
-          status: "error",
-          durationMs: Date.now() - start,
-          error: "No monitor found",
-        });
-      }
-
-      const image = primary.captureImageSync();
-      const png = image.toPngSync();
-      const scaleFactor = primary.scaleFactor() ?? 1;
-
-      return createScreenshotReceipt({
-        status: "success",
-        durationMs: Date.now() - start,
-        data: {
-          mimeType: "image/png",
-          base64: png.toString("base64"),
-          width: Math.round(image.width / scaleFactor),
-          height: Math.round(image.height / scaleFactor),
-        },
-      });
-    } catch (error) {
-      return createScreenshotReceipt({
-        status: "error",
-        durationMs: Date.now() - start,
-        error: error instanceof Error ? error.message : "Screenshot failed",
-      });
-    }
+  async screenshot(): Promise<PiComputerUseReceipt> {
+    return invokeWindowsUseBridge({ capability: "screenshot" }).receipt;
   }
 
-  async click(input: ClickRequest): Promise<ActionReceipt> {
-    const start = Date.now();
-    try {
-      const nut = await loadNutJs();
-      const point = new nut.Point(input.x, input.y);
-      await nut.mouse.move(nut.straightTo(point));
-      await nut.mouse.click(nutButton(nut, input.button));
-      return createActionReceipt({
-        action: "pi.click",
-        status: "success",
-        durationMs: Date.now() - start,
-        data: { x: input.x, y: input.y, button: input.button ?? "left" },
-      });
-    } catch (error) {
-      return createActionReceipt({
-        action: "pi.click",
-        status: "error",
-        durationMs: Date.now() - start,
-        error: error instanceof Error ? error.message : "Click failed",
-      });
-    }
+  async activeWindow(): Promise<PiComputerUseReceipt> {
+    return invokeWindowsUseBridge({ capability: "active_window" }).receipt;
   }
 
-  async doubleClick(input: ClickRequest): Promise<ActionReceipt> {
-    const start = Date.now();
-    try {
-      const nut = await loadNutJs();
-      const point = new nut.Point(input.x, input.y);
-      await nut.mouse.move(nut.straightTo(point));
-      await nut.mouse.doubleClick(nutButton(nut, input.button));
-      return createActionReceipt({
-        action: "pi.double_click",
-        status: "success",
-        durationMs: Date.now() - start,
-        data: { x: input.x, y: input.y, button: input.button ?? "left" },
-      });
-    } catch (error) {
-      return createActionReceipt({
-        action: "pi.double_click",
-        status: "error",
-        durationMs: Date.now() - start,
-        error: error instanceof Error ? error.message : "Double click failed",
-      });
-    }
+  async click(input: ClickRequest): Promise<PiComputerUseReceipt> {
+    return invokeWindowsUseBridge({
+      capability: "mouse_click",
+      params: { x: input.x, y: input.y, button: input.button ?? "left" },
+    }).receipt;
   }
 
-  async type(input: TypeRequest): Promise<ActionReceipt> {
-    const start = Date.now();
-    try {
-      const nut = await loadNutJs();
-      await nut.keyboard.type(input.text);
-      return createActionReceipt({
-        action: "pi.type",
-        status: "success",
-        durationMs: Date.now() - start,
-        data: { length: input.text.length },
-      });
-    } catch (error) {
-      return createActionReceipt({
-        action: "pi.type",
-        status: "error",
-        durationMs: Date.now() - start,
-        error: error instanceof Error ? error.message : "Type failed",
-      });
-    }
+  async doubleClick(input: ClickRequest): Promise<PiComputerUseReceipt> {
+    return invokeWindowsUseBridge({
+      capability: "double_click",
+      params: { x: input.x, y: input.y, button: input.button ?? "left" },
+    }).receipt;
   }
 
-  async hotkey(input: HotkeyRequest): Promise<ActionReceipt> {
-    const start = Date.now();
-    try {
-      const nut = await loadNutJs();
-      const resolved = input.keys.map((key) => resolveNutKey(nut, key));
-      await nut.keyboard.pressKey(...resolved);
-      await nut.keyboard.releaseKey(...resolved);
-      return createActionReceipt({
-        action: "pi.hotkey",
-        status: "success",
-        durationMs: Date.now() - start,
-        data: { keys: input.keys },
-      });
-    } catch (error) {
-      return createActionReceipt({
-        action: "pi.hotkey",
-        status: "error",
-        durationMs: Date.now() - start,
-        error: error instanceof Error ? error.message : "Hotkey failed",
-      });
+  async type(input: TypeRequest): Promise<PiComputerUseReceipt> {
+    const params: Record<string, unknown> = { text: input.text };
+    if (input.x !== undefined && input.y !== undefined) {
+      params.x = input.x;
+      params.y = input.y;
     }
+    return invokeWindowsUseBridge({ capability: "type_text", params }).receipt;
   }
 
-  async moveMouse(input: MoveRequest): Promise<ActionReceipt> {
-    const start = Date.now();
-    try {
-      const nut = await loadNutJs();
-      const point = new nut.Point(input.x, input.y);
-      await nut.mouse.move(nut.straightTo(point));
-      return createActionReceipt({
-        action: "pi.move",
-        status: "success",
-        durationMs: Date.now() - start,
-        data: { x: input.x, y: input.y },
-      });
-    } catch (error) {
-      return createActionReceipt({
-        action: "pi.move",
-        status: "error",
-        durationMs: Date.now() - start,
-        error: error instanceof Error ? error.message : "Mouse move failed",
-      });
-    }
+  async hotkey(input: HotkeyRequest): Promise<PiComputerUseReceipt> {
+    return invokeWindowsUseBridge({
+      capability: "hotkey",
+      params: { keys: input.keys },
+    }).receipt;
   }
 
-  async scroll(input: ScrollRequest): Promise<ActionReceipt> {
-    const start = Date.now();
-    const amount = Math.max(1, input.amount ?? 3);
-    try {
-      const nut = await loadNutJs();
-      for (let step = 0; step < amount; step += 1) {
-        if (input.direction === "down") {
-          await nut.mouse.scrollDown(1);
-        } else {
-          await nut.mouse.scrollUp(1);
-        }
-      }
-      return createActionReceipt({
-        action: "pi.scroll",
-        status: "success",
-        durationMs: Date.now() - start,
-        data: { direction: input.direction, amount },
-      });
-    } catch (error) {
-      return createActionReceipt({
-        action: "pi.scroll",
-        status: "error",
-        durationMs: Date.now() - start,
-        error: error instanceof Error ? error.message : "Scroll failed",
-      });
-    }
+  async moveMouse(input: MoveRequest): Promise<PiComputerUseReceipt> {
+    return invokeWindowsUseBridge({
+      capability: "mouse_move",
+      params: { x: input.x, y: input.y },
+    }).receipt;
+  }
+
+  async scroll(input: ScrollRequest): Promise<PiComputerUseReceipt> {
+    return invokeWindowsUseBridge({
+      capability: "scroll",
+      params: {
+        direction: input.direction,
+        amount: input.amount ?? 3,
+      },
+    }).receipt;
   }
 
   async probe(): Promise<PiComputerUseProbeResult> {
     const screenshot = await this.screenshot();
-    const nut = await loadNutJs();
-    const current = await nut.mouse.getPosition();
-    const move = await this.moveMouse({
-      x: current.x + 1,
-      y: current.y,
-    });
-    await this.moveMouse({ x: current.x, y: current.y });
+    const activeWindow = await this.activeWindow();
 
     return {
       platform: this.platform,
       backend: this.backendId,
       screenshotOk: screenshot.status === "success",
-      mouseMoveOk: move.status === "success",
-      message: `${formatPiPlatformLabel(this.platform)} / ${this.backendId} probe complete`,
+      activeWindowOk: activeWindow.status === "success",
+      mouseMoveOk: false,
+      mouseMoveSkipped: true,
+      windowsUseImportOk: screenshot.status !== "blocked",
+      message: `${formatPiPlatformLabel(this.platform)} / ${this.backendId} probe complete (mouse move skipped)`,
+      receipt: screenshot,
     };
   }
 }
 
 export function createWindowsUseAdapter(): WindowsUseAdapter {
   return new WindowsUseAdapter();
+}
+
+export function createBlockedWindowsUseReceipt(
+  capability: PiComputerUseReceipt["capability"],
+  summary: string,
+  error: string,
+): PiComputerUseReceipt {
+  return createPiComputerUseReceipt({
+    backend: "windows-use",
+    capability,
+    status: "blocked",
+    summary,
+    error,
+  });
 }

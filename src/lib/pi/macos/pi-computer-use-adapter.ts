@@ -1,34 +1,38 @@
-import { createActionReceipt, createScreenshotReceipt } from "../pi-computer-use-receipts";
+import { createPiComputerUseReceipt } from "../pi-computer-use-receipts";
 import type {
-  ActionReceipt,
   ClickRequest,
   ComputerUseAdapter,
   HotkeyRequest,
   MoveRequest,
   PiComputerUseProbeResult,
+  PiComputerUseReceipt,
   PiComputerUseStatus,
   ScrollRequest,
-  ScreenshotReceipt,
   TypeRequest,
 } from "../pi-computer-use-types";
 import { formatPiPlatformLabel, resolvePiPlatform } from "../pi-platform-resolver";
 
 const SCAFFOLD_CAPABILITIES = {
   screenshot: false,
+  activeWindow: false,
   mouse: false,
   keyboard: false,
   scroll: false,
 } as const;
 
-function unavailableReceipt(
-  action: ActionReceipt["action"],
+const SCAFFOLD_ERROR = "pi-computer-use macOS backend is scaffolded but not yet implemented";
+
+function blockedReceipt(
+  capability: PiComputerUseReceipt["capability"],
   start: number,
-): ActionReceipt {
-  return createActionReceipt({
-    action,
-    status: "unavailable",
+): PiComputerUseReceipt {
+  return createPiComputerUseReceipt({
+    backend: "pi-computer-use",
+    capability,
+    status: "blocked",
+    summary: SCAFFOLD_ERROR,
     durationMs: Date.now() - start,
-    error: "pi-computer-use macOS backend is scaffolded but not yet implemented",
+    error: SCAFFOLD_ERROR,
   });
 }
 
@@ -41,42 +45,42 @@ export class PiComputerUseMacAdapter implements ComputerUseAdapter {
       actor: "pi",
       platform: this.platform,
       backend: this.backendId,
+      status: "SCAFFOLD",
       computerUse: "SCAFFOLD",
       capabilities: { ...SCAFFOLD_CAPABILITIES },
     };
   }
 
-  async screenshot(): Promise<ScreenshotReceipt> {
-    const start = Date.now();
-    return createScreenshotReceipt({
-      status: "unavailable",
-      durationMs: Date.now() - start,
-      error: "pi-computer-use macOS backend is scaffolded but not yet implemented",
-    });
+  async screenshot(): Promise<PiComputerUseReceipt> {
+    return blockedReceipt("screenshot", Date.now());
   }
 
-  async click(input: ClickRequest): Promise<ActionReceipt> {
-    return unavailableReceipt("pi.click", Date.now());
+  async activeWindow(): Promise<PiComputerUseReceipt> {
+    return blockedReceipt("active_window", Date.now());
   }
 
-  async doubleClick(_input: ClickRequest): Promise<ActionReceipt> {
-    return unavailableReceipt("pi.double_click", Date.now());
+  async click(_input: ClickRequest): Promise<PiComputerUseReceipt> {
+    return blockedReceipt("mouse_click", Date.now());
   }
 
-  async type(_input: TypeRequest): Promise<ActionReceipt> {
-    return unavailableReceipt("pi.type", Date.now());
+  async doubleClick(_input: ClickRequest): Promise<PiComputerUseReceipt> {
+    return blockedReceipt("double_click", Date.now());
   }
 
-  async hotkey(_input: HotkeyRequest): Promise<ActionReceipt> {
-    return unavailableReceipt("pi.hotkey", Date.now());
+  async type(_input: TypeRequest): Promise<PiComputerUseReceipt> {
+    return blockedReceipt("type_text", Date.now());
   }
 
-  async moveMouse(_input: MoveRequest): Promise<ActionReceipt> {
-    return unavailableReceipt("pi.move", Date.now());
+  async hotkey(_input: HotkeyRequest): Promise<PiComputerUseReceipt> {
+    return blockedReceipt("hotkey", Date.now());
   }
 
-  async scroll(_input: ScrollRequest): Promise<ActionReceipt> {
-    return unavailableReceipt("pi.scroll", Date.now());
+  async moveMouse(_input: MoveRequest): Promise<PiComputerUseReceipt> {
+    return blockedReceipt("mouse_move", Date.now());
+  }
+
+  async scroll(_input: ScrollRequest): Promise<PiComputerUseReceipt> {
+    return blockedReceipt("scroll", Date.now());
   }
 
   async probe(): Promise<PiComputerUseProbeResult> {
@@ -84,7 +88,10 @@ export class PiComputerUseMacAdapter implements ComputerUseAdapter {
       platform: this.platform,
       backend: this.backendId,
       screenshotOk: false,
+      activeWindowOk: false,
       mouseMoveOk: false,
+      mouseMoveSkipped: true,
+      windowsUseImportOk: false,
       message: `${formatPiPlatformLabel(this.platform)} / ${this.backendId} scaffold only`,
     };
   }

@@ -24,6 +24,31 @@ function formatBackendLabel(backend: PiComputerUseStatus["backend"]): string {
   }
 }
 
+function formatReadinessLabel(status: PiComputerUseStatus["status"]): string {
+  switch (status) {
+    case "NOT_INSTALLED":
+      return "NOT INSTALLED";
+    case "FAILED":
+      return "FAILED";
+    default:
+      return status;
+  }
+}
+
+function readinessClassName(status: PiComputerUseStatus["status"]): string {
+  switch (status) {
+    case "READY":
+      return "text-emerald-300/90";
+    case "NOT_INSTALLED":
+    case "FAILED":
+      return "text-amber-200/85";
+    case "SCAFFOLD":
+      return "text-amber-200/85";
+    default:
+      return "text-[#9a9a9a]";
+  }
+}
+
 export function PiComputerUseStatusPanel({ className }: PiComputerUseStatusPanelProps) {
   const [status, setStatus] = useState<PiComputerUseStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -56,7 +81,7 @@ export function PiComputerUseStatusPanel({ className }: PiComputerUseStatusPanel
   }, []);
 
   const platformLabel = status ? formatPiPlatformLabel(status.platform) : "…";
-  const computerUseLabel = status?.computerUse ?? "…";
+  const readinessLabel = status ? formatReadinessLabel(status.status) : "…";
   const backendLabel = status ? formatBackendLabel(status.backend) : "…";
 
   return (
@@ -68,7 +93,7 @@ export function PiComputerUseStatusPanel({ className }: PiComputerUseStatusPanel
       aria-label="PI computer use status"
     >
       <div className="mb-1 text-[9px] uppercase tracking-[0.16em] text-emerald-300/75">
-        PI STATUS
+        PI COMPUTER USE
       </div>
 
       {loadError ? (
@@ -79,33 +104,40 @@ export function PiComputerUseStatusPanel({ className }: PiComputerUseStatusPanel
             Platform: <span className="text-emerald-300/90">{platformLabel}</span>
           </div>
           <div>
-            Computer Use:{" "}
-            <span
-              className={
-                computerUseLabel === "READY"
-                  ? "text-emerald-300/90"
-                  : computerUseLabel === "SCAFFOLD"
-                    ? "text-amber-200/85"
-                    : "text-[#9a9a9a]"
-              }
-            >
-              {computerUseLabel}
+            Backend: <span className="text-[#bdbdbd]">{backendLabel}</span>
+          </div>
+          <div>
+            Status:{" "}
+            <span className={readinessClassName(status?.status ?? "UNAVAILABLE")}>
+              {readinessLabel}
             </span>
           </div>
+
           <div className="pt-0.5">
             Capabilities:
             <div className="pl-2">
               <div>
                 {capabilityMark(status?.capabilities.screenshot ?? false)} Screenshot
               </div>
+              <div>
+                {capabilityMark(status?.capabilities.activeWindow ?? false)} Active Window
+              </div>
               <div>{capabilityMark(status?.capabilities.mouse ?? false)} Mouse</div>
               <div>{capabilityMark(status?.capabilities.keyboard ?? false)} Keyboard</div>
               <div>{capabilityMark(status?.capabilities.scroll ?? false)} Scroll</div>
             </div>
           </div>
-          <div className="pt-0.5 text-[#6f6f6f]">
-            Backend: <span className="text-[#bdbdbd]">{backendLabel}</span>
-          </div>
+
+          {status?.lastError ? (
+            <div className="pt-1 text-amber-200/80">Error: {status.lastError}</div>
+          ) : null}
+
+          {status?.remediation ? (
+            <div className="pt-1 text-[#6f6f6f]">
+              Remediation:{" "}
+              <span className="text-[#bdbdbd]">{status.remediation}</span>
+            </div>
+          ) : null}
         </div>
       )}
     </section>

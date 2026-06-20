@@ -48,6 +48,52 @@ const DEFAULT_LEASE: ControlLease = {
   reason: "Default state",
 };
 
+type ControlLeaseStoreState = {
+  currentLease: ControlLease;
+  muthurMode: MUTHURMode;
+  eventLog: ControlEventRecord[];
+};
+
+const GLOBAL_KEY = "__echoMirageControlLeaseStore__";
+
+function createInitialState(): ControlLeaseStoreState {
+  return {
+    currentLease: { ...DEFAULT_LEASE },
+    muthurMode: "OBSERVE",
+    eventLog: [],
+  };
+}
+
+function getStore(): ControlLeaseStoreState {
+  const globalRef = globalThis as typeof globalThis & {
+    [GLOBAL_KEY]?: ControlLeaseStoreState;
+  };
+  if (!globalRef[GLOBAL_KEY]) {
+    globalRef[GLOBAL_KEY] = createInitialState();
+  }
+  return globalRef[GLOBAL_KEY];
+}
+
+function getCurrentLeaseRef(): ControlLease {
+  return getStore().currentLease;
+}
+
+function setCurrentLeaseRef(lease: ControlLease): void {
+  getStore().currentLease = lease;
+}
+
+function getEventLogRef(): ControlEventRecord[] {
+  return getStore().eventLog;
+}
+
+function getMuthurModeRef(): MUTHURMode {
+  return getStore().muthurMode;
+}
+
+function setMuthurModeRef(mode: MUTHURMode): void {
+  getStore().muthurMode = mode;
+}
+
 const MUTHUR_INPUT_SCOPES = new Set<ControlScope>(["input", "full"]);
 const MUTHUR_OBSERVATION_SCOPES = new Set<ControlScope>([
   "observation",
@@ -56,16 +102,13 @@ const MUTHUR_OBSERVATION_SCOPES = new Set<ControlScope>([
   "full",
 ]);
 
-let currentLease: ControlLease = { ...DEFAULT_LEASE };
-let muthurMode: MUTHURMode = "OBSERVE";
-const eventLog: ControlEventRecord[] = [];
-
 export function emit(event: ControlEvent, extra?: Partial<ControlEventRecord>): void {
   const record: ControlEventRecord = {
     event,
     timestamp: new Date().toISOString(),
     ...extra,
   };
+  const eventLog = getEventLogRef();
   eventLog.push(record);
   if (eventLog.length > 100) eventLog.shift();
 }
@@ -76,18 +119,19 @@ function isExpired(lease: ControlLease): boolean {
 }
 
 export function getCurrentOwner(): ControlOwner {
-  return currentLease.owner;
+  return getCurrentLeaseRef().owner;
 }
 
 export function getCurrentLease(): ControlLease {
+  const currentLease = getCurrentLeaseRef();
   if (isExpired(currentLease)) {
     expireLease("Lease expired");
   }
-  return { ...currentLease };
+  return { ...getCurrentLeaseRef() };
 }
 
 export function getEventLog(): readonly ControlEventRecord[] {
-  return [...eventLog];
+  return [...getEventLogRef()];
 }
 
 export function requestLease(
@@ -99,6 +143,7 @@ export function requestLease(
     reason?: string;
   }
 ): { granted: boolean; lease?: ControlLease; deniedReason?: string } {
+  const currentLease = getCurrentLeaseRef();
   emit("CONTROL_REQUESTED", {
     from: currentLease.owner,
     to: owner,
@@ -163,8 +208,8 @@ function grantLease(
     reason?: string;
   }
 ): ControlLease {
-  const prev = currentLease.owner;
-  currentLease = {
+  const prev = getCurrentLeaseRef().owner;
+  const nextLease: ControlLease = {
     owner,
     scope,
     grantedAt: new Date().toISOString(),
@@ -172,20 +217,22 @@ function grantLease(
     revocable: opts?.revocable ?? false,
     reason: opts?.reason ?? "Lease granted",
   };
+  setCurrentLeaseRef(nextLease);
   emit("CONTROL_GRANTED", {
     from: prev,
     to: owner,
-    lease: { ...currentLease },
-    reason: currentLease.reason,
+    lease: { ...nextLease },
+    reason: nextLease.reason,
   });
   narrate("CONTROL_GRANTED");
-  return { ...currentLease };
+  return { ...nextLease };
 }
 
 export function retake(
   requestor: ControlOwner = "USER",
   reason: string = "Retake"
 ): { success: boolean; previousOwner: ControlOwner } {
+  const currentLease = getCurrentLeaseRef();
   if (requestor !== "USER") {
     emit("CONTROL_DENIED", {
       from: currentLease.owner,
@@ -196,14 +243,14 @@ export function retake(
   }
 
   const prev = currentLease.owner;
-  currentLease = {
+  setCurrentLeaseRef({
     owner: "USER",
     scope: "full",
     grantedAt: new Date().toISOString(),
     expiresAt: null,
     revocable: false,
     reason,
-  };
+  });
   emit("CONTROL_RETAKEN", {
     from: prev,
     to: requestor,
@@ -214,8 +261,8 @@ export function retake(
 }
 
 export function expireLease(reason: string = "Expired"): ControlLease {
-  const prev = currentLease.owner;
-  currentLease = {
+  const prev = getCurrentLeaseRef().owner;
+  const nextLease: ControlLease = {
     owner: "USER",
     scope: "full",
     grantedAt: new Date().toISOString(),
@@ -223,22 +270,25 @@ export function expireLease(reason: string = "Expired"): ControlLease {
     revocable: false,
     reason,
   };
+  setCurrentLeaseRef(nextLease);
   emit("CONTROL_EXPIRED", {
     from: prev,
     to: "USER",
     reason,
   });
   narrate("CONTROL_RETURNED");
-  return { ...currentLease };
+  return { ...nextLease };
 }
 
 export function checkActionPermission(
   actionScope: ControlScope
 ): { allowed: boolean; reason?: string } {
+  const currentLease = getCurrentLeaseRef();
   if (isExpired(currentLease)) {
     expireLease("Automatic expiration");
+    const refreshed = getCurrentLeaseRef();
     return {
-      allowed: currentLease.scope === "full" || currentLease.scope === actionScope,
+      allowed: refreshed.scope === "full" || refreshed.scope === actionScope,
       reason: "Lease expired, ownership returned to USER",
     };
   }
@@ -271,22 +321,23 @@ export function checkActionPermission(
 }
 
 export function canRevoke(): boolean {
-  return currentLease.revocable;
+  return getCurrentLeaseRef().revocable;
 }
 
 export function getMUTHURMode(): MUTHURMode {
-  return muthurMode;
+  return getMuthurModeRef();
 }
 
 export function setMUTHURMode(mode: MUTHURMode): MUTHURMode {
-  muthurMode = mode;
-  return muthurMode;
+  setMuthurModeRef(mode);
+  return getMuthurModeRef();
 }
 
 export function emitControlDenied(opts: {
   deniedTo?: ControlOwner;
   reason: string;
 }): void {
+  const currentLease = getCurrentLeaseRef();
   emit("CONTROL_DENIED", {
     from: currentLease.owner,
     to: opts.deniedTo,
@@ -299,6 +350,7 @@ export function revokeLease(
   revoker: ControlOwner = "USER",
   reason: string = "Revoked"
 ): { success: boolean; previousOwner: ControlOwner } {
+  const currentLease = getCurrentLeaseRef();
   if (!currentLease.revocable && revoker !== "USER") {
     emit("CONTROL_DENIED", {
       from: currentLease.owner,

@@ -1,22 +1,21 @@
 export {
-  executePiComputerUseCommand,
-  getPiComputerUseAdapter,
   getPiComputerUseStatus,
   probePiComputerUse,
-  resolvePiComputerUseAdapter,
 } from "./pi-computer-use-manager";
+export type { PiComputerUseExecutionOptions } from "./pi-computer-use-manager";
 export type {
-  ActionReceipt,
   ComputerUseAdapter,
   PiComputerUseCapabilities,
+  PiComputerUseCapabilityName,
   PiComputerUseCommand,
   PiComputerUseCommandAction,
   PiComputerUseProbeResult,
+  PiComputerUseReadiness,
   PiComputerUseReceipt,
+  PiComputerUseReceiptStatus,
   PiComputerUseStatus,
   PiPlatform,
   PiComputerUseBackend,
-  ScreenshotReceipt,
 } from "./pi-computer-use-types";
 export {
   formatPiPlatformLabel,

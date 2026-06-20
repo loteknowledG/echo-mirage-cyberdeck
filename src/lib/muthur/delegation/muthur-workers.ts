@@ -9,6 +9,12 @@ export type MuthurDelegationWorker = {
 
 export const MUTHUR_DELEGATION_WORKERS: MuthurDelegationWorker[] = [
   {
+    id: "pi",
+    label: "Pi",
+    role: "Embodiment / computer-use operator",
+    handoffHint: "Pi executes desktop missions under an active control lease.",
+  },
+  {
     id: "cursor",
     label: "Cursor",
     role: "Interactive IDE editor",

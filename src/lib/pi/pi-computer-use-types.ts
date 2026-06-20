@@ -2,16 +2,17 @@ export type PiPlatform = "windows" | "macos" | "linux" | "unsupported";
 
 export type PiComputerUseBackend = "windows-use" | "pi-computer-use" | "none";
 
-export type PiReceiptAction =
-  | "pi.screenshot"
-  | "pi.click"
-  | "pi.double_click"
-  | "pi.type"
-  | "pi.hotkey"
-  | "pi.scroll"
-  | "pi.move";
+export type PiComputerUseCapabilityName =
+  | "screenshot"
+  | "mouse_move"
+  | "mouse_click"
+  | "double_click"
+  | "type_text"
+  | "hotkey"
+  | "scroll"
+  | "active_window";
 
-export type PiReceiptStatus = "success" | "error" | "unavailable";
+export type PiComputerUseReceiptStatus = "success" | "failed" | "blocked";
 
 export type PiComputerUseCommandAction =
   | "screenshot"
@@ -20,7 +21,8 @@ export type PiComputerUseCommandAction =
   | "type"
   | "hotkey"
   | "scroll"
-  | "move";
+  | "move"
+  | "active_window";
 
 export interface PiComputerUseCommand {
   action: PiComputerUseCommandAction;
@@ -33,32 +35,18 @@ export interface PiComputerUseCommand {
   button?: "left" | "right" | "middle";
 }
 
-export interface PiReceiptBase {
-  receiptId: string;
+export interface PiComputerUseReceipt {
+  id: string;
   actor: "pi";
-  action: PiReceiptAction;
-  status: PiReceiptStatus;
-  timestamp: string;
-  durationMs: number;
+  backend: "windows-use" | "pi-computer-use" | "none";
+  capability: PiComputerUseCapabilityName;
+  status: PiComputerUseReceiptStatus;
+  createdAt: string;
+  durationMs?: number;
+  summary: string;
   error?: string;
-}
-
-export interface ScreenshotReceipt extends PiReceiptBase {
-  action: "pi.screenshot";
-  data?: {
-    mimeType: "image/png" | "image/jpeg";
-    base64: string;
-    width: number;
-    height: number;
-  };
-}
-
-export interface ActionReceipt extends PiReceiptBase {
-  action: Exclude<PiReceiptAction, "pi.screenshot">;
   data?: Record<string, unknown>;
 }
-
-export type PiComputerUseReceipt = ScreenshotReceipt | ActionReceipt;
 
 export interface ClickRequest {
   x: number;
@@ -68,6 +56,8 @@ export interface ClickRequest {
 
 export interface TypeRequest {
   text: string;
+  x?: number;
+  y?: number;
 }
 
 export interface HotkeyRequest {
@@ -86,37 +76,54 @@ export interface ScrollRequest {
 
 export interface PiComputerUseCapabilities {
   screenshot: boolean;
+  activeWindow: boolean;
   mouse: boolean;
   keyboard: boolean;
   scroll: boolean;
 }
 
+export type PiComputerUseReadiness =
+  | "READY"
+  | "NOT_INSTALLED"
+  | "FAILED"
+  | "SCAFFOLD"
+  | "UNAVAILABLE";
+
 export interface PiComputerUseStatus {
   actor: "pi";
   platform: PiPlatform;
   backend: PiComputerUseBackend;
-  computerUse: "READY" | "UNAVAILABLE" | "SCAFFOLD";
+  status: PiComputerUseReadiness;
+  /** @deprecated Use `status` — kept for existing callers */
+  computerUse: PiComputerUseReadiness;
   capabilities: PiComputerUseCapabilities;
+  remediation?: string;
+  lastError?: string;
 }
 
 export interface PiComputerUseProbeResult {
   platform: PiPlatform;
   backend: PiComputerUseBackend;
   screenshotOk: boolean;
+  activeWindowOk: boolean;
   mouseMoveOk: boolean;
+  mouseMoveSkipped: boolean;
+  windowsUseImportOk: boolean;
   message: string;
+  receipt?: PiComputerUseReceipt;
 }
 
 export interface ComputerUseAdapter {
   readonly backendId: PiComputerUseBackend;
   readonly platform: PiPlatform;
   getStatus(): PiComputerUseStatus;
-  screenshot(): Promise<ScreenshotReceipt>;
-  click(input: ClickRequest): Promise<ActionReceipt>;
-  doubleClick(input: ClickRequest): Promise<ActionReceipt>;
-  type(input: TypeRequest): Promise<ActionReceipt>;
-  hotkey(input: HotkeyRequest): Promise<ActionReceipt>;
-  moveMouse(input: MoveRequest): Promise<ActionReceipt>;
-  scroll(input: ScrollRequest): Promise<ActionReceipt>;
+  screenshot(): Promise<PiComputerUseReceipt>;
+  activeWindow(): Promise<PiComputerUseReceipt>;
+  click(input: ClickRequest): Promise<PiComputerUseReceipt>;
+  doubleClick(input: ClickRequest): Promise<PiComputerUseReceipt>;
+  type(input: TypeRequest): Promise<PiComputerUseReceipt>;
+  hotkey(input: HotkeyRequest): Promise<PiComputerUseReceipt>;
+  moveMouse(input: MoveRequest): Promise<PiComputerUseReceipt>;
+  scroll(input: ScrollRequest): Promise<PiComputerUseReceipt>;
   probe(): Promise<PiComputerUseProbeResult>;
 }

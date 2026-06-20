@@ -1,6 +1,7 @@
 import type { BrowserCommand } from "@/lib/browser-intents";
 import type { OperatorEditorEdit } from "@/lib/operator-workbench";
 import type { MuthurPosture } from "@/lib/muthur/muthur-posture";
+import type { PiControlLeaseRequest } from "@/lib/muthur/control/pi-control-lease-types";
 
 export type MuthurOperatorBrowserRef = BrowserCommand;
 
@@ -37,6 +38,8 @@ export type MuthurToolExecutionContext = {
   codingTouches: string[];
   codingVerify: MuthurCodingVerifyReceipt | null;
   posture: MuthurPosture;
+  piControlLeaseRequest: PiControlLeaseRequest | null;
+  piMissionDelegated: boolean;
 };
 
 export function createMuthurToolExecutionContext(
@@ -50,6 +53,8 @@ export function createMuthurToolExecutionContext(
     codingTouches: [],
     codingVerify: null,
     posture,
+    piControlLeaseRequest: null,
+    piMissionDelegated: false,
   };
 }
 

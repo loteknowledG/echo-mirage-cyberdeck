@@ -309,6 +309,50 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "request_pi_control_lease",
+      description:
+        "Request operator grant for a temporary Pi control lease before desktop/computer-use missions. Pi is the embodiment operator for mouse, keyboard, and screen.",
+      parameters: {
+        type: "object",
+        properties: {
+          task: {
+            type: "string",
+            description: "Short mission title shown in the control request UI (e.g. Draw Cat).",
+          },
+          reason: {
+            type: "string",
+            description: "Why computer use / embodiment is required.",
+          },
+          missionText: {
+            type: "string",
+            description: "Full operator mission text to pass to Pi after grant.",
+          },
+        },
+        required: ["task", "reason"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delegate_pi_computer_use",
+      description:
+        "Delegate mission instructions to Pi after the operator grants the control lease. Monitors via Pi computer-use subsystem.",
+      parameters: {
+        type: "object",
+        properties: {
+          instructions: {
+            type: "string",
+            description: "Step-by-step mission for Pi to execute on the desktop.",
+          },
+        },
+        required: ["instructions"],
+      },
+    },
+  },
 ];
 
 export function getMuthurOpenAiToolsForPosture(posture: MuthurPosture, context?: MuthurPostureToolContext) {

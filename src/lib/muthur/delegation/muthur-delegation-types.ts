@@ -11,6 +11,7 @@ export type MuthurDelegationStatus = (typeof MUTHUR_DELEGATION_STATUSES)[number]
 
 /** External AI worker — native tool surface, not hosted by Echo Mirage. */
 export type MuthurDelegationWorkerId =
+  | "pi"
   | "cursor"
   | "codex"
   | "opencode"

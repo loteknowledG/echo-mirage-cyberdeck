@@ -266,6 +266,10 @@ import {
 import { setMuthurScreenSnapshot } from "@/lib/muthur-screen-context";
 import { formatPiScreenContextForMuthur, readPiScreenSnapshot } from "@/lib/pi-screen-context";
 import { setMUTHURMode } from "@/lib/computer-use/control-lease";
+import { detectComputerUseMission } from "@/lib/muthur/control/computer-use-intent";
+import { usePiControlLease } from "@/lib/muthur/control/use-pi-control-lease";
+import type { PiControlLeaseRequest } from "@/lib/muthur/control/pi-control-lease-types";
+import { MuthurControlLeaseHost } from "@/components/cyberdeck/muthur-control-lease-host";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { summarizeMuthurOperatorEdits } from "@/lib/muthur-operator-edit-summary";
 import {
@@ -1112,6 +1116,7 @@ export default function CyberdeckApp() {
   const [muthurDiagnostics, setMuthurDiagnostics] = useState<MuthurDiagnosticsState>(() =>
     createEmptyMuthurDiagnosticsState(),
   );
+  const piControlLease = usePiControlLease();
   const [muthurStall, setMuthurStall] = useState<MuthurResponseStall | null>(null);
   const [muthurResponseFailed, setMuthurResponseFailed] = useState(false);
   const composeStartedAtRef = useRef<number | null>(null);
@@ -5171,6 +5176,22 @@ export default function CyberdeckApp() {
     messageInputRef.current?.clear();
     setChatPinnedToBottom(true);
     setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
+
+    const computerUseMission = detectComputerUseMission(userMessage);
+    if (computerUseMission && !piControlLease.snapshot.activeLease) {
+      try {
+        await piControlLease.requestMission(userMessage, computerUseMission);
+        setMuthurDiagnostics((current) =>
+          appendMuthurDiagnosticEntry(
+            current,
+            `CONTROL REQUEST // ${computerUseMission.task} // operator: Pi // awaiting grant`,
+          ),
+        );
+      } catch {
+        /* lease request best-effort */
+      }
+    }
+
     setIsStreaming(true);
     setStreamText(MUTHUR_UPLINK_PREPARING);
     setStreamToolTrace("");
@@ -5839,6 +5860,15 @@ ${diff}`;
 
       const muthurToolsHeader = res.headers.get("x-muthur-tools-used")?.trim() ?? "";
       const operatorEdits = parseOperatorEditsHeader(res.headers.get("x-muthur-operator-edits"));
+      const piControlHeader = res.headers.get("x-muthur-pi-control-request");
+      if (piControlHeader) {
+        try {
+          const pending = JSON.parse(piControlHeader) as PiControlLeaseRequest;
+          piControlLease.applyPendingRequest(pending);
+        } catch {
+          /* ignore malformed lease header */
+        }
+      }
       setStreamToolTrace(muthurToolsHeader);
 
       const reader = res.body?.getReader();
@@ -6815,6 +6845,28 @@ ${diff}`;
     playDeckSystemSound("chirp", 0.05);
   }, []);
 
+  const openOrFocusPiTab = useCallback(() => {
+    const customTabs = useCyberdeckTabStore.getState().customTabs;
+    const existing = customTabs.find((t) => t.kind === "pi");
+    if (existing) {
+      useCyberdeckTabStore.getState().setActiveCustomTabId(existing.id);
+      setNavRailContext("tabs");
+      playDeckSystemSound("chirp", 0.05);
+      return;
+    }
+    const id = `tab-${crypto.randomUUID()}`;
+    const tab: CustomTab = {
+      id,
+      label: defaultCustomTabLabelForKind("pi"),
+      glyph: defaultCustomTabGlyphForKind("pi"),
+      kind: "pi",
+    };
+    useCyberdeckTabStore.getState().setCustomTabs((prev) => [...prev, tab]);
+    useCyberdeckTabStore.getState().setActiveCustomTabId(id);
+    setNavRailContext("tabs");
+    playDeckSystemSound("chirp", 0.05);
+  }, []);
+
   const openOrFocusCallCenterTab = useCallback(() => {
     const customTabs = useCyberdeckTabStore.getState().customTabs;
     const existing = customTabs.find((t) => t.kind === "call-center");
@@ -7356,6 +7408,44 @@ ${diff}`;
         updateCustomTab={updateCustomTab}
       />
       <LazyIndicateOverlay />
+      <MuthurControlLeaseHost
+        snapshot={piControlLease.snapshot}
+        onGrant={async () => {
+          const lease = await piControlLease.grant();
+          openOrFocusPiTab();
+          if (lease) {
+            setMuthurDiagnostics((current) =>
+              appendMuthurDiagnosticEntry(
+                current,
+                `CONTROL GRANTED // ${lease.task} // operator: Pi // lease: ${lease.leaseId}`,
+              ),
+            );
+            window.dispatchEvent(
+              new CustomEvent("muthur-pi-mission", {
+                detail: { missionText: lease.missionText, task: lease.task },
+              }),
+            );
+          }
+        }}
+        onDeny={async () => {
+          await piControlLease.deny();
+          setMuthurDiagnostics((current) =>
+            appendMuthurDiagnosticEntry(current, "CONTROL DENIED // Pi lease request rejected"),
+          );
+        }}
+        onRetake={async () => {
+          await piControlLease.retake();
+          setMuthurDiagnostics((current) =>
+            appendMuthurDiagnosticEntry(current, "AUTHORITY RETURN // pi → user // user_retake"),
+          );
+        }}
+        onContinueMission={async () => {
+          await piControlLease.clearConflict();
+        }}
+        onReportConflict={async () => {
+          await piControlLease.reportConflict();
+        }}
+      />
       {railTabContextMenu || mirageContextMenu || gatewayPaneContextMenu ? (
         <div
           className="fixed inset-0 z-[90]"
