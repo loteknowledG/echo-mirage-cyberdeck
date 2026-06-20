@@ -56,6 +56,7 @@ function readinessClassName(status: PiComputerUseStatus["status"]): string {
 export function PiComputerUseStatusPanel({ className }: PiComputerUseStatusPanelProps) {
   const [status, setStatus] = useState<PiComputerUseStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const operatorPlatform = detectOperatorPlatform();
 
   useEffect(() => {
@@ -93,6 +94,10 @@ export function PiComputerUseStatusPanel({ className }: PiComputerUseStatusPanel
   const hostMismatchNote =
     hostPlatform && describeHostOperatorMismatch(hostPlatform, operatorPlatform);
 
+  const collapsedSummary = loadError
+    ? loadError
+    : `Status: ${readinessLabel} · Host: ${hostLabel} · Backend: ${backendLabel}`;
+
   return (
     <section
       className={cn(
@@ -101,61 +106,72 @@ export function PiComputerUseStatusPanel({ className }: PiComputerUseStatusPanel
       )}
       aria-label="PI computer use status"
     >
-      <div className="mb-1 text-[9px] uppercase tracking-[0.16em] text-emerald-300/75">
-        PI COMPUTER USE
-      </div>
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 text-left font-mono text-[10px] text-amber-500/90 hover:text-amber-400"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <span>{expanded ? "▼" : "▶"}</span>
+        <span className="uppercase tracking-[0.16em]">PI Computer Use</span>
+        {!expanded ? (
+          <span className="truncate text-[#9a9a9a]"> · {collapsedSummary}</span>
+        ) : null}
+      </button>
 
-      {loadError ? (
-        <div className="text-amber-200/85">{loadError}</div>
-      ) : (
-        <div className="space-y-0.5">
-          <div>
-            Host (Node): <span className="text-emerald-300/90">{hostLabel}</span>
-          </div>
-          <div>
-            Operator: <span className="text-[#bdbdbd]">{operatorLabel}</span>
-          </div>
-          <div>
-            Backend: <span className="text-[#bdbdbd]">{backendLabel}</span>
-          </div>
-          <div>
-            Status:{" "}
-            <span className={readinessClassName(status?.status ?? "UNAVAILABLE")}>
-              {readinessLabel}
-            </span>
-          </div>
-
-          <div className="pt-0.5">
-            Capabilities:
-            <div className="pl-2">
-              <div>
-                {capabilityMark(status?.capabilities.screenshot ?? false)} Screenshot
-              </div>
-              <div>
-                {capabilityMark(status?.capabilities.activeWindow ?? false)} Active Window
-              </div>
-              <div>{capabilityMark(status?.capabilities.mouse ?? false)} Mouse</div>
-              <div>{capabilityMark(status?.capabilities.keyboard ?? false)} Keyboard</div>
-              <div>{capabilityMark(status?.capabilities.scroll ?? false)} Scroll</div>
+      {expanded ? (
+        loadError ? (
+          <div className="mt-2 text-amber-200/85">{loadError}</div>
+        ) : (
+          <div className="mt-2 space-y-0.5">
+            <div>
+              Host (Node): <span className="text-emerald-300/90">{hostLabel}</span>
             </div>
-          </div>
-
-          {hostMismatchNote ? (
-            <div className="pt-1 text-amber-200/80">{hostMismatchNote}</div>
-          ) : null}
-
-          {status?.lastError ? (
-            <div className="pt-1 text-amber-200/80">Error: {status.lastError}</div>
-          ) : null}
-
-          {status?.remediation ? (
-            <div className="pt-1 text-[#6f6f6f]">
-              Remediation:{" "}
-              <span className="text-[#bdbdbd]">{status.remediation}</span>
+            <div>
+              Operator: <span className="text-[#bdbdbd]">{operatorLabel}</span>
             </div>
-          ) : null}
-        </div>
-      )}
+            <div>
+              Backend: <span className="text-[#bdbdbd]">{backendLabel}</span>
+            </div>
+            <div>
+              Status:{" "}
+              <span className={readinessClassName(status?.status ?? "UNAVAILABLE")}>
+                {readinessLabel}
+              </span>
+            </div>
+
+            <div className="pt-0.5">
+              Capabilities:
+              <div className="pl-2">
+                <div>
+                  {capabilityMark(status?.capabilities.screenshot ?? false)} Screenshot
+                </div>
+                <div>
+                  {capabilityMark(status?.capabilities.activeWindow ?? false)} Active Window
+                </div>
+                <div>{capabilityMark(status?.capabilities.mouse ?? false)} Mouse</div>
+                <div>{capabilityMark(status?.capabilities.keyboard ?? false)} Keyboard</div>
+                <div>{capabilityMark(status?.capabilities.scroll ?? false)} Scroll</div>
+              </div>
+            </div>
+
+            {hostMismatchNote ? (
+              <div className="pt-1 text-amber-200/80">{hostMismatchNote}</div>
+            ) : null}
+
+            {status?.lastError ? (
+              <div className="pt-1 text-amber-200/80">Error: {status.lastError}</div>
+            ) : null}
+
+            {status?.remediation ? (
+              <div className="pt-1 text-[#6f6f6f]">
+                Remediation:{" "}
+                <span className="text-[#bdbdbd]">{status.remediation}</span>
+              </div>
+            ) : null}
+          </div>
+        )
+      ) : null}
     </section>
   );
 }
