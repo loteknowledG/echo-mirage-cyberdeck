@@ -39,6 +39,8 @@
     "probe:muthur-phase-c": "tsx scripts/probe-muthur-phase-c-uplink-mode.ts",
     "probe:muthur-commander-delegation": "tsx scripts/probe-muthur-commander-delegation.ts",
     "probe:muthur-commander-posture": "tsx scripts/probe-muthur-commander-posture.ts",
+    "probe:ambient-twinkle": "tsx scripts/probe-ambient-twinkle.ts",
+    "probe:muthur-cognition": "tsx scripts/probe-muthur-cognition.ts",
     "probe:muthur-mission-lifecycle": "tsx scripts/probe-muthur-mission-lifecycle.ts",
     "probe:muthur-operator-disk-save": "tsx scripts/probe-muthur-operator-disk-save.ts",
     "probe:muthur-atlas-memory": "tsx scripts/probe-muthur-atlas-memory.ts",

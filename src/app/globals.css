@@ -2,6 +2,7 @@
 @import url("https://cdn.jsdelivr.net/npm/hack-font@3/build/web/hack.css");
 @import "../styles/cyberdeck-realmorphism.css";
 @import "../styles/cyberdeck-asciimorphism-depth.css";
+@import "../styles/ambient-twinkle.css";
 /* Import Mrs Saint Delafield from Google Fonts */
 /* If Google Fonts import is blocked, you can self-host a WOFF2 at /public/fonts/MrsSaintDelafield.woff2 */
 html,

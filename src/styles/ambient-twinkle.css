@@ -1,0 +1,104 @@
+/**
+ * L-UI-LIGHT-001 — Ambient twinkle indicator lamps (Nostromo-style annunciator seed).
+ * Sparse, dim, industrial. No alarm semantics in this phase.
+ */
+
+.ambient-twinkle-host {
+  --twinkle-bezel-bg: #060606;
+  --twinkle-bezel-border: #1a1a1a;
+  --twinkle-lamp-face: #101010;
+  --twinkle-lamp-rim: #2a2a2a;
+  --twinkle-signal-core: rgba(54, 255, 115, 0.55);
+  --twinkle-signal-glow: rgba(54, 255, 115, 0.22);
+  --twinkle-amber-core: rgba(252, 211, 77, 0.5);
+  --twinkle-amber-glow: rgba(252, 211, 77, 0.18);
+  --twinkle-cyan-core: rgba(94, 234, 212, 0.45);
+  --twinkle-cyan-glow: rgba(94, 234, 212, 0.16);
+  --twinkle-neutral-core: rgba(138, 138, 138, 0.42);
+  --twinkle-neutral-glow: rgba(138, 138, 138, 0.12);
+}
+
+.ambient-twinkle-bezel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 5px;
+  border: 1px solid var(--twinkle-bezel-border);
+  background: linear-gradient(180deg, #0a0a0a 0%, var(--twinkle-bezel-bg) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.ambient-twinkle-lamp {
+  --lamp-core: var(--twinkle-neutral-core);
+  --lamp-glow: var(--twinkle-neutral-glow);
+  --lamp-idle-opacity: 0.12;
+  --lamp-peak-opacity: 0.2;
+  --twinkle-period: 10s;
+  --twinkle-delay: 0ms;
+  --twinkle-pulse-width: 6%;
+
+  display: block;
+  width: 4px;
+  height: 4px;
+  flex-shrink: 0;
+  border: 1px solid var(--twinkle-lamp-rim);
+  background: var(--twinkle-lamp-face);
+  box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.9);
+  opacity: var(--lamp-idle-opacity);
+  animation: ambient-twinkle-pulse var(--twinkle-period) ease-in-out infinite;
+  animation-delay: var(--twinkle-delay);
+}
+
+.ambient-twinkle-lamp--signal {
+  --lamp-core: var(--twinkle-signal-core);
+  --lamp-glow: var(--twinkle-signal-glow);
+}
+
+.ambient-twinkle-lamp--amber {
+  --lamp-core: var(--twinkle-amber-core);
+  --lamp-glow: var(--twinkle-amber-glow);
+}
+
+.ambient-twinkle-lamp--cyan {
+  --lamp-core: var(--twinkle-cyan-core);
+  --lamp-glow: var(--twinkle-cyan-glow);
+}
+
+.ambient-twinkle-lamp--neutral {
+  --lamp-core: var(--twinkle-neutral-core);
+  --lamp-glow: var(--twinkle-neutral-glow);
+}
+
+@keyframes ambient-twinkle-pulse {
+  0%,
+  88%,
+  100% {
+    opacity: var(--lamp-idle-opacity);
+    background-color: var(--twinkle-lamp-face);
+    box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.9);
+  }
+  94% {
+    opacity: var(--lamp-peak-opacity);
+    background-color: var(--lamp-core);
+    box-shadow:
+      inset 0 0 1px rgba(0, 0, 0, 0.5),
+      0 0 3px var(--lamp-glow),
+      0 0 6px var(--lamp-glow);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-twinkle-lamp {
+    animation: none;
+    opacity: var(--lamp-idle-opacity);
+  }
+}
+
+[data-deck-mode="ascii"] .ambient-twinkle-lamp {
+  border-radius: 0;
+}
+
+[data-deck-mode="realmorphism"] .ambient-twinkle-lamp {
+  border-radius: 999px;
+}

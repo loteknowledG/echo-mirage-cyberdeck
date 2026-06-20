@@ -188,6 +188,7 @@ import {
 import { MiragePaneLayer } from "@/components/cyberdeck/mirage-pane-layer";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
 import { EchoHeader } from "@/components/cyberdeck/echo-header";
+import { AmbientTwinkleHost } from "@/components/cyberdeck/ambient-twinkle-host";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
 import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-tab";
 import { Textarea } from "@/components/ui/textarea";
@@ -213,6 +214,8 @@ import {
 import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
 import { MuthurCommanderStatus } from "@/components/cyberdeck/muthur-commander-status";
 import { MuthurDelegationPanel } from "@/components/cyberdeck/muthur-delegation-panel";
+import { MuthurCognitionModeControl } from "@/components/cyberdeck/muthur-cognition-mode-control";
+import { MuthurCognitionStreamPanel } from "@/components/cyberdeck/muthur-cognition-stream-panel";
 import { MuthurUplinkModeRoller } from "@/components/cyberdeck/muthur-uplink-mode-roller";
 import {
   formatDelegationCancelledLine,
@@ -298,6 +301,29 @@ import {
   formatMuthurModeChangedLine,
 } from "@/lib/muthur/mission/muthur-commander-events";
 import { getMuthurCommanderPosture } from "@/lib/muthur/mission/muthur-commander-posture";
+import {
+  flushMuthurCognitionSummary,
+  recordMuthurCognitionEvent,
+  setMuthurCognitionMode,
+} from "@/lib/muthur/cognition/muthur-cognition-channel";
+import {
+  cognitionFromCommanderPosture,
+  cognitionFromDelegationCancelled,
+  cognitionFromDelegationDispatched,
+  cognitionFromDelegationPrepared,
+  cognitionFromDelegationResult,
+  cognitionFromMemoryContext,
+  cognitionFromMissionCreated,
+  cognitionFromMissionLifecycle,
+  cognitionFromUserMessage,
+} from "@/lib/muthur/cognition/muthur-cognition-events";
+import {
+  loadMuthurCognition,
+} from "@/lib/muthur/cognition/muthur-cognition-store";
+import type {
+  MuthurCognitionEmitInput,
+  MuthurCognitionState,
+} from "@/lib/muthur/cognition/muthur-cognition-types";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 import {
   POWERFIST_STACK_CHANNEL,
@@ -1115,6 +1141,8 @@ export default function CyberdeckApp() {
   const [muthurDelegations, setMuthurDelegations] = useState<MuthurDelegationAssignment[]>(() =>
     loadMuthurDelegations(),
   );
+  const [muthurCognition, setMuthurCognition] = useState<MuthurCognitionState>(() => loadMuthurCognition());
+  const cognitionSummaryTimerRef = useRef<number | null>(null);
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
@@ -1626,6 +1654,38 @@ export default function CyberdeckApp() {
     [setMessages],
   );
 
+  const emitMuthurCognition = useCallback((input: MuthurCognitionEmitInput) => {
+    setMuthurCognition((current) => {
+      const recorded = recordMuthurCognitionEvent(current, input);
+      return recorded.state;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (muthurCognition.mode !== "summary") return;
+    if (muthurCognition.pendingSummary.length === 0) return;
+
+    if (cognitionSummaryTimerRef.current != null) {
+      window.clearTimeout(cognitionSummaryTimerRef.current);
+    }
+
+    cognitionSummaryTimerRef.current = window.setTimeout(() => {
+      setMuthurCognition((current) => flushMuthurCognitionSummary(current));
+      cognitionSummaryTimerRef.current = null;
+    }, 1500);
+
+    return () => {
+      if (cognitionSummaryTimerRef.current != null) {
+        window.clearTimeout(cognitionSummaryTimerRef.current);
+        cognitionSummaryTimerRef.current = null;
+      }
+    };
+  }, [muthurCognition.mode, muthurCognition.pendingSummary.length, muthurCognition.events[0]?.id]);
+
+  const handleMuthurCognitionModeChange = useCallback((mode: MuthurCognitionState["mode"]) => {
+    setMuthurCognition((current) => setMuthurCognitionMode(current, mode));
+  }, []);
+
   const handleMuthurUplinkModeChange = useCallback(
     (next: MuthurUplinkMode) => {
       const resolved = normalizeMuthurUplinkMode(next);
@@ -1638,6 +1698,12 @@ export default function CyberdeckApp() {
             formatMuthurCommanderArchiveLine("muthur_commander_awaiting_mission"),
           );
         }
+        emitMuthurCognition(
+          cognitionFromCommanderPosture({
+            posture,
+            missionTitle: muthurMission?.title,
+          }),
+        );
         archiveMuthurHistoryLine(
           formatMuthurCommanderActivatedLine({
             posture,
@@ -1653,7 +1719,7 @@ export default function CyberdeckApp() {
       archiveMuthurHistoryLine(formatMuthurModeChangedLine(muthurUplinkMode, resolved));
       setMuthurUplinkMode(resolved);
     },
-    [archiveMuthurHistoryLine, muthurMission, muthurUplinkMode],
+    [archiveMuthurHistoryLine, emitMuthurCognition, muthurMission, muthurUplinkMode],
   );
 
   const handleCreateMuthurMission = useCallback(
@@ -1666,8 +1732,9 @@ export default function CyberdeckApp() {
       if (ready.ok) {
         archiveMuthurHistoryLine(ready.archiveLine);
       }
+      emitMuthurCognition(cognitionFromMissionCreated(ready.mission));
     },
-    [archiveMuthurHistoryLine],
+    [archiveMuthurHistoryLine, emitMuthurCognition],
   );
 
   const handleStartMuthurMission = useCallback(() => {
@@ -1677,11 +1744,13 @@ export default function CyberdeckApp() {
     );
     if (!activated.ok) {
       archiveMuthurHistoryLine(activated.archiveLine);
+      emitMuthurCognition(cognitionFromMissionLifecycle(activated, muthurMission));
       return;
     }
     setMuthurMission(activated.mission);
     archiveMuthurHistoryLine(activated.archiveLine);
-  }, [archiveMuthurHistoryLine, muthurMission]);
+    emitMuthurCognition(cognitionFromMissionLifecycle(activated, activated.mission));
+  }, [archiveMuthurHistoryLine, emitMuthurCognition, muthurMission]);
 
   useEffect(() => {
     saveMuthurMission(muthurMission);
@@ -1696,8 +1765,9 @@ export default function CyberdeckApp() {
       if (!result) return;
       setMuthurMission(result.mission);
       archiveMuthurHistoryLine(result.archiveLine);
+      emitMuthurCognition(cognitionFromMissionLifecycle(result, result.mission));
     },
-    [archiveMuthurHistoryLine],
+    [archiveMuthurHistoryLine, emitMuthurCognition],
   );
 
   const handleCreateMuthurDelegation = useCallback(
@@ -1719,8 +1789,9 @@ export default function CyberdeckApp() {
       });
       setMuthurDelegations((current) => [assignment, ...current]);
       archiveMuthurHistoryLine(formatDelegationPreparedLine(assignment));
+      emitMuthurCognition(cognitionFromDelegationPrepared(assignment));
     },
-    [archiveMuthurHistoryLine, muthurMission],
+    [archiveMuthurHistoryLine, emitMuthurCognition, muthurMission],
   );
 
   const handleDispatchMuthurDelegation = useCallback(
@@ -1737,6 +1808,7 @@ export default function CyberdeckApp() {
       const missionAssignments = listDelegationsForMission(nextDelegations, muthurMission.id);
       const lifecycle = advanceMissionForDelegationDispatch(muthurMission, missionAssignments);
       applyMissionLifecycleResult(lifecycle);
+      emitMuthurCognition(cognitionFromDelegationDispatched(dispatched));
 
       const missionForPackage = lifecycle?.mission ?? muthurMission;
       return formatMuthurDelegationPackageMessage({
@@ -1762,8 +1834,9 @@ export default function CyberdeckApp() {
       applyMissionLifecycleResult(
         advanceMissionForDelegationResult(muthurMission, missionAssignments, input.success),
       );
+      emitMuthurCognition(cognitionFromDelegationResult(recorded, input.success));
     },
-    [applyMissionLifecycleResult, muthurDelegations, muthurMission, archiveMuthurHistoryLine],
+    [applyMissionLifecycleResult, emitMuthurCognition, muthurDelegations, muthurMission, archiveMuthurHistoryLine],
   );
 
   const handleCancelMuthurDelegation = useCallback(
@@ -1781,8 +1854,9 @@ export default function CyberdeckApp() {
       applyMissionLifecycleResult(
         advanceMissionWhenDelegationsClear(muthurMission, missionAssignments),
       );
+      emitMuthurCognition(cognitionFromDelegationCancelled(cancelled));
     },
-    [applyMissionLifecycleResult, muthurDelegations, muthurMission, archiveMuthurHistoryLine],
+    [applyMissionLifecycleResult, emitMuthurCognition, muthurDelegations, muthurMission, archiveMuthurHistoryLine],
   );
 
   const handleDeckSfxVolumeChange = useCallback((volume: number) => {
@@ -5666,6 +5740,11 @@ ${diff}`;
         abortCtl.abort();
       }, CHAT_UPLINK_TIMEOUT_MS);
       const memoryContext = buildMuthurMemoryContext(muthurMemoryRef.current, userMessage);
+      emitMuthurCognition(cognitionFromUserMessage(userMessage));
+      const memoryCognition = cognitionFromMemoryContext(memoryContext, userMessage);
+      if (memoryCognition) {
+        emitMuthurCognition(memoryCognition);
+      }
       const history = buildCyberdeckChatHistory(messages);
       const glyphContext = await buildGlyphContextSnapshot();
       const piScreenContext = formatPiScreenContextForMuthur(readPiScreenSnapshot());
@@ -7624,6 +7703,7 @@ ${diff}`;
                   </div>
                 </MuthurComposerShell>
                 <div className="muthur-composer-controls px-1">
+                  <AmbientTwinkleHost preset="compact" seedOffset={2} className="mb-1" />
                   <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                   <button
@@ -7813,6 +7893,17 @@ ${diff}`;
                       className="mt-1"
                     />
                   ) : null}
+                  <MuthurCognitionModeControl
+                    mode={muthurCognition.mode}
+                    disabled={isStreaming}
+                    onChange={handleMuthurCognitionModeChange}
+                    className="mt-1"
+                  />
+                  <MuthurCognitionStreamPanel
+                    mode={muthurCognition.mode}
+                    stream={muthurCognition.stream}
+                    className="mt-1"
+                  />
                 </div>
               </div>
             </footer>
