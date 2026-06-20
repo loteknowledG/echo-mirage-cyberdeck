@@ -79,7 +79,11 @@ export function createPiComputerUseTool(): AgentTool<typeof piComputerUseSchema,
         throw new Error(message);
       }
 
-      return JSON.stringify(payload.receipt ?? payload, null, 2);
+      const text = JSON.stringify(payload.receipt ?? payload, null, 2);
+      return {
+        content: [{ type: "text", text }],
+        details: text,
+      };
     },
   };
 }
