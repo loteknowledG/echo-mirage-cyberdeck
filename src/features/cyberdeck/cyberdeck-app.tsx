@@ -200,7 +200,7 @@ import {
   CyberdeckControlButton,
   CyberdeckMenuButton,
 } from "@/components/cyberdeck/cyberdeck-control-button";
-import { CyberdeckIconSwitch } from "@/components/cyberdeck/cyberdeck-icon-switch";
+import { muthurVoiceControlOptions } from "@/lib/cyberdeck/muthur-depth-control";
 import {
   getInitialUplinkSonarVolume,
   saveUplinkSonarVolume,
@@ -7816,50 +7816,48 @@ ${diff}`;
                   >
                     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
                     <CyberdeckControlTooltip label={voiceEnabled ? "Voice on" : "Voice off"}>
-                    <span className="inline-flex">
-                    <CyberdeckIconSwitch
-                      checked={voiceEnabled}
-                      onCheckedChange={() => toggleVoiceEnabled()}
-                      icon={
-                        voiceEnabled ? (
-                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
-                            <path
-                              d="M5 10V14H8L12 18V6L8 10H5Z"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                            <path
-                              d="M16 9C16.9 9.7 17.5 10.8 17.5 12C17.5 13.2 16.9 14.3 16 15"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                            />
-                            <path
-                              d="M18.5 7C20 8.3 21 10.1 21 12C21 13.9 20 15.7 18.5 17"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        ) : (
-                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
-                            <path
-                              d="M5 10V14H8L12 18V6L8 10H5Z"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                            <path d="M15 9L21 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                            <path d="M21 9L15 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                          </svg>
-                        )
-                      }
-                      ariaLabel={voiceEnabled ? "Voice on" : "Voice off"}
-                    />
-                    </span>
+                    <CyberdeckComposerControl
+                      control={muthurVoiceControlOptions(voiceEnabled, voiceHealth)}
+                      onClick={toggleVoiceEnabled}
+                      aria-label={voiceEnabled ? "Voice on" : "Voice off"}
+                      aria-pressed={voiceEnabled}
+                    >
+                      {voiceEnabled ? (
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
+                          <path
+                            d="M5 10V14H8L12 18V6L8 10H5Z"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M16 9C16.9 9.7 17.5 10.8 17.5 12C17.5 13.2 16.9 14.3 16 15"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d="M18.5 7C20 8.3 21 10.1 21 12C21 13.9 20 15.7 18.5 17"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
+                          <path
+                            d="M5 10V14H8L12 18V6L8 10H5Z"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path d="M15 9L21 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                          <path d="M21 9L15 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                        </svg>
+                      )}
+                    </CyberdeckComposerControl>
                     </CyberdeckControlTooltip>
                     {voiceEnabled && voiceBlockTotal > 0 ? (
                       <>

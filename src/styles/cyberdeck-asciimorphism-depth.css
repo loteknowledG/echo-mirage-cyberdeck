@@ -164,7 +164,6 @@
 
 /* Icon switch — thumb is the colored side; icon lives on the empty track half */
 [data-deck-mode="ascii"] .cyberdeck-icon-switch--ascii {
-  --switch-travel: calc(2.125rem - 1rem - 6px);
   border-radius: 0;
   background: #000;
   box-shadow: none;

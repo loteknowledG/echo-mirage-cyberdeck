@@ -269,8 +269,8 @@ function OperatorViewEditControls({
               }
               onSetOperatorDocMode("edit");
             }}
-            leftIcon={<CodexIcon icon={cdxIconEye} className="h-3 w-3" />}
-            rightIcon={<CodexIcon icon={cdxIconEdit} className="h-3 w-3" />}
+            leftIcon={<CodexIcon icon={cdxIconEye} className="h-3.5 w-3.5" />}
+            rightIcon={<CodexIcon icon={cdxIconEdit} className="h-3.5 w-3.5" />}
             ariaLabel="Toggle operator view edit mode"
           />
         </span>
