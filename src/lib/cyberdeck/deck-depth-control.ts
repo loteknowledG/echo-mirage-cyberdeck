@@ -39,7 +39,7 @@ export function muthurVoiceControlOptions(
   voiceHealth: "idle" | "backend" | "fallback" | "off",
 ): RealmorphismControlOptions {
   return {
-    size: "micro",
+    size: "icon",
     signal: voiceEnabled && voiceHealth !== "fallback" && voiceHealth !== "off",
     amber: voiceEnabled && voiceHealth === "fallback",
     off: !voiceEnabled || voiceHealth === "off",

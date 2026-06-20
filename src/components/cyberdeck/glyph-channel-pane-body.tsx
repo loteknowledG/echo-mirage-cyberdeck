@@ -30,6 +30,7 @@ import {
   CyberdeckComposerControl,
   CyberdeckControl,
 } from "@/components/cyberdeck/cyberdeck-control-button";
+import { CyberdeckIconSwitch } from "@/components/cyberdeck/cyberdeck-icon-switch";
 import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { GlyphEnginePicker } from "@/components/cyberdeck/glyph-engine-picker";
@@ -637,28 +638,19 @@ export function CyberdeckGlyphChannelPaneBody() {
           </div>
         }
         right={
-          <div className="deck-pane-depth-toolbar flex items-center gap-0.5">
-            <CyberdeckControlTooltip label="View">
-              <CyberdeckComposerControl
-                className="is-depth-toggle"
-                control={{ size: "micro", signal: paneMode === "view" }}
-                onClick={() => setPaneModeWithFocus("view")}
-                aria-label="View mode"
-                aria-pressed={paneMode === "view"}
-              >
-                <CodexIcon icon={cdxIconEye} className="h-3 w-3" />
-              </CyberdeckComposerControl>
-            </CyberdeckControlTooltip>
-            <CyberdeckControlTooltip label="Edit">
-              <CyberdeckComposerControl
-                className="is-depth-toggle"
-                control={{ size: "micro", signal: paneMode === "edit" }}
-                onClick={() => setPaneModeWithFocus("edit")}
-                aria-label="Edit mode"
-                aria-pressed={paneMode === "edit"}
-              >
-                <CodexIcon icon={cdxIconEdit} className="h-3 w-3" />
-              </CyberdeckComposerControl>
+          <div className="deck-pane-depth-toolbar flex items-center">
+            <CyberdeckControlTooltip
+              label={paneMode === "edit" ? "Edit mode — switch to view" : "View mode — switch to edit"}
+            >
+              <span className="inline-flex">
+                <CyberdeckIconSwitch
+                  checked={paneMode === "edit"}
+                  onCheckedChange={(checked) => setPaneModeWithFocus(checked ? "edit" : "view")}
+                  leftIcon={<CodexIcon icon={cdxIconEye} className="h-3 w-3" />}
+                  rightIcon={<CodexIcon icon={cdxIconEdit} className="h-3 w-3" />}
+                  ariaLabel="Toggle ASCII view edit mode"
+                />
+              </span>
             </CyberdeckControlTooltip>
           </div>
         }

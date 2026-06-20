@@ -45,6 +45,7 @@ import {
   CyberdeckComposerControl,
   CyberdeckControl,
 } from "@/components/cyberdeck/cyberdeck-control-button";
+import { CyberdeckIconSwitch } from "@/components/cyberdeck/cyberdeck-icon-switch";
 import { useDeckMode } from "@/lib/deck-mode";
 import { useGlyphTextHistory } from "@/lib/use-glyph-text-history";
 import { CodexIcon } from "@/components/codex-icon";
@@ -192,31 +193,21 @@ function OperatorToolbarIconButton({
   onClick,
   disabled = false,
   className = "",
-  pressed = false,
-  toggle = false,
   children,
 }: {
   label: string;
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
-  pressed?: boolean;
-  /** Mode toggle — icon stays on face (top-left), not in the handle well when selected. */
-  toggle?: boolean;
   children: ReactNode;
 }) {
   const button = (
     <CyberdeckComposerControl
-      control={{ size: toggle ? "micro" : "toolbar", signal: pressed }}
+      control={{ size: "toolbar" }}
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      aria-pressed={toggle ? pressed : undefined}
-      className={cn(
-        toggle && "is-depth-toggle",
-        disabled && "disabled:cursor-not-allowed disabled:opacity-30",
-        className,
-      )}
+      className={cn(disabled && "disabled:cursor-not-allowed disabled:opacity-30", className)}
     >
       {children}
     </CyberdeckComposerControl>
@@ -262,26 +253,28 @@ function OperatorViewEditControls({
   onSetOperatorDocMode: Dispatch<SetStateAction<"view" | "edit">>;
 }) {
   return (
-    <div className="deck-pane-depth-toolbar flex shrink-0 items-center gap-0.5">
-      <OperatorToolbarIconButton
-        label="View"
-        toggle
-        pressed={operatorDocMode === "view"}
-        onClick={() => {
-          onCommitOperatorDocName();
-          onSetOperatorDocMode("view");
-        }}
+    <div className="deck-pane-depth-toolbar flex shrink-0 items-center">
+      <CyberdeckPaneTooltip
+        label={operatorDocMode === "edit" ? "Edit mode — switch to view" : "View mode — switch to edit"}
+        side="top"
       >
-        <CodexIcon icon={cdxIconEye} className="h-3 w-3" />
-      </OperatorToolbarIconButton>
-      <OperatorToolbarIconButton
-        label="Edit"
-        toggle
-        pressed={operatorDocMode === "edit"}
-        onClick={() => onSetOperatorDocMode("edit")}
-      >
-        <CodexIcon icon={cdxIconEdit} className="h-3 w-3" />
-      </OperatorToolbarIconButton>
+        <span className="inline-flex">
+          <CyberdeckIconSwitch
+            checked={operatorDocMode === "edit"}
+            onCheckedChange={(checked) => {
+              if (!checked) {
+                onCommitOperatorDocName();
+                onSetOperatorDocMode("view");
+                return;
+              }
+              onSetOperatorDocMode("edit");
+            }}
+            leftIcon={<CodexIcon icon={cdxIconEye} className="h-3 w-3" />}
+            rightIcon={<CodexIcon icon={cdxIconEdit} className="h-3 w-3" />}
+            ariaLabel="Toggle operator view edit mode"
+          />
+        </span>
+      </CyberdeckPaneTooltip>
     </div>
   );
 }
