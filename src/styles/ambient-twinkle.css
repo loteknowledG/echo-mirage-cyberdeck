@@ -1,6 +1,6 @@
 /**
  * L-UI-LIGHT-001 — Ambient twinkle indicator lamps (Nostromo-style annunciator seed).
- * Sparse, dim, industrial. No alarm semantics in this phase.
+ * Incandescent ignition + soft decay. No alarm semantics in this phase.
  */
 
 .ambient-twinkle-host {
@@ -8,14 +8,14 @@
   --twinkle-bezel-border: #1a1a1a;
   --twinkle-lamp-face: #101010;
   --twinkle-lamp-rim: #2a2a2a;
-  --twinkle-signal-core: rgba(54, 255, 115, 0.55);
-  --twinkle-signal-glow: rgba(54, 255, 115, 0.22);
-  --twinkle-amber-core: rgba(252, 211, 77, 0.5);
-  --twinkle-amber-glow: rgba(252, 211, 77, 0.18);
-  --twinkle-cyan-core: rgba(94, 234, 212, 0.45);
-  --twinkle-cyan-glow: rgba(94, 234, 212, 0.16);
-  --twinkle-neutral-core: rgba(138, 138, 138, 0.42);
-  --twinkle-neutral-glow: rgba(138, 138, 138, 0.12);
+  --twinkle-signal-core: rgba(54, 255, 115, 0.82);
+  --twinkle-signal-glow: rgba(54, 255, 115, 0.38);
+  --twinkle-amber-core: rgba(252, 211, 77, 0.78);
+  --twinkle-amber-glow: rgba(252, 211, 77, 0.32);
+  --twinkle-cyan-core: rgba(94, 234, 212, 0.72);
+  --twinkle-cyan-glow: rgba(94, 234, 212, 0.28);
+  --twinkle-neutral-core: rgba(180, 180, 180, 0.68);
+  --twinkle-neutral-glow: rgba(180, 180, 180, 0.22);
 }
 
 .ambient-twinkle-bezel {
@@ -32,11 +32,12 @@
 .ambient-twinkle-lamp {
   --lamp-core: var(--twinkle-neutral-core);
   --lamp-glow: var(--twinkle-neutral-glow);
-  --lamp-idle-opacity: 0.12;
-  --lamp-peak-opacity: 0.2;
+  --lamp-idle-opacity: 0.08;
+  --lamp-peak-opacity: 0.65;
+  --lamp-afterglow-opacity: 0.25;
   --twinkle-period: 10s;
   --twinkle-delay: 0ms;
-  --twinkle-pulse-width: 6%;
+  --twinkle-sparkle-ms: 180ms;
 
   display: block;
   width: 4px;
@@ -46,8 +47,17 @@
   background: var(--twinkle-lamp-face);
   box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.9);
   opacity: var(--lamp-idle-opacity);
-  animation: ambient-twinkle-pulse var(--twinkle-period) ease-in-out infinite;
+  animation: ambient-twinkle-sparkle var(--twinkle-period) linear infinite;
   animation-delay: var(--twinkle-delay);
+}
+
+.ambient-twinkle-lamp--active {
+  animation: ambient-twinkle-incandescent var(--twinkle-period) linear infinite;
+  animation-delay: var(--twinkle-delay);
+}
+
+.ambient-twinkle-lamp--wave {
+  animation: ambient-twinkle-wave-flash 180ms ease-out forwards !important;
 }
 
 .ambient-twinkle-lamp--signal {
@@ -70,28 +80,138 @@
   --lamp-glow: var(--twinkle-neutral-glow);
 }
 
-@keyframes ambient-twinkle-pulse {
+/* Incandescent: idle → ignition (100ms) → afterglow (300ms) → slow decay (3s) → idle */
+@keyframes ambient-twinkle-incandescent {
   0%,
-  88%,
+  36%,
   100% {
     opacity: var(--lamp-idle-opacity);
     background-color: var(--twinkle-lamp-face);
     box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.9);
   }
-  94% {
+  0.9% {
     opacity: var(--lamp-peak-opacity);
     background-color: var(--lamp-core);
     box-shadow:
-      inset 0 0 1px rgba(0, 0, 0, 0.5),
-      0 0 3px var(--lamp-glow),
+      inset 0 0 1px rgba(0, 0, 0, 0.35),
+      0 0 5px var(--lamp-glow),
+      0 0 8px var(--lamp-glow);
+  }
+  3.4% {
+    opacity: var(--lamp-afterglow-opacity);
+    background-color: color-mix(in srgb, var(--lamp-core) 55%, var(--twinkle-lamp-face));
+    box-shadow:
+      inset 0 0 1px rgba(0, 0, 0, 0.55),
+      0 0 4px var(--lamp-glow),
       0 0 6px var(--lamp-glow);
   }
+}
+
+/* Idle lamps: brief sparkle flash (100–250ms window) */
+@keyframes ambient-twinkle-sparkle {
+  0%,
+  96%,
+  100% {
+    opacity: var(--lamp-idle-opacity);
+    background-color: var(--twinkle-lamp-face);
+    box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.9);
+  }
+  97.2% {
+    opacity: calc(var(--lamp-idle-opacity) + 0.18);
+    background-color: color-mix(in srgb, var(--lamp-core) 35%, var(--twinkle-lamp-face));
+    box-shadow:
+      inset 0 0 1px rgba(0, 0, 0, 0.7),
+      0 0 3px var(--lamp-glow);
+  }
+  98.4% {
+    opacity: var(--lamp-idle-opacity);
+    background-color: var(--twinkle-lamp-face);
+    box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.9);
+  }
+}
+
+@keyframes ambient-twinkle-wave-flash {
+  0% {
+    opacity: var(--lamp-idle-opacity);
+    background-color: var(--twinkle-lamp-face);
+    box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.9);
+  }
+  35% {
+    opacity: min(calc(var(--lamp-peak-opacity) + 0.15), 1);
+    background-color: var(--lamp-core);
+    box-shadow:
+      inset 0 0 1px rgba(0, 0, 0, 0.25),
+      0 0 6px var(--lamp-glow),
+      0 0 10px var(--lamp-glow);
+  }
+  100% {
+    opacity: var(--lamp-afterglow-opacity);
+    background-color: color-mix(in srgb, var(--lamp-core) 45%, var(--twinkle-lamp-face));
+    box-shadow:
+      inset 0 0 1px rgba(0, 0, 0, 0.5),
+      0 0 5px var(--lamp-glow);
+  }
+}
+
+/* MUTHUR annunciator console */
+
+.muthur-annunciator-panel {
+  width: 100%;
+}
+
+.muthur-annunciator-bezel {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 2px;
+  padding: 4px 5px;
+  border: 1px solid var(--twinkle-bezel-border);
+  background: linear-gradient(180deg, #0a0a0a 0%, var(--twinkle-bezel-bg) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.muthur-annunciator-sector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.muthur-annunciator-label {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  color: rgba(54, 255, 115, 0.12);
+  transition: color 180ms ease, text-shadow 180ms ease;
+  user-select: none;
+}
+
+.muthur-annunciator-sector--armed .muthur-annunciator-label {
+  color: rgba(54, 255, 115, 0.28);
+}
+
+.muthur-annunciator-sector--wave .muthur-annunciator-label {
+  color: rgba(54, 255, 115, 0.92);
+  text-shadow: 0 0 6px rgba(54, 255, 115, 0.35);
+}
+
+.muthur-annunciator-lamps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ambient-twinkle-lamp {
     animation: none;
     opacity: var(--lamp-idle-opacity);
+  }
+
+  .muthur-annunciator-sector--armed .muthur-annunciator-label {
+    color: rgba(54, 255, 115, 0.45);
   }
 }
 
@@ -101,4 +221,11 @@
 
 [data-deck-mode="realmorphism"] .ambient-twinkle-lamp {
   border-radius: 999px;
+}
+
+@media (max-width: 640px) {
+  .muthur-annunciator-bezel {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: 6px;
+  }
 }

@@ -15,11 +15,9 @@ import {
 } from "@/lib/muthur-uplink-mode";
 
 const UPLINK_MODE_GLYPHS: Record<MuthurUplinkMode, string> = {
-  ask: "?",
   plan: "P",
   agent: "A",
   commander: "C",
-  debug: "D",
 };
 
 type MuthurUplinkModeRollerProps = {
@@ -59,7 +57,7 @@ export function MuthurUplinkModeRoller({
     [selectorMeta],
   );
 
-  const pickerValue = MUTHUR_UPLINK_MODE_SELECTOR.includes(resolvedMode) ? resolvedMode : "agent";
+  const pickerValue = resolvedMode;
 
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>

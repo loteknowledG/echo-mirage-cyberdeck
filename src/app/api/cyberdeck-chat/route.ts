@@ -75,17 +75,11 @@ function buildDocumentEditHint(
 ): string {
   if (!isOperatorPaneEditRequest(message, operatorContext)) return "";
 
-  if (uplinkMode === "ask") {
-    return (
-      "\n\nOPERATOR HINT: User mentioned a change but uplink is ASK mode. " +
-      "Ask clarifying questions to understand what they want. Do NOT edit or create files."
-    );
-  }
   if (uplinkMode === "plan") {
     return (
       "\n\nOPERATOR HINT: User mentioned a change but uplink is PLAN mode. " +
       "Brainstorm the approach and outline steps — do NOT call suggest_operator_edit, localfs, convert, or export. " +
-      "Tell the operator to switch to Debug (edit, manual save) or Agent (edit + auto-save) to apply changes."
+      "Tell the operator to switch to Agent or Commander to apply changes."
     );
   }
 
@@ -94,13 +88,6 @@ function buildDocumentEditHint(
   const ctxSurface = operatorContext?.previewSurface ?? "";
 
   if (isDocxFileName(ctxName) || ctxSurface === "docx") {
-    if (uplinkMode === "debug") {
-      return (
-        "\n\nOPERATOR HINT: User wants to edit a DOCX open in the operator pane. " +
-        "Debug mode cannot convert DOCX. Switch to Agent to convert to markdown, edit, and save. " +
-        "Do NOT use justbash or localfs to search the filesystem."
-      );
-    }
     return (
       "\n\nOPERATOR HINT: User wants to edit a DOCX open in the operator pane. " +
       "Do NOT use justbash or localfs to search the filesystem. " +
@@ -131,9 +118,9 @@ function buildDocumentEditHint(
     return "\n\nOPERATOR HINT: User wants a document edit but no text editor is active. Open the file in the operator pane. For DOCX, convert to markdown first.";
   }
   const saveHint =
-    uplinkMode === "agent"
+    uplinkMode === "agent" || uplinkMode === "commander"
       ? "Edits auto-save to disk when a writable path exists."
-      : "Debug mode: edits stay in the pane — operator saves manually (Ctrl+S).";
+      : "Plan mode: observe and discuss only — switch to Agent or Commander to edit.";
 
   return (
     "\n\nOPERATOR HINT: User wants an in-pane edit on the open operator document. " +

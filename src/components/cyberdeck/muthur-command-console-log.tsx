@@ -42,6 +42,7 @@ type MuthurCommandConsoleLogProps = {
   renderDiagnosticText?: (text: string) => ReactNode;
   isMobileLayout?: boolean;
   echoHeader?: ReactNode;
+  cognitionStatusLine?: string | null;
 };
 
 function DiagnosticLine({
@@ -53,10 +54,21 @@ function DiagnosticLine({
 }) {
   const label = formatDiagnosticLabel(message.text);
   const isFailure = /fail|error|invalid|rejected|timeout|abort/i.test(message.text);
+  const isCognition = /^\[COGNITION/i.test(message.text.trim());
   return (
     <div className="py-0.5 font-mono text-[10px] leading-snug text-amber-200/80">
-      <span className={isFailure ? "text-red-400/90" : "text-amber-500/90"}>[{label}] </span>
-      <span className="whitespace-pre-wrap text-gray-400">
+      <span
+        className={
+          isFailure
+            ? "text-red-400/90"
+            : isCognition
+              ? "text-emerald-400/90"
+              : "text-amber-500/90"
+        }
+      >
+        [{label}]{" "}
+      </span>
+      <span className={`whitespace-pre-wrap ${isCognition ? "text-emerald-200/75" : "text-gray-400"}`}>
         {renderDiagnosticText ? renderDiagnosticText(message.text) : message.text}
       </span>
     </div>
@@ -76,6 +88,7 @@ export function MuthurCommandConsoleLog({
   renderDiagnosticText,
   isMobileLayout,
   echoHeader,
+  cognitionStatusLine,
 }: MuthurCommandConsoleLogProps) {
   const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
   const lastDiagnosticsCountRef = useRef(0);
@@ -91,16 +104,16 @@ export function MuthurCommandConsoleLog({
   const progressStatus = extractMuthurProgressStatus(streamText);
 
   useEffect(() => {
-    if (diagnosticsTotalCount === 0) {
+    if (diagnosticsTotalCount === 0 && !cognitionStatusLine) {
       setDiagnosticsExpanded(false);
       lastDiagnosticsCountRef.current = 0;
       return;
     }
-    if (isStreaming || diagnosticsTotalCount > lastDiagnosticsCountRef.current) {
+    if (isStreaming || diagnosticsTotalCount > lastDiagnosticsCountRef.current || cognitionStatusLine) {
       setDiagnosticsExpanded(true);
     }
     lastDiagnosticsCountRef.current = diagnosticsTotalCount;
-  }, [diagnosticsTotalCount, isStreaming]);
+  }, [cognitionStatusLine, diagnosticsTotalCount, isStreaming]);
 
   let rowIndex = 0;
 
@@ -188,7 +201,7 @@ export function MuthurCommandConsoleLog({
         ) : null}
       </section>
 
-      {diagnosticsTotalCount > 0 || streamToolTrace ? (
+      {diagnosticsTotalCount > 0 || streamToolTrace || cognitionStatusLine ? (
         <section data-muthur-diagnostics className="mt-4 border-t border-[#1a1a1a] pt-3">
           <button
             type="button"
@@ -198,12 +211,21 @@ export function MuthurCommandConsoleLog({
           >
             <span>{diagnosticsExpanded ? "▼" : "▶"}</span>
             <span>Diagnostics ({diagnosticsTotalCount})</span>
+            {cognitionStatusLine && !diagnosticsExpanded ? (
+              <span className="truncate text-emerald-500/70"> · cognition active</span>
+            ) : null}
             {diagnosticsPresentation.collapsedSummary && !diagnosticsExpanded ? (
               <span className="truncate text-gray-500"> · collapsed</span>
             ) : null}
           </button>
           {diagnosticsExpanded ? (
             <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded border border-[#1a1a1a] bg-[#050505] p-2">
+              {cognitionStatusLine ? (
+                <DiagnosticLine
+                  message={{ role: "system", text: cognitionStatusLine }}
+                  renderDiagnosticText={renderDiagnosticText}
+                />
+              ) : null}
               {isStreaming && streamToolTrace ? (
                 <DiagnosticLine
                   message={toolTraceToDiagnostic(streamToolTrace)}

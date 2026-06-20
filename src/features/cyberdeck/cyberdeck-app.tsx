@@ -188,7 +188,7 @@ import {
 import { MiragePaneLayer } from "@/components/cyberdeck/mirage-pane-layer";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
 import { EchoHeader } from "@/components/cyberdeck/echo-header";
-import { AmbientTwinkleHost } from "@/components/cyberdeck/ambient-twinkle-host";
+import { MuthurAnnunciatorPanel } from "@/components/cyberdeck/muthur-annunciator-panel";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
 import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-tab";
 import { Textarea } from "@/components/ui/textarea";
@@ -214,8 +214,6 @@ import {
 import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
 import { MuthurCommanderStatus } from "@/components/cyberdeck/muthur-commander-status";
 import { MuthurDelegationPanel } from "@/components/cyberdeck/muthur-delegation-panel";
-import { MuthurCognitionModeControl } from "@/components/cyberdeck/muthur-cognition-mode-control";
-import { MuthurCognitionStreamPanel } from "@/components/cyberdeck/muthur-cognition-stream-panel";
 import { MuthurUplinkModeRoller } from "@/components/cyberdeck/muthur-uplink-mode-roller";
 import {
   formatDelegationCancelledLine,
@@ -302,9 +300,10 @@ import {
 } from "@/lib/muthur/mission/muthur-commander-events";
 import { getMuthurCommanderPosture } from "@/lib/muthur/mission/muthur-commander-posture";
 import {
-  flushMuthurCognitionSummary,
+  buildMuthurCognitionStatusLine,
+  formatMuthurCognitionDiagnosticFromInput,
   recordMuthurCognitionEvent,
-  setMuthurCognitionMode,
+  shouldSurfaceCognitionForUplinkMode,
 } from "@/lib/muthur/cognition/muthur-cognition-channel";
 import {
   cognitionFromCommanderPosture,
@@ -1141,8 +1140,7 @@ export default function CyberdeckApp() {
   const [muthurDelegations, setMuthurDelegations] = useState<MuthurDelegationAssignment[]>(() =>
     loadMuthurDelegations(),
   );
-  const [muthurCognition, setMuthurCognition] = useState<MuthurCognitionState>(() => loadMuthurCognition());
-  const cognitionSummaryTimerRef = useRef<number | null>(null);
+  const [, setMuthurCognition] = useState<MuthurCognitionState>(() => loadMuthurCognition());
   const [generatedUI, setGeneratedUI] = useState<string | null>(null);
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
@@ -1654,37 +1652,39 @@ export default function CyberdeckApp() {
     [setMessages],
   );
 
-  const emitMuthurCognition = useCallback((input: MuthurCognitionEmitInput) => {
-    setMuthurCognition((current) => {
-      const recorded = recordMuthurCognitionEvent(current, input);
-      return recorded.state;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (muthurCognition.mode !== "summary") return;
-    if (muthurCognition.pendingSummary.length === 0) return;
-
-    if (cognitionSummaryTimerRef.current != null) {
-      window.clearTimeout(cognitionSummaryTimerRef.current);
-    }
-
-    cognitionSummaryTimerRef.current = window.setTimeout(() => {
-      setMuthurCognition((current) => flushMuthurCognitionSummary(current));
-      cognitionSummaryTimerRef.current = null;
-    }, 1500);
-
-    return () => {
-      if (cognitionSummaryTimerRef.current != null) {
-        window.clearTimeout(cognitionSummaryTimerRef.current);
-        cognitionSummaryTimerRef.current = null;
+  const emitMuthurCognition = useCallback(
+    (input: MuthurCognitionEmitInput) => {
+      setMuthurCognition((current) => recordMuthurCognitionEvent(current, input).state);
+      if (shouldSurfaceCognitionForUplinkMode(muthurUplinkMode)) {
+        setMuthurDiagnostics((current) =>
+          appendMuthurDiagnosticEntry(current, formatMuthurCognitionDiagnosticFromInput(input)),
+        );
       }
-    };
-  }, [muthurCognition.mode, muthurCognition.pendingSummary.length, muthurCognition.events[0]?.id]);
+    },
+    [muthurUplinkMode],
+  );
 
-  const handleMuthurCognitionModeChange = useCallback((mode: MuthurCognitionState["mode"]) => {
-    setMuthurCognition((current) => setMuthurCognitionMode(current, mode));
-  }, []);
+  const appendMuthurCognitionStatus = useCallback(
+    (mode: MuthurUplinkMode, mission: MuthurMission | null) => {
+      const line = buildMuthurCognitionStatusLine(mode, {
+        commanderPosture: getMuthurCommanderPosture(mode, mission),
+        missionTitle: mission?.title,
+      });
+      if (line) {
+        setMuthurDiagnostics((current) => appendMuthurDiagnosticEntry(current, line));
+      }
+    },
+    [],
+  );
+
+  const muthurCognitionStatusLine = useMemo(
+    () =>
+      buildMuthurCognitionStatusLine(muthurUplinkMode, {
+        commanderPosture: getMuthurCommanderPosture(muthurUplinkMode, muthurMission),
+        missionTitle: muthurMission?.title,
+      }),
+    [muthurUplinkMode, muthurMission],
+  );
 
   const handleMuthurUplinkModeChange = useCallback(
     (next: MuthurUplinkMode) => {
@@ -1717,9 +1717,10 @@ export default function CyberdeckApp() {
       }
 
       archiveMuthurHistoryLine(formatMuthurModeChangedLine(muthurUplinkMode, resolved));
+      appendMuthurCognitionStatus(resolved, muthurMission);
       setMuthurUplinkMode(resolved);
     },
-    [archiveMuthurHistoryLine, emitMuthurCognition, muthurMission, muthurUplinkMode],
+    [appendMuthurCognitionStatus, archiveMuthurHistoryLine, emitMuthurCognition, muthurMission, muthurUplinkMode],
   );
 
   const handleCreateMuthurMission = useCallback(
@@ -6076,11 +6077,7 @@ ${diff}`;
                 );
               }
             } else {
-              const unsavedHint =
-                muthurUplinkMode === "debug"
-                  ? `UNSAVED // ${operatorEditFileName} — Debug mode: save when ready (Ctrl+S)`
-                  : `UNSAVED // ${operatorEditFileName} — save when ready (Ctrl+S)`;
-              systemLines.push(unsavedHint);
+              systemLines.push(`UNSAVED // ${operatorEditFileName} — save when ready (Ctrl+S)`);
             }
             setMessages((prev) => [
               ...prev,
@@ -7660,6 +7657,14 @@ ${diff}`;
                   <EchoHeader />
                 </div>
               ) : null}
+              <MuthurCommanderStatus
+                mode={muthurUplinkMode}
+                mission={muthurMission}
+                disabled={isStreaming}
+                onCreateMission={handleCreateMuthurMission}
+                onStartMission={handleStartMuthurMission}
+                className="mb-3"
+              />
               <MuthurCommandConsoleLog
                 messages={messages}
                 diagnosticsState={muthurDiagnostics}
@@ -7672,6 +7677,7 @@ ${diff}`;
                 chatKeyboardHighlightIndex={chatKeyboardHighlightIndex}
                 renderDiagnosticText={renderGatewayMessageText}
                 isMobileLayout={isMobileLayout}
+                cognitionStatusLine={muthurCognitionStatusLine}
                 echoHeader={
                   <div className="mb-2">
                     <EchoHeader />
@@ -7703,7 +7709,7 @@ ${diff}`;
                   </div>
                 </MuthurComposerShell>
                 <div className="muthur-composer-controls px-1">
-                  <AmbientTwinkleHost preset="compact" seedOffset={2} className="mb-1" />
+                  <MuthurAnnunciatorPanel className="mb-1" />
                   <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                   <button
@@ -7873,14 +7879,6 @@ ${diff}`;
                     </CyberdeckPaneTooltipProvider>
                   </div>
                   </div>
-                  <MuthurCommanderStatus
-                    mode={muthurUplinkMode}
-                    mission={muthurMission}
-                    disabled={isStreaming}
-                    onCreateMission={handleCreateMuthurMission}
-                    onStartMission={handleStartMuthurMission}
-                    className="mt-1"
-                  />
                   {muthurUplinkMode === "commander" ? (
                     <MuthurDelegationPanel
                       mission={muthurMission}
@@ -7893,17 +7891,6 @@ ${diff}`;
                       className="mt-1"
                     />
                   ) : null}
-                  <MuthurCognitionModeControl
-                    mode={muthurCognition.mode}
-                    disabled={isStreaming}
-                    onChange={handleMuthurCognitionModeChange}
-                    className="mt-1"
-                  />
-                  <MuthurCognitionStreamPanel
-                    mode={muthurCognition.mode}
-                    stream={muthurCognition.stream}
-                    className="mt-1"
-                  />
                 </div>
               </div>
             </footer>

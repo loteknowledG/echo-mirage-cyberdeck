@@ -2,15 +2,12 @@
 
 import type {
   MuthurCognitionEvent,
-  MuthurCognitionMode,
   MuthurCognitionState,
-  MuthurCognitionStreamEntry,
 } from "@/lib/muthur/cognition/muthur-cognition-types";
 
 export const MUTHUR_COGNITION_STORAGE_KEY = "echo-mirage-muthur-cognition-v1";
 
 export const MUTHUR_COGNITION_MAX_EVENTS = 120;
-export const MUTHUR_COGNITION_MAX_STREAM = 60;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -21,11 +18,6 @@ function newId(prefix: string): string {
     return `${prefix}-${crypto.randomUUID()}`;
   }
   return `${prefix}-${Date.now()}`;
-}
-
-function normalizeMode(value: unknown): MuthurCognitionMode {
-  if (value === "off" || value === "summary" || value === "live") return value;
-  return "off";
 }
 
 function normalizeEvent(raw: unknown): MuthurCognitionEvent | null {
@@ -58,51 +50,21 @@ function normalizeEvent(raw: unknown): MuthurCognitionEvent | null {
   };
 }
 
-function normalizeStreamEntry(raw: unknown): MuthurCognitionStreamEntry | null {
-  if (!raw || typeof raw !== "object") return null;
-  const item = raw as Partial<MuthurCognitionStreamEntry>;
-  if (item.kind !== "live" && item.kind !== "summary") return null;
-  if (typeof item.id !== "string" || !item.id.trim()) return null;
-  if (typeof item.text !== "string" || !item.text.trim()) return null;
-  if (typeof item.createdAt !== "string") return null;
-  return {
-    id: item.id.trim(),
-    kind: item.kind,
-    text: item.text.trim(),
-    createdAt: item.createdAt,
-  };
-}
-
 function normalizeState(raw: unknown): MuthurCognitionState | null {
   if (!raw || typeof raw !== "object") return null;
-  const item = raw as Partial<MuthurCognitionState>;
-  if (!Array.isArray(item.events) || !Array.isArray(item.stream)) return null;
+  const item = raw as Partial<MuthurCognitionState> & {
+    stream?: unknown;
+    events?: unknown;
+  };
+  if (!Array.isArray(item.events)) return null;
   const events = item.events
     .map((entry) => normalizeEvent(entry))
     .filter((entry): entry is MuthurCognitionEvent => Boolean(entry));
-  const stream = item.stream
-    .map((entry) => normalizeStreamEntry(entry))
-    .filter((entry): entry is MuthurCognitionStreamEntry => Boolean(entry));
-  const pendingSummary = Array.isArray(item.pendingSummary)
-    ? item.pendingSummary
-        .map((entry) => normalizeEvent(entry))
-        .filter((entry): entry is MuthurCognitionEvent => Boolean(entry))
-    : [];
-  return {
-    mode: normalizeMode(item.mode),
-    events,
-    stream,
-    pendingSummary,
-  };
+  return { events };
 }
 
 export function createEmptyMuthurCognitionState(): MuthurCognitionState {
-  return {
-    mode: "off",
-    events: [],
-    stream: [],
-    pendingSummary: [],
-  };
+  return { events: [] };
 }
 
 export function loadMuthurCognition(): MuthurCognitionState {
@@ -127,10 +89,6 @@ export function saveMuthurCognition(state: MuthurCognitionState): void {
 
 export function createMuthurCognitionEventId(): string {
   return newId("cog");
-}
-
-export function createMuthurCognitionStreamEntryId(): string {
-  return newId("cog-stream");
 }
 
 export function stampMuthurCognitionNow(): string {

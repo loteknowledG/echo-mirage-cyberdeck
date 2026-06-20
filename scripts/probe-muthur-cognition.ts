@@ -1,49 +1,36 @@
 import assert from "node:assert/strict";
 import {
-  flushMuthurCognitionSummary,
-  formatMuthurCognitionLiveLine,
+  buildMuthurCognitionStatusLine,
+  formatMuthurCognitionDiagnostic,
   recordMuthurCognitionEvent,
-  setMuthurCognitionMode,
+  shouldSurfaceCognitionForUplinkMode,
 } from "../src/lib/muthur/cognition/muthur-cognition-channel";
 import { createEmptyMuthurCognitionState } from "../src/lib/muthur/cognition/muthur-cognition-store";
 
 function main() {
   let state = createEmptyMuthurCognitionState();
 
-  const offRecorded = recordMuthurCognitionEvent(state, {
-    category: "observe",
-    message: "Hidden while OFF.",
-  });
-  state = offRecorded.state;
-  assert.equal(state.stream.length, 0);
-  assert.equal(state.events.length, 1);
+  assert.equal(shouldSurfaceCognitionForUplinkMode("plan"), true);
+  assert.equal(shouldSurfaceCognitionForUplinkMode("agent"), true);
+  assert.equal(shouldSurfaceCognitionForUplinkMode("commander"), true);
 
-  state = setMuthurCognitionMode(state, "live");
-  const liveRecorded = recordMuthurCognitionEvent(state, {
+  const recorded = recordMuthurCognitionEvent(state, {
     category: "observe",
     message: "Operator discussing Ambient Command Surface.",
   });
-  state = liveRecorded.state;
-  assert.equal(state.stream.length, 1);
-  assert.match(state.stream[0]?.text ?? "", /\[observe\]/);
-  assert.match(formatMuthurCognitionLiveLine(state.events[0]!), /Ambient Command Surface/);
+  state = recorded.state;
+  assert.equal(state.events.length, 1);
+  assert.match(formatMuthurCognitionDiagnostic(recorded.event), /\[COGNITION observe\]/);
+  assert.match(formatMuthurCognitionDiagnostic(recorded.event), /Ambient Command Surface/);
 
-  state = setMuthurCognitionMode(state, "summary");
-  state = recordMuthurCognitionEvent(state, {
-    category: "observe",
-    message: "Conversation topic shifted to diagnostics header.",
-  }).state;
-  state = recordMuthurCognitionEvent(state, {
-    category: "recommend",
-    message: "Promote lighting host to mission.",
-  }).state;
-  assert.equal(state.pendingSummary.length, 2);
+  const planStatus = buildMuthurCognitionStatusLine("plan");
+  assert.match(planStatus ?? "", /PLAN/);
+  assert.match(planStatus ?? "", /read-only/i);
 
-  state = flushMuthurCognitionSummary(state);
-  assert.equal(state.pendingSummary.length, 0);
-  assert.equal(state.stream.length, 2);
-  assert.match(state.stream[0]?.text ?? "", /OBSERVATION:/);
-  assert.match(state.stream[0]?.text ?? "", /RECOMMENDATION:/);
+  const commanderStatus = buildMuthurCognitionStatusLine("commander", {
+    commanderPosture: "AWAITING_MISSION",
+  });
+  assert.match(commanderStatus ?? "", /AWAITING MISSION/i);
 
   console.log("probe-muthur-cognition: PASS");
 }

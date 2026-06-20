@@ -2,7 +2,7 @@
 
 import { getExecutableMuthurMission } from "@/lib/muthur/mission/muthur-mission-store";
 
-export type MuthurUplinkMode = "ask" | "plan" | "agent" | "commander" | "debug";
+export type MuthurUplinkMode = "plan" | "agent" | "commander";
 
 export type MuthurUplinkCommitPolicy = "never" | "manual" | "immediate";
 
@@ -10,13 +10,8 @@ export const MUTHUR_UPLINK_MODE_STORAGE_KEY = "echo-mirage-muthur-uplink-mode-v1
 
 const DEFAULT_MODE: MuthurUplinkMode = "plan";
 
-/** Visible in the composer mode roller (L-MUTHUR-001). */
-export const MUTHUR_UPLINK_MODE_SELECTOR: MuthurUplinkMode[] = [
-  "ask",
-  "plan",
-  "agent",
-  "commander",
-];
+/** Visible in the composer mode roller. */
+export const MUTHUR_UPLINK_MODE_SELECTOR: MuthurUplinkMode[] = ["plan", "agent", "commander"];
 
 export type MuthurUplinkModeMeta = {
   id: MuthurUplinkMode;
@@ -28,16 +23,9 @@ export type MuthurUplinkModeMeta = {
 
 export const MUTHUR_UPLINK_MODES: MuthurUplinkModeMeta[] = [
   {
-    id: "ask",
-    label: "Ask",
-    title: "Conversation only — no tools",
-    internalMode: "OBSERVE",
-    commit: "never",
-  },
-  {
     id: "plan",
     label: "Plan",
-    title: "Architecture, work orders, and ADRs — no tools",
+    title: "Observe panes, discuss architecture — read-only, no edits",
     internalMode: "ASSIST",
     commit: "never",
   },
@@ -55,13 +43,6 @@ export const MUTHUR_UPLINK_MODES: MuthurUplinkModeMeta[] = [
     internalMode: "USE",
     commit: "immediate",
   },
-  {
-    id: "debug",
-    label: "Debug",
-    title: "Patch — edit operator pane, operator saves disk",
-    internalMode: "ASSIST",
-    commit: "manual",
-  },
 ];
 
 export type MuthurUplinkToolContext = {
@@ -76,7 +57,15 @@ function resolveMissionExecutionActive(context?: MuthurUplinkToolContext): boole
   return Boolean(getExecutableMuthurMission());
 }
 
-const READ_ONLY_TOOLS = new Set([
+const PLAN_TOOLS = new Set([
+  "observe_operator_pane",
+  "operator_browser",
+  "clock",
+  "git_status",
+  "git_diff",
+]);
+
+const EXECUTION_TOOLS = new Set([
   "observe_operator_pane",
   "clock",
   "git_status",
@@ -84,40 +73,27 @@ const READ_ONLY_TOOLS = new Set([
   "justbash",
   "localfs",
   "operator_browser",
-]);
-
-const DEBUG_TOOLS = new Set([
-  ...READ_ONLY_TOOLS,
   "open_operator_file",
   "suggest_operator_edit",
   "workspace_exec",
-]);
-
-const AGENT_TOOLS = new Set([
-  ...DEBUG_TOOLS,
   "convert_document_to_markdown",
   "export_markdown_to_docx",
   "export_markdown_to_pdf",
 ]);
 
 const TOOLS_BY_MODE: Record<MuthurUplinkMode, Set<string>> = {
-  ask: new Set(),
-  plan: new Set(),
-  debug: DEBUG_TOOLS,
-  agent: AGENT_TOOLS,
-  commander: AGENT_TOOLS,
+  plan: PLAN_TOOLS,
+  agent: EXECUTION_TOOLS,
+  commander: EXECUTION_TOOLS,
 };
 
 export function normalizeMuthurUplinkMode(value: unknown): MuthurUplinkMode {
-  if (
-    value === "ask" ||
-    value === "plan" ||
-    value === "agent" ||
-    value === "commander" ||
-    value === "debug"
-  ) {
+  if (value === "plan" || value === "agent" || value === "commander") {
     return value;
   }
+  // Legacy stored modes
+  if (value === "ask") return "plan";
+  if (value === "debug") return "agent";
   return DEFAULT_MODE;
 }
 
@@ -140,7 +116,7 @@ export function saveMuthurUplinkMode(mode: MuthurUplinkMode): void {
 }
 
 export function getMuthurUplinkModeMeta(mode: MuthurUplinkMode): MuthurUplinkModeMeta {
-  return MUTHUR_UPLINK_MODES.find((entry) => entry.id === mode) ?? MUTHUR_UPLINK_MODES[1];
+  return MUTHUR_UPLINK_MODES.find((entry) => entry.id === mode) ?? MUTHUR_UPLINK_MODES[0];
 }
 
 export function getMuthurUplinkCommitPolicy(mode: MuthurUplinkMode): MuthurUplinkCommitPolicy {
@@ -148,7 +124,7 @@ export function getMuthurUplinkCommitPolicy(mode: MuthurUplinkMode): MuthurUplin
 }
 
 export function allowsOperatorPaneEdits(mode: MuthurUplinkMode): boolean {
-  return mode === "agent" || mode === "commander" || mode === "debug";
+  return mode === "agent" || mode === "commander";
 }
 
 export function shouldAutoCommitOperatorEdits(mode: MuthurUplinkMode): boolean {
@@ -179,22 +155,10 @@ export function formatBlockedToolMessage(mode: MuthurUplinkMode, toolName: strin
       "Commander cannot execute mission work until the mission is ACTIVE. Observe, summarize, and prepare the mission in conversation first."
     );
   }
-  if (mode === "ask") {
-    return (
-      `[TOOL BLOCKED] ${toolName}\n\n` +
-      "Ask mode is conversation-only — no tools. Switch to Plan for architecture discussion, Agent for directed execution, or Commander for mission orchestration."
-    );
-  }
   if (mode === "plan") {
     return (
       `[TOOL BLOCKED] ${toolName}\n\n` +
-      "Plan mode is discuss-only — no tools. Switch to Agent for directed execution or Commander for mission orchestration."
-    );
-  }
-  if (mode === "debug") {
-    return (
-      `[TOOL BLOCKED] ${toolName}\n\n` +
-      `Debug mode cannot run ${toolName}. Switch to Agent or Commander for disk writes, exports, or DOCX conversion.`
+      "Plan mode is read-only — observe panes and discuss, but no edits. Switch to Agent for directed execution or Commander for mission orchestration."
     );
   }
   return `[TOOL BLOCKED] ${toolName}\n\nNot available in ${mode.toUpperCase()} uplink mode.`;
@@ -202,15 +166,10 @@ export function formatBlockedToolMessage(mode: MuthurUplinkMode, toolName: strin
 
 export function buildUplinkModeSystemPrompt(mode: MuthurUplinkMode): string {
   switch (mode) {
-    case "ask":
-      return (
-        "\n\nUPLINK MODE: ASK (OBSERVE). Conversation only — clarify intent with questions. " +
-        "Do NOT call tools or mutate operator state."
-      );
     case "plan":
       return (
-        "\n\nUPLINK MODE: PLAN (ASSIST). Architecture, work orders, ADRs, and planning discussion only. " +
-        "Do NOT call tools, edit files, or create documents. If execution is needed, tell the operator to switch to Agent or Commander."
+        "\n\nUPLINK MODE: PLAN (ASSIST). Observe operator panes (observe_operator_pane, operator_browser), discuss architecture, work orders, and ADRs. " +
+        "Read-only — do NOT edit files, write to disk, or mutate operator state. If execution is needed, tell the operator to switch to Agent or Commander."
       );
     case "agent":
       return (
@@ -225,14 +184,10 @@ export function buildUplinkModeSystemPrompt(mode: MuthurUplinkMode): string {
         "record assignments and results, and advance mission status. Use native worker tools — do not host CADRE runtimes. " +
         "Operator pane edits auto-save when a writable path exists."
       );
-    case "debug":
-      return (
-        "\n\nUPLINK MODE: DEBUG (ASSIST). Investigate (observe_operator_pane, git_diff, workspace_exec) and patch via suggest_operator_edit. " +
-        "Edits apply in the operator pane only — operator saves disk manually (Ctrl+S). Do NOT use localfs write, convert, or export unless operator switches to Agent or Commander. " +
-        "Report evidence before and after fixes."
-      );
-    default:
-      return "";
+    default: {
+      const _exhaustive: never = mode;
+      return _exhaustive;
+    }
   }
 }
 
@@ -242,13 +197,11 @@ export function shouldEnableToolsForUplinkMode(
   context?: MuthurUplinkToolContext,
 ): boolean {
   switch (mode) {
-    case "ask":
     case "plan":
-      return false;
+      return true;
     case "commander":
       return resolveMissionExecutionActive(context);
     case "agent":
-    case "debug":
       return true;
     default: {
       const _exhaustive: never = mode;

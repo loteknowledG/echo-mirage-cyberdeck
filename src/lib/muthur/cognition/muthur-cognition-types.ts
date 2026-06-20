@@ -1,7 +1,3 @@
-export const MUTHUR_COGNITION_MODES = ["off", "summary", "live"] as const;
-
-export type MuthurCognitionMode = (typeof MUTHUR_COGNITION_MODES)[number];
-
 export const MUTHUR_COGNITION_CATEGORIES = [
   "observe",
   "retrieve",
@@ -25,18 +21,8 @@ export interface MuthurCognitionEvent {
   source?: string;
 }
 
-export type MuthurCognitionStreamEntry = {
-  id: string;
-  kind: "live" | "summary";
-  text: string;
-  createdAt: string;
-};
-
 export type MuthurCognitionState = {
-  mode: MuthurCognitionMode;
   events: MuthurCognitionEvent[];
-  stream: MuthurCognitionStreamEntry[];
-  pendingSummary: MuthurCognitionEvent[];
 };
 
 export type MuthurCognitionEmitInput = {

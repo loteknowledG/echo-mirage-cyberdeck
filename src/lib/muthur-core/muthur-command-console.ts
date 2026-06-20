@@ -38,6 +38,7 @@ export function formatDiagnosticLabel(text: string): string {
     return "SYS";
   }
   if (/^\[TOOLS\]/i.test(trimmed) || /MUTHUR_TOOLS|tool/i.test(trimmed)) return "TOOLS";
+  if (/^\[COGNITION/i.test(trimmed)) return "COGNITION";
   if (/fail|error|invalid|rejected/i.test(trimmed)) return "ERR";
   if (DIAGNOSTIC_PREFIX_RE.test(trimmed)) {
     const match = trimmed.match(/^\[([A-Z]+)\]/i);

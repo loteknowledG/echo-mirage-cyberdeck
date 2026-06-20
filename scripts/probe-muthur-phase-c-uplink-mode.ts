@@ -15,32 +15,30 @@ import {
   type MuthurUplinkMode,
 } from "../src/lib/muthur-uplink-mode";
 
-const MODES: MuthurUplinkMode[] = ["ask", "plan", "agent", "commander", "debug"];
+const MODES: MuthurUplinkMode[] = ["plan", "agent", "commander"];
 
 async function main() {
   assert.equal(normalizeMuthurUplinkMode("agent"), "agent");
   assert.equal(normalizeMuthurUplinkMode("commander"), "commander");
   assert.equal(normalizeMuthurUplinkMode("unknown"), "plan");
+  assert.equal(normalizeMuthurUplinkMode("ask"), "plan");
+  assert.equal(normalizeMuthurUplinkMode("debug"), "agent");
 
   assert.equal(getMuthurUplinkCommitPolicy("agent"), "immediate");
-  assert.equal(getMuthurUplinkCommitPolicy("debug"), "manual");
   assert.equal(getMuthurUplinkCommitPolicy("plan"), "never");
-  assert.equal(getMuthurUplinkCommitPolicy("ask"), "never");
+  assert.equal(getMuthurUplinkCommitPolicy("commander"), "immediate");
 
   assert.equal(allowsOperatorPaneEdits("agent"), true);
-  assert.equal(allowsOperatorPaneEdits("debug"), true);
   assert.equal(allowsOperatorPaneEdits("commander"), true);
   assert.equal(allowsOperatorPaneEdits("plan"), false);
-  assert.equal(allowsOperatorPaneEdits("ask"), false);
 
   assert.equal(shouldAutoCommitOperatorEdits("agent"), true);
   assert.equal(shouldAutoCommitOperatorEdits("commander"), true);
-  assert.equal(shouldAutoCommitOperatorEdits("debug"), false);
   assert.equal(shouldAutoCommitOperatorEdits("plan"), false);
 
   assert.equal(isLocalFsWriteAllowedForUplinkMode("agent", "write"), true);
   assert.equal(isLocalFsWriteAllowedForUplinkMode("commander", "write"), true);
-  assert.equal(isLocalFsWriteAllowedForUplinkMode("debug", "write"), false);
+  assert.equal(isLocalFsWriteAllowedForUplinkMode("plan", "write"), false);
   assert.equal(isLocalFsWriteAllowedForUplinkMode("agent", "cat"), true);
 
   for (const mode of MODES) {
@@ -48,42 +46,39 @@ async function main() {
   }
 
   assert.equal(shouldEnableToolsForUplinkMode("agent", "hi"), true);
-  assert.equal(shouldEnableToolsForUplinkMode("debug", "hey"), true);
-  assert.equal(shouldEnableToolsForUplinkMode("plan", "hi"), false);
-  assert.equal(shouldEnableToolsForUplinkMode("ask", "hi"), false);
+  assert.equal(shouldEnableToolsForUplinkMode("plan", "hi"), true);
   assert.equal(shouldEnableToolsForUplinkMode("commander", "hi"), false);
   assert.equal(shouldEnableToolsForUplinkMode("commander", "hi", { missionActive: true }), true);
 
-  const askTools = getMuthurOpenAiToolsForMode("ask");
   const planTools = getMuthurOpenAiToolsForMode("plan");
-  const debugTools = getMuthurOpenAiToolsForMode("debug");
   const agentTools = getMuthurOpenAiToolsForMode("agent");
   const commanderToolsBlocked = getMuthurOpenAiToolsForMode("commander");
   const commanderToolsActive = getMuthurOpenAiToolsForMode("commander", { missionActive: true });
 
-  assert.equal(askTools.length, 0);
-  assert.equal(planTools.length, 0);
+  assert.ok(planTools.length > 0);
+  assert.ok(planTools.some((tool) => tool.function.name === "observe_operator_pane"));
   assert.equal(commanderToolsBlocked.length, 0);
-  assert.deepEqual(commanderToolsActive.map((tool) => tool.function.name).sort(), agentTools.map((tool) => tool.function.name).sort());
-  assert.ok(agentTools.length > askTools.length);
-  assert.ok(debugTools.length > askTools.length);
-  assert.ok(agentTools.length > debugTools.length);
+  assert.deepEqual(
+    commanderToolsActive.map((tool) => tool.function.name).sort(),
+    agentTools.map((tool) => tool.function.name).sort(),
+  );
+  assert.ok(agentTools.length > planTools.length);
 
   for (const tool of agentTools) {
     assert.ok(isToolAllowedForUplinkMode("agent", tool.function.name));
   }
   assert.ok(agentTools.some((tool) => tool.function.name === "localfs"));
-  assert.ok(debugTools.some((tool) => tool.function.name === "suggest_operator_edit"));
-  assert.ok(debugTools.some((tool) => tool.function.name === "localfs"));
+  assert.ok(agentTools.some((tool) => tool.function.name === "suggest_operator_edit"));
   assert.ok(!isToolAllowedForUplinkMode("commander", "git_status"));
   assert.ok(isToolAllowedForUplinkMode("commander", "git_status", { missionActive: true }));
 
   const registry = createMuthurToolRegistry();
   const planCtx = createMuthurToolExecutionContext("plan");
-  const askCtx = createMuthurToolExecutionContext("ask");
-  const debugCtx = createMuthurToolExecutionContext("debug");
   const agentCtx = createMuthurToolExecutionContext("agent");
   const commanderCtx = createMuthurToolExecutionContext("commander");
+
+  const planGit = await executeMuthurChatTool(registry, "git_status", "{}", planCtx);
+  assert.match(planGit, /GIT_STATUS/);
 
   const planExec = await executeMuthurChatTool(
     registry,
@@ -101,33 +96,6 @@ async function main() {
   );
   assert.match(planEdit, /\[TOOL BLOCKED\] suggest_operator_edit/);
 
-  const askGit = await executeMuthurChatTool(registry, "git_status", "{}", askCtx);
-  assert.match(askGit, /\[TOOL BLOCKED\] git_status/);
-
-  const askEdit = await executeMuthurChatTool(
-    registry,
-    "suggest_operator_edit",
-    JSON.stringify({ kind: "replace_content", text: "probe" }),
-    askCtx,
-  );
-  assert.match(askEdit, /\[TOOL BLOCKED\] suggest_operator_edit/);
-
-  const debugExec = await executeMuthurChatTool(
-    registry,
-    "workspace_exec",
-    JSON.stringify({ command: "git status --short" }),
-    debugCtx,
-  );
-  assert.doesNotMatch(debugExec, /\[TOOL BLOCKED\]/);
-
-  const debugLocalfs = await executeMuthurChatTool(
-    registry,
-    "localfs",
-    JSON.stringify({ action: "write", path: ".tmp/phase-c-probe.txt", content: "x" }),
-    debugCtx,
-  );
-  assert.match(debugLocalfs, /localfs write requires Agent uplink mode/i);
-
   const agentGit = await executeMuthurChatTool(registry, "git_status", "{}", agentCtx);
   assert.match(agentGit, /GIT_STATUS/);
 
@@ -143,7 +111,7 @@ async function main() {
   assert.match(commanderGitBlocked, /\[TOOL BLOCKED\] git_status/);
 
   console.log(
-    `[probe] tool counts ask/plan/debug/agent/commander(active) = ${askTools.length}/${planTools.length}/${debugTools.length}/${agentTools.length}/${commanderToolsActive.length}`,
+    `[probe] tool counts plan/agent/commander(active) = ${planTools.length}/${agentTools.length}/${commanderToolsActive.length}`,
   );
   console.log("probe-muthur-phase-c-uplink-mode: PASS");
 }
