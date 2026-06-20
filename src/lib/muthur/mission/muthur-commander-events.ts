@@ -1,9 +1,9 @@
 import type { MuthurMission } from "@/lib/muthur/mission/muthur-mission-types";
 import type { MuthurCommanderPosture } from "@/lib/muthur/mission/muthur-commander-posture";
-import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
+import type { MuthurPosture } from "@/lib/muthur/muthur-posture";
 
 export type MuthurCommanderArchiveEvent =
-  | "muthur_mode_changed"
+  | "muthur_posture_changed"
   | "muthur_mission_created"
   | "muthur_commander_activated"
   | "muthur_commander_awaiting_mission"
@@ -14,10 +14,10 @@ export function formatMuthurCommanderArchiveLine(
   detail?: Record<string, string | undefined>,
 ): string {
   switch (event) {
-    case "muthur_mode_changed": {
+    case "muthur_posture_changed": {
       const from = detail?.from?.toUpperCase() ?? "?";
       const to = detail?.to?.toUpperCase() ?? "?";
-      return `[MUTHUR] muthur_mode_changed // ${from} → ${to}`;
+      return `[MUTHUR] muthur_posture_changed // ${from} → ${to}`;
     }
     case "muthur_mission_created":
       return `[MUTHUR] muthur_mission_created // ${detail?.title ?? "mission"} // ${detail?.missionId ?? ""}`.trim();
@@ -26,7 +26,7 @@ export function formatMuthurCommanderArchiveLine(
     case "muthur_commander_awaiting_mission":
       return "[MUTHUR] muthur_commander_awaiting_mission // AWAITING_MISSION";
     case "muthur_commander_stood_down":
-      return `[MUTHUR] muthur_commander_stood_down // ${detail?.to?.toUpperCase() ?? "mode change"}`;
+      return `[MUTHUR] muthur_commander_stood_down // ${detail?.to?.toUpperCase() ?? "posture change"}`;
     default: {
       const _exhaustive: never = event;
       return `[MUTHUR] ${_exhaustive}`;
@@ -34,8 +34,8 @@ export function formatMuthurCommanderArchiveLine(
   }
 }
 
-export function formatMuthurModeChangedLine(from: MuthurUplinkMode, to: MuthurUplinkMode): string {
-  return formatMuthurCommanderArchiveLine("muthur_mode_changed", { from, to });
+export function formatMuthurPostureChangedLine(from: MuthurPosture, to: MuthurPosture): string {
+  return formatMuthurCommanderArchiveLine("muthur_posture_changed", { from, to });
 }
 
 export function formatMuthurMissionCreatedLine(mission: MuthurMission): string {

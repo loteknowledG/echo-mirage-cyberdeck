@@ -7,38 +7,38 @@ import {
   CyberdeckPaneTooltipProvider,
 } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
 import {
-  MUTHUR_UPLINK_MODE_SELECTOR,
-  MUTHUR_UPLINK_MODES,
-  getMuthurUplinkModeMeta,
-  normalizeMuthurUplinkMode,
-  type MuthurUplinkMode,
-} from "@/lib/muthur-uplink-mode";
+  MUTHUR_POSTURE_SELECTOR,
+  MUTHUR_POSTURES,
+  getMuthurPostureMeta,
+  normalizeMuthurPosture,
+  type MuthurPosture,
+} from "@/lib/muthur/muthur-posture";
 
-const UPLINK_MODE_GLYPHS: Record<MuthurUplinkMode, string> = {
+const POSTURE_GLYPHS: Record<MuthurPosture, string> = {
   plan: "P",
   agent: "A",
   commander: "C",
 };
 
-type MuthurUplinkModeRollerProps = {
-  mode: MuthurUplinkMode;
+type MuthurPostureRollerProps = {
+  posture: MuthurPosture;
   disabled?: boolean;
-  onChange: (mode: MuthurUplinkMode) => void;
+  onChange: (posture: MuthurPosture) => void;
 };
 
-/** Y-axis rolodex — same compact roller as GlyphChannel TEXT / FIGLET / 1 LINE. */
-export function MuthurUplinkModeRoller({
-  mode,
+/** Y-axis rolodex — Plan / Agent / Commander postures. */
+export function MuthurPostureRoller({
+  posture,
   disabled = false,
   onChange,
-}: MuthurUplinkModeRollerProps) {
-  const resolvedMode = normalizeMuthurUplinkMode(mode);
-  const activeMeta = getMuthurUplinkModeMeta(resolvedMode);
+}: MuthurPostureRollerProps) {
+  const resolvedPosture = normalizeMuthurPosture(posture);
+  const activeMeta = getMuthurPostureMeta(resolvedPosture);
 
   const selectorMeta = useMemo(
     () =>
-      MUTHUR_UPLINK_MODE_SELECTOR.map((id) => MUTHUR_UPLINK_MODES.find((entry) => entry.id === id)).filter(
-        (entry): entry is (typeof MUTHUR_UPLINK_MODES)[number] => Boolean(entry),
+      MUTHUR_POSTURE_SELECTOR.map((id) => MUTHUR_POSTURES.find((entry) => entry.id === id)).filter(
+        (entry): entry is (typeof MUTHUR_POSTURES)[number] => Boolean(entry),
       ),
     [],
   );
@@ -50,14 +50,12 @@ export function MuthurUplinkModeRoller({
         label: entry.label.toUpperCase(),
         slide: (
           <span className="font-mono text-[9px] leading-none tracking-[0.06em]">
-            {UPLINK_MODE_GLYPHS[entry.id]}
+            {POSTURE_GLYPHS[entry.id]}
           </span>
         ),
       })),
     [selectorMeta],
   );
-
-  const pickerValue = resolvedMode;
 
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
@@ -65,9 +63,9 @@ export function MuthurUplinkModeRoller({
         <div className={disabled ? "pointer-events-none opacity-40" : undefined}>
           <CyberdeckRollingPicker
             items={items}
-            value={pickerValue}
-            onChange={(next) => onChange(normalizeMuthurUplinkMode(next))}
-            ariaLabel="MUTHUR uplink mode"
+            value={resolvedPosture}
+            onChange={(next) => onChange(normalizeMuthurPosture(next))}
+            ariaLabel="MUTHUR posture"
             viewportClassName="h-7 min-w-[3rem] w-auto max-w-[5.25rem]"
             alwaysShowLabel
             showTextWhileScrolling

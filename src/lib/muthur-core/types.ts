@@ -1,6 +1,6 @@
 import type { BrowserCommand } from "@/lib/browser-intents";
 import type { OperatorEditorEdit } from "@/lib/operator-workbench";
-import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
+import type { MuthurPosture } from "@/lib/muthur/muthur-posture";
 
 export type MuthurOperatorBrowserRef = BrowserCommand;
 
@@ -36,11 +36,11 @@ export type MuthurToolExecutionContext = {
   operatorBrowser: MuthurOperatorBrowserRef | null;
   codingTouches: string[];
   codingVerify: MuthurCodingVerifyReceipt | null;
-  uplinkMode: MuthurUplinkMode;
+  posture: MuthurPosture;
 };
 
 export function createMuthurToolExecutionContext(
-  uplinkMode: MuthurUplinkMode = "plan",
+  posture: MuthurPosture = "plan",
 ): MuthurToolExecutionContext {
   return {
     operatorEdits: [],
@@ -49,7 +49,7 @@ export function createMuthurToolExecutionContext(
     operatorBrowser: null,
     codingTouches: [],
     codingVerify: null,
-    uplinkMode,
+    posture,
   };
 }
 

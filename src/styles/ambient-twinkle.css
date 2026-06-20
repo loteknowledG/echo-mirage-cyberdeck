@@ -229,3 +229,217 @@
     row-gap: 6px;
   }
 }
+
+/* ASCII logo — crisp circular glyph pool twinkle */
+
+@property --pool-radius {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 2px;
+}
+
+.ascii-logo-twinkle {
+  position: relative;
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.ascii-logo-twinkle__glyphs {
+  position: relative;
+  display: inline-block;
+  min-width: 0;
+}
+
+.ascii-logo-twinkle__base,
+.ascii-logo-twinkle__lit,
+.ascii-logo-twinkle__sonar {
+  margin: 0;
+  min-width: 0;
+  white-space: pre;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 4px;
+  line-height: 1;
+  text-shadow: none;
+  -webkit-font-smoothing: auto;
+}
+
+.ascii-logo-twinkle__base {
+  position: relative;
+  z-index: 1;
+  color: #0f2418;
+}
+
+.ascii-logo-twinkle__sonar {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  color: #39ff88;
+}
+
+.ascii-logo-twinkle__pools {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.ascii-logo-twinkle__pool {
+  --pool-lit: #39ff88;
+  --pool-radius: 2px;
+  --lamp-idle-opacity: 0;
+  --lamp-peak-opacity: 1;
+  --lamp-afterglow-opacity: 0.55;
+  --twinkle-period: 10s;
+  --twinkle-delay: 0ms;
+
+  position: absolute;
+  inset: 0;
+  clip-path: circle(var(--pool-radius) at var(--pool-x) 50%);
+  opacity: var(--lamp-idle-opacity);
+  animation: ascii-logo-pool-sparkle var(--twinkle-period) linear infinite;
+  animation-delay: var(--twinkle-delay);
+}
+
+.ascii-logo-twinkle__pool--active {
+  animation: ascii-logo-pool-incandescent var(--twinkle-period) linear infinite;
+  animation-delay: var(--twinkle-delay);
+}
+
+.ascii-logo-twinkle__pool--wave {
+  animation: ascii-logo-pool-wave 180ms ease-out forwards !important;
+}
+
+.ascii-logo-twinkle__lit {
+  color: var(--pool-lit);
+}
+
+.ascii-logo-twinkle__pool--signal {
+  --pool-lit: #36ff73;
+}
+
+.ascii-logo-twinkle__pool--amber {
+  --pool-lit: #fcd34d;
+}
+
+.ascii-logo-twinkle__pool--cyan {
+  --pool-lit: #5eead4;
+}
+
+.ascii-logo-twinkle__pool--neutral {
+  --pool-lit: #b4b4b4;
+}
+
+/* Pool follows lamp: build radius then brighten (same timing as incandescent lamps) */
+@keyframes ascii-logo-pool-incandescent {
+  0%,
+  36%,
+  100% {
+    opacity: 0;
+    --pool-radius: 2px;
+  }
+  0.5% {
+    opacity: 0.12;
+    --pool-radius: 6px;
+  }
+  0.9% {
+    opacity: var(--lamp-peak-opacity);
+    --pool-radius: 14px;
+  }
+  3.4% {
+    opacity: var(--lamp-afterglow-opacity);
+    --pool-radius: 11px;
+  }
+}
+
+@keyframes ascii-logo-pool-sparkle {
+  0%,
+  96%,
+  100% {
+    opacity: 0;
+    --pool-radius: 2px;
+  }
+  97.2% {
+    opacity: 0.35;
+    --pool-radius: 9px;
+  }
+  98.4% {
+    opacity: 0;
+    --pool-radius: 2px;
+  }
+}
+
+@keyframes ascii-logo-pool-wave {
+  0% {
+    opacity: 0;
+    --pool-radius: 3px;
+  }
+  35% {
+    opacity: min(calc(var(--lamp-peak-opacity) + 0.08), 1);
+    --pool-radius: 16px;
+  }
+  100% {
+    opacity: var(--lamp-afterglow-opacity);
+    --pool-radius: 12px;
+  }
+}
+
+/* Sonar uplink: sweep glyphs; dim lamp strip */
+.cyberdeck-net-pane.is-net-active .ascii-logo-twinkle__base {
+  color: #060d09;
+}
+
+.cyberdeck-net-pane.is-net-active .ascii-logo-twinkle__pools {
+  opacity: 0;
+}
+
+.cyberdeck-net-pane.is-net-active .ascii-logo-twinkle__sonar {
+  opacity: 1;
+  color: transparent;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(57, 255, 136, 0.08) 0%,
+      rgba(57, 255, 136, 0.92) 45%,
+      rgba(230, 255, 240, 1) 50%,
+      rgba(57, 255, 136, 0.92) 55%,
+      rgba(57, 255, 136, 0.08) 100%
+    );
+  background-size: 34% 100%;
+  background-repeat: no-repeat;
+  background-position: -40% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: none;
+}
+
+.cyberdeck-net-pane.left.is-net-active .ascii-logo-twinkle__sonar {
+  animation:
+    echoMainBounce 3s ease-in-out infinite,
+    shortWaveLeft 0.75s linear infinite;
+}
+
+.cyberdeck-net-pane.right.is-net-active .ascii-logo-twinkle__sonar {
+  animation:
+    mirageMainBounce 3s ease-in-out infinite,
+    shortWaveRight 0.75s linear 0.35s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ascii-logo-twinkle__pool {
+    animation: none;
+    opacity: 0;
+  }
+
+  .cyberdeck-net-pane.is-net-active .ascii-logo-twinkle__sonar {
+    animation: none;
+    opacity: 0.4;
+    color: #39ff88;
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+  }
+}

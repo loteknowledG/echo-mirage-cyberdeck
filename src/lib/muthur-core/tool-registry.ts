@@ -7,7 +7,7 @@ import { convertMarkdownFileToPdf } from "@/lib/markdown-to-pdf.server";
 import { isOperatorWorkspaceTextPath } from "@/lib/operator-file-surface";
 import { getLatestMuthurObservation } from "@/lib/muthur/observation/observation-store.server";
 import { validateReadFilePath } from "@/lib/muthur/execution/safety-policy";
-import { isLocalFsWriteAllowedForUplinkMode } from "@/lib/muthur-uplink-mode";
+import { isLocalFsWriteAllowedForPosture } from "@/lib/muthur/muthur-posture";
 import { parseSuggestOperatorEditArgs } from "@/lib/muthur-core/suggest-operator-edit";
 import {
   runGitDiff,
@@ -150,11 +150,11 @@ async function runLocalFs(call: ToolCall): Promise<ToolResult> {
     }
 
     if (action === "mkdir") {
-      const uplinkMode = call.executionContext?.uplinkMode ?? "plan";
-      if (!isLocalFsWriteAllowedForUplinkMode(uplinkMode, action)) {
+      const posture = call.executionContext?.posture ?? "plan";
+      if (!isLocalFsWriteAllowedForPosture(posture, action)) {
         return {
           ok: false,
-          error: "localfs mkdir requires Agent uplink mode.",
+          error: "localfs mkdir requires Agent posture.",
         };
       }
       const abs = path.resolve(targetPath);
@@ -175,11 +175,11 @@ async function runLocalFs(call: ToolCall): Promise<ToolResult> {
     }
 
     if (action === "write") {
-      const uplinkMode = call.executionContext?.uplinkMode ?? "plan";
-      if (!isLocalFsWriteAllowedForUplinkMode(uplinkMode, action)) {
+      const posture = call.executionContext?.posture ?? "plan";
+      if (!isLocalFsWriteAllowedForPosture(posture, action)) {
         return {
           ok: false,
-          error: "localfs write requires Agent uplink mode. Use Debug for pane edits without save.",
+          error: "localfs write requires Agent posture.",
         };
       }
       const abs = path.resolve(targetPath);

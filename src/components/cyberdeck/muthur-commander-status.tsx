@@ -8,12 +8,12 @@ import {
 } from "@/lib/muthur/mission/muthur-commander-posture";
 import type { MuthurMission } from "@/lib/muthur/mission/muthur-mission-types";
 import { isOperationalMuthurMission } from "@/lib/muthur/mission/muthur-mission-types";
-import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
-import { getMuthurUplinkModeMeta } from "@/lib/muthur-uplink-mode";
+import type { MuthurPosture } from "@/lib/muthur/muthur-posture";
+import { getMuthurPostureMeta } from "@/lib/muthur/muthur-posture";
 import { cn } from "@/lib/utils";
 
 type MuthurCommanderStatusProps = {
-  mode: MuthurUplinkMode;
+  posture: MuthurPosture;
   mission: MuthurMission | null;
   disabled?: boolean;
   onCreateMission: (input: { title: string; objective: string }) => void;
@@ -22,7 +22,7 @@ type MuthurCommanderStatusProps = {
 };
 
 export function MuthurCommanderStatus({
-  mode,
+  posture,
   mission,
   disabled = false,
   onCreateMission,
@@ -33,10 +33,10 @@ export function MuthurCommanderStatus({
   const [objectiveDraft, setObjectiveDraft] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  const modeLabel = getMuthurUplinkModeMeta(mode).label.toUpperCase();
-  const posture = getMuthurCommanderPosture(mode, mission);
-  const postureLabel = formatMuthurCommanderPostureLabel(posture);
-  const showCommanderPanel = mode === "commander" || showCreateForm;
+  const postureLabel = getMuthurPostureMeta(posture).label.toUpperCase();
+  const missionPosture = getMuthurCommanderPosture(posture, mission);
+  const missionPostureLabel = formatMuthurCommanderPostureLabel(missionPosture);
+  const showCommanderPanel = posture === "commander" || showCreateForm;
 
   if (!showCommanderPanel) {
     return null;
@@ -67,20 +67,20 @@ export function MuthurCommanderStatus({
       <div className="space-y-0.5 text-[#8a8a8a]">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
           <span>
-            Mode: <span className="text-emerald-300/90">{modeLabel}</span>
+            Posture: <span className="text-emerald-300/90">{postureLabel}</span>
           </span>
           <span>
-            Status:{" "}
+            Mission status:{" "}
             <span
               className={
-                posture === "EXECUTING" || posture === "VERIFYING"
+                missionPosture === "EXECUTING" || missionPosture === "VERIFYING"
                   ? "text-emerald-300/80"
-                  : posture === "WAITING"
+                  : missionPosture === "WAITING"
                     ? "text-amber-200/85"
                     : "text-[#9a9a9a]"
               }
             >
-              {postureLabel}
+              {missionPostureLabel}
             </span>
           </span>
         </div>

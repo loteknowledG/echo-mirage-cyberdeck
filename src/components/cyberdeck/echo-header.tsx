@@ -1,31 +1,14 @@
-import { AmbientTwinkleHost } from "@/components/cyberdeck/ambient-twinkle-host";
+import { EchoLogoTwinkle } from "@/components/cyberdeck/echo-logo-twinkle";
 import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 
 export function EchoHeader() {
   return (
     <header
       data-morphism={MORPHISM_ZONE_ASCIIMORPHISM}
-      className="relative flex w-full shrink-0 flex-col gap-1.5 overflow-visible border-b border-gray-800 bg-black px-6 py-2"
+      className="relative flex w-full shrink-0 flex-col overflow-visible border-b border-gray-800 bg-black px-6 py-2"
     >
-      <AmbientTwinkleHost preset="command-surface" className="w-full" />
-      <div className="flex w-full items-end justify-end gap-3">
-      <pre
-        className="cyberdeck-net-logo m-0 min-w-0 shrink whitespace-pre font-mono text-[4px] leading-[1.0] text-green-400"
-        style={{ textShadow: "0 0 5px #00ff00" }}
-      >
-        {`
-          _            _             _       _    _       
-        ╱╲ ╲         ╱╲ ╲           ╱ ╱╲    ╱ ╱╲ ╱╲ ╲     
-       ╱  ╲ ╲       ╱  ╲ ╲         ╱ ╱ ╱   ╱ ╱ ╱╱  ╲ ╲    
-      ╱ ╱╲ ╲ ╲     ╱ ╱╲ ╲ ╲       ╱ ╱_╱   ╱ ╱ ╱╱ ╱╲ ╲ ╲   
-     ╱ ╱ ╱╲ ╲_╲   ╱ ╱ ╱╲ ╲ ╲     ╱ ╱╲ ╲__╱ ╱ ╱╱ ╱ ╱╲ ╲ ╲  
-    ╱ ╱_╱_ ╲╱_╱  ╱ ╱ ╱  ╲ ╲_╲   ╱ ╱╲ ╲___╲╱ ╱╱ ╱ ╱  ╲ ╲_╲ 
-   ╱ ╱____╱╲    ╱ ╱ ╱    ╲╱_╱  ╱ ╱ ╱╲╱___╱ ╱╱ ╱ ╱   ╱ ╱ ╱ 
-  ╱ ╱╲____╲╱   ╱ ╱ ╱          ╱ ╱ ╱   ╱ ╱ ╱╱ ╱ ╱   ╱ ╱ ╱  
- ╱ ╱ ╱______  ╱ ╱ ╱________  ╱ ╱ ╱   ╱ ╱ ╱╱ ╱ ╱___╱ ╱ ╱   
-╱ ╱ ╱_______╲╱ ╱ ╱_________╲╱ ╱ ╱   ╱ ╱ ╱╱ ╱ ╱____╲╱ ╱    
-╲╱__________╱╲╱____________╱╲╱_╱    ╲╱_╱ ╲╱_________╱`}
-      </pre>
+      <div className="flex w-full items-end justify-end">
+        <EchoLogoTwinkle />
       </div>
     </header>
   );

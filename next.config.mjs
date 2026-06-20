@@ -101,6 +101,9 @@ const nextConfig = {
 		"gif-frames",
 		"gif-encoder-2",
 		"node-pty",
+		"@nut-tree-fork/nut-js",
+		"node-screenshots",
+		"windows-use",
 	],
 	webpack: (config, { dev, isServer }) => {
 		if (isServer) {

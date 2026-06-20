@@ -2,8 +2,8 @@ import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { executeMuthurChatTool } from "@/lib/muthur-core/execute-openai-tool";
-import { getMuthurOpenAiToolsForMode } from "@/lib/muthur-core/openai-tool-definitions";
-import type { MuthurUplinkMode, MuthurUplinkToolContext } from "@/lib/muthur-uplink-mode";
+import { getMuthurOpenAiToolsForPosture } from "@/lib/muthur-core/openai-tool-definitions";
+import type { MuthurPosture, MuthurPostureToolContext } from "@/lib/muthur/muthur-posture";
 import { appendMuthurStreamFooters } from "@/lib/muthur-core/muthur-stream-payload";
 import {
   inlineCallsToOpenAiToolCalls,
@@ -167,17 +167,17 @@ export async function muthurChatWithModelTools(options: {
   registry: ToolRegistry;
   /** When false, stream a direct reply with no tool definitions (greetings, small talk). */
   toolsEnabled?: boolean;
-  uplinkMode?: MuthurUplinkMode;
+  posture?: MuthurPosture;
   commanderMissionActive?: boolean;
   providerReceipt?: ProviderReceipt;
 }): Promise<Response> {
   const { endpoint, apiKey, model, registry, providerReceipt } = options;
-  const uplinkMode = options.uplinkMode ?? "plan";
-  const toolContext: MuthurUplinkToolContext | undefined =
+  const posture = options.posture ?? "plan";
+  const toolContext: MuthurPostureToolContext | undefined =
     typeof options.commanderMissionActive === "boolean"
       ? { missionActive: options.commanderMissionActive }
       : undefined;
-  const openAiTools = getMuthurOpenAiToolsForMode(uplinkMode, toolContext);
+  const openAiTools = getMuthurOpenAiToolsForPosture(posture, toolContext);
   const toolsEnabled =
     options.toolsEnabled !== false &&
     ENABLE_AUTOMATION &&
@@ -186,7 +186,7 @@ export async function muthurChatWithModelTools(options: {
   const messages: JsonMessage[] = options.baseMessages.map((m) => ({ ...m }));
   const fallbackMessages = options.baseMessages.map((m) => ({ ...m }));
   const toolsUsed: string[] = [];
-  const toolCtx = createMuthurToolExecutionContext(uplinkMode);
+  const toolCtx = createMuthurToolExecutionContext(posture);
 
   if (!toolsEnabled) {
     let streamRes: Response;

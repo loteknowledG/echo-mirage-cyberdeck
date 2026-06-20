@@ -1,5 +1,5 @@
 import type { MuthurCommanderPosture } from "@/lib/muthur/mission/muthur-commander-posture";
-import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
+import type { MuthurPosture } from "@/lib/muthur/muthur-posture";
 import {
   createMuthurCognitionEventId,
   MUTHUR_COGNITION_MAX_EVENTS,
@@ -12,8 +12,8 @@ import type {
   MuthurCognitionState,
 } from "@/lib/muthur/cognition/muthur-cognition-types";
 
-export function shouldSurfaceCognitionForUplinkMode(mode: MuthurUplinkMode): boolean {
-  return mode === "plan" || mode === "agent" || mode === "commander";
+export function shouldSurfaceCognitionForPosture(posture: MuthurPosture): boolean {
+  return posture === "plan" || posture === "agent" || posture === "commander";
 }
 
 export function formatMuthurCognitionDiagnostic(event: MuthurCognitionEvent): string {
@@ -25,24 +25,24 @@ export function formatMuthurCognitionDiagnosticFromInput(input: MuthurCognitionE
 }
 
 export function buildMuthurCognitionStatusLine(
-  mode: MuthurUplinkMode,
+  posture: MuthurPosture,
   context?: {
     commanderPosture?: MuthurCommanderPosture | null;
     missionTitle?: string;
   },
 ): string | null {
-  switch (mode) {
+  switch (posture) {
     case "plan":
       return "[COGNITION] PLAN — observe panes, ask questions; read-only, no edits.";
     case "agent":
       return "[COGNITION] AGENT — full tool execution and operator edits.";
     case "commander": {
-      const posture = context?.commanderPosture ?? "AWAITING_MISSION";
-      const postureLabel = posture.replace(/_/g, " ");
-      if (posture === "EXECUTING" && context?.missionTitle) {
+      const missionPosture = context?.commanderPosture ?? "AWAITING_MISSION";
+      const missionPostureLabel = missionPosture.replace(/_/g, " ");
+      if (missionPosture === "EXECUTING" && context?.missionTitle) {
         return `[COGNITION] COMMANDER — EXECUTING: ${context.missionTitle}; event-driven loops active.`;
       }
-      return `[COGNITION] COMMANDER — ${postureLabel}; orchestration when mission is active.`;
+      return `[COGNITION] COMMANDER — ${missionPostureLabel}; orchestration when mission is active.`;
     }
     default:
       return null;

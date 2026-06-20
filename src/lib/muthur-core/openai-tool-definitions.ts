@@ -1,5 +1,5 @@
-import type { MuthurUplinkMode, MuthurUplinkToolContext } from "@/lib/muthur-uplink-mode";
-import { isToolAllowedForUplinkMode } from "@/lib/muthur-uplink-mode";
+import type { MuthurPosture, MuthurPostureToolContext } from "@/lib/muthur/muthur-posture";
+import { isToolAllowedForPosture } from "@/lib/muthur/muthur-posture";
 
 /**
  * OpenAI-compatible `tools` for chat/completions.
@@ -311,8 +311,8 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   },
 ];
 
-export function getMuthurOpenAiToolsForMode(mode: MuthurUplinkMode, context?: MuthurUplinkToolContext) {
+export function getMuthurOpenAiToolsForPosture(posture: MuthurPosture, context?: MuthurPostureToolContext) {
   return MUTHUR_OPENAI_TOOLS.filter((tool) =>
-    isToolAllowedForUplinkMode(mode, tool.function.name, context),
+    isToolAllowedForPosture(posture, tool.function.name, context),
   );
 }

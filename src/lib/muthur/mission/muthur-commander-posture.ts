@@ -1,5 +1,5 @@
 import type { MuthurMission } from "@/lib/muthur/mission/muthur-mission-types";
-import type { MuthurUplinkMode } from "@/lib/muthur-uplink-mode";
+import type { MuthurPosture } from "@/lib/muthur/muthur-posture";
 
 export type MuthurCommanderPosture =
   | "AWAITING_MISSION"
@@ -9,10 +9,10 @@ export type MuthurCommanderPosture =
   | "VERIFYING";
 
 export function getMuthurCommanderPosture(
-  mode: MuthurUplinkMode,
+  posture: MuthurPosture,
   mission: MuthurMission | null | undefined,
 ): MuthurCommanderPosture | null {
-  if (mode !== "commander") return null;
+  if (posture !== "commander") return null;
   if (!mission) return "AWAITING_MISSION";
 
   switch (mission.status) {

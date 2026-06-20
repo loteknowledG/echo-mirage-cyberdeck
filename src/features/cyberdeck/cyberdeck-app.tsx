@@ -188,7 +188,6 @@ import {
 import { MiragePaneLayer } from "@/components/cyberdeck/mirage-pane-layer";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
 import { EchoHeader } from "@/components/cyberdeck/echo-header";
-import { MuthurAnnunciatorPanel } from "@/components/cyberdeck/muthur-annunciator-panel";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
 import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-tab";
 import { Textarea } from "@/components/ui/textarea";
@@ -214,7 +213,7 @@ import {
 import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
 import { MuthurCommanderStatus } from "@/components/cyberdeck/muthur-commander-status";
 import { MuthurDelegationPanel } from "@/components/cyberdeck/muthur-delegation-panel";
-import { MuthurUplinkModeRoller } from "@/components/cyberdeck/muthur-uplink-mode-roller";
+import { MuthurPostureRoller } from "@/components/cyberdeck/muthur-posture-roller";
 import {
   formatDelegationCancelledLine,
   formatDelegationDispatchedLine,
@@ -270,13 +269,13 @@ import { setMUTHURMode } from "@/lib/computer-use/control-lease";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { summarizeMuthurOperatorEdits } from "@/lib/muthur-operator-edit-summary";
 import {
-  getMuthurUplinkModeMeta,
-  loadMuthurUplinkMode,
-  normalizeMuthurUplinkMode,
-  saveMuthurUplinkMode,
+  getMuthurPostureMeta,
+  loadMuthurPosture,
+  normalizeMuthurPosture,
+  saveMuthurPosture,
   shouldAutoCommitOperatorEdits,
-  type MuthurUplinkMode,
-} from "@/lib/muthur-uplink-mode";
+  type MuthurPosture,
+} from "@/lib/muthur/muthur-posture";
 import {
   createMuthurMission,
   loadMuthurMission,
@@ -296,14 +295,14 @@ import {
   formatMuthurCommanderActivatedLine,
   formatMuthurCommanderArchiveLine,
   formatMuthurMissionCreatedLine,
-  formatMuthurModeChangedLine,
+  formatMuthurPostureChangedLine,
 } from "@/lib/muthur/mission/muthur-commander-events";
 import { getMuthurCommanderPosture } from "@/lib/muthur/mission/muthur-commander-posture";
 import {
   buildMuthurCognitionStatusLine,
   formatMuthurCognitionDiagnosticFromInput,
   recordMuthurCognitionEvent,
-  shouldSurfaceCognitionForUplinkMode,
+  shouldSurfaceCognitionForPosture,
 } from "@/lib/muthur/cognition/muthur-cognition-channel";
 import {
   cognitionFromCommanderPosture,
@@ -1135,7 +1134,7 @@ export default function CyberdeckApp() {
   const [streamText, setStreamText] = useState("");
   const [streamToolTrace, setStreamToolTrace] = useState("");
   const [chatPinnedToBottom, setChatPinnedToBottom] = useState(true);
-  const [muthurUplinkMode, setMuthurUplinkMode] = useState<MuthurUplinkMode>(() => loadMuthurUplinkMode());
+  const [muthurPosture, setMuthurPosture] = useState<MuthurPosture>(() => loadMuthurPosture());
   const [muthurMission, setMuthurMission] = useState<MuthurMission | null>(() => loadMuthurMission());
   const [muthurDelegations, setMuthurDelegations] = useState<MuthurDelegationAssignment[]>(() =>
     loadMuthurDelegations(),
@@ -1655,17 +1654,17 @@ export default function CyberdeckApp() {
   const emitMuthurCognition = useCallback(
     (input: MuthurCognitionEmitInput) => {
       setMuthurCognition((current) => recordMuthurCognitionEvent(current, input).state);
-      if (shouldSurfaceCognitionForUplinkMode(muthurUplinkMode)) {
+      if (shouldSurfaceCognitionForPosture(muthurPosture)) {
         setMuthurDiagnostics((current) =>
           appendMuthurDiagnosticEntry(current, formatMuthurCognitionDiagnosticFromInput(input)),
         );
       }
     },
-    [muthurUplinkMode],
+    [muthurPosture],
   );
 
   const appendMuthurCognitionStatus = useCallback(
-    (mode: MuthurUplinkMode, mission: MuthurMission | null) => {
+    (mode: MuthurPosture, mission: MuthurMission | null) => {
       const line = buildMuthurCognitionStatusLine(mode, {
         commanderPosture: getMuthurCommanderPosture(mode, mission),
         missionTitle: mission?.title,
@@ -1679,17 +1678,17 @@ export default function CyberdeckApp() {
 
   const muthurCognitionStatusLine = useMemo(
     () =>
-      buildMuthurCognitionStatusLine(muthurUplinkMode, {
-        commanderPosture: getMuthurCommanderPosture(muthurUplinkMode, muthurMission),
+      buildMuthurCognitionStatusLine(muthurPosture, {
+        commanderPosture: getMuthurCommanderPosture(muthurPosture, muthurMission),
         missionTitle: muthurMission?.title,
       }),
-    [muthurUplinkMode, muthurMission],
+    [muthurPosture, muthurMission],
   );
 
-  const handleMuthurUplinkModeChange = useCallback(
-    (next: MuthurUplinkMode) => {
-      const resolved = normalizeMuthurUplinkMode(next);
-      if (resolved === muthurUplinkMode) return;
+  const handleMuthurPostureChange = useCallback(
+    (next: MuthurPosture) => {
+      const resolved = normalizeMuthurPosture(next);
+      if (resolved === muthurPosture) return;
 
       if (resolved === "commander") {
         const posture = getMuthurCommanderPosture("commander", muthurMission) ?? "AWAITING_MISSION";
@@ -1710,17 +1709,17 @@ export default function CyberdeckApp() {
             title: muthurMission?.title,
           }),
         );
-      } else if (muthurUplinkMode === "commander") {
+      } else if (muthurPosture === "commander") {
         archiveMuthurHistoryLine(
           formatMuthurCommanderArchiveLine("muthur_commander_stood_down", { to: resolved }),
         );
       }
 
-      archiveMuthurHistoryLine(formatMuthurModeChangedLine(muthurUplinkMode, resolved));
+      archiveMuthurHistoryLine(formatMuthurPostureChangedLine(muthurPosture, resolved));
       appendMuthurCognitionStatus(resolved, muthurMission);
-      setMuthurUplinkMode(resolved);
+      setMuthurPosture(resolved);
     },
-    [appendMuthurCognitionStatus, archiveMuthurHistoryLine, emitMuthurCognition, muthurMission, muthurUplinkMode],
+    [appendMuthurCognitionStatus, archiveMuthurHistoryLine, emitMuthurCognition, muthurMission, muthurPosture],
   );
 
   const handleCreateMuthurMission = useCallback(
@@ -2412,9 +2411,9 @@ export default function CyberdeckApp() {
   }, [deckMode]);
 
   useEffect(() => {
-    saveMuthurUplinkMode(muthurUplinkMode);
-    setMUTHURMode(getMuthurUplinkModeMeta(muthurUplinkMode).internalMode);
-  }, [muthurUplinkMode]);
+    saveMuthurPosture(muthurPosture);
+    setMUTHURMode(getMuthurPostureMeta(muthurPosture).internalMode);
+  }, [muthurPosture]);
 
   useEffect(() => {
     const onRequestEditMode = () => setOperatorDocMode("edit");
@@ -5768,7 +5767,7 @@ ${diff}`;
             piScreenContext,
             history,
             operatorContext,
-            uplinkMode: muthurUplinkMode,
+            posture: muthurPosture,
             commanderMissionActive: canExecuteCommanderMissionWork(muthurMission),
           }),
         });
@@ -5972,7 +5971,7 @@ ${diff}`;
           streamPayload.codingVerify ?? parseCodingVerifyHeader(res.headers.get("x-muthur-coding-verify"));
         if (codingVerifyReceipt) {
           const systemLines = [formatCodingVerifySystemLine(codingVerifyReceipt)];
-          if (codingVerifyReceipt.passed && muthurUplinkMode === "agent") {
+          if (codingVerifyReceipt.passed && muthurPosture === "agent") {
             systemLines.push(
               "RUNTIME PATROL // queued after coding verify (tsc + /cyberdeck in background)",
             );
@@ -6061,7 +6060,7 @@ ${diff}`;
           if (editResult === "applied") {
             operatorEditApplied = true;
             const systemLines = ["OPERATOR EDIT // MUTHUR applied — Ctrl+Z to undo in the operator pane."];
-            if (shouldAutoCommitOperatorEdits(muthurUplinkMode)) {
+            if (shouldAutoCommitOperatorEdits(muthurPosture)) {
               if (
                 canSaveOperatorDocumentInPlace(
                   operatorActiveFilePath,
@@ -7658,7 +7657,7 @@ ${diff}`;
                 </div>
               ) : null}
               <MuthurCommanderStatus
-                mode={muthurUplinkMode}
+                posture={muthurPosture}
                 mission={muthurMission}
                 disabled={isStreaming}
                 onCreateMission={handleCreateMuthurMission}
@@ -7709,7 +7708,6 @@ ${diff}`;
                   </div>
                 </MuthurComposerShell>
                 <div className="muthur-composer-controls px-1">
-                  <MuthurAnnunciatorPanel className="mb-1" />
                   <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                   <button
@@ -7726,10 +7724,10 @@ ${diff}`;
                   >
                     {modelID ? modelID.split("/").pop() : "NO_MODEL"}
                   </button>
-                  <MuthurUplinkModeRoller
-                    mode={muthurUplinkMode}
+                  <MuthurPostureRoller
+                    posture={muthurPosture}
                     disabled={isStreaming}
-                    onChange={handleMuthurUplinkModeChange}
+                    onChange={handleMuthurPostureChange}
                   />
                   </div>
                   <div
@@ -7879,7 +7877,7 @@ ${diff}`;
                     </CyberdeckPaneTooltipProvider>
                   </div>
                   </div>
-                  {muthurUplinkMode === "commander" ? (
+                  {muthurPosture === "commander" ? (
                     <MuthurDelegationPanel
                       mission={muthurMission}
                       assignments={muthurDelegations}

@@ -1,32 +1,32 @@
 import assert from "node:assert/strict";
 import { executeMuthurChatTool } from "../src/lib/muthur-core/execute-openai-tool";
-import { getMuthurOpenAiToolsForMode } from "../src/lib/muthur-core/openai-tool-definitions";
+import { getMuthurOpenAiToolsForPosture } from "../src/lib/muthur-core/openai-tool-definitions";
 import { createMuthurToolRegistry } from "../src/lib/muthur-core/tool-registry";
 import { createMuthurToolExecutionContext } from "../src/lib/muthur-core/types";
 import {
   allowsOperatorPaneEdits,
-  buildUplinkModeSystemPrompt,
-  getMuthurUplinkCommitPolicy,
-  isLocalFsWriteAllowedForUplinkMode,
-  isToolAllowedForUplinkMode,
-  normalizeMuthurUplinkMode,
+  buildMuthurPostureSystemPrompt,
+  getMuthurPostureCommitPolicy,
+  isLocalFsWriteAllowedForPosture,
+  isToolAllowedForPosture,
+  normalizeMuthurPosture,
   shouldAutoCommitOperatorEdits,
-  shouldEnableToolsForUplinkMode,
-  type MuthurUplinkMode,
-} from "../src/lib/muthur-uplink-mode";
+  shouldEnableToolsForPosture,
+  type MuthurPosture,
+} from "../src/lib/muthur/muthur-posture";
 
-const MODES: MuthurUplinkMode[] = ["plan", "agent", "commander"];
+const POSTURES: MuthurPosture[] = ["plan", "agent", "commander"];
 
 async function main() {
-  assert.equal(normalizeMuthurUplinkMode("agent"), "agent");
-  assert.equal(normalizeMuthurUplinkMode("commander"), "commander");
-  assert.equal(normalizeMuthurUplinkMode("unknown"), "plan");
-  assert.equal(normalizeMuthurUplinkMode("ask"), "plan");
-  assert.equal(normalizeMuthurUplinkMode("debug"), "agent");
+  assert.equal(normalizeMuthurPosture("agent"), "agent");
+  assert.equal(normalizeMuthurPosture("commander"), "commander");
+  assert.equal(normalizeMuthurPosture("unknown"), "plan");
+  assert.equal(normalizeMuthurPosture("ask"), "plan");
+  assert.equal(normalizeMuthurPosture("debug"), "agent");
 
-  assert.equal(getMuthurUplinkCommitPolicy("agent"), "immediate");
-  assert.equal(getMuthurUplinkCommitPolicy("plan"), "never");
-  assert.equal(getMuthurUplinkCommitPolicy("commander"), "immediate");
+  assert.equal(getMuthurPostureCommitPolicy("agent"), "immediate");
+  assert.equal(getMuthurPostureCommitPolicy("plan"), "never");
+  assert.equal(getMuthurPostureCommitPolicy("commander"), "immediate");
 
   assert.equal(allowsOperatorPaneEdits("agent"), true);
   assert.equal(allowsOperatorPaneEdits("commander"), true);
@@ -36,24 +36,24 @@ async function main() {
   assert.equal(shouldAutoCommitOperatorEdits("commander"), true);
   assert.equal(shouldAutoCommitOperatorEdits("plan"), false);
 
-  assert.equal(isLocalFsWriteAllowedForUplinkMode("agent", "write"), true);
-  assert.equal(isLocalFsWriteAllowedForUplinkMode("commander", "write"), true);
-  assert.equal(isLocalFsWriteAllowedForUplinkMode("plan", "write"), false);
-  assert.equal(isLocalFsWriteAllowedForUplinkMode("agent", "cat"), true);
+  assert.equal(isLocalFsWriteAllowedForPosture("agent", "write"), true);
+  assert.equal(isLocalFsWriteAllowedForPosture("commander", "write"), true);
+  assert.equal(isLocalFsWriteAllowedForPosture("plan", "write"), false);
+  assert.equal(isLocalFsWriteAllowedForPosture("agent", "cat"), true);
 
-  for (const mode of MODES) {
-    assert.match(buildUplinkModeSystemPrompt(mode), /UPLINK MODE/i);
+  for (const posture of POSTURES) {
+    assert.match(buildMuthurPostureSystemPrompt(posture), /MUTHUR POSTURE/i);
   }
 
-  assert.equal(shouldEnableToolsForUplinkMode("agent", "hi"), true);
-  assert.equal(shouldEnableToolsForUplinkMode("plan", "hi"), true);
-  assert.equal(shouldEnableToolsForUplinkMode("commander", "hi"), false);
-  assert.equal(shouldEnableToolsForUplinkMode("commander", "hi", { missionActive: true }), true);
+  assert.equal(shouldEnableToolsForPosture("agent", "hi"), true);
+  assert.equal(shouldEnableToolsForPosture("plan", "hi"), true);
+  assert.equal(shouldEnableToolsForPosture("commander", "hi"), false);
+  assert.equal(shouldEnableToolsForPosture("commander", "hi", { missionActive: true }), true);
 
-  const planTools = getMuthurOpenAiToolsForMode("plan");
-  const agentTools = getMuthurOpenAiToolsForMode("agent");
-  const commanderToolsBlocked = getMuthurOpenAiToolsForMode("commander");
-  const commanderToolsActive = getMuthurOpenAiToolsForMode("commander", { missionActive: true });
+  const planTools = getMuthurOpenAiToolsForPosture("plan");
+  const agentTools = getMuthurOpenAiToolsForPosture("agent");
+  const commanderToolsBlocked = getMuthurOpenAiToolsForPosture("commander");
+  const commanderToolsActive = getMuthurOpenAiToolsForPosture("commander", { missionActive: true });
 
   assert.ok(planTools.length > 0);
   assert.ok(planTools.some((tool) => tool.function.name === "observe_operator_pane"));
@@ -65,12 +65,12 @@ async function main() {
   assert.ok(agentTools.length > planTools.length);
 
   for (const tool of agentTools) {
-    assert.ok(isToolAllowedForUplinkMode("agent", tool.function.name));
+    assert.ok(isToolAllowedForPosture("agent", tool.function.name));
   }
   assert.ok(agentTools.some((tool) => tool.function.name === "localfs"));
   assert.ok(agentTools.some((tool) => tool.function.name === "suggest_operator_edit"));
-  assert.ok(!isToolAllowedForUplinkMode("commander", "git_status"));
-  assert.ok(isToolAllowedForUplinkMode("commander", "git_status", { missionActive: true }));
+  assert.ok(!isToolAllowedForPosture("commander", "git_status"));
+  assert.ok(isToolAllowedForPosture("commander", "git_status", { missionActive: true }));
 
   const registry = createMuthurToolRegistry();
   const planCtx = createMuthurToolExecutionContext("plan");
@@ -113,7 +113,7 @@ async function main() {
   console.log(
     `[probe] tool counts plan/agent/commander(active) = ${planTools.length}/${agentTools.length}/${commanderToolsActive.length}`,
   );
-  console.log("probe-muthur-phase-c-uplink-mode: PASS");
+  console.log("probe-muthur-posture: PASS");
 }
 
 main().catch((error) => {

@@ -3,16 +3,16 @@ import {
   buildMuthurCognitionStatusLine,
   formatMuthurCognitionDiagnostic,
   recordMuthurCognitionEvent,
-  shouldSurfaceCognitionForUplinkMode,
+  shouldSurfaceCognitionForPosture,
 } from "../src/lib/muthur/cognition/muthur-cognition-channel";
 import { createEmptyMuthurCognitionState } from "../src/lib/muthur/cognition/muthur-cognition-store";
 
 function main() {
   let state = createEmptyMuthurCognitionState();
 
-  assert.equal(shouldSurfaceCognitionForUplinkMode("plan"), true);
-  assert.equal(shouldSurfaceCognitionForUplinkMode("agent"), true);
-  assert.equal(shouldSurfaceCognitionForUplinkMode("commander"), true);
+  assert.equal(shouldSurfaceCognitionForPosture("plan"), true);
+  assert.equal(shouldSurfaceCognitionForPosture("agent"), true);
+  assert.equal(shouldSurfaceCognitionForPosture("commander"), true);
 
   const recorded = recordMuthurCognitionEvent(state, {
     category: "observe",

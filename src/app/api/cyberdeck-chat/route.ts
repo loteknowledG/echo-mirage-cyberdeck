@@ -29,11 +29,11 @@ import {
   shouldEnableMuthurTools,
 } from "@/lib/muthur-core/muthur-chat-intent";
 import {
-  buildUplinkModeSystemPrompt,
-  normalizeMuthurUplinkMode,
-  shouldEnableToolsForUplinkMode,
-  type MuthurUplinkMode,
-} from "@/lib/muthur-uplink-mode";
+  buildMuthurPostureSystemPrompt,
+  normalizeMuthurPosture,
+  shouldEnableToolsForPosture,
+  type MuthurPosture,
+} from "@/lib/muthur/muthur-posture";
 import { messageReferencesLocalPath } from "@/lib/browser-intents";
 import {
   buildProviderReceipt,
@@ -71,13 +71,13 @@ const MUTHUR_AVAILABLE_TOOLS_PROMPT =
 function buildDocumentEditHint(
   message: string,
   operatorContext: OperatorChatContext | null | undefined,
-  uplinkMode: MuthurUplinkMode,
+  posture: MuthurPosture,
 ): string {
   if (!isOperatorPaneEditRequest(message, operatorContext)) return "";
 
-  if (uplinkMode === "plan") {
+  if (posture === "plan") {
     return (
-      "\n\nOPERATOR HINT: User mentioned a change but uplink is PLAN mode. " +
+      "\n\nOPERATOR HINT: User mentioned a change but MUTHUR is in PLAN posture. " +
       "Brainstorm the approach and outline steps — do NOT call suggest_operator_edit, localfs, convert, or export. " +
       "Tell the operator to switch to Agent or Commander to apply changes."
     );
@@ -112,15 +112,15 @@ function buildDocumentEditHint(
           previewSurface: "docx",
           localFilePath: obs?.editor?.filePath ?? undefined,
         },
-        uplinkMode,
+        posture,
       );
     }
     return "\n\nOPERATOR HINT: User wants a document edit but no text editor is active. Open the file in the operator pane. For DOCX, convert to markdown first.";
   }
   const saveHint =
-    uplinkMode === "agent" || uplinkMode === "commander"
+    posture === "agent" || posture === "commander"
       ? "Edits auto-save to disk when a writable path exists."
-      : "Plan mode: observe and discuss only — switch to Agent or Commander to edit.";
+      : "Plan posture: observe and discuss only — switch to Agent or Commander to edit.";
 
   return (
     "\n\nOPERATOR HINT: User wants an in-pane edit on the open operator document. " +
@@ -208,7 +208,7 @@ function buildEditorContextPrompt(): string {
 function buildMuthurSystemContent(args: {
   message: string;
   operatorContext: OperatorChatContext | null;
-  uplinkMode: MuthurUplinkMode;
+  posture: MuthurPosture;
   commanderMissionActive?: boolean;
   memoryPrompt: string;
   browserPrompt: string;
@@ -221,17 +221,17 @@ function buildMuthurSystemContent(args: {
       : undefined;
   const toolsEnabled =
     shouldEnableMuthurTools(args.message) &&
-    shouldEnableToolsForUplinkMode(args.uplinkMode, args.message, toolContext);
+    shouldEnableToolsForPosture(args.posture, args.message, toolContext);
   const needsOperator = messageNeedsOperatorContext(args.message, args.operatorContext);
 
   let systemContent =
     "You are MU/TH/UR 6000, the AI interface of the Echo Mirage Cyberdeck. Concise, technical, helpful.";
 
-  systemContent += buildUplinkModeSystemPrompt(args.uplinkMode);
+  systemContent += buildMuthurPostureSystemPrompt(args.posture);
 
   if (toolsEnabled) {
     systemContent += MUTHUR_AVAILABLE_TOOLS_PROMPT;
-    systemContent += buildDocumentEditHint(args.message, args.operatorContext, args.uplinkMode);
+    systemContent += buildDocumentEditHint(args.message, args.operatorContext, args.posture);
     if (needsOperator) {
       systemContent += formatOperatorChatContextPrompt(args.operatorContext);
       systemContent += buildEditorContextPrompt();
@@ -365,11 +365,12 @@ export async function POST(request: Request) {
       glyphContext,
       history,
       operatorContext: operatorContextRaw,
-      uplinkMode: uplinkModeRaw,
+      posture: postureRaw,
+      uplinkMode: legacyPostureRaw,
       commanderMissionActive: commanderMissionActiveRaw,
     } = body;
     const operatorContext = parseOperatorChatContext(operatorContextRaw);
-    const uplinkMode = normalizeMuthurUplinkMode(uplinkModeRaw);
+    const posture = normalizeMuthurPosture(postureRaw ?? legacyPostureRaw);
     const commanderMissionActive = commanderMissionActiveRaw === true;
     const chatHistory = normalizeChatHistory(history);
     const toolRegistryPrefetch = ENABLE_AUTOMATION
@@ -567,7 +568,7 @@ export async function POST(request: Request) {
         const { systemContent, toolsEnabled } = buildMuthurSystemContent({
           message,
           operatorContext,
-          uplinkMode,
+          posture,
           commanderMissionActive,
           memoryPrompt,
           browserPrompt,
@@ -588,7 +589,7 @@ export async function POST(request: Request) {
           baseMessages,
           registry: toolsEnabled ? await toolRegistryPrefetch : EMPTY_TOOL_REGISTRY,
           toolsEnabled,
-          uplinkMode,
+          posture,
           commanderMissionActive,
           providerReceipt,
         });
@@ -652,7 +653,7 @@ export async function POST(request: Request) {
     const { systemContent, toolsEnabled } = buildMuthurSystemContent({
       message: userMessage,
       operatorContext,
-      uplinkMode,
+      posture,
       commanderMissionActive,
       memoryPrompt: fallbackMemoryPrompt,
       browserPrompt,
@@ -674,7 +675,7 @@ export async function POST(request: Request) {
         baseMessages,
         registry: toolsEnabled ? await resolveToolRegistry() : EMPTY_TOOL_REGISTRY,
         toolsEnabled,
-        uplinkMode,
+        posture,
         commanderMissionActive,
       });
     }

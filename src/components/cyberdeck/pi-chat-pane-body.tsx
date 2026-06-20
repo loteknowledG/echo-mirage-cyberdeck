@@ -14,6 +14,7 @@ import {
   flattenPiAgentMessage,
   setPiScreenSnapshot,
 } from "@/lib/pi-screen-context";
+import { PiComputerUseStatusPanel } from "@/components/cyberdeck/pi-computer-use-status-panel";
 
 type PiChatPaneBodyProps = {
   server: string;
@@ -388,10 +389,13 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
   }, []);
 
   return (
-    <div
-      ref={hostRef}
-      className="pi-pane-host custom-scrollbar flex h-full min-h-0 w-full flex-col overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80"
-      data-pi-status={status || server.toUpperCase()}
-    />
+    <div className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden">
+      <PiComputerUseStatusPanel className="shrink-0" />
+      <div
+        ref={hostRef}
+        className="pi-pane-host custom-scrollbar flex min-h-0 flex-1 w-full flex-col overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80"
+        data-pi-status={status || server.toUpperCase()}
+      />
+    </div>
   );
 }

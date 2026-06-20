@@ -3,7 +3,7 @@ import { runCodingVerify } from "@/lib/muthur-core/coding-verify.server";
 import { executeMuthurChatTool } from "@/lib/muthur-core/execute-openai-tool";
 import { createMuthurToolRegistry } from "@/lib/muthur-core/tool-registry";
 import { createMuthurToolExecutionContext } from "@/lib/muthur-core/types";
-import { normalizeMuthurUplinkMode } from "@/lib/muthur-uplink-mode";
+import { normalizeMuthurPosture } from "@/lib/muthur/muthur-posture";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       toolName?: string;
       args?: Record<string, unknown>;
+      posture?: string;
       uplinkMode?: string;
     };
     const toolName = typeof body.toolName === "string" ? body.toolName.trim() : "";
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     const args = body.args && typeof body.args === "object" ? body.args : {};
-    const ctx = createMuthurToolExecutionContext(normalizeMuthurUplinkMode(body.uplinkMode));
+    const ctx = createMuthurToolExecutionContext(normalizeMuthurPosture(body.posture ?? body.uplinkMode));
     const registry = createMuthurToolRegistry();
 
     if (toolName === "coding_verify") {
