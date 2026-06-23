@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CyberdeckRollingPicker } from '@/components/cyberdeck/cyberdeck-rolling-picker';
 import { FigletFontPreviewSlide } from '@/components/cyberdeck/figlet-font-preview-slide';
-import { ShowroomTickPointerRail } from '@/components/cyberdeck/showroom-tick-pointer-rail';
 import { cn } from '@/lib/utils';
 import {
   resolveFigletPickerValue,
@@ -155,13 +154,13 @@ export function FigletFontPicker({
       wheelNeighborCount={3}
       slideHeightPx={isPriceIsRight ? 44 : 28}
       wheelScrollStep={1}
-      wheelMomentumGain={1.92}
-      wheelMomentumFriction={0.972}
-      wheelMomentumDuration={155}
+      wheelMomentumGain={2.15}
+      wheelMomentumFriction={0.978}
+      wheelMomentumDuration={180}
       alwaysShowLabel={isPriceIsRight}
       showTextWhileScrolling={false}
       wheelSettledShowsSlide={false}
-      loop
+      loop={!isPriceIsRight}
       rollerType={isPriceIsRight ? 'figlet-price-is-right' : 'figlet-compact'}
     />
   );
@@ -201,9 +200,7 @@ export function FigletFontPicker({
             No fonts match.
           </p>
         ) : (
-          <ShowroomTickPointerRail slideHeightPx={44}>
-            {roller}
-          </ShowroomTickPointerRail>
+          roller
         )}
       </div>
     </div>
