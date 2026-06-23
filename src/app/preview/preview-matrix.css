@@ -134,62 +134,34 @@
   min-height: 0;
 }
 
-.powerfist-preview-root .powerfistJoystickControls {
-  flex-shrink: 0;
+.powerfist-preview-root .powerfistJoystickFab {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 6;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 12px;
-  padding: 0 12px 12px;
+  justify-items: end;
+  gap: 6px;
   pointer-events: auto;
-}
-
-.powerfist-preview-root .powerfistJoystickTarget {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-
-.powerfist-preview-root .powerfistJoystickTargetLabel {
-  color: var(--pf-muted);
-  font-size: 9px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.powerfist-preview-root .powerfistPaneRollerViewportJoystick {
-  min-height: 44px;
-  border-radius: 8px;
-  border: 1px solid rgba(134, 239, 172, 0.35);
-  background: rgba(2, 8, 5, 0.92);
-}
-
-.powerfist-preview-root .powerfistJoystickPad {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
 }
 
 .powerfist-preview-root .powerfistJoystickHint {
   margin: 0;
-  min-height: 1.2em;
+  max-width: 112px;
   color: var(--pf-muted);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  text-align: right;
   text-transform: uppercase;
 }
 
-.powerfist-preview-root .powerfistJoystickPad [data-testid="joystick-base"] {
-  border: 1px solid rgba(134, 239, 172, 0.35);
+.powerfist-preview-root .powerfistJoystickFab [data-testid="joystick-base"] {
+  border: 1px solid rgba(134, 239, 172, 0.45);
+  border-radius: 999px;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-    0 8px 24px rgba(0, 0, 0, 0.35);
-}
-
-.powerfist-preview-root[data-compact-cards="true"] .powerfistJoystickControls {
-  grid-template-columns: 1fr;
-  justify-items: center;
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 10px 28px rgba(0, 0, 0, 0.45);
 }
 
 .powerfist-preview-root .powerfistMainLayout {
@@ -785,7 +757,7 @@
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root .matrixStage,
 .cyberdeck-rola-dex-pane .powerfist-preview-root .matrix,
-.cyberdeck-rola-dex-pane .powerfist-preview-root .powerfistJoystickControls {
+.cyberdeck-rola-dex-pane .powerfist-preview-root .powerfistJoystickFab {
   width: 100%;
   max-width: 100%;
 }

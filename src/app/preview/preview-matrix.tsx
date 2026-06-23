@@ -11,9 +11,7 @@ import {
 import EmblaCarousel, { type EmblaCarouselType } from "embla-carousel";
 import { FigletFontPreviewSlide } from "@/components/cyberdeck/figlet-font-preview-slide";
 import {
-  CYBERDECK_PANE_KINDS,
   CYBERDECK_PANE_REGISTRY,
-  type CyberdeckPaneKind,
 } from "@/features/cyberdeck/pane-registry";
 import { ensurePickerSnappedToCenter } from "@/lib/embla-ios-picker-loop";
 import {
@@ -21,7 +19,7 @@ import {
   POWERFIST_STACK_PUSH_EVENT,
   type PowerFistStackCommand,
 } from "@/lib/cyberdeck/powerfist-events";
-import { GLYPH_CHANNEL_PREVIEW_DECKS, PREVIEW_DECKS } from "./preview-data";
+import { ALL_PREVIEW_DECKS } from "./preview-data";
 import { scrollMatrixTo, wrapIndex } from "./preview-matrix-nav";
 import { PowerfistJoystickControls } from "./powerfist-joystick-controls";
 import "./preview-matrix.css";
@@ -34,7 +32,7 @@ const CARD_PLAY_TRACE_PATH =
 function cardChatMessage(
   deckName: string,
   targetPaneLabel: string,
-  card: (typeof PREVIEW_DECKS)[number]["cards"][number],
+  card: (typeof ALL_PREVIEW_DECKS)[number]["cards"][number],
 ): string {
   const preview =
     card.preview?.kind === "figlet"
@@ -66,7 +64,6 @@ export function PreviewMatrix() {
   const [activeDeckIndex, setActiveDeckIndex] = useState(0);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [isCompactCards, setIsCompactCards] = useState(false);
-  const [targetPane, setTargetPane] = useState<CyberdeckPaneKind>("operator");
   const [composerText, setComposerText] = useState("");
   const [armingCardKey, setArmingCardKey] = useState<string | null>(null);
   const [armedCardKey, setArmedCardKey] = useState<string | null>(null);
@@ -89,8 +86,7 @@ export function PreviewMatrix() {
   } | null>(null);
   const pushReceiptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const targetPaneLabel = CYBERDECK_PANE_REGISTRY[targetPane].label;
-  const activeDecks = targetPane === "glyph-channel" ? GLYPH_CHANNEL_PREVIEW_DECKS : PREVIEW_DECKS;
+  const activeDecks = ALL_PREVIEW_DECKS;
   const armedCard = useMemo(() => {
     if (!armedCardKey) return null;
     const [deckIndex, cardIndex] = armedCardKey.split(":").map(Number);
@@ -98,18 +94,6 @@ export function PreviewMatrix() {
     const card = deck?.cards[cardIndex];
     return deck && card ? { card, cardIndex, deck, deckIndex } : null;
   }, [activeDecks, armedCardKey]);
-  const paneRollerItems = useMemo(
-    () =>
-      CYBERDECK_PANE_KINDS.map((kind) => {
-        const label = CYBERDECK_PANE_REGISTRY[kind].label;
-        return {
-          value: kind,
-          label,
-          slide: <span className="powerfistPaneRollerLabel">{label}</span>,
-        };
-      }),
-    [],
-  );
 
   const setActiveFocus = useCallback((deckIndex: number, cardIndex: number) => {
     activeDeckIndexRef.current = deckIndex;
@@ -361,8 +345,9 @@ export function PreviewMatrix() {
       applyFocus(deckIndex, cardIndex);
       const deck = activeDecks[deckIndex];
       const card = deck.cards[cardIndex];
+      const deckTargetLabel = CYBERDECK_PANE_REGISTRY[deck.targetPane].label;
       const composerSupplement = composerText.trim() || undefined;
-      const chatMessage = cardChatMessage(deck.name, targetPaneLabel, card);
+      const chatMessage = cardChatMessage(deck.name, deckTargetLabel, card);
       const detail: PowerFistStackCommand = {
         kind: "powerfist-stack-push",
         actor: "operator",
@@ -377,7 +362,7 @@ export function PreviewMatrix() {
         toolOverride: card.toolOverride,
         composerSupplement,
         preparedArtifact: card.preview,
-        targetPane: targetPaneLabel,
+        targetPane: deckTargetLabel,
       };
       if (composerSupplement && card.toolOverride?.composerArg) {
         setComposerText("");
@@ -394,14 +379,14 @@ export function PreviewMatrix() {
       }
       if (pushReceiptTimerRef.current) clearTimeout(pushReceiptTimerRef.current);
       setPushReceiptHtml(
-        `Pushed <strong>${card.title}</strong> from <strong>${deck.name}</strong> onto the Echo Mirage command stack against <strong>${targetPaneLabel}</strong>.`,
+        `Pushed <strong>${card.title}</strong> from <strong>${deck.name}</strong> onto the Echo Mirage command stack against <strong>${deckTargetLabel}</strong>.`,
       );
       pushReceiptTimerRef.current = setTimeout(() => {
         setPushReceiptHtml(null);
         pushReceiptTimerRef.current = null;
       }, CARD_PUSH_RECEIPT_DURATION_MS);
     },
-    [activeDecks, applyFocus, composerText, targetPaneLabel],
+    [activeDecks, applyFocus, composerText],
   );
 
   const cancelCardHold = useCallback(() => {
@@ -488,13 +473,6 @@ export function PreviewMatrix() {
     [],
   );
 
-  const handleTargetPaneChange = useCallback((next: string) => {
-    activeDeckIndexRef.current = 0;
-    activeCardIndexRef.current = 0;
-    setActiveDeckIndex(0);
-    setActiveCardIndex(0);
-    setTargetPane(next as CyberdeckPaneKind);
-  }, []);
 
   return (
     <div className="powerfist-preview-root" data-compact-cards={isCompactCards ? "true" : "false"}>
@@ -669,9 +647,6 @@ export function PreviewMatrix() {
           {!armedCardKey ? (
             <PowerfistJoystickControls
               disabled={Boolean(armedCardKey)}
-              paneRollerItems={paneRollerItems}
-              targetPane={targetPane}
-              onTargetPaneChange={handleTargetPaneChange}
               onNavigateCard={navigateCard}
               onNavigateDeck={navigateDeck}
             />

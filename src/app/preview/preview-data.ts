@@ -1,3 +1,5 @@
+import type { CyberdeckPaneKind } from "@/features/cyberdeck/pane-registry";
+
 export type PreviewCardRisk = "safe" | "caution" | "restricted";
 
 export type PreviewCardToolOverride = {
@@ -24,6 +26,42 @@ export type PreviewDeck = {
   badge: string;
   cards: PreviewCard[];
 };
+
+export type PreviewDeckWithTarget = PreviewDeck & {
+  targetPane: CyberdeckPaneKind;
+};
+
+const PREVIEW_DECK_TARGET_BY_NAME: Record<string, CyberdeckPaneKind> = {
+  "Execution Deck": "operator",
+  "Diagnostics Deck": "diagnostics",
+  "Voice Deck": "voice-lab",
+  "Quorum Deck": "db8",
+  "Coding Deck": "cadre",
+  "Operator Deck": "operator",
+  "Filesystem Deck": "document",
+  "Gateway Deck": "pi",
+  "Stack Deck": "diagnostics",
+};
+
+const GLYPH_PREVIEW_DECK_NAMES = new Set([
+  "Text",
+  "1 Line ASCII",
+  "Figlet",
+  "Divider",
+  "Signal",
+  "Banner",
+]);
+
+export function resolvePreviewDeckTarget(name: string): CyberdeckPaneKind {
+  if (GLYPH_PREVIEW_DECK_NAMES.has(name)) {
+    return "glyph-channel";
+  }
+  return PREVIEW_DECK_TARGET_BY_NAME[name] ?? "operator";
+}
+
+export function withPreviewDeckTarget(deck: PreviewDeck): PreviewDeckWithTarget {
+  return { ...deck, targetPane: resolvePreviewDeckTarget(deck.name) };
+}
 
 /** Embla loop needs enough slide mass for 38% card peek and 72% deck bands (6+ cards per hand). */
 /** Static deck data mirrored from public/preview.html */
@@ -722,4 +760,10 @@ export const GLYPH_CHANNEL_PREVIEW_DECKS: PreviewDeck[] = [
       },
     ],
   },
+];
+
+/** Full matrix carousel: main decks then glyph-channel engine decks. Target pane follows the active deck. */
+export const ALL_PREVIEW_DECKS: PreviewDeckWithTarget[] = [
+  ...PREVIEW_DECKS.map(withPreviewDeckTarget),
+  ...GLYPH_CHANNEL_PREVIEW_DECKS.map(withPreviewDeckTarget),
 ];

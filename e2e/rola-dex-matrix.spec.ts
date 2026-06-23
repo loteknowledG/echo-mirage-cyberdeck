@@ -24,7 +24,6 @@ async function sendDeckCommand(page: import("@playwright/test").Page, text: stri
 /** Focused card chrome must intersect the matrix viewport (not scrolled off-screen). */
 async function expectPowerfistReady(page: import("@playwright/test").Page) {
   await expect(page.getByTestId("preview-matrix")).toBeVisible({ timeout: 15000 });
-  await expect(page.getByLabel("PowerFist target pane")).toBeVisible();
   await expect(page.getByTestId("powerfist-joystick")).toBeVisible();
 }
 
@@ -133,7 +132,7 @@ test.describe("Rola Dex / Preview matrix", () => {
     await expectPowerfistReady(page);
     const title = await expectFocusedCardVisibleInMatrix(page);
     expect(title).toContain("Capture");
-    await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(54);
+    await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(90);
   });
 
   test("cyberdeck rola-dex tab shows focused card inside matrix", async ({ page }) => {
@@ -231,7 +230,7 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
     await expectPowerfistReady(page);
-    await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(54);
+    await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(90);
 
     const hand = page.locator(".powerfist-preview-root .handViewport").first();
     const box = await hand.boundingBox();
@@ -367,7 +366,7 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.getByRole("button", { name: "Close" }).click();
 
     for (let i = 0; i < 5; i += 1) {
-      await pressMatrixKey(page, "ArrowDown");
+      await pressMatrixKey(page, "ArrowUp");
     }
     await pressMatrixKey(page, "ArrowLeft");
     await armSelectedCard(page);
@@ -377,15 +376,13 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.getByLabel("PowerFist instruction").fill("src/app/preview/preview-matrix.tsx");
   });
 
-  test("glyph channel target exposes text, one-line ASCII, and figlet decks", async ({ page }) => {
+  test("glyph channel decks are reachable by scrolling the matrix deck carousel", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
     await expectPowerfistReady(page);
 
-    await page.getByLabel("PowerFist target pane").hover();
-    for (let step = 0; step < 11; step += 1) {
-      await page.mouse.wheel(0, 120);
-      await page.waitForTimeout(90);
+    for (let step = 0; step < 9; step += 1) {
+      await pressMatrixKey(page, "ArrowUp");
     }
 
     await expect(page.locator(".cardTitle", { hasText: "Render Plain Text" })).toBeVisible();

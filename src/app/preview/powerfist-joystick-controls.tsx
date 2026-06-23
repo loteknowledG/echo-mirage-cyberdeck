@@ -2,8 +2,6 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Joystick } from "react-joystick-component";
-import { CyberdeckRollingPicker } from "@/components/cyberdeck/cyberdeck-rolling-picker";
-import type { CyberdeckRollingPickerItem } from "@/components/cyberdeck/cyberdeck-rolling-picker";
 import {
   describePowerfistJoystickPath,
   resolvePowerfistJoystickMoves,
@@ -18,11 +16,11 @@ type JoystickUpdateEvent = {
   distance: number | null;
 };
 
+/** Repeat interval while the stick is held (ms). */
+const JOYSTICK_REPEAT_MS = 130;
+
 type PowerfistJoystickControlsProps = {
   disabled?: boolean;
-  paneRollerItems: CyberdeckRollingPickerItem[];
-  targetPane: string;
-  onTargetPaneChange: (next: string) => void;
   onNavigateCard: (direction: 1 | -1) => void;
   onNavigateDeck: (direction: 1 | -1) => void;
 };
@@ -52,87 +50,95 @@ function applyJoystickMove(
   }
 }
 
+function pathKey(moves: PowerfistJoystickMove[]): string {
+  return moves.join("|");
+}
+
 export function PowerfistJoystickControls({
   disabled = false,
-  paneRollerItems,
-  targetPane,
-  onTargetPaneChange,
   onNavigateCard,
   onNavigateDeck,
 }: PowerfistJoystickControlsProps) {
-  const lastGestureRef = useRef<JoystickUpdateEvent | null>(null);
+  const activePathRef = useRef<PowerfistJoystickMove[]>([]);
+  const pathStepRef = useRef(0);
+  const lastFireAtRef = useRef(0);
   const [pathHint, setPathHint] = useState("");
 
-  const rememberGesture = useCallback((event: JoystickUpdateEvent) => {
-    if (event.x == null || event.y == null || event.distance == null) return;
-    lastGestureRef.current = event;
-    const moves = resolvePowerfistJoystickMoves(event.x, event.y, event.distance);
-    setPathHint(describePowerfistJoystickPath(moves));
-  }, []);
+  const firePathStep = useCallback(
+    (moves: PowerfistJoystickMove[]) => {
+      if (moves.length < 1) return;
+      const step = pathStepRef.current % moves.length;
+      applyJoystickMove(moves[step], onNavigateCard, onNavigateDeck);
+      pathStepRef.current = step + 1;
+      lastFireAtRef.current = Date.now();
+    },
+    [onNavigateCard, onNavigateDeck],
+  );
 
   const handleMove = useCallback(
     (event: JoystickUpdateEvent) => {
       if (disabled) return;
-      rememberGesture(event);
+      if (event.x == null || event.y == null || event.distance == null) return;
+
+      const moves = resolvePowerfistJoystickMoves(event.x, event.y, event.distance);
+      setPathHint(describePowerfistJoystickPath(moves));
+
+      if (moves.length < 1) {
+        activePathRef.current = [];
+        pathStepRef.current = 0;
+        return;
+      }
+
+      const nextKey = pathKey(moves);
+      const activeKey = pathKey(activePathRef.current);
+      const now = Date.now();
+
+      if (nextKey !== activeKey) {
+        activePathRef.current = moves;
+        pathStepRef.current = 0;
+        firePathStep(moves);
+        return;
+      }
+
+      if (now - lastFireAtRef.current < JOYSTICK_REPEAT_MS) return;
+      firePathStep(moves);
     },
-    [disabled, rememberGesture],
+    [disabled, firePathStep],
   );
 
-  const handleStop = useCallback(
-    (event: JoystickUpdateEvent) => {
-      if (disabled) return;
-      const sample = lastGestureRef.current ?? event;
-      lastGestureRef.current = null;
-      const moves = resolvePowerfistJoystickMoves(sample.x, sample.y, sample.distance);
-      setPathHint(describePowerfistJoystickPath(moves));
-      for (const move of moves) {
-        applyJoystickMove(move, onNavigateCard, onNavigateDeck);
-      }
-      if (moves.length < 1) {
-        setPathHint("");
-      }
-    },
-    [disabled, onNavigateCard, onNavigateDeck],
-  );
+  const handleStop = useCallback(() => {
+    activePathRef.current = [];
+    pathStepRef.current = 0;
+    lastFireAtRef.current = 0;
+    setPathHint("");
+  }, []);
 
   const handleStart = useCallback(() => {
-    lastGestureRef.current = null;
+    activePathRef.current = [];
+    pathStepRef.current = 0;
+    lastFireAtRef.current = 0;
     setPathHint("");
   }, []);
 
   return (
-    <section className="powerfistJoystickControls" aria-label="Matrix navigation">
-      <div className="powerfistJoystickTarget">
-        <span className="powerfistJoystickTargetLabel">Target</span>
-        <CyberdeckRollingPicker
-          items={paneRollerItems}
-          value={targetPane}
-          onChange={onTargetPaneChange}
-          ariaLabel="PowerFist target pane"
-          viewportClassName="powerfistPaneRollerViewport powerfistPaneRollerViewportJoystick"
-          alwaysShowLabel
-          showTextWhileScrolling
-          loop
-        />
-      </div>
-
-      <div className="powerfistJoystickPad" data-testid="powerfist-joystick">
-        <Joystick
-          size={112}
-          stickSize={44}
-          baseColor="rgba(8, 17, 13, 0.94)"
-          stickColor="rgba(134, 239, 172, 0.92)"
-          minDistance={15}
-          throttle={40}
-          disabled={disabled}
-          move={handleMove}
-          stop={handleStop}
-          start={handleStart}
-        />
+    <div className="powerfistJoystickFab" data-testid="powerfist-joystick" aria-label="Matrix navigation">
+      <Joystick
+        size={96}
+        stickSize={38}
+        baseColor="rgba(8, 17, 13, 0.94)"
+        stickColor="rgba(134, 239, 172, 0.92)"
+        minDistance={15}
+        throttle={16}
+        disabled={disabled}
+        move={handleMove}
+        stop={handleStop}
+        start={handleStart}
+      />
+      {pathHint ? (
         <p className="powerfistJoystickHint" aria-live="polite">
-          {pathHint || "Drag // release to step deck + hand"}
+          {pathHint}
         </p>
-      </div>
-    </section>
+      ) : null}
+    </div>
   );
 }
