@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CyberdeckRollingPicker } from '@/components/cyberdeck/cyberdeck-rolling-picker';
 import { FigletFontPreviewSlide } from '@/components/cyberdeck/figlet-font-preview-slide';
+import { ShowroomTickPointerRail } from '@/components/cyberdeck/showroom-tick-pointer-rail';
 import { cn } from '@/lib/utils';
 import {
   resolveFigletPickerValue,
@@ -197,7 +198,9 @@ export function FigletFontPicker({
             No fonts match.
           </p>
         ) : (
-          roller
+          <ShowroomTickPointerRail slideHeightPx={44}>
+            {roller}
+          </ShowroomTickPointerRail>
         )}
       </div>
     </div>
