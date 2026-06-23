@@ -154,13 +154,10 @@ export function FigletFontPicker({
       wheelNeighborCount={3}
       slideHeightPx={isPriceIsRight ? 44 : 28}
       wheelScrollStep={1}
-      wheelMomentumGain={2.15}
-      wheelMomentumFriction={0.978}
-      wheelMomentumDuration={180}
       alwaysShowLabel={isPriceIsRight}
       showTextWhileScrolling={false}
       wheelSettledShowsSlide={false}
-      loop={!isPriceIsRight}
+      loop
       rollerType={isPriceIsRight ? 'figlet-price-is-right' : 'figlet-compact'}
     />
   );
