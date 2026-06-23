@@ -210,7 +210,7 @@ export function PreviewMatrix() {
 
     const deckEmbla = EmblaCarousel(deckViewport, {
       axis: "y",
-      loop: activeDecks.length > 1,
+      loop: true,
       align: "center",
       dragFree: false,
       containScroll: false,
@@ -237,19 +237,33 @@ export function PreviewMatrix() {
     let cancelled = false;
     let resizeObserver: ResizeObserver | null = null;
 
-    const tryMount = () => {
-      if (cancelled) return false;
-      return mountCarousels();
+    const syncCarousels = () => {
+      if (cancelled) return;
+      if (deckEmblaRef.current) {
+        deckEmblaRef.current.reInit();
+        handEmblaRefs.current.forEach((embla) => embla?.reInit());
+        const deckCount = activeDecks.length;
+        if (deckCount < 1) return;
+        const next = scrollMatrixTo(
+          deckEmblaRef.current,
+          handEmblaRefs.current,
+          activeDeckIndexRef.current,
+          activeCardIndexRef.current,
+          deckCount,
+          { jump: true },
+        );
+        setActiveFocus(next.deckIndex, next.cardIndex);
+        return;
+      }
+      mountCarousels();
     };
 
-    if (!tryMount()) {
-      const matrix = matrixRef.current;
-      if (matrix) {
-        resizeObserver = new ResizeObserver(() => {
-          if (tryMount()) resizeObserver?.disconnect();
-        });
-        resizeObserver.observe(matrix);
-      }
+    syncCarousels();
+
+    const matrix = matrixRef.current;
+    if (matrix) {
+      resizeObserver = new ResizeObserver(() => syncCarousels());
+      resizeObserver.observe(matrix);
     }
 
     return () => {
@@ -260,7 +274,7 @@ export function PreviewMatrix() {
       handEmblaRefs.current.forEach((embla) => embla?.destroy());
       handEmblaRefs.current = [];
     };
-  }, [mountCarousels]);
+  }, [activeDecks, mountCarousels, setActiveFocus]);
 
   useEffect(() => {
     const matrix = matrixRef.current;

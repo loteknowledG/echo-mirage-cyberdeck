@@ -124,7 +124,7 @@ test.describe("Rola Dex / Preview matrix", () => {
     await expectPowerfistReady(page);
     const title = await expectFocusedCardVisibleInMatrix(page);
     expect(title).toContain("Capture");
-    await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(18);
+    await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(54);
   });
 
   test("cyberdeck rola-dex tab shows focused card inside matrix", async ({ page }) => {
@@ -222,7 +222,7 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
     await expectPowerfistReady(page);
-    await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(18);
+    await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(54);
 
     const hand = page.locator(".powerfist-preview-root .handViewport").first();
     const box = await hand.boundingBox();

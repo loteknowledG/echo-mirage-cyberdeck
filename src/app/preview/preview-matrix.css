@@ -27,8 +27,10 @@
     linear-gradient(180deg, #020403, var(--pf-bg));
   color: var(--pf-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
 
@@ -40,7 +42,11 @@
 
 .powerfist-preview-root .shell {
   width: min(960px, 94vw);
-  display: grid;
+  flex: 1 1 auto;
+  max-height: calc(100vh - 2rem);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   container-type: inline-size;
 }
@@ -114,8 +120,10 @@
 }
 
 .powerfist-preview-root .matrixStage {
-  height: 520px;
   position: relative;
+  flex: 1 1 auto;
+  min-height: 520px;
+  height: 100%;
 }
 
 .powerfist-preview-root .powerfistMainLayout {
@@ -125,12 +133,13 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex: 1 1 auto;
 }
 
 .powerfist-preview-root .powerfistMainLayout .matrixStage {
   min-height: 0;
   flex: 1 1 auto;
-  height: auto;
+  height: 100%;
 }
 
 .powerfist-preview-root .matrix {
@@ -989,7 +998,7 @@
 .cyberdeck-rola-dex-pane .powerfist-preview-root .powerfistMainLayout {
   flex: 1 1 auto;
   min-height: 0;
-  height: auto;
+  height: 100%;
 }
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root .matrixStage,
