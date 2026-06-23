@@ -199,7 +199,7 @@ export function PreviewMatrix() {
     });
 
     deckEmblaRef.current = deckEmbla;
-    // Defer focus until scroll settles so deck bands slide before selection updates.
+    deckEmbla.on("select", syncFromEmbla);
     deckEmbla.on("settle", syncFromEmbla);
     const next = scrollMatrixTo(
       deckEmbla,
@@ -317,15 +317,16 @@ export function PreviewMatrix() {
   const navigateCard = useCallback(
     (direction: 1 | -1) => {
       if (armedCardKey) return;
-      const deck = activeDecks[activeDeckIndex];
+      const deckIndex = activeDeckIndexRef.current;
+      const deck = activeDecks[deckIndex];
       if (!deck || deck.cards.length < 1) return;
 
-      const handEmbla = handEmblaRefs.current[activeDeckIndex];
+      const handEmbla = handEmblaRefs.current[deckIndex];
       if (!handEmbla) return;
       if (direction < 0) handEmbla.scrollPrev();
       else handEmbla.scrollNext();
     },
-    [activeDeckIndex, activeDecks, armedCardKey],
+    [activeDecks, armedCardKey],
   );
 
   /** Vertical deck band: smooth scroll like dragging the deck viewport (not jump/fade). */
@@ -336,8 +337,9 @@ export function PreviewMatrix() {
       if (!deckEmbla) return;
       if (direction < 0) deckEmbla.scrollNext();
       else deckEmbla.scrollPrev();
+      syncFromEmbla();
     },
-    [armedCardKey],
+    [armedCardKey, syncFromEmbla],
   );
 
   const handlePushCard = useCallback(
