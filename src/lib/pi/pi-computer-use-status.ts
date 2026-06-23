@@ -3,10 +3,8 @@ import type {
   PiComputerUseStatus,
   PiPlatform,
 } from "./pi-computer-use-types";
-import {
-  resolvePiComputerUseBackendAsync,
-  resolvePiPlatform,
-} from "./pi-platform-resolver";
+import { resolvePiPlatform } from "./pi-platform-resolver";
+import { resolvePiComputerUseBackendAsync } from "./pi-platform-resolver.server";
 import { getSynapseAdapterStatus } from "./synapse/synapse-adapter";
 import {
   checkWindowsUseBackend,

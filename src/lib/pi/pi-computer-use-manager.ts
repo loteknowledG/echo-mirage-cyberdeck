@@ -6,10 +6,8 @@ import type {
   PiComputerUseReceipt,
   PiPlatform,
 } from "./pi-computer-use-types";
-import {
-  resolvePiComputerUseBackendAsync,
-  resolvePiPlatform,
-} from "./pi-platform-resolver";
+import { resolvePiPlatform } from "./pi-platform-resolver";
+import { resolvePiComputerUseBackendAsync } from "./pi-platform-resolver.server";
 
 export { getPiComputerUseStatus } from "./pi-computer-use-status";
 

@@ -17,8 +17,5 @@ export type {
   PiPlatform,
   PiComputerUseBackend,
 } from "./pi-computer-use-types";
-export {
-  formatPiPlatformLabel,
-  resolvePiComputerUseBackend,
-  resolvePiPlatform,
-} from "./pi-platform-resolver";
+export { formatPiPlatformLabel, resolvePiPlatform } from "./pi-platform-resolver";
+export { resolvePiComputerUseBackend } from "./pi-platform-resolver.server";

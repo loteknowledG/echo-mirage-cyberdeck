@@ -13,11 +13,8 @@ import {
   resolvePiComputerUseAdapter,
 } from "../src/lib/pi/pi-computer-use-manager";
 import { getPiComputerUseStatus } from "../src/lib/pi/pi-computer-use-status";
-import {
-  formatPiPlatformLabel,
-  resolvePiComputerUseBackendAsync,
-  resolvePiPlatform,
-} from "../src/lib/pi/pi-platform-resolver";
+import { formatPiPlatformLabel, resolvePiPlatform } from "../src/lib/pi/pi-platform-resolver";
+import { resolvePiComputerUseBackendAsync } from "../src/lib/pi/pi-platform-resolver.server";
 import {
   releaseSynapseOperatorLease,
   syncSynapseLeaseWithPiGrant,

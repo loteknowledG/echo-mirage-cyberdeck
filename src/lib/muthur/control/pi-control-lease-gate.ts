@@ -10,7 +10,8 @@ import {
 } from "@/lib/muthur/control/pi-control-lease-store";
 import type { PiAuthorityReceipt } from "@/lib/muthur/control/pi-control-lease-types";
 import type { PiComputerUseReceipt } from "@/lib/pi/pi-computer-use-types";
-import { resolvePiComputerUseBackend, resolvePiPlatform } from "@/lib/pi/pi-platform-resolver";
+import { resolvePiPlatform } from "@/lib/pi/pi-platform-resolver";
+import { resolvePiComputerUseBackend } from "@/lib/pi/pi-platform-resolver.server";
 
 export type PiExecutionGateOptions = {
   /** Test/probe scripts only — never enabled in production. */
