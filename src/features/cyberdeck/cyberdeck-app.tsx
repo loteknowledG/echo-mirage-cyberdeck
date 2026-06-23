@@ -611,7 +611,7 @@ function isCustomTabKind(kind: unknown): kind is CustomTabKind {
 }
 
 /** Blank tabs can still pick a surface; assigned tabs are type-locked. */
-function isUnassignedCustomTab(tab: CustomTab | null | undefined): tab is CustomTab {
+function isUnassignedCustomTab(tab: { kind: string } | null | undefined): boolean {
   return Boolean(tab && tab.kind === "blank");
 }
 
