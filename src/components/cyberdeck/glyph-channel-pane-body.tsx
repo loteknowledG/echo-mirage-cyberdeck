@@ -34,7 +34,7 @@ import { CyberdeckIconSwitch } from "@/components/cyberdeck/cyberdeck-icon-switc
 import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { GlyphEnginePicker } from "@/components/cyberdeck/glyph-engine-picker";
-import { FigletFontListPicker } from "@/components/cyberdeck/figlet-font-list-picker";
+import { FigletFontPicker } from "@/components/cyberdeck/figlet-font-picker";
 import { FigletFontPreviewPanel } from "@/components/cyberdeck/figlet-font-preview-panel";
 import { OnelineArtPicker } from "@/components/cyberdeck/oneline-art-picker";
 import {
@@ -863,13 +863,13 @@ export function CyberdeckGlyphChannelPaneBody() {
                 />
                 {settings.engine === "figlet" ? (
                   <div className="flex min-w-0 flex-1 items-stretch gap-2 overflow-hidden">
-                    <FigletFontListPicker
-                      className="w-[10.5rem] shrink-0"
+                    <FigletFontPicker
+                      variant="showroom"
                       value={settings.figletFont}
                       onChange={(figletFont) =>
                         setSettings((prev) => ({ ...prev, figletFont }))
                       }
-                      onSelect={focusComposer}
+                      onWheelSettled={focusComposer}
                     />
                     <FigletFontPreviewPanel
                       variant="toolbar"
