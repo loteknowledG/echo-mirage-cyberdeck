@@ -610,6 +610,11 @@ function isCustomTabKind(kind: unknown): kind is CustomTabKind {
   return typeof kind === "string" && normalizeCustomTabKind(kind) !== null;
 }
 
+/** Blank tabs can still pick a surface; assigned tabs are type-locked. */
+function isUnassignedCustomTab(tab: CustomTab | null | undefined): tab is CustomTab {
+  return Boolean(tab && tab.kind === "blank");
+}
+
 function sanitizeCustomTabs(value: unknown): CustomTab[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
@@ -5255,6 +5260,18 @@ export default function CyberdeckApp() {
         return;
       }
 
+      const activeTab = useCyberdeckTabStore
+        .getState()
+        .customTabs.find((tab) => tab.id === activeCustomTabId);
+      if (!isUnassignedCustomTab(activeTab)) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: "TAB_CONVERT_SKIPPED // TAB_TYPE_LOCKED" },
+        ]);
+        setIsStreaming(false);
+        return;
+      }
+
       convertCustomTab(activeCustomTabId, tabCommand.surfaceKind, {
         label: tabCommand.label,
         glyph: tabCommand.glyph,
@@ -6534,9 +6551,12 @@ ${diff}`;
         glyph?: string;
       },
     ) => {
+      const sourceTab = useCyberdeckTabStore.getState().customTabs.find((t) => t.id === tabId);
+      if (!sourceTab) return;
+      if (!isUnassignedCustomTab(sourceTab)) return;
+
       if (nextKind === "document") {
-        const sourceTab = useCyberdeckTabStore.getState().customTabs.find((t) => t.id === tabId);
-        const sourceAsset = sourceTab?.asset as DroppedOperatorAsset | null | undefined;
+        const sourceAsset = sourceTab.asset as DroppedOperatorAsset | null | undefined;
         flushSync(() => {
           if (sourceAsset) {
             operatorKindManualRef.current = false;
@@ -6662,7 +6682,15 @@ ${diff}`;
       closeGatewayPaneContextMenu();
 
       const menuWidth = 140;
-      const menuHeight = isFixedServerTabId(tabId) ? 132 : 520;
+      const tab =
+        !isFixedServerTabId(tabId)
+          ? useCyberdeckTabStore.getState().customTabs.find((entry) => entry.id === tabId)
+          : null;
+      const menuHeight = isFixedServerTabId(tabId)
+        ? 132
+        : isUnassignedCustomTab(tab)
+          ? 520
+          : 56;
       const padding = 8;
       const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
       const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
@@ -6705,6 +6733,8 @@ ${diff}`;
         action.action === "convert" ? action.kind : "settings";
 
       if (existingTabId) {
+        const tab = useCyberdeckTabStore.getState().customTabs.find((entry) => entry.id === existingTabId);
+        if (!isUnassignedCustomTab(tab)) return;
         convertCustomTab(existingTabId, kind);
         return;
       }
@@ -7525,16 +7555,22 @@ ${diff}`;
               </>
             ) : (
               <>
-                {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
-                  <CyberdeckMenuButton
-                    key={`convert-${action.label}`}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => applyTabMenuAction(action, railTabContextMenu.tabId)}
-                  >
-                    {action.label}
-                  </CyberdeckMenuButton>
-                ))}
+                {isUnassignedCustomTab(
+                  useCyberdeckTabStore
+                    .getState()
+                    .customTabs.find((tab) => tab.id === railTabContextMenu.tabId),
+                )
+                  ? CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
+                      <CyberdeckMenuButton
+                        key={`convert-${action.label}`}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => applyTabMenuAction(action, railTabContextMenu.tabId)}
+                      >
+                        {action.label}
+                      </CyberdeckMenuButton>
+                    ))
+                  : null}
                 <CyberdeckMenuButton
                   type="button"
                   role="menuitem"
