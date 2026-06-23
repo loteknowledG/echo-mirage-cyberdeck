@@ -65,8 +65,6 @@ const nextConfig = {
 		"lit-element",
 		"lit-html",
 		"@mariozechner/mini-lit",
-		"@mariozechner/pi-agent-core",
-		"@mariozechner/pi-ai",
 		"@mariozechner/pi-web-ui",
 	],
 	allowedDevOrigins: ["127.0.0.1", "localhost"],
