@@ -2,7 +2,9 @@
 
 import { useMemo } from "react";
 import { CyberdeckRollingPicker } from "@/components/cyberdeck/cyberdeck-rolling-picker";
+import { RollerDialFlanks } from "@/components/cyberdeck/roller-dial-flanks";
 import type { GlyphPaneEngine } from "@/lib/glyph-channel";
+import { useDeckMode } from "@/lib/deck-mode";
 
 const GLYPH_ENGINE_ENTRIES: Array<{ value: GlyphPaneEngine; label: string; glyph: string }> = [
   { value: "ascii", label: "TEXT", glyph: "T" },
@@ -17,6 +19,8 @@ type GlyphEnginePickerProps = {
 
 /** Y-axis rolodex picker for ASCII vs Figlet render engine. */
 export function GlyphEnginePicker({ value, onChange }: GlyphEnginePickerProps) {
+  const deckMode = useDeckMode();
+
   const items = useMemo(
     () =>
       GLYPH_ENGINE_ENTRIES.map((entry) => ({
@@ -33,7 +37,7 @@ export function GlyphEnginePicker({ value, onChange }: GlyphEnginePickerProps) {
     ? value
     : "ascii";
 
-  return (
+  const picker = (
     <CyberdeckRollingPicker
       items={items}
       value={resolvedValue}
@@ -45,4 +49,14 @@ export function GlyphEnginePicker({ value, onChange }: GlyphEnginePickerProps) {
       loop
     />
   );
+
+  if (deckMode === "ascii") {
+    return (
+      <RollerDialFlanks className="glyph-engine-roller shrink-0 font-mono text-[9px] tracking-[0.06em] text-[#8ca39a]">
+        {picker}
+      </RollerDialFlanks>
+    );
+  }
+
+  return picker;
 }
