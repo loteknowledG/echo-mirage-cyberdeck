@@ -155,6 +155,9 @@ export function FigletFontPicker({
       wheelNeighborCount={3}
       slideHeightPx={isPriceIsRight ? 44 : 28}
       wheelScrollStep={1}
+      wheelMomentumGain={1.92}
+      wheelMomentumFriction={0.972}
+      wheelMomentumDuration={155}
       alwaysShowLabel={isPriceIsRight}
       showTextWhileScrolling={false}
       wheelSettledShowsSlide={false}
