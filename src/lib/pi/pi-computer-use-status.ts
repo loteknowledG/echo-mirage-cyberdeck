@@ -4,9 +4,10 @@ import type {
   PiPlatform,
 } from "./pi-computer-use-types";
 import {
-  resolvePiComputerUseBackend,
+  resolvePiComputerUseBackendAsync,
   resolvePiPlatform,
 } from "./pi-platform-resolver";
+import { getSynapseAdapterStatus } from "./synapse/synapse-adapter";
 import {
   checkWindowsUseBackend,
   isWindowsUseBridgeAvailable,
@@ -17,7 +18,7 @@ function buildCapabilities(
   backend: PiComputerUseBackend,
   ready: boolean,
 ): PiComputerUseStatus["capabilities"] {
-  if (backend === "windows-use" && ready) {
+  if ((backend === "synapse" || backend === "windows-use") && ready) {
     return {
       screenshot: true,
       activeWindow: true,
@@ -64,10 +65,14 @@ function buildWindowsReadiness(): {
   };
 }
 
-function buildComputerUseState(
+async function buildComputerUseState(
   backend: PiComputerUseBackend,
-): PiComputerUseStatus["status"] {
+): Promise<PiComputerUseStatus["status"]> {
   switch (backend) {
+    case "synapse": {
+      const status = await getSynapseAdapterStatus();
+      return status.status;
+    }
     case "windows-use":
       return buildWindowsReadiness().status;
     case "pi-computer-use":
@@ -77,12 +82,13 @@ function buildComputerUseState(
   }
 }
 
-export function buildPiComputerUseStatus(
+export async function buildPiComputerUseStatus(
   platform: PiPlatform = resolvePiPlatform(),
-): PiComputerUseStatus {
-  const backend = resolvePiComputerUseBackend(platform);
-  const status = buildComputerUseState(backend);
+): Promise<PiComputerUseStatus> {
+  const backend = await resolvePiComputerUseBackendAsync(platform);
+  const status = await buildComputerUseState(backend);
   const windowsMeta = backend === "windows-use" ? buildWindowsReadiness() : null;
+  const synapseMeta = backend === "synapse" ? await getSynapseAdapterStatus() : null;
 
   return {
     actor: "pi",
@@ -94,12 +100,17 @@ export function buildPiComputerUseStatus(
     capabilities: buildCapabilities(backend, status === "READY"),
     remediation:
       status === "NOT_INSTALLED" || status === "FAILED"
-        ? PI_WINDOWS_USE_REMEDIATION
+        ? backend === "synapse"
+          ? synapseMeta?.remediation
+          : PI_WINDOWS_USE_REMEDIATION
         : undefined,
-    lastError: windowsMeta?.lastError,
+    lastError:
+      backend === "synapse"
+        ? synapseMeta?.lastError
+        : windowsMeta?.lastError,
   };
 }
 
-export function getPiComputerUseStatus(): PiComputerUseStatus {
+export async function getPiComputerUseStatus(): Promise<PiComputerUseStatus> {
   return buildPiComputerUseStatus();
 }

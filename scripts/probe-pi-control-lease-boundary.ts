@@ -22,7 +22,7 @@ async function main() {
     return;
   }
 
-  const status = getPiComputerUseStatus();
+  const status = await getPiComputerUseStatus();
   if (status.status !== "READY") {
     console.log(`probe:pi-control-lease-boundary: SKIP (status=${status.status})`);
     return;

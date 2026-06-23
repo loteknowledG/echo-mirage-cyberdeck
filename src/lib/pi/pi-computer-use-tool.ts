@@ -14,7 +14,7 @@ const piComputerUseSchema = Type.Object({
     Type.Literal("move"),
   ], {
     description:
-      "Desktop action via Pi windows-use backend. Requires active operator control lease.",
+      "Desktop action via Pi (Synapse preferred, windows-use fallback). Requires active operator control lease.",
   }),
   x: Type.Optional(Type.Number({ description: "Screen X coordinate" })),
   y: Type.Optional(Type.Number({ description: "Screen Y coordinate" })),
@@ -49,7 +49,7 @@ export function createPiComputerUseTool(): AgentTool<typeof piComputerUseSchema,
     label: "Pi Computer Use",
     name: "pi_computer_use",
     description:
-      "Execute a single desktop action through Pi's windows-use backend (screenshot, active_window, mouse, keyboard, scroll). " +
+      "Execute a single desktop action through Pi (Synapse preferred, windows-use fallback): screenshot, active_window, mouse, keyboard, scroll. " +
       "Requires an active Pi control lease granted by the operator. " +
       "Use for Paint/desktop missions: screenshot first, then open apps via hotkey, click, type, etc. " +
       "Returns a JSON receipt with status and summary.",

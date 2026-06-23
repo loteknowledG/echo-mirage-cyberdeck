@@ -24,7 +24,7 @@ function isPiComputerUseCommand(value: unknown): value is PiComputerUseCommand {
 }
 
 export async function POST(request: Request) {
-  const status = getPiComputerUseStatus();
+  const status = await getPiComputerUseStatus();
   if (status.status !== "READY") {
     return NextResponse.json(
       {

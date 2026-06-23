@@ -6,31 +6,53 @@ import type {
   PiComputerUseReceipt,
   PiPlatform,
 } from "./pi-computer-use-types";
-import { resolvePiComputerUseBackend, resolvePiPlatform } from "./pi-platform-resolver";
+import {
+  resolvePiComputerUseBackendAsync,
+  resolvePiPlatform,
+} from "./pi-platform-resolver";
 
 export { getPiComputerUseStatus } from "./pi-computer-use-status";
 
 let cachedAdapter: ComputerUseAdapter | null = null;
+let cachedAdapterKey: string | null = null;
 
 export type PiComputerUseExecutionOptions = {
   probeBypass?: boolean;
 };
 
+export function clearPiComputerUseAdapterCacheForTests(): void {
+  cachedAdapter = null;
+  cachedAdapterKey = null;
+}
+
 async function loadAdapterForPlatform(platform: PiPlatform): Promise<ComputerUseAdapter> {
-  const backend = resolvePiComputerUseBackend(platform);
+  const backend = await resolvePiComputerUseBackendAsync(platform);
+  const cacheKey = `${platform}:${backend}`;
+  if (cachedAdapter && cachedAdapterKey === cacheKey) {
+    return cachedAdapter;
+  }
+
+  let adapter: ComputerUseAdapter;
   switch (backend) {
+    case "synapse": {
+      const { createSynapseAdapter } = await import("./synapse/synapse-adapter");
+      adapter = createSynapseAdapter();
+      break;
+    }
     case "windows-use": {
       const { createWindowsUseAdapter } = await import("./windows/windows-use-adapter");
-      return createWindowsUseAdapter();
+      adapter = createWindowsUseAdapter();
+      break;
     }
     case "pi-computer-use": {
       const { createPiComputerUseMacAdapter } = await import("./macos/pi-computer-use-adapter");
-      return createPiComputerUseMacAdapter();
+      adapter = createPiComputerUseMacAdapter();
+      break;
     }
     default: {
       const { createPiComputerUseMacAdapter } = await import("./macos/pi-computer-use-adapter");
       const unavailable = createPiComputerUseMacAdapter();
-      return {
+      adapter = {
         backendId: "none",
         platform,
         getStatus: () => ({
@@ -67,8 +89,13 @@ async function loadAdapterForPlatform(platform: PiPlatform): Promise<ComputerUse
           message: `Computer use unavailable on ${platform}`,
         }),
       };
+      break;
     }
   }
+
+  cachedAdapter = adapter;
+  cachedAdapterKey = cacheKey;
+  return adapter;
 }
 
 export async function resolvePiComputerUseAdapter(
@@ -78,10 +105,7 @@ export async function resolvePiComputerUseAdapter(
 }
 
 async function getPiComputerUseAdapter(): Promise<ComputerUseAdapter> {
-  if (!cachedAdapter) {
-    cachedAdapter = await loadAdapterForPlatform(resolvePiPlatform());
-  }
-  return cachedAdapter;
+  return loadAdapterForPlatform(resolvePiPlatform());
 }
 
 async function executePiComputerUseCommandInternal(
@@ -147,11 +171,13 @@ export async function executePiComputerUseCommand(
 export async function probePiComputerUse(
   options?: PiComputerUseExecutionOptions,
 ): Promise<PiComputerUseProbeResult> {
+  const platform = resolvePiPlatform();
+  const backend = await resolvePiComputerUseBackendAsync(platform);
   const gate = assertPiControlLeaseForExecution({ action: "screenshot" }, options);
   if (!gate.allowed) {
     return {
-      platform: resolvePiPlatform(),
-      backend: resolvePiComputerUseBackend(resolvePiPlatform()),
+      platform,
+      backend,
       screenshotOk: false,
       activeWindowOk: false,
       mouseMoveOk: false,

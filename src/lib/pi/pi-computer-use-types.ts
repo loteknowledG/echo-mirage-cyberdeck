@@ -1,6 +1,10 @@
 export type PiPlatform = "windows" | "macos" | "linux" | "unsupported";
 
-export type PiComputerUseBackend = "windows-use" | "pi-computer-use" | "none";
+export type PiComputerUseBackend =
+  | "synapse"
+  | "windows-use"
+  | "pi-computer-use"
+  | "none";
 
 export type PiComputerUseCapabilityName =
   | "screenshot"
@@ -38,7 +42,7 @@ export interface PiComputerUseCommand {
 export interface PiComputerUseReceipt {
   id: string;
   actor: "pi";
-  backend: "windows-use" | "pi-computer-use" | "none";
+  backend: "synapse" | "windows-use" | "pi-computer-use" | "none";
   capability: PiComputerUseCapabilityName;
   status: PiComputerUseReceiptStatus;
   createdAt: string;

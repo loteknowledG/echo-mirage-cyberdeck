@@ -848,7 +848,7 @@ export function CyberdeckGlyphChannelPaneBody() {
             <div className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto border-t border-[#1a1a1a]">
               <div
                 className={cn(
-                  "flex min-w-0 flex-nowrap items-end gap-1.5 px-2 py-1.5",
+                  "flex min-w-0 flex-nowrap items-start gap-1.5 px-2 py-1.5",
                   settings.engine === "figlet"
                     ? "min-h-[8.25rem] overflow-hidden"
                     : "min-h-7 overflow-hidden",

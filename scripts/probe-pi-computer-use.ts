@@ -15,15 +15,19 @@ import {
 import { getPiComputerUseStatus } from "../src/lib/pi/pi-computer-use-status";
 import {
   formatPiPlatformLabel,
-  resolvePiComputerUseBackend,
+  resolvePiComputerUseBackendAsync,
   resolvePiPlatform,
 } from "../src/lib/pi/pi-platform-resolver";
+import {
+  releaseSynapseOperatorLease,
+  syncSynapseLeaseWithPiGrant,
+} from "../src/lib/pi/synapse/synapse-control-lease.server";
 
 async function main() {
   resetPiControlLeaseForTests();
 
   const platform = resolvePiPlatform();
-  const backend = resolvePiComputerUseBackend(platform);
+  const backend = await resolvePiComputerUseBackendAsync(platform);
 
   console.log(`[probe] platform=${platform} (${formatPiPlatformLabel(platform)})`);
   console.log(`[probe] backend=${backend}`);
@@ -31,7 +35,7 @@ async function main() {
   const adapter = await resolvePiComputerUseAdapter(platform);
   assert.equal(adapter.backendId, backend === "none" ? "none" : backend);
 
-  const status = getPiComputerUseStatus();
+  const status = await getPiComputerUseStatus();
   assert.equal(status.actor, "pi");
   assert.equal(status.platform, platform);
   assert.equal(status.backend, backend);
@@ -59,6 +63,9 @@ async function main() {
   const granted = grantPiControlLease(60_000);
   assert.equal(granted.granted, true);
   assert.ok(isPiControlLeaseActive());
+  if (backend === "synapse") {
+    await syncSynapseLeaseWithPiGrant(60_000);
+  }
 
   const screenshot = await executePiComputerUseCommand({ action: "screenshot" });
   assert.equal(screenshot.capability, "screenshot");
@@ -77,13 +84,16 @@ async function main() {
 
   const probe = await probePiComputerUse();
   assert.equal(probe.platform, "windows");
-  assert.equal(probe.backend, "windows-use");
+  assert.ok(probe.backend === "synapse" || probe.backend === "windows-use");
   assert.equal(probe.screenshotOk, true);
   assert.equal(probe.activeWindowOk, true);
   assert.equal(probe.mouseMoveSkipped, true);
   console.log(`[probe] ${probe.message}`);
 
   userRetakePiControl("probe_cleanup");
+  if (backend === "synapse") {
+    await releaseSynapseOperatorLease();
+  }
   assert.equal(isPiControlLeaseActive(), false);
 
   console.log("probe-pi-computer-use: PASS");

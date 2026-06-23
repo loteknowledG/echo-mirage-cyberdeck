@@ -10,6 +10,7 @@ import {
 } from "@/lib/muthur/control/pi-control-lease-store";
 import type { PiAuthorityReceipt } from "@/lib/muthur/control/pi-control-lease-types";
 import type { PiComputerUseReceipt } from "@/lib/pi/pi-computer-use-types";
+import { resolvePiComputerUseBackend, resolvePiPlatform } from "@/lib/pi/pi-platform-resolver";
 
 export type PiExecutionGateOptions = {
   /** Test/probe scripts only — never enabled in production. */
@@ -85,7 +86,7 @@ export function assertPiControlLeaseForExecution(
   pushPiAuthorityReceipt(authorityReceipt);
 
   const denialReceipt = createPiComputerUseReceipt({
-    backend: "windows-use",
+    backend: resolvePiComputerUseBackend(resolvePiPlatform()),
     capability: commandToCapability(command.action),
     status: "blocked",
     summary: "Pi computer-use execution denied — no active control lease",

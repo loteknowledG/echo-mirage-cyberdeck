@@ -28,7 +28,7 @@ const piComputerUseParameters = Type.Object({
 export const PI_COMPUTER_USE_CHAT_TOOL: Tool<typeof piComputerUseParameters> = {
   name: "pi_computer_use",
   description:
-    "Execute one desktop action via Pi windows-use (screenshot, active_window, click, type, hotkey, scroll, move). " +
+    "Execute one desktop action via Pi (Synapse preferred, windows-use fallback): screenshot, active_window, click, type, hotkey, scroll, move. " +
     "Requires active operator control lease. Take screenshot first, then act step by step.",
   parameters: piComputerUseParameters,
 };
@@ -74,7 +74,7 @@ export async function executePiComputerUseChatTool(
     return { text: `[TOOL ERROR] Unknown tool: ${toolCall.name}`, isError: true };
   }
 
-  const status = getPiComputerUseStatus();
+  const status = await getPiComputerUseStatus();
   if (status.status !== "READY") {
     return {
       text:

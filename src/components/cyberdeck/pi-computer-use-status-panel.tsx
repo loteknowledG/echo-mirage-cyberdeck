@@ -19,6 +19,8 @@ function capabilityMark(enabled: boolean): string {
 
 function formatBackendLabel(backend: PiComputerUseStatus["backend"]): string {
   switch (backend) {
+    case "synapse":
+      return "synapse";
     case "windows-use":
       return "windows-use";
     case "pi-computer-use":

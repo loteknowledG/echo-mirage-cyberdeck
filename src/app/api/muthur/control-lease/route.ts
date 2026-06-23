@@ -11,6 +11,10 @@ import {
   userRetakePiControl,
 } from "@/lib/muthur/control/pi-control-lease-store";
 import type { ComputerUseMission } from "@/lib/muthur/control/pi-control-lease-types";
+import {
+  releaseSynapseOperatorLease,
+  syncSynapseLeaseWithPiGrant,
+} from "@/lib/pi/synapse/synapse-control-lease.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,6 +74,21 @@ export async function POST(request: Request) {
           { status: 409 },
         );
       }
+      try {
+        await syncSynapseLeaseWithPiGrant(result.lease?.leaseDurationMs ?? durationMs ?? 15 * 60 * 1000);
+      } catch (error) {
+        terminateActiveLease("synapse_lease_sync_failed", { emitReceipt: true });
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to acquire Synapse operator lease",
+          },
+          { status: 503 },
+        );
+      }
       return NextResponse.json({
         ok: true,
         ...getPiControlLeaseSnapshot(),
@@ -80,18 +99,21 @@ export async function POST(request: Request) {
       denyPiControlLease(
         typeof body.reason === "string" ? body.reason : "operator_denied",
       );
+      await releaseSynapseOperatorLease();
       return NextResponse.json({ ok: true, ...getPiControlLeaseSnapshot() });
     }
     case "terminate": {
       const lease = terminateActiveLease(
         typeof body.reason === "string" ? body.reason : "mission_complete",
       );
+      await releaseSynapseOperatorLease();
       return NextResponse.json({ ok: true, lease, ...getPiControlLeaseSnapshot() });
     }
     case "retake": {
       const result = userRetakePiControl(
         typeof body.reason === "string" ? body.reason : "user_retake",
       );
+      await releaseSynapseOperatorLease();
       return NextResponse.json({ ok: true, ...result, ...getPiControlLeaseSnapshot() });
     }
     case "conflict": {
