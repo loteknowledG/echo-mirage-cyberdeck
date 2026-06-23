@@ -108,6 +108,44 @@ async function readEchoMirageClipboardText(): Promise<string> {
 
 type GlyphPaneMode = "view" | "edit";
 
+function GlyphDisplayZoomControls({
+  zoomPercent,
+  onDecrease,
+  onIncrease,
+  className,
+}: {
+  zoomPercent: number;
+  onDecrease: () => void;
+  onIncrease: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("deck-pane-depth-toolbar flex shrink-0 items-center gap-1", className)}>
+      <CyberdeckControlTooltip label="Decrease display zoom">
+        <CyberdeckControl
+          control={{ size: "compact", signal: true }}
+          onClick={onDecrease}
+          aria-label="Decrease display zoom"
+        >
+          −
+        </CyberdeckControl>
+      </CyberdeckControlTooltip>
+      <span className="min-w-[2.25rem] text-center font-mono text-[9px] text-[#6a6a6a]">
+        {zoomPercent}%
+      </span>
+      <CyberdeckControlTooltip label="Increase display zoom">
+        <CyberdeckControl
+          control={{ size: "compact", signal: true }}
+          onClick={onIncrease}
+          aria-label="Increase display zoom"
+        >
+          +
+        </CyberdeckControl>
+      </CyberdeckControlTooltip>
+    </div>
+  );
+}
+
 export function CyberdeckGlyphChannelPaneBody() {
   const deckMode = useDeckMode();
   const history = useGlyphTextHistory(GLYPH_CHANNEL_DEFAULT_TEXT);
@@ -623,6 +661,13 @@ export function CyberdeckGlyphChannelPaneBody() {
     [composerHeight, updateComposerHeight],
   );
 
+  const bumpZoom = useCallback((delta: number) => {
+    setSettings((prev) => ({
+      ...prev,
+      zoomPercent: Math.min(200, Math.max(50, prev.zoomPercent + delta)),
+    }));
+  }, []);
+
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-black">
@@ -877,6 +922,12 @@ export function CyberdeckGlyphChannelPaneBody() {
                       text={composer.trim() || "ECHO MIRAGE"}
                       className="min-w-[5.5rem] flex-1"
                     />
+                    <GlyphDisplayZoomControls
+                      className="self-center"
+                      zoomPercent={settings.zoomPercent}
+                      onDecrease={() => bumpZoom(-10)}
+                      onIncrease={() => bumpZoom(10)}
+                    />
                   </div>
                 ) : null}
                 {settings.engine === "oneline" ? (
@@ -912,35 +963,13 @@ export function CyberdeckGlyphChannelPaneBody() {
                   {statusLine}
                 </p>
                 <div className="deck-pane-depth-toolbar flex shrink-0 items-center gap-1.5">
-                  <CyberdeckControlTooltip label="Decrease display zoom">
-                    <CyberdeckControl
-                      control={{ size: "compact", signal: true }}
-                      onClick={() =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          zoomPercent: Math.max(50, prev.zoomPercent - 10),
-                        }))
-                      }
-                      aria-label="Decrease display zoom"
-                    >
-                      −
-                    </CyberdeckControl>
-                  </CyberdeckControlTooltip>
-                  <span className="font-mono text-[9px] text-[#6a6a6a]">{settings.zoomPercent}%</span>
-                  <CyberdeckControlTooltip label="Increase display zoom">
-                    <CyberdeckControl
-                      control={{ size: "compact", signal: true }}
-                      onClick={() =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          zoomPercent: Math.min(200, prev.zoomPercent + 10),
-                        }))
-                      }
-                      aria-label="Increase display zoom"
-                    >
-                      +
-                    </CyberdeckControl>
-                  </CyberdeckControlTooltip>
+                  {settings.engine !== "figlet" ? (
+                    <GlyphDisplayZoomControls
+                      zoomPercent={settings.zoomPercent}
+                      onDecrease={() => bumpZoom(-10)}
+                      onIncrease={() => bumpZoom(10)}
+                    />
+                  ) : null}
 
                   <CyberdeckControlTooltip
                     label="Render"
