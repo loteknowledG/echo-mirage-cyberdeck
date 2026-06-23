@@ -25,6 +25,15 @@ async function sendDeckCommand(page: import("@playwright/test").Page, text: stri
 async function expectPowerfistReady(page: import("@playwright/test").Page) {
   await expect(page.getByTestId("preview-matrix")).toBeVisible({ timeout: 15000 });
   await expect(page.getByLabel("PowerFist target pane")).toBeVisible();
+  await expect(page.getByTestId("powerfist-joystick")).toBeVisible();
+}
+
+async function pressMatrixKey(
+  page: import("@playwright/test").Page,
+  key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight",
+) {
+  await page.keyboard.press(key);
+  await page.waitForTimeout(200);
 }
 
 async function armSelectedCard(page: import("@playwright/test").Page) {
@@ -147,11 +156,11 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
     await expectPowerfistReady(page);
 
-    await page.getByRole("button", { name: "Move deck up" }).click();
+    await pressMatrixKey(page, "ArrowUp");
     await page.waitForTimeout(450);
     await expectFocusedCardVisibleInMatrix(page);
 
-    await page.getByRole("button", { name: "Move cards left" }).click();
+    await pressMatrixKey(page, "ArrowLeft");
     await page.waitForTimeout(450);
     await expectFocusedCardVisibleInMatrix(page);
   });
@@ -165,10 +174,10 @@ test.describe("Rola Dex / Preview matrix", () => {
       "true",
     );
 
-    await page.getByRole("button", { name: "Move cards left" }).click();
+    await pressMatrixKey(page, "ArrowLeft");
     await expect(page.locator(".cardTitle", { hasText: "Request Codex Review" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Move cards right" }).click();
+    await pressMatrixKey(page, "ArrowRight");
     await expect(page.locator(".cardTitle", { hasText: "Capture Builder Result" })).toBeVisible();
   });
 
@@ -358,9 +367,9 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.getByRole("button", { name: "Close" }).click();
 
     for (let i = 0; i < 5; i += 1) {
-      await page.getByRole("button", { name: "Move deck down" }).click();
+      await pressMatrixKey(page, "ArrowDown");
     }
-    await page.getByRole("button", { name: "Move cards left" }).click();
+    await pressMatrixKey(page, "ArrowLeft");
     await armSelectedCard(page);
     const openCard = page.getByTestId("powerfist-open-card");
     await expect(openCard).toContainText("Open File");
@@ -380,9 +389,9 @@ test.describe("Rola Dex / Preview matrix", () => {
     }
 
     await expect(page.locator(".cardTitle", { hasText: "Render Plain Text" })).toBeVisible();
-    await page.getByRole("button", { name: "Move deck up" }).click();
+    await pressMatrixKey(page, "ArrowUp");
     await expect(page.locator(".cardSlide.is-selected .cardArtifactPreviewOneline")).toBeVisible();
-    await page.getByRole("button", { name: "Move deck up" }).click();
+    await pressMatrixKey(page, "ArrowUp");
     await expect(page.locator(".cardSlide.is-selected .cardArtifactPreviewFiglet")).toBeVisible();
   });
 

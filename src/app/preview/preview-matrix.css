@@ -124,6 +124,72 @@
   flex: 1 1 auto;
   min-height: 520px;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.powerfist-preview-root .matrixStage > .matrix {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.powerfist-preview-root .powerfistJoystickControls {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  padding: 0 12px 12px;
+  pointer-events: auto;
+}
+
+.powerfist-preview-root .powerfistJoystickTarget {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.powerfist-preview-root .powerfistJoystickTargetLabel {
+  color: var(--pf-muted);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.powerfist-preview-root .powerfistPaneRollerViewportJoystick {
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid rgba(134, 239, 172, 0.35);
+  background: rgba(2, 8, 5, 0.92);
+}
+
+.powerfist-preview-root .powerfistJoystickPad {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.powerfist-preview-root .powerfistJoystickHint {
+  margin: 0;
+  min-height: 1.2em;
+  color: var(--pf-muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.powerfist-preview-root .powerfistJoystickPad [data-testid="joystick-base"] {
+  border: 1px solid rgba(134, 239, 172, 0.35);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.powerfist-preview-root[data-compact-cards="true"] .powerfistJoystickControls {
+  grid-template-columns: 1fr;
+  justify-items: center;
 }
 
 .powerfist-preview-root .powerfistMainLayout {
@@ -640,290 +706,6 @@
   }
 }
 
-.powerfist-preview-root .controls {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 14px;
-  pointer-events: none;
-}
-
-.powerfist-preview-root .controls .dpad {
-  pointer-events: auto;
-}
-
-.powerfist-preview-root .compactCardControls {
-  pointer-events: none;
-  position: absolute;
-  inset: 8px;
-  z-index: 3;
-}
-
-.powerfist-preview-root .compactCardControl {
-  pointer-events: auto;
-  position: absolute;
-  top: 50%;
-  width: 34px;
-  height: calc(100% - 68px);
-  transform: translateY(-50%);
-}
-
-.powerfist-preview-root .compactCardControlLeft {
-  left: 0;
-  border-radius: 10px 4px 4px 10px;
-}
-
-.powerfist-preview-root .compactCardControlRight {
-  right: 0;
-  border-radius: 4px 10px 10px 4px;
-}
-
-.powerfist-preview-root .compactCardControlUp,
-.powerfist-preview-root .compactCardControlDown {
-  left: 50%;
-  width: calc(100% - 68px);
-  height: 34px;
-  transform: translateX(-50%);
-}
-
-.powerfist-preview-root .compactCardControlUp {
-  top: 0;
-  border-radius: 10px 10px 4px 4px;
-}
-
-.powerfist-preview-root .compactCardControlDown {
-  top: auto;
-  bottom: 0;
-  border-radius: 4px 4px 10px 10px;
-}
-
-.powerfist-preview-root .dpad {
-  display: grid;
-  grid-template-columns: repeat(3, 40px);
-  grid-template-rows: repeat(3, 40px);
-  gap: 0;
-}
-
-.powerfist-preview-root .dpadBtn {
-  border: 1px solid rgba(134, 239, 172, 0.35);
-  background: rgba(8, 17, 13, 0.92);
-  color: var(--pf-text);
-  font: inherit;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-  display: grid;
-  place-items: center;
-}
-
-.powerfist-preview-root .dpadBtn:hover {
-  border-color: rgba(134, 239, 172, 0.75);
-  background: rgba(134, 239, 172, 0.12);
-}
-
-.powerfist-preview-root .dpadBtn:active {
-  background: rgba(134, 239, 172, 0.22);
-}
-
-.powerfist-preview-root .dpadUp {
-  grid-column: 2;
-  grid-row: 1;
-  border-radius: 10px 10px 4px 4px;
-}
-
-.powerfist-preview-root .dpadLeft {
-  grid-column: 1;
-  grid-row: 2;
-  border-radius: 10px 4px 4px 10px;
-}
-
-.powerfist-preview-root .dpadPaneRoller {
-  grid-column: 2;
-  grid-row: 2;
-  border-radius: 4px;
-  overflow: hidden;
-  padding: 0;
-}
-
-.powerfist-preview-root .powerfistPaneRollerViewportDpad {
-  border-radius: 0;
-  border: 0;
-  background: transparent;
-}
-
-.powerfist-preview-root .dpadRight {
-  grid-column: 3;
-  grid-row: 2;
-  border-radius: 4px 10px 10px 4px;
-}
-
-.powerfist-preview-root .dpadDown {
-  grid-column: 2;
-  grid-row: 3;
-  border-radius: 4px 4px 10px 10px;
-}
-
-/* Floating rectangle controller (compare with floating d-pad; d-pad unchanged) */
-.powerfist-preview-root .powerfistRectLayer {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-}
-
-.powerfist-preview-root .powerfistRectDrag {
-  pointer-events: auto;
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  touch-action: none;
-  cursor: grab;
-}
-
-.powerfist-preview-root .powerfistRectDrag:active {
-  cursor: grabbing;
-}
-
-.powerfist-preview-root .powerfistRectController {
-  width: min(100%, 336px);
-  aspect-ratio: 7 / 3;
-  min-height: 72px;
-  border: 1px solid var(--pf-line);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(12, 22, 17, 0.96), rgba(6, 12, 10, 0.98));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 8px 24px rgba(0, 0, 0, 0.35);
-  display: grid;
-  grid-template-columns: 1fr 1.1fr 0.85fr;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-}
-
-.powerfist-preview-root .powerfistRectController__zoneLabel {
-  position: absolute;
-  top: 4px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 7px;
-  letter-spacing: 0.14em;
-  color: var(--pf-muted);
-  pointer-events: none;
-}
-
-.powerfist-preview-root .powerfistRectController__dpad,
-.powerfist-preview-root .powerfistRectController__center,
-.powerfist-preview-root .powerfistRectController__face {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  padding-top: 10px;
-}
-
-.powerfist-preview-root .powerfistRectController__dpad {
-  display: grid;
-  grid-template-columns: repeat(3, 26px);
-  grid-template-rows: repeat(3, 26px);
-  gap: 0;
-  justify-content: center;
-}
-
-.powerfist-preview-root .powerfistRectBtn {
-  border: 1px solid rgba(134, 239, 172, 0.35);
-  background: rgba(8, 17, 13, 0.92);
-  color: var(--pf-text);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-  display: grid;
-  place-items: center;
-}
-
-.powerfist-preview-root .powerfistRectBtn:hover:not(:disabled) {
-  border-color: rgba(134, 239, 172, 0.75);
-  background: rgba(134, 239, 172, 0.12);
-}
-
-.powerfist-preview-root .powerfistRectBtn:active:not(:disabled) {
-  background: rgba(134, 239, 172, 0.22);
-}
-
-.powerfist-preview-root .powerfistRectBtn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.powerfist-preview-root .powerfistRectBtn--up {
-  grid-column: 2;
-  grid-row: 1;
-  border-radius: 8px 8px 3px 3px;
-}
-
-.powerfist-preview-root .powerfistRectBtn--left {
-  grid-column: 1;
-  grid-row: 2;
-  border-radius: 8px 3px 3px 8px;
-}
-
-.powerfist-preview-root .powerfistRectBtn--right {
-  grid-column: 3;
-  grid-row: 2;
-  border-radius: 3px 8px 8px 3px;
-}
-
-.powerfist-preview-root .powerfistRectBtn--down {
-  grid-column: 2;
-  grid-row: 3;
-  border-radius: 3px 3px 8px 8px;
-}
-
-.powerfist-preview-root .powerfistRectController__center {
-  flex-direction: column;
-  gap: 4px;
-}
-
-.powerfist-preview-root .powerfistRectController__roller {
-  width: 100%;
-  max-width: 120px;
-  min-height: 28px;
-  border-radius: 4px;
-  border: 1px solid rgba(134, 239, 172, 0.25);
-  background: rgba(0, 0, 0, 0.35);
-}
-
-.powerfist-preview-root .powerfistRectController__face {
-  gap: 10px;
-}
-
-.powerfist-preview-root .powerfistRectBtn--round {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-
-.powerfist-preview-root .powerfistRectBtn--b {
-  color: #facc15;
-  border-color: rgba(250, 204, 21, 0.45);
-}
-
-.powerfist-preview-root .powerfistRectBtn--a {
-  color: #86efac;
-  border-color: rgba(134, 239, 172, 0.55);
-}
-
 .powerfist-preview-root .cardPushReceipt {
   position: absolute;
   right: 14px;
@@ -1003,14 +785,9 @@
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root .matrixStage,
 .cyberdeck-rola-dex-pane .powerfist-preview-root .matrix,
-.cyberdeck-rola-dex-pane .powerfist-preview-root .controls,
-.cyberdeck-rola-dex-pane .powerfist-preview-root .powerfistRectLayer {
+.cyberdeck-rola-dex-pane .powerfist-preview-root .powerfistJoystickControls {
   width: 100%;
   max-width: 100%;
-}
-
-.cyberdeck-rola-dex-pane .powerfist-preview-root .controls {
-  display: flex;
 }
 
 .cyberdeck-rola-dex-pane .powerfist-preview-root .matrixStage {

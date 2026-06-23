@@ -9,8 +9,6 @@ import {
   useState,
 } from "react";
 import EmblaCarousel, { type EmblaCarouselType } from "embla-carousel";
-import { motion } from "motion/react";
-import { CyberdeckRollingPicker } from "@/components/cyberdeck/cyberdeck-rolling-picker";
 import { FigletFontPreviewSlide } from "@/components/cyberdeck/figlet-font-preview-slide";
 import {
   CYBERDECK_PANE_KINDS,
@@ -25,7 +23,7 @@ import {
 } from "@/lib/cyberdeck/powerfist-events";
 import { GLYPH_CHANNEL_PREVIEW_DECKS, PREVIEW_DECKS } from "./preview-data";
 import { scrollMatrixTo, wrapIndex } from "./preview-matrix-nav";
-import { PowerfistRectController } from "./powerfist-rect-controller";
+import { PowerfistJoystickControls } from "./powerfist-joystick-controls";
 import "./preview-matrix.css";
 
 const CARD_PLAY_TRAIL_DURATION_MS = 900;
@@ -67,7 +65,6 @@ function composerPlaceholderForArg(arg: string): string {
 export function PreviewMatrix() {
   const [activeDeckIndex, setActiveDeckIndex] = useState(0);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
-  const [isDraggingDpad, setIsDraggingDpad] = useState(false);
   const [isCompactCards, setIsCompactCards] = useState(false);
   const [targetPane, setTargetPane] = useState<CyberdeckPaneKind>("operator");
   const [composerText, setComposerText] = useState("");
@@ -669,127 +666,16 @@ export function PreviewMatrix() {
               />
             ) : null}
           </section>
-          {isCompactCards && !armedCardKey ? (
-            <div className="compactCardControls">
-              <button
-                type="button"
-                className="dpadBtn compactCardControl compactCardControlLeft"
-                aria-label="Move cards left"
-                disabled={Boolean(armedCardKey)}
-                onClick={() => navigateCard(1)}
-              >
-                ←
-              </button>
-              <button
-                type="button"
-                className="dpadBtn compactCardControl compactCardControlRight"
-                aria-label="Move cards right"
-                disabled={Boolean(armedCardKey)}
-                onClick={() => navigateCard(-1)}
-              >
-                →
-              </button>
-              <button
-                type="button"
-                className="dpadBtn compactCardControl compactCardControlUp"
-                aria-label="Move deck up"
-                disabled={Boolean(armedCardKey)}
-                onClick={() => navigateDeck(-1)}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                className="dpadBtn compactCardControl compactCardControlDown"
-                aria-label="Move deck down"
-                disabled={Boolean(armedCardKey)}
-                onClick={() => navigateDeck(1)}
-              >
-                ↓
-              </button>
-            </div>
-          ) : null}
-
-          {!armedCardKey && !isCompactCards ? (
-            <PowerfistRectController
-              constraintsRef={paneRef}
+          {!armedCardKey ? (
+            <PowerfistJoystickControls
               disabled={Boolean(armedCardKey)}
               paneRollerItems={paneRollerItems}
               targetPane={targetPane}
               onTargetPaneChange={handleTargetPaneChange}
-              onNavigateCard={(delta) => navigateCard(delta === 1 ? 1 : -1)}
-              onDeckUp={() => navigateDeck(-1)}
-              onDeckDown={() => navigateDeck(1)}
+              onNavigateCard={navigateCard}
+              onNavigateDeck={navigateDeck}
             />
           ) : null}
-
-          <section className="controls">
-          {!armedCardKey ? (
-              <motion.div
-                className="dpad"
-                aria-label="Matrix navigation"
-                drag
-                dragConstraints={paneRef}
-                dragMomentum
-                onDragStart={() => setIsDraggingDpad(true)}
-                onDragEnd={() => setIsDraggingDpad(false)}
-              >
-                <button
-                  type="button"
-                  className="dpadBtn dpadUp"
-                  aria-label="Move deck up"
-                  disabled={isDraggingDpad || Boolean(armedCardKey)}
-                  onClick={() => navigateDeck(-1)}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  className="dpadBtn dpadLeft"
-                  aria-label="Move cards left"
-                  disabled={isDraggingDpad || Boolean(armedCardKey)}
-                  onClick={() => navigateCard(1)}
-                >
-                  ←
-                </button>
-                <button
-                  type="button"
-                  className="dpadBtn dpadPaneRoller"
-                  aria-label="Set target pane"
-                  disabled={isDraggingDpad}
-                >
-                  <CyberdeckRollingPicker
-                    items={paneRollerItems}
-                    value={targetPane}
-                    onChange={handleTargetPaneChange}
-                    ariaLabel="PowerFist target pane"
-                    viewportClassName="powerfistPaneRollerViewport powerfistPaneRollerViewportDpad"
-                    alwaysShowLabel
-                    showTextWhileScrolling
-                    loop
-                  />
-                </button>
-                <button
-                  type="button"
-                  className="dpadBtn dpadRight"
-                  aria-label="Move cards right"
-                  disabled={isDraggingDpad || Boolean(armedCardKey)}
-                  onClick={() => navigateCard(-1)}
-                >
-                  →
-                </button>
-                <button
-                  type="button"
-                  className="dpadBtn dpadDown"
-                  aria-label="Move deck down"
-                  disabled={isDraggingDpad || Boolean(armedCardKey)}
-                  onClick={() => navigateDeck(1)}
-                >
-                  ↓
-                </button>
-              </motion.div>
-            ) : null}
-          </section>
           </section>
         </div>
       </main>
