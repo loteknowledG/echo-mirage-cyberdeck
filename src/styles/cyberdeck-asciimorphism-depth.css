@@ -282,18 +282,6 @@
   opacity: 0;
 }
 
-[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-posture-roller {
-  --panel-face: #050505;
-  --panel-border: #1a1a1a;
-  --panel-side: #222;
-  --panel-bottom: #181818;
-}
-
-[data-deck-mode="ascii"] .cyberdeck-message-box .muthur-posture-roller .depth-panel__face {
-  border-radius: 0;
-  background: #000;
-}
-
 [data-deck-mode="ascii"] .depth-panel[data-glow="true"] .depth-panel__face {
   text-shadow: none;
   box-shadow: none;

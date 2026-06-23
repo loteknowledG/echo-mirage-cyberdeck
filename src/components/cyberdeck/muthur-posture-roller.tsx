@@ -6,7 +6,7 @@ import {
   CyberdeckPaneTooltip,
   CyberdeckPaneTooltipProvider,
 } from "@/components/cyberdeck/cyberdeck-pane-tooltip";
-import { DepthPanel } from "@/components/realmorphism";
+import { RollerDialFlanks } from "@/components/cyberdeck/roller-dial-flanks";
 import { useDeckMode } from "@/lib/deck-mode";
 import {
   MUTHUR_POSTURE_SELECTOR,
@@ -75,11 +75,9 @@ export function MuthurPostureRoller({
 
   const rollerBody =
     deckMode === "ascii" ? (
-      <DepthPanel variant="inset" depth={4} className="muthur-posture-roller shrink-0">
-        <div className="flex items-center justify-center px-1.5 py-0.5 font-mono text-[9px] tracking-[0.06em] text-[#bdbdbd]">
-          {picker}
-        </div>
-      </DepthPanel>
+      <RollerDialFlanks className="muthur-posture-roller font-mono text-[9px] tracking-[0.06em] text-[#bdbdbd]">
+        {picker}
+      </RollerDialFlanks>
     ) : (
       picker
     );
