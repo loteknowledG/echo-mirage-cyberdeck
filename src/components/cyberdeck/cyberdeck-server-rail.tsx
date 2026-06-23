@@ -26,7 +26,7 @@ type CyberdeckServerRailProps = {
   serverKeyboardHighlightId: CyberdeckServerId | null;
   railGlyphForServer: (btn: FixedServerBtn) => string;
   railGlyphForCustomTab: (tab: { kind: string; glyph: string; id?: string; label?: string }) => string;
-  onTabClick: (id: string) => void;
+  onTabClick: (id: string, anchor?: { clientX: number; clientY: number }) => void;
   onOpenNewTabMenu: (event: MouseEvent<HTMLButtonElement>) => void;
   onRailContextMenu: (tabId: string, event: MouseEvent<HTMLElement>) => void;
   createRailTabLongPressHandlers: (tabId: string) => Record<string, unknown>;
@@ -152,10 +152,10 @@ export function CyberdeckServerRail({
                 ? " server-rail-kb-hover"
                 : ""
             }`}
-            onClick={() => {
+            onClick={(event) => {
               if (consumeClickIfLongPress(btn.id)) return;
               onPointerNavReset();
-              onTabClick(btn.id);
+              onTabClick(btn.id, { clientX: event.clientX, clientY: event.clientY });
             }}
             style={{
               margin: 0,
@@ -183,10 +183,10 @@ export function CyberdeckServerRail({
                 ? " server-rail-kb-hover"
                 : ""
             }`}
-            onClick={() => {
+            onClick={(event) => {
               if (consumeClickIfLongPress(tab.id)) return;
               onPointerNavReset();
-              onTabClick(tab.id);
+              onTabClick(tab.id, { clientX: event.clientX, clientY: event.clientY });
             }}
             style={{
               margin: 0,

@@ -10,7 +10,7 @@ export const RAIL_TAB_LONG_PRESS_MOVE_PX = 10;
 type OpenMenuFn = (tabId: string, clientX: number, clientY: number) => void;
 
 /**
- * Pointer long-press for rail tabs (touch / pen). Desktop mouse uses context menu only.
+ * Pointer long-press for rail tabs (touch / pen). Selected-tab tap also opens the menu.
  * Call {@link createHandlers} per tab with that tab's id.
  */
 export function useRailTabLongPress(options: {

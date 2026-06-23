@@ -3810,8 +3810,43 @@ export default function CyberdeckApp() {
     emitSignal({ source: "ui", type: "cancel", payload: { target: "gateway_menu" }, severity: "info" });
   }, []);
 
+  const openRailTabContextMenu = useCallback(
+    (tabId: string, clientX: number, clientY: number) => {
+      if (getCyberdeckSelectedRailTabId() !== tabId || typeof window === "undefined") return;
+      closeMirageContextMenu();
+      closeGatewayPaneContextMenu();
+
+      const menuWidth = 140;
+      const tab =
+        !isFixedServerTabId(tabId)
+          ? useCyberdeckTabStore.getState().customTabs.find((entry) => entry.id === tabId)
+          : null;
+      const menuHeight = isFixedServerTabId(tabId)
+        ? 132
+        : isUnassignedCustomTab(tab)
+          ? 520
+          : 56;
+      const padding = 8;
+      const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
+      const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
+
+      setRailTabContextMenu(
+        isFixedServerTabId(tabId)
+          ? { variant: "fixed", serverId: tabId, x, y }
+          : { variant: "custom", tabId, x, y },
+      );
+    },
+    [closeGatewayPaneContextMenu, closeMirageContextMenu],
+  );
+
   const handleTabClick = useCallback(
-    (id: string) => {
+    (
+      id: string,
+      anchor?: {
+        clientX: number;
+        clientY: number;
+      },
+    ): boolean => {
       const { customTabs, activeCustomTabId, server } = useCyberdeckTabStore.getState();
       const isCustomTab = customTabs.some((tab) => tab.id === id);
       const willChange = isCustomTab
@@ -3820,10 +3855,12 @@ export default function CyberdeckApp() {
 
       // Paint rail + panes in the same frame as the click (before audio / page setState).
       flushSync(() => {
-        if (isCustomTab) {
-          if (willChange) useCyberdeckTabStore.getState().selectTab(id, true);
-        } else {
-          useCyberdeckTabStore.getState().selectTab(id, false);
+        if (willChange) {
+          if (isCustomTab) {
+            useCyberdeckTabStore.getState().selectTab(id, true);
+          } else {
+            useCyberdeckTabStore.getState().selectTab(id, false);
+          }
         }
       });
 
@@ -3835,26 +3872,39 @@ export default function CyberdeckApp() {
           payload: { tabId: id, kind: isCustomTab ? "custom" : "fixed" },
           severity: "info",
         });
-      } else {
-        playDeckSystemSound("click", 0.02);
+        startTransition(() => {
+          closeRailTabContextMenu();
+          closeMirageContextMenu();
+          closeGatewayPaneContextMenu();
+          setNavRailContext("gateway");
+          setServerKeyboardHighlightId(null);
+          if (!isCustomTab && id === "s") {
+            focusGatewayConnectionPanel();
+          }
+        });
+        return true;
       }
 
+      playDeckSystemSound("click", 0.02);
       startTransition(() => {
-        closeRailTabContextMenu();
         closeMirageContextMenu();
         closeGatewayPaneContextMenu();
-        setNavRailContext("gateway");
         setServerKeyboardHighlightId(null);
-        if (!isCustomTab && id === "s") {
-          focusGatewayConnectionPanel();
-        }
+
+        const tabEl = document.querySelector<HTMLElement>(`[data-server-tab="${CSS.escape(id)}"]`);
+        const rect = tabEl?.getBoundingClientRect();
+        const clientX = anchor?.clientX ?? (rect ? rect.left + rect.width / 2 : window.innerWidth / 2);
+        const clientY = anchor?.clientY ?? (rect ? rect.bottom : window.innerHeight / 2);
+        openRailTabContextMenu(id, clientX, clientY);
       });
+      return false;
     },
     [
       closeGatewayPaneContextMenu,
       closeMirageContextMenu,
       closeRailTabContextMenu,
       focusGatewayConnectionPanel,
+      openRailTabContextMenu,
     ],
   );
 
@@ -4769,13 +4819,15 @@ export default function CyberdeckApp() {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             sfxNav.commit();
-            handleTabClick(serverKeyboardHighlightId ?? sPivot);
-            setNavRailContext("gateway");
-            setServerKeyboardHighlightId(null);
-            setModelKeyboardHighlightId(null);
-            const pid =
-              (PROVIDER_IDS as readonly string[]).includes(activeProvider) ? activeProvider : PROVIDER_IDS[0];
-            setProviderKeyboardHighlightId(pid);
+            const tabChanged = handleTabClick(serverKeyboardHighlightId ?? sPivot);
+            if (tabChanged) {
+              setNavRailContext("gateway");
+              setServerKeyboardHighlightId(null);
+              setModelKeyboardHighlightId(null);
+              const pid =
+                (PROVIDER_IDS as readonly string[]).includes(activeProvider) ? activeProvider : PROVIDER_IDS[0];
+              setProviderKeyboardHighlightId(pid);
+            }
             return;
           }
         } else if (navKey && !isEditableTarget) {
@@ -6673,35 +6725,6 @@ ${diff}`;
       await loadCustomTabAssetFromFile(tabId, file);
     },
     [loadCustomTabAssetFromFile],
-  );
-
-  const openRailTabContextMenu = useCallback(
-    (tabId: string, clientX: number, clientY: number) => {
-      if (getCyberdeckSelectedRailTabId() !== tabId || typeof window === "undefined") return;
-      closeMirageContextMenu();
-      closeGatewayPaneContextMenu();
-
-      const menuWidth = 140;
-      const tab =
-        !isFixedServerTabId(tabId)
-          ? useCyberdeckTabStore.getState().customTabs.find((entry) => entry.id === tabId)
-          : null;
-      const menuHeight = isFixedServerTabId(tabId)
-        ? 132
-        : isUnassignedCustomTab(tab)
-          ? 520
-          : 56;
-      const padding = 8;
-      const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
-      const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
-
-      setRailTabContextMenu(
-        isFixedServerTabId(tabId)
-          ? { variant: "fixed", serverId: tabId, x, y }
-          : { variant: "custom", tabId, x, y },
-      );
-    },
-    [closeGatewayPaneContextMenu, closeMirageContextMenu],
   );
 
   const openNewTabMenu = useCallback(
