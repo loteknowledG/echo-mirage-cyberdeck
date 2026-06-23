@@ -88,6 +88,8 @@ const nextConfig = {
 	},
 	// Treat as external in the Node.js server runtime (native / optional / E2E-only).
 	serverExternalPackages: [
+		"@mariozechner/pi-ai",
+		"@mariozechner/pi-agent-core",
 		"figlet",
 		"google-photos-album-image-url-fetch",
 		"md-to-pdf",
