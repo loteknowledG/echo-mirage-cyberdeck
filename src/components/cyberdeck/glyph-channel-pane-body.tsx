@@ -753,6 +753,14 @@ export function CyberdeckGlyphChannelPaneBody() {
             <CodexIcon icon={cdxIconPaste} className="h-3.5 w-3.5" />
           </CyberdeckComposerControl>
         </CyberdeckControlTooltip>
+
+        <div className="ml-1 border-l border-[#1c1c1c] pl-2">
+          <GlyphDisplayZoomControls
+            zoomPercent={settings.zoomPercent}
+            onDecrease={() => bumpZoom(-10)}
+            onIncrease={() => bumpZoom(10)}
+          />
+        </div>
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -922,12 +930,6 @@ export function CyberdeckGlyphChannelPaneBody() {
                       text={composer.trim() || "ECHO MIRAGE"}
                       className="min-w-[5.5rem] flex-1"
                     />
-                    <GlyphDisplayZoomControls
-                      className="self-center"
-                      zoomPercent={settings.zoomPercent}
-                      onDecrease={() => bumpZoom(-10)}
-                      onIncrease={() => bumpZoom(10)}
-                    />
                   </div>
                 ) : null}
                 {settings.engine === "oneline" ? (
@@ -963,14 +965,6 @@ export function CyberdeckGlyphChannelPaneBody() {
                   {statusLine}
                 </p>
                 <div className="deck-pane-depth-toolbar flex shrink-0 items-center gap-1.5">
-                  {settings.engine !== "figlet" ? (
-                    <GlyphDisplayZoomControls
-                      zoomPercent={settings.zoomPercent}
-                      onDecrease={() => bumpZoom(-10)}
-                      onIncrease={() => bumpZoom(10)}
-                    />
-                  ) : null}
-
                   <CyberdeckControlTooltip
                     label="Render"
                     disabled={!composer.trim() || rendering}
