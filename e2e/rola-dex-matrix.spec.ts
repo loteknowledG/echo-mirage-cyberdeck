@@ -22,6 +22,23 @@ async function sendDeckCommand(page: import("@playwright/test").Page, text: stri
 }
 
 /** Focused card chrome must intersect the matrix viewport (not scrolled off-screen). */
+async function expectPowerfistReady(page: import("@playwright/test").Page) {
+  await expect(page.getByTestId("preview-matrix")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByLabel("PowerFist target pane")).toBeVisible();
+}
+
+async function armSelectedCard(page: import("@playwright/test").Page) {
+  const card = page.locator(".deckSlide.is-selected .cardSlide.is-selected .card");
+  const box = await card.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(980);
+  await page.mouse.up();
+  await expect(page.getByTestId("powerfist-open-card")).toBeVisible();
+}
+
+/** Focused card chrome must intersect the matrix viewport (not scrolled off-screen). */
 async function expectFocusedCardVisibleInMatrix(page: import("@playwright/test").Page) {
   const visible = await page.evaluate(() => {
     const matrix = document.querySelector(".powerfist-preview-root .matrix");
@@ -104,7 +121,7 @@ async function dragCompactCard(
 test.describe("Rola Dex / Preview matrix", () => {
   test("/preview route shows focused card inside matrix", async ({ page }) => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible({ timeout: 15000 });
+    await expectPowerfistReady(page);
     const title = await expectFocusedCardVisibleInMatrix(page);
     expect(title).toContain("Capture");
     await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(18);
@@ -122,13 +139,13 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.getByRole("menuitem", { name: "Rola Dex" }).click();
 
     await expect(page.locator(".cyberdeck-rola-dex-pane")).toBeVisible({ timeout: 30000 });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible({ timeout: 15000 });
+    await expectPowerfistReady(page);
     await expectFocusedCardVisibleInMatrix(page);
   });
 
   test("deck and card controls update focused card", async ({ page }) => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expectPowerfistReady(page);
 
     await page.getByRole("button", { name: "Move deck up" }).click();
     await page.waitForTimeout(450);
@@ -142,7 +159,7 @@ test.describe("Rola Dex / Preview matrix", () => {
   test("single-card mode card controls move left and right", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expectPowerfistReady(page);
     await expect(page.locator(".powerfist-preview-root")).toHaveAttribute(
       "data-compact-cards",
       "true",
@@ -158,7 +175,7 @@ test.describe("Rola Dex / Preview matrix", () => {
   test("single-card mode matrix remains square while shrinking", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expectPowerfistReady(page);
 
     const wideCompactSize = await page.locator(".matrixStage").evaluate((stage) => {
       const box = stage.getBoundingClientRect();
@@ -178,7 +195,7 @@ test.describe("Rola Dex / Preview matrix", () => {
   test("single-card mode horizontal drag moves between cards", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expectPowerfistReady(page);
 
     await dragCompactCard(page, "left");
     await expect(page.locator(".cardTitle", { hasText: "Request Codex Review" })).toBeVisible();
@@ -187,7 +204,7 @@ test.describe("Rola Dex / Preview matrix", () => {
   test("single-card mode repeated drags preserve direction and wraparound", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expectPowerfistReady(page);
 
     await dragCompactCard(page, "left");
     await expect(page.locator(".cardTitle", { hasText: "Request Codex Review" })).toBeVisible();
@@ -204,7 +221,7 @@ test.describe("Rola Dex / Preview matrix", () => {
   test("single-card mode keeps nested horizontal carousel motion", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expectPowerfistReady(page);
     await expect(page.locator(".powerfist-preview-root .card")).toHaveCount(18);
 
     const hand = page.locator(".powerfist-preview-root .handViewport").first();
@@ -230,7 +247,7 @@ test.describe("Rola Dex / Preview matrix", () => {
   test("single-card mode preserves drag-free power swipe motion", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expectPowerfistReady(page);
 
     const hand = page.locator(".powerfist-preview-root .handViewport").first();
     const box = await hand.boundingBox();
@@ -270,7 +287,7 @@ test.describe("Rola Dex / Preview matrix", () => {
   test("multi-card mode keeps the focused card inside the matrix", async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expectPowerfistReady(page);
     await expect(page.locator(".powerfist-preview-root")).toHaveAttribute(
       "data-compact-cards",
       "false",
@@ -280,7 +297,7 @@ test.describe("Rola Dex / Preview matrix", () => {
 
   test("neighbor decks peek above and below the focused deck", async ({ page }) => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expectPowerfistReady(page);
 
     const peek = await page.evaluate(() => {
       const matrix = document.querySelector(".powerfist-preview-root .matrix");
@@ -305,7 +322,7 @@ test.describe("Rola Dex / Preview matrix", () => {
 
   test("horizontal drag on hand scrolls cards", async ({ page }) => {
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expectPowerfistReady(page);
 
     const hand = page.locator(".powerfist-preview-root .handViewport").first();
     const box = await hand.boundingBox();
@@ -331,22 +348,30 @@ test.describe("Rola Dex / Preview matrix", () => {
     await expectFocusedCardVisibleInMatrix(page);
   });
 
-  test("message box queues instructions for the selected target pane", async ({ page }) => {
+  test("composer only appears on armed cards that need tool input", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    const input = page.getByLabel("PowerFist instruction");
-    await expect(input).toBeVisible();
-    await expect(page.getByLabel("PowerFist target pane")).toBeVisible();
-    await input.fill("Open the current document");
-    await page.getByRole("button", { name: "Queue" }).click();
-    await expect(page.locator(".stackLog")).toContainText(
-      /Queued instruction for OPERATOR: Open the current document/i,
-    );
+    await expectPowerfistReady(page);
+    await expect(page.getByLabel("PowerFist instruction")).toHaveCount(0);
+    await armSelectedCard(page);
+    await expect(page.getByLabel("PowerFist instruction")).toHaveCount(0);
+    await page.getByRole("button", { name: "Close" }).click();
+
+    for (let i = 0; i < 5; i += 1) {
+      await page.getByRole("button", { name: "Move deck down" }).click();
+    }
+    await page.getByRole("button", { name: "Move cards left" }).click();
+    await armSelectedCard(page);
+    const openCard = page.getByTestId("powerfist-open-card");
+    await expect(openCard).toContainText("Open File");
+    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await page.getByLabel("PowerFist instruction").fill("src/app/preview/preview-matrix.tsx");
   });
 
   test("glyph channel target exposes text, one-line ASCII, and figlet decks", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto("/preview", { waitUntil: "domcontentloaded" });
-    await expect(page.getByLabel("PowerFist instruction")).toBeVisible();
+    await expectPowerfistReady(page);
 
     await page.getByLabel("PowerFist target pane").hover();
     for (let step = 0; step < 11; step += 1) {
@@ -371,7 +396,6 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.down();
     await expect(card).toHaveClass(/is-arming/);
-    await expect(page.locator(".stackLog")).toHaveText("Stack idle.");
     await page.waitForTimeout(980);
     await expect(card).not.toHaveClass(/is-arming/);
     await page.mouse.up();
@@ -393,7 +417,6 @@ test.describe("Rola Dex / Preview matrix", () => {
     expect(viewportFit).not.toBeNull();
     expect(viewportFit?.heightDelta).toBeLessThanOrEqual(2);
     expect(viewportFit?.widthDelta).toBeLessThanOrEqual(2);
-    await expect(page.locator(".stackLog")).toHaveText("Stack idle.");
     await expect(openCard.getByRole("button", { name: "Close" })).toBeVisible();
     await page.evaluate(() => {
       window.addEventListener(
@@ -407,7 +430,6 @@ test.describe("Rola Dex / Preview matrix", () => {
       );
     });
     await openCard.getByRole("button", { name: "Push" }).click();
-    await expect(page.locator(".stackLog")).toHaveText("Stack idle.");
     const pushReceipt = page.getByTestId("powerfist-push-receipt");
     await expect(pushReceipt).toContainText(/Pushed Capture Builder Result/i);
     await expect(card).not.toHaveClass(/is-armed/);
@@ -441,7 +463,6 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.mouse.down();
     await page.mouse.move(box!.x + box!.width * 0.25, y, { steps: 5 });
     await page.mouse.up();
-    await expect(page.locator(".stackLog")).toHaveText("Stack idle.");
     await expect(page.locator(".cardSlide.is-selected .cardTitle")).not.toHaveText(
       "Capture Builder Result",
     );

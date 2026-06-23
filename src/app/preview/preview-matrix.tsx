@@ -33,15 +33,6 @@ const CARD_PUSH_RECEIPT_DURATION_MS = 2400;
 const CARD_PLAY_TRACE_PATH =
   "M 50 1 L 93 1 A 6 6 0 0 1 99 7 L 99 93 A 6 6 0 0 1 93 99 L 7 99 A 6 6 0 0 1 1 93 L 1 7 A 6 6 0 0 1 7 1 L 50 1";
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
 function cardChatMessage(
   deckName: string,
   targetPaneLabel: string,
@@ -56,23 +47,36 @@ function cardChatMessage(
   return `POWERFIST STACK PUSH // "${card.title}" from "${deckName}" against ${targetPaneLabel}. ${card.purpose}${preview}`;
 }
 
+function cardNeedsComposer(card: { toolOverride?: { composerArg?: string } }): boolean {
+  return Boolean(card.toolOverride?.composerArg);
+}
+
+function composerPlaceholderForArg(arg: string): string {
+  switch (arg) {
+    case "filePath":
+      return "Repo file path…";
+    case "path":
+      return "Filesystem path…";
+    case "text":
+      return "Text for tool argument…";
+    default:
+      return `Value for ${arg}…`;
+  }
+}
+
 export function PreviewMatrix() {
   const [activeDeckIndex, setActiveDeckIndex] = useState(0);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
-  const [stackLogHtml, setStackLogHtml] = useState("Stack idle.");
   const [isDraggingDpad, setIsDraggingDpad] = useState(false);
   const [isCompactCards, setIsCompactCards] = useState(false);
   const [targetPane, setTargetPane] = useState<CyberdeckPaneKind>("operator");
-  const [message, setMessage] = useState("");
+  const [composerText, setComposerText] = useState("");
   const [armingCardKey, setArmingCardKey] = useState<string | null>(null);
   const [armedCardKey, setArmedCardKey] = useState<string | null>(null);
   const [pushReceiptHtml, setPushReceiptHtml] = useState<string | null>(null);
-  const [splitMode, setSplitMode] = useState<"stack" | "side">("stack");
-  const [splitSize, setSplitSize] = useState(108);
 
   const matrixRef = useRef<HTMLElement>(null);
   const paneRef = useRef<HTMLElement>(null);
-  const messageInputRef = useRef<HTMLInputElement>(null);
   const deckViewportRef = useRef<HTMLDivElement>(null);
   const handViewportRefs = useRef<(HTMLDivElement | null)[]>([]);
   const deckEmblaRef = useRef<EmblaCarouselType | null>(null);
@@ -87,9 +91,6 @@ export function PreviewMatrix() {
     timer: ReturnType<typeof setTimeout>;
   } | null>(null);
   const pushReceiptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const splitDragRef = useRef<{ start: number; size: number; mode: "stack" | "side" } | null>(
-    null,
-  );
 
   const targetPaneLabel = CYBERDECK_PANE_REGISTRY[targetPane].label;
   const activeDecks = targetPane === "glyph-channel" ? GLYPH_CHANNEL_PREVIEW_DECKS : PREVIEW_DECKS;
@@ -349,7 +350,7 @@ export function PreviewMatrix() {
       applyFocus(deckIndex, cardIndex);
       const deck = activeDecks[deckIndex];
       const card = deck.cards[cardIndex];
-      const composerSupplement = (messageInputRef.current?.value ?? message).trim() || undefined;
+      const composerSupplement = composerText.trim() || undefined;
       const chatMessage = cardChatMessage(deck.name, targetPaneLabel, card);
       const detail: PowerFistStackCommand = {
         kind: "powerfist-stack-push",
@@ -368,7 +369,7 @@ export function PreviewMatrix() {
         targetPane: targetPaneLabel,
       };
       if (composerSupplement && card.toolOverride?.composerArg) {
-        setMessage("");
+        setComposerText("");
       }
       const event = new CustomEvent<PowerFistStackCommand>(POWERFIST_STACK_PUSH_EVENT, {
         cancelable: true,
@@ -389,7 +390,7 @@ export function PreviewMatrix() {
         pushReceiptTimerRef.current = null;
       }, CARD_PUSH_RECEIPT_DURATION_MS);
     },
-    [activeDecks, applyFocus, message, targetPaneLabel],
+    [activeDecks, applyFocus, composerText, targetPaneLabel],
   );
 
   const cancelCardHold = useCallback(() => {
@@ -404,6 +405,7 @@ export function PreviewMatrix() {
     cancelCardHold();
     const openedCardKey = armedCardKey;
     setArmedCardKey(null);
+    setComposerText("");
     if (!openedCardKey) return;
     const [deckIndex, cardIndex] = openedCardKey.split(":").map(Number);
     requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
@@ -421,6 +423,7 @@ export function PreviewMatrix() {
         if (cardHoldRef.current?.key !== key) return;
         cardHoldRef.current = null;
         setArmingCardKey(null);
+        setComposerText("");
         setArmedCardKey(key);
       }, CARD_PLAY_TRAIL_DURATION_MS);
       cardHoldRef.current = {
@@ -474,26 +477,6 @@ export function PreviewMatrix() {
     [],
   );
 
-  const queueMessage = useCallback(
-    () => {
-      const instruction = (messageInputRef.current?.value ?? message).trim();
-      if (!instruction) return;
-      setStackLogHtml(
-        `Queued instruction for <strong>${targetPaneLabel}</strong>: ${escapeHtml(instruction)}`,
-      );
-      setMessage("");
-    },
-    [message, targetPaneLabel],
-  );
-
-  const handleMessageSubmit = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      queueMessage();
-    },
-    [queueMessage],
-  );
-
   const handleTargetPaneChange = useCallback((next: string) => {
     activeDeckIndexRef.current = 0;
     activeCardIndexRef.current = 0;
@@ -502,105 +485,10 @@ export function PreviewMatrix() {
     setTargetPane(next as CyberdeckPaneKind);
   }, []);
 
-  useEffect(() => {
-    const pane = paneRef.current;
-    if (!pane) return;
-
-    const applySplitMode = () => {
-      const rect = pane.getBoundingClientRect();
-      const nextMode: "stack" | "side" = rect.width > rect.height ? "side" : "stack";
-      setSplitMode(nextMode);
-      setSplitSize((current) => {
-        const min = nextMode === "side" ? 260 : 84;
-        const maxBase = nextMode === "side" ? rect.width : rect.height;
-        const max =
-          nextMode === "side"
-            ? Math.max(min + 80, Math.floor(maxBase * 0.55))
-            : Math.max(min + 30, Math.min(220, Math.floor(maxBase * 0.3)));
-        const fallback = nextMode === "side" ? 320 : 108;
-        return Math.min(max, Math.max(min, current || fallback));
-      });
-    };
-
-    applySplitMode();
-    const observer = new ResizeObserver(applySplitMode);
-    observer.observe(pane);
-    return () => observer.disconnect();
-  }, []);
-
-  const beginSplitResize = useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-
-      splitDragRef.current = {
-        start: splitMode === "side" ? event.clientX : event.clientY,
-        size: splitSize,
-        mode: splitMode,
-      };
-
-      const onMove = (moveEvent: PointerEvent) => {
-        const drag = splitDragRef.current;
-        const pane = paneRef.current;
-        if (!drag || !pane) return;
-
-        const cursor = drag.mode === "side" ? moveEvent.clientX : moveEvent.clientY;
-        const delta = cursor - drag.start;
-        const rect = pane.getBoundingClientRect();
-        const min = drag.mode === "side" ? 260 : 84;
-        const maxBase = drag.mode === "side" ? rect.width : rect.height;
-        const max =
-          drag.mode === "side"
-            ? Math.max(min + 80, Math.floor(maxBase * 0.55))
-            : Math.max(min + 30, Math.min(220, Math.floor(maxBase * 0.3)));
-        const next = Math.min(max, Math.max(min, drag.size + delta));
-        setSplitSize(next);
-      };
-
-      const onUp = () => {
-        splitDragRef.current = null;
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
-      };
-
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-    },
-    [splitMode, splitSize],
-  );
-
   return (
     <div className="powerfist-preview-root" data-compact-cards={isCompactCards ? "true" : "false"}>
       <main className="shell" ref={paneRef}>
-        <div
-          className="powerfistSplitLayout"
-          data-split-mode={splitMode}
-          style={{ ["--pf-split-size" as string]: `${splitSize}px` }}
-        >
-          <section className="status powerfistComposer">
-            <form className="powerfistMessageBox" onSubmit={handleMessageSubmit}>
-              <input
-                ref={messageInputRef}
-                aria-label="PowerFist instruction"
-                className="powerfistMessageInput"
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                placeholder="Issue instruction to selected pane"
-              />
-              <button className="powerfistMessageSend" type="button" onClick={queueMessage}>
-                Queue
-              </button>
-            </form>
-          </section>
-
-          <button
-            type="button"
-            className="powerfistSplitHandle"
-            aria-label="Resize message and matrix panes"
-            aria-orientation={splitMode === "side" ? "vertical" : "horizontal"}
-            onPointerDown={beginSplitResize}
-          />
-
+        <div className="powerfistMainLayout">
           <section className="matrixStage">
           <section className="matrix" ref={matrixRef} data-testid="preview-matrix">
             <div className="deckViewport" ref={deckViewportRef}>
@@ -717,6 +605,28 @@ export function PreviewMatrix() {
                     </pre>
                   ) : null}
                   <p className="cardOpenViewportPurpose">{armedCard.card.purpose}</p>
+                  {cardNeedsComposer(armedCard.card) ? (
+                    <label className="cardOpenViewportComposer">
+                      <span className="cardOpenViewportComposerLabel">
+                        {armedCard.card.toolOverride?.composerArg}
+                      </span>
+                      <input
+                        aria-label="PowerFist instruction"
+                        className="powerfistMessageInput cardOpenViewportComposerInput"
+                        value={composerText}
+                        onChange={(event) => setComposerText(event.target.value)}
+                        placeholder={composerPlaceholderForArg(
+                          armedCard.card.toolOverride?.composerArg ?? "",
+                        )}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") return;
+                          event.preventDefault();
+                          handlePushCard(armedCard.deckIndex, armedCard.cardIndex);
+                          resetCardPlay();
+                        }}
+                      />
+                    </label>
+                  ) : null}
                 </div>
                 <div className="cardOpenViewportActions">
                   <button type="button" className="cardClose" onClick={resetCardPlay}>
@@ -868,11 +778,6 @@ export function PreviewMatrix() {
           </section>
           </section>
         </div>
-
-        <section
-          className="stackLog"
-          dangerouslySetInnerHTML={{ __html: stackLogHtml }}
-        />
       </main>
     </div>
   );

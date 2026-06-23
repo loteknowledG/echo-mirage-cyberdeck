@@ -15,14 +15,10 @@ test("powerfist card long press prepares push without blocking swipe", async ({ 
   const card = page.getByTestId("card-slide-0-0");
   await expect(card).toBeVisible();
 
-  const stackLog = page.locator(".stackLog");
-  await expect(stackLog).toContainText("Stack idle.");
-
   const start = await centerOf(card);
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await expect(card.locator(".card.is-arming")).toHaveCount(1);
-  await expect(stackLog).not.toContainText("Pushed");
   await page.waitForTimeout(980);
   await expect(card.locator(".card.is-arming")).toHaveCount(0);
   await page.mouse.up();
@@ -32,7 +28,6 @@ test("powerfist card long press prepares push without blocking swipe", async ({ 
   await expect(openCard.getByRole("button", { name: "Push" })).toBeVisible();
   const moveCardsLeft = page.getByRole("button", { name: "Move cards left" });
   await expect(moveCardsLeft).toHaveCount(0);
-  await expect(stackLog).not.toContainText("Pushed");
   await openCard.getByRole("button", { name: "Close" }).click();
   await expect(card.locator(".card.is-armed")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Move cards left" })).toBeVisible();
@@ -44,5 +39,5 @@ test("powerfist card long press prepares push without blocking swipe", async ({ 
   await page.mouse.down();
   await page.mouse.move(dragStart.x - 50, dragStart.y, { steps: 4 });
   await page.mouse.up();
-  await expect(stackLog).not.toContainText("Pushed");
+  await expect(page.getByTestId("powerfist-push-receipt")).toHaveCount(0);
 });
