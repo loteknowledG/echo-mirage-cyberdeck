@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CyberdeckRollingPicker } from '@/components/cyberdeck/cyberdeck-rolling-picker';
 import { FigletFontPreviewSlide } from '@/components/cyberdeck/figlet-font-preview-slide';
 import { cn } from '@/lib/utils';
@@ -12,13 +12,16 @@ import {
 const FONT_SLIDE_CLASS =
   'flex w-full min-w-0 items-center justify-center overflow-hidden whitespace-nowrap px-1 font-mono text-[8px] leading-none tracking-[0.04em]';
 
+const FILTER_INPUT_CLASS =
+  'w-full border-0 bg-transparent font-mono text-[9px] tracking-[0.04em] text-emerald-200 placeholder:text-[#5a6a62] focus:outline-none';
+
 type FigletFontPickerProps = {
   value: string;
   onChange: (font: string) => void;
   /** Called when the user finishes spinning the font wheel (snap settled). */
   onWheelSettled?: () => void;
-  /** Compact glyph toolbar vs registry showroom with figlet previews in the wheel. */
-  variant?: 'compact' | 'showroom';
+  /** Compact glyph toolbar vs Price Is Right pinned wheel with figlet previews. */
+  variant?: 'compact' | 'price-is-right';
   className?: string;
 };
 
@@ -44,7 +47,13 @@ function fontLabelSlide(font: string, active: boolean) {
   );
 }
 
-/** Y-axis figlet font rolodex — neighbors visible while scrolling; figlet preview in showroom mode. */
+function filterFigletFonts(fonts: readonly string[], filter: string): string[] {
+  const query = filter.trim().toLowerCase();
+  if (!query) return [...fonts];
+  return fonts.filter((font) => font.toLowerCase().includes(query));
+}
+
+/** Y-axis figlet font rolodex — compact strip or Price Is Right pinned preview wheel. */
 export function FigletFontPicker({
   value,
   onChange,
@@ -53,14 +62,22 @@ export function FigletFontPicker({
   className,
 }: FigletFontPickerProps) {
   const { pickerFonts, loadError } = useFigletFontCatalog();
-  const isShowroom = variant === 'showroom';
+  const isPriceIsRight = variant === 'price-is-right';
+  const [filter, setFilter] = useState('');
+
+  const filteredFonts = useMemo(
+    () => filterFigletFonts(pickerFonts, filter),
+    [filter, pickerFonts],
+  );
+
+  const wheelFonts = filter.trim() ? filteredFonts : pickerFonts;
 
   const items = useMemo(
     () =>
-      pickerFonts.map((font) => ({
+      wheelFonts.map((font) => ({
         value: font,
         label: font,
-        ...(isShowroom
+        ...(isPriceIsRight
           ? {
               renderSlide: (active: boolean) => (
                 <FigletFontPreviewSlide
@@ -77,10 +94,13 @@ export function FigletFontPicker({
               labelSlide: fontSlide(font),
             }),
       })),
-    [isShowroom, pickerFonts],
+    [isPriceIsRight, wheelFonts],
   );
 
-  const resolvedValue = resolveFigletPickerValue(value, pickerFonts);
+  const resolvedValue = resolveFigletPickerValue(
+    value,
+    wheelFonts.length > 0 ? wheelFonts : pickerFonts,
+  );
 
   useEffect(() => {
     if (resolvedValue === value) return;
@@ -105,7 +125,7 @@ export function FigletFontPicker({
       <div
         className={cn(
           'flex min-w-0 items-center justify-center rounded border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[8px] text-amber-300/90',
-          isShowroom ? 'h-[8.25rem] w-[10.5rem] shrink-0' : 'h-7',
+          isPriceIsRight ? 'h-[10rem] w-[10.5rem] shrink-0' : 'h-7',
           className,
         )}
       >
@@ -114,33 +134,72 @@ export function FigletFontPicker({
     );
   }
 
+  const roller = (
+    <CyberdeckRollingPicker
+      items={items}
+      value={resolvedValue}
+      onChange={onChange}
+      onUserSelect={() => {
+        onWheelSettled?.();
+      }}
+      ariaLabel="Figlet font"
+      viewportClassName={
+        isPriceIsRight
+          ? 'w-full max-w-none touch-pan-y select-none'
+          : 'h-7 min-w-0 w-full max-w-none overflow-hidden rounded border border-[#2d2d2d] bg-black [scrollbar-width:none]'
+      }
+      wheelTransparent={false}
+      wheelExpandOnScroll={isPriceIsRight}
+      wheelPinnedOpen={isPriceIsRight}
+      wheelNeighborCount={3}
+      slideHeightPx={isPriceIsRight ? 44 : 28}
+      wheelScrollStep={1}
+      alwaysShowLabel={isPriceIsRight}
+      showTextWhileScrolling={false}
+      wheelSettledShowsSlide={false}
+      loop
+      rollerType={isPriceIsRight ? 'figlet-price-is-right' : 'figlet-compact'}
+    />
+  );
+
+  if (!isPriceIsRight) {
+    return <div className={className}>{roller}</div>;
+  }
+
   return (
-    <div className={cn(isShowroom && 'shrink-0', className)}>
-      <CyberdeckRollingPicker
-        items={items}
-        value={resolvedValue}
-        onChange={onChange}
-        onUserSelect={() => {
-          onWheelSettled?.();
-        }}
-        ariaLabel="Figlet font"
-        viewportClassName={
-          isShowroom
-            ? 'w-[10.5rem] max-w-[10.5rem]'
-            : 'h-7 min-w-0 w-full max-w-none overflow-hidden rounded border border-[#2d2d2d] bg-black [scrollbar-width:none]'
-        }
-        wheelTransparent={false}
-        wheelExpandOnScroll={isShowroom}
-        wheelPinnedOpen={isShowroom}
-        wheelNeighborCount={3}
-        slideHeightPx={isShowroom ? 44 : 28}
-        wheelScrollStep={1}
-        alwaysShowLabel={isShowroom}
-        showTextWhileScrolling={false}
-        wheelSettledShowsSlide={false}
-        loop
-        rollerType={isShowroom ? 'figlet-showroom' : 'figlet-compact'}
-      />
+    <div
+      className={cn(
+        'flex h-[10rem] w-[10.5rem] shrink-0 flex-col overflow-hidden rounded-sm border border-[#2d2d2d] bg-black',
+        className,
+      )}
+      data-figlet-price-is-right-roller
+      role="group"
+      aria-label="Figlet font wheel"
+    >
+      <div className="shrink-0 border-b border-[#1c1c1c] px-2 py-1">
+        <input
+          type="search"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+          placeholder="Filter fonts…"
+          spellCheck={false}
+          autoCapitalize="off"
+          autoComplete="off"
+          autoCorrect="off"
+          aria-label="Filter figlet fonts"
+          className={FILTER_INPUT_CLASS}
+        />
+      </div>
+
+      <div className="flex min-h-0 flex-1 items-stretch justify-center overflow-hidden">
+        {wheelFonts.length === 0 ? (
+          <p className="flex flex-1 items-center justify-center px-2 font-mono text-[9px] text-[#6a6a6a]">
+            No fonts match.
+          </p>
+        ) : (
+          roller
+        )}
+      </div>
     </div>
   );
 }

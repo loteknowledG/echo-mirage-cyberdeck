@@ -850,7 +850,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                 className={cn(
                   "flex min-w-0 flex-nowrap items-start gap-1.5 px-2 py-1.5",
                   settings.engine === "figlet"
-                    ? "min-h-[8.25rem] overflow-hidden"
+                    ? "min-h-[10rem] overflow-hidden"
                     : "min-h-7 overflow-hidden",
                 )}
               >
@@ -864,7 +864,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                 {settings.engine === "figlet" ? (
                   <div className="flex min-w-0 flex-1 items-stretch gap-2 overflow-hidden">
                     <FigletFontPicker
-                      variant="showroom"
+                      variant="price-is-right"
                       value={settings.figletFont}
                       onChange={(figletFont) =>
                         setSettings((prev) => ({ ...prev, figletFont }))

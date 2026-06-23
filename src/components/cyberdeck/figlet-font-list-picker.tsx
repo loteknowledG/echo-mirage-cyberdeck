@@ -14,7 +14,7 @@ type FigletFontListPickerProps = {
   className?: string;
 };
 
-/** Scrollable figlet font list — replaces the showroom rolling wheel. */
+/** Scrollable figlet font list — alternative to the Price Is Right rolling wheel. */
 export function FigletFontListPicker({
   value,
   onChange,
