@@ -1,4 +1,4 @@
-import { assertPiControlLeaseForExecution } from "@/lib/muthur/control/pi-control-lease-gate";
+import { assertPiControlLeaseForExecution } from "@/lib/muthur/control/pi-control-lease-gate.server";
 import type {
   ComputerUseAdapter,
   PiComputerUseCommand,

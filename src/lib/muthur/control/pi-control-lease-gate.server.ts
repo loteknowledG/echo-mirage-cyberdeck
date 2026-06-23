@@ -1,8 +1,6 @@
 import type { PiComputerUseCommand } from "@/lib/pi/pi-computer-use-types";
 import { createPiComputerUseReceipt } from "@/lib/pi/pi-computer-use-receipts";
-import {
-  createPiAuthorityReceipt,
-} from "@/lib/muthur/control/pi-control-lease-receipts";
+import { createPiAuthorityReceipt } from "@/lib/muthur/control/pi-control-lease-receipts";
 import {
   getPiControlLeaseSnapshot,
   isPiControlLeaseActive,
@@ -12,6 +10,7 @@ import type { PiAuthorityReceipt } from "@/lib/muthur/control/pi-control-lease-t
 import type { PiComputerUseReceipt } from "@/lib/pi/pi-computer-use-types";
 import { resolvePiPlatform } from "@/lib/pi/pi-platform-resolver";
 import { resolvePiComputerUseBackend } from "@/lib/pi/pi-platform-resolver.server";
+import { isPiProbeLeaseBypassEnabled } from "@/lib/muthur/control/pi-control-lease-probe";
 
 export type PiExecutionGateOptions = {
   /** Test/probe scripts only — never enabled in production. */
@@ -24,8 +23,6 @@ export type PiExecutionGateResult = {
   authorityReceipt?: PiAuthorityReceipt;
   reason?: string;
 };
-
-const PROBE_BYPASS_ENV = "PI_COMPUTER_USE_PROBE_BYPASS";
 
 function commandToCapability(action: PiComputerUseCommand["action"]) {
   switch (action) {
@@ -50,13 +47,6 @@ function commandToCapability(action: PiComputerUseCommand["action"]) {
       return exhaustive;
     }
   }
-}
-
-export function isPiProbeLeaseBypassEnabled(): boolean {
-  if (process.env.NODE_ENV === "production") {
-    return false;
-  }
-  return process.env[PROBE_BYPASS_ENV] === "1";
 }
 
 export function assertPiControlLeaseForExecution(

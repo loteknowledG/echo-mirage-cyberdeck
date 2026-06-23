@@ -7,7 +7,7 @@ import * as uiVerification from "./ui-verification";
 import * as indicateLayer from "./indicate-layer";
 import { getActionScope } from "./capability-registry";
 import { getCurrentOwner, checkActionPermission, emitControlDenied } from "./control-lease";
-import { isPiProbeLeaseBypassEnabled } from "@/lib/muthur/control/pi-control-lease-gate";
+import { isPiProbeLeaseBypassEnabled } from "@/lib/muthur/control/pi-control-lease-probe";
 import { isPiControlLeaseActive } from "@/lib/muthur/control/pi-control-lease-store";
 import { narrate } from "./narration";
 
