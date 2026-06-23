@@ -208,8 +208,7 @@
   },
   "pnpm": {
     "overrides": {
-      "pdfjs-dist": "^6.0.227",
-      "realmorphism": "link:../realmorphism"
+      "pdfjs-dist": "^6.0.227"
     },
     "onlyBuiltDependencies": [
       "@google/genai",
