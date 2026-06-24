@@ -19,6 +19,8 @@ import {
   takePendingPiMission,
   type PiMissionDetail,
 } from "@/lib/pi/pi-mission-bridge";
+import { buildGlyphContextSnapshot } from "@/lib/glyph-channel";
+import { applyGlyphResponseFromAgent } from "@/lib/glyph-channel-apply.client";
 
 type PiChatPaneBodyProps = {
   server: string;
@@ -244,6 +246,7 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
               }
 
               const muthurScreenContext = formatMuthurScreenContextForPi(readMuthurScreenSnapshot());
+              const glyphContext = await buildGlyphContextSnapshot();
               const response = await fetch("/api/pi-chat", {
                 method: "POST",
                 headers: {
@@ -255,6 +258,7 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
                   model: model.id,
                   systemPrompt: context.systemPrompt,
                   muthurScreenContext,
+                  glyphContext,
                   computerUseEnabled: true,
                   messages: context.messages,
                 }),
@@ -316,11 +320,23 @@ export function CyberdeckPiChatPaneBody({ server }: PiChatPaneBodyProps) {
               }
 
               partial.content = [{ type: "text", text }];
+              const glyphApplied = await applyGlyphResponseFromAgent(text).catch((glyphError) => {
+                console.error("[pi-tab] glyph apply failed", glyphError);
+                return { applied: false, displayText: text };
+              });
+              if (glyphApplied.displayText !== text) {
+                text = glyphApplied.displayText;
+                partial.content = [{ type: "text", text }];
+              }
+
               stream.push({ type: "text_end", contentIndex: 0, content: text, partial });
               stream.push({ type: "done", reason: "stop", message: partial });
               stream.end(partial);
               queueMicrotask(forceReady);
-              console.debug("[pi-tab] stream done", { length: text.length });
+              console.debug("[pi-tab] stream done", {
+                length: text.length,
+                glyphApplied: glyphApplied.applied,
+              });
             } catch (error) {
               let message =
                 error instanceof Error ? error.message : "Pi proxy request failed";

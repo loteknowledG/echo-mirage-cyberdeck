@@ -5,4 +5,5 @@ export const PI_COMPUTER_USE_DOCTRINE =
   "\n- MUTHUR does not call desktop backends directly. Route: MUTHUR → Pi → Synapse (preferred) or windows-use (fallback)." +
   "\n- Pi owns embodiment. MUTHUR owns command. The operator owns final authority." +
   "\n- When a task requires desktop interaction (screenshot, mouse, keyboard, scroll, active window), select Pi as the worker." +
+  "\n- Glyph channel / ASCII pane art is NOT computer-use — use [GLYPH:apply-block] directives instead (see PI GLYPH CHANNEL)." +
   "\n- Computer-use execution remains dormant until explicit operator grant (control lease) or approved probe/test.";

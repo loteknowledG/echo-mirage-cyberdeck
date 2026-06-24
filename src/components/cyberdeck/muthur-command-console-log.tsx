@@ -41,6 +41,7 @@ type MuthurCommandConsoleLogProps = {
   chatKeyboardHighlightIndex: number | null;
   renderDiagnosticText?: (text: string) => ReactNode;
   cognitionStatusLine?: string | null;
+  delegationPanel?: ReactNode;
 };
 
 function DiagnosticLine({
@@ -85,6 +86,7 @@ export function MuthurCommandConsoleLog({
   chatKeyboardHighlightIndex,
   renderDiagnosticText,
   cognitionStatusLine,
+  delegationPanel,
 }: MuthurCommandConsoleLogProps) {
   const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
   const turns = useMemo(() => groupMuthurChatTurns(messages), [messages]);
@@ -188,6 +190,8 @@ export function MuthurCommandConsoleLog({
           </div>
         ) : null}
       </section>
+
+      {delegationPanel}
 
       {diagnosticsTotalCount > 0 || streamToolTrace || cognitionStatusLine ? (
         <section data-muthur-diagnostics className="mt-4 border-t border-[#1a1a1a] pt-3">

@@ -128,8 +128,9 @@ import {
   pdfFilenameFromMarkdownName,
   type OperatorExportFormat,
 } from "@/lib/markdown-to-docx-intent";
-import { parseGlyphResponseActions, resolveGlyphCommand, type GlyphApplyAction, type GlyphCommand } from "@/lib/muthur-glyph-intent";
+import { parseGlyphResponseActions, resolveGlyphCommand, type GlyphCommand } from "@/lib/muthur-glyph-intent";
 import type { AsciiRenderRequest } from "@/lib/muthur-ascii-skill/types";
+import { applyGlyphActions, GLYPH_CHANNEL_FOCUS_EVENT } from "@/lib/glyph-channel-apply.client";
 import {
   buildGlyphContextSnapshot,
   dispatchGlyphPaneMode,
@@ -1475,27 +1476,19 @@ export default function CyberdeckApp() {
   );
 
   const applyGlyphActionsFromMuthur = useCallback(
-    async (actions: GlyphApplyAction[]) => {
-      for (const action of actions) {
-        if (action.kind === "set") {
-          await setRawGlyphChannelText(action.text, action.merge ?? "replace");
-          continue;
-        }
-        if (action.kind === "ascii-skill") {
-          await renderAsciiSkillToChannel(action.request);
-          continue;
-        }
-        await renderGlyphToChannel({
-          engine: action.engine,
-          text: action.text,
-          font: action.font,
-          merge: action.merge,
-          decorate: action.decorate,
-        });
-      }
+    async (actions: Parameters<typeof applyGlyphActions>[0]) => {
+      await applyGlyphActions(actions);
     },
-    [renderAsciiSkillToChannel, renderGlyphToChannel, setRawGlyphChannelText],
+    [],
   );
+
+  useEffect(() => {
+    const handler = () => {
+      focusGlyphChannelTab();
+    };
+    window.addEventListener(GLYPH_CHANNEL_FOCUS_EVENT, handler);
+    return () => window.removeEventListener(GLYPH_CHANNEL_FOCUS_EVENT, handler);
+  }, [focusGlyphChannelTab]);
 
   const handleGlyphOperatorCommand = useCallback(
     async (command: GlyphCommand) => {
@@ -6218,6 +6211,28 @@ ${diff}`;
         const editsToApply =
           operatorEditsFromStream.length > 0 ? operatorEditsFromStream : operatorEdits;
         let operatorEditApplied = false;
+
+        if (glyphResponse.actions.length > 0) {
+          try {
+            await applyGlyphActionsFromMuthur(glyphResponse.actions);
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                text: "GLYPH // applied to ⟁ Glyph Channel (edit mode).",
+              },
+            ]);
+          } catch (glyphError) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                text: `GLYPH // FAILED // ${glyphError instanceof Error ? glyphError.message : "Glyph apply failed"}`,
+              },
+            ]);
+          }
+        }
+
         const operatorEditFileName =
           operatorActiveFilePath?.split("/").pop() ||
           operatorDroppedAsset?.name ||
@@ -7903,6 +7918,20 @@ ${diff}`;
                 chatKeyboardHighlightIndex={chatKeyboardHighlightIndex}
                 renderDiagnosticText={renderGatewayMessageText}
                 cognitionStatusLine={muthurCognitionStatusLine}
+                delegationPanel={
+                  muthurPosture === "commander" ? (
+                    <MuthurDelegationPanel
+                      variant="accordion"
+                      mission={muthurMission}
+                      assignments={muthurDelegations}
+                      disabled={isStreaming}
+                      onCreateDelegation={handleCreateMuthurDelegation}
+                      onDispatchDelegation={handleDispatchMuthurDelegation}
+                      onRecordDelegationResult={handleRecordMuthurDelegationResult}
+                      onCancelDelegation={handleCancelMuthurDelegation}
+                    />
+                  ) : null
+                }
               />
               <div ref={messagesEndRef} className="h-px" aria-hidden />
             </div>
@@ -8124,18 +8153,6 @@ ${diff}`;
                     </CyberdeckPaneTooltipProvider>
                   </div>
                   </div>
-                  {muthurPosture === "commander" ? (
-                    <MuthurDelegationPanel
-                      mission={muthurMission}
-                      assignments={muthurDelegations}
-                      disabled={isStreaming}
-                      onCreateDelegation={handleCreateMuthurDelegation}
-                      onDispatchDelegation={handleDispatchMuthurDelegation}
-                      onRecordDelegationResult={handleRecordMuthurDelegationResult}
-                      onCancelDelegation={handleCancelMuthurDelegation}
-                      className="mt-1"
-                    />
-                  ) : null}
                 </div>
               </div>
             </footer>

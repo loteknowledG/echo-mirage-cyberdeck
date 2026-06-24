@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getModel, streamSimple, type Message, type Model } from "@mariozechner/pi-ai";
 import { runPiChatWithComputerUseTools } from "@/lib/pi/pi-chat-with-tools.server";
 import { PI_COMPUTER_USE_DOCTRINE } from "@/lib/pi/pi-computer-use-doctrine";
+import { buildPiGlyphContextPrompt, PI_GLYPH_DOCTRINE } from "@/lib/pi/pi-glyph-doctrine";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -133,13 +134,16 @@ export async function POST(request: Request) {
     const baseSystemPrompt = typeof body.systemPrompt === "string" ? body.systemPrompt : "";
     const muthurScreenContext =
       typeof body.muthurScreenContext === "string" ? body.muthurScreenContext.trim() : "";
+    const glyphContext = typeof body.glyphContext === "string" ? body.glyphContext : "";
     const computerUseEnabled = body.computerUseEnabled !== false;
     const systemPrompt = [
       baseSystemPrompt.trim(),
       muthurScreenContext,
+      PI_GLYPH_DOCTRINE,
+      buildPiGlyphContextPrompt(glyphContext),
       computerUseEnabled ? PI_COMPUTER_USE_DOCTRINE : "",
       computerUseEnabled
-        ? "\nWhen executing desktop missions, call pi_computer_use repeatedly: screenshot first, then open apps (Win key, type paint, enter), draw with click/type. Report each receipt."
+        ? "\nWhen executing desktop missions (not glyph channel art), call pi_computer_use repeatedly: screenshot first, then act. Report each receipt."
         : "",
     ]
       .filter(Boolean)

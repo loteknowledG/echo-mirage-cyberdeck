@@ -32,6 +32,8 @@ type MuthurDelegationPanelProps = {
   onRecordDelegationResult: (assignmentId: string, input: { success: boolean; summary: string }) => void;
   onCancelDelegation: (assignmentId: string) => void;
   className?: string;
+  /** Accordion sits in the chat log above diagnostics; default panel is a bordered block. */
+  variant?: "panel" | "accordion";
 };
 
 async function copyDelegationText(text: string): Promise<boolean> {
@@ -59,7 +61,9 @@ export function MuthurDelegationPanel({
   onRecordDelegationResult,
   onCancelDelegation,
   className,
+  variant = "panel",
 }: MuthurDelegationPanelProps) {
+  const [expanded, setExpanded] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [workerId, setWorkerId] = useState<MuthurDelegationWorkerId>("cursor");
   const [titleDraft, setTitleDraft] = useState("");
@@ -112,23 +116,31 @@ export function MuthurDelegationPanel({
         : `Package ready for ${assignment.package.workerLabel} (copy failed).`,
     );
     setExpandedAssignmentId(assignment.id);
+    if (variant === "accordion") {
+      setExpanded(true);
+    }
   };
 
-  return (
-    <div
-      className={cn(
-        "rounded border border-[#1c1c1c] bg-black/80 px-2 py-1.5 font-mono text-[9px] leading-relaxed tracking-[0.04em]",
-        className,
-      )}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[#8a8a8a]">
-          Delegations <span className="text-[#666]">({missionAssignments.length})</span>
-        </span>
+  const panelBody = (
+    <>
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-2",
+          variant === "accordion" ? "justify-end" : "justify-between",
+        )}
+      >
+        {variant === "panel" ? (
+          <span className="text-[#8a8a8a]">
+            Delegations <span className="text-[#666]">({missionAssignments.length})</span>
+          </span>
+        ) : null}
         <CyberdeckActionButton
           variant="accent"
           disabled={disabled}
           onClick={() => {
+            if (variant === "accordion") {
+              setExpanded(true);
+            }
             setShowCreateForm((current) => !current);
             setContextDraft(mission.objective);
           }}
@@ -327,6 +339,45 @@ export function MuthurDelegationPanel({
       ) : (
         <p className="mt-1 text-[#666]">No delegations for this mission.</p>
       )}
+    </>
+  );
+
+  if (variant === "accordion") {
+    const awaitingCount = missionAssignments.filter(
+      (assignment) => assignment.status === "awaiting_result",
+    ).length;
+
+    return (
+      <section data-muthur-delegations className={cn("mt-4 border-t border-[#1a1a1a] pt-3", className)}>
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 text-left font-mono text-[10px] text-amber-500/90 hover:text-amber-400"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <span>{expanded ? "▼" : "▶"}</span>
+          <span>Delegations ({missionAssignments.length})</span>
+          {awaitingCount > 0 && !expanded ? (
+            <span className="truncate text-emerald-500/70"> · {awaitingCount} awaiting result</span>
+          ) : null}
+        </button>
+        {expanded ? (
+          <div className="mt-2 max-h-48 overflow-y-auto rounded border border-[#1a1a1a] bg-[#050505] p-2 font-mono text-[9px] leading-relaxed tracking-[0.04em]">
+            {panelBody}
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded border border-[#1c1c1c] bg-black/80 px-2 py-1.5 font-mono text-[9px] leading-relaxed tracking-[0.04em]",
+        className,
+      )}
+    >
+      {panelBody}
     </div>
   );
 }
