@@ -85,12 +85,37 @@ export function createPiControlLeaseRequest(
   return { ...store.pendingRequest };
 }
 
-export function grantPiControlLease(durationMs?: number): {
+/** Restore pending from client when server memory is empty (serverless / split instance). */
+export function restorePiControlLeaseRequest(
+  pending: PiControlLeaseRequest,
+): PiControlLeaseRequest {
+  const store = getStore();
+  store.pendingRequest = {
+    leaseId: pending.leaseId,
+    task: pending.task,
+    taskSlug: pending.taskSlug,
+    operator: "pi",
+    capabilities: [...pending.capabilities],
+    reason: pending.reason,
+    status: "pending",
+    missionText: pending.missionText,
+    requestedAt: pending.requestedAt || new Date().toISOString(),
+  };
+  return { ...store.pendingRequest };
+}
+
+export function grantPiControlLease(
+  durationMs?: number,
+  pendingOverride?: PiControlLeaseRequest,
+): {
   granted: boolean;
   lease?: PiControlLease;
   reason?: string;
 } {
   const store = getStore();
+  if (!store.pendingRequest && pendingOverride) {
+    restorePiControlLeaseRequest(pendingOverride);
+  }
   if (!store.pendingRequest) {
     return { granted: false, reason: "No pending control request" };
   }

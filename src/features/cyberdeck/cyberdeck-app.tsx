@@ -268,6 +268,7 @@ import { setMuthurScreenSnapshot } from "@/lib/muthur-screen-context";
 import { formatPiScreenContextForMuthur, readPiScreenSnapshot } from "@/lib/pi-screen-context";
 import { setMUTHURMode } from "@/lib/computer-use/control-lease";
 import { detectComputerUseMission } from "@/lib/muthur/control/computer-use-intent";
+import { parsePiControlLeaseStreamMarker } from "@/lib/muthur/control/pi-control-lease-stream";
 import { usePiControlLease } from "@/lib/muthur/control/use-pi-control-lease";
 import type { PiControlLeaseRequest } from "@/lib/muthur/control/pi-control-lease-types";
 import { queuePiMission } from "@/lib/pi/pi-mission-bridge";
@@ -6032,6 +6033,10 @@ ${diff}`;
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           fullText += chunk;
+          const pendingFromStream = parsePiControlLeaseStreamMarker(fullText);
+          if (pendingFromStream) {
+            piControlLease.applyPendingRequest(pendingFromStream);
+          }
           streamDisplayText = formatMuthurLiveStreamDisplay(fullText);
           scheduleStreamFlush();
         }

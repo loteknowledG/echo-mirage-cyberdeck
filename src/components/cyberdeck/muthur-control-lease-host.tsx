@@ -78,10 +78,11 @@ export function MuthurControlLeaseHost({
       {pending ? (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4">
           <div
-            role="dialog"
-            aria-labelledby="pi-control-request-title"
-            className="w-full max-w-md rounded border border-amber-500/40 bg-[#0a0a0a] p-4 font-mono text-[11px] text-gray-200 shadow-[0_0_24px_rgba(251,191,36,0.12)]"
-          >
+          role="dialog"
+          aria-labelledby="pi-control-request-title"
+          className="w-full max-w-md rounded border border-amber-500/40 bg-[#0a0a0a] p-4 font-mono text-[11px] text-gray-200 shadow-[0_0_24px_rgba(251,191,36,0.12)]"
+          onMouseDown={(event) => event.stopPropagation()}
+        >
             <p className="text-[10px] uppercase tracking-[0.18em] text-amber-400/90">
               Control Request
             </p>

@@ -9,6 +9,7 @@ import { parseOperatorBrowserJson } from "@/lib/muthur-core/operator-browser-ref
 import { parseOperatorConversionJson } from "@/lib/muthur-core/operator-conversion-ref";
 import { parseOperatorOpenJson } from "@/lib/muthur-core/operator-open-file-ref";
 import { stripDsmlToolMarkup } from "@/lib/muthur-core/parse-dsml-tool-calls";
+import { stripPiControlLeaseStreamMarkers } from "@/lib/muthur/control/pi-control-lease-stream";
 
 const OPERATOR_EDITS_FOOTER_RE =
   /\n\n\[MUTHUR_OPERATOR_EDITS\]([\s\S]*?)\[\/MUTHUR_OPERATOR_EDITS\]\s*$/;
@@ -53,6 +54,7 @@ export function formatMuthurLiveStreamDisplay(text: string): string {
     .replace(/^=+\s*$/gm, "")
     .replace(/^=+$\n?/g, "")
     .trim();
+  body = stripPiControlLeaseStreamMarkers(body);
 
   if (body) return body;
 
@@ -174,11 +176,13 @@ export function splitMuthurStreamPayload(text: string): {
     toolsUsed = toolsMatch[1].trim();
   }
 
-  const displayText = stripDsmlToolMarkup(body)
-    .replace(CODING_VERIFY_INLINE_RE, "")
-    .replace(UPLINK_PROGRESS_RE, "")
-    .replace(/^=+$\n?/gm, "")
-    .trim();
+  const displayText = stripPiControlLeaseStreamMarkers(
+    stripDsmlToolMarkup(body)
+      .replace(CODING_VERIFY_INLINE_RE, "")
+      .replace(UPLINK_PROGRESS_RE, "")
+      .replace(/^=+$\n?/gm, "")
+      .trim(),
+  );
   return { displayText, operatorEdits, operatorConversion, operatorOpenFile, operatorBrowser, codingVerify, toolsUsed };
 }
 

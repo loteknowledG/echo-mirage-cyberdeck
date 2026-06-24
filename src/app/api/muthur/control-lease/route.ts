@@ -7,14 +7,28 @@ import {
   getPiControlLeaseSnapshot,
   grantPiControlLease,
   markPiControlConflict,
+  restorePiControlLeaseRequest,
   terminateActiveLease,
   userRetakePiControl,
 } from "@/lib/muthur/control/pi-control-lease-store";
-import type { ComputerUseMission } from "@/lib/muthur/control/pi-control-lease-types";
+import type {
+  ComputerUseMission,
+  PiControlLeaseRequest,
+} from "@/lib/muthur/control/pi-control-lease-types";
 import {
   releaseSynapseOperatorLease,
   syncSynapseLeaseWithPiGrant,
 } from "@/lib/pi/synapse/synapse-control-lease.server";
+
+function parsePendingOverride(body: Record<string, unknown>): PiControlLeaseRequest | undefined {
+  const raw = body.pendingRequest;
+  if (!raw || typeof raw !== "object") return undefined;
+  const pending = raw as Partial<PiControlLeaseRequest>;
+  if (typeof pending.leaseId !== "string" || typeof pending.task !== "string") {
+    return undefined;
+  }
+  return pending as PiControlLeaseRequest;
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,7 +81,8 @@ export async function POST(request: Request) {
     case "grant": {
       const durationMs =
         typeof body.durationMs === "number" ? body.durationMs : undefined;
-      const result = grantPiControlLease(durationMs);
+      const pendingOverride = parsePendingOverride(body);
+      const result = grantPiControlLease(durationMs, pendingOverride);
       if (!result.granted) {
         return NextResponse.json(
           { ok: false, error: result.reason ?? "Grant failed" },
@@ -96,6 +111,10 @@ export async function POST(request: Request) {
       });
     }
     case "deny": {
+      const pendingOverride = parsePendingOverride(body);
+      if (pendingOverride && !getPiControlLeaseSnapshot().pendingRequest) {
+        restorePiControlLeaseRequest(pendingOverride);
+      }
       denyPiControlLease(
         typeof body.reason === "string" ? body.reason : "operator_denied",
       );

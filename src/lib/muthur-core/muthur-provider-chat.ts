@@ -5,6 +5,7 @@ import { executeMuthurChatTool } from "@/lib/muthur-core/execute-openai-tool";
 import { getMuthurOpenAiToolsForPosture } from "@/lib/muthur-core/openai-tool-definitions";
 import type { MuthurPosture, MuthurPostureToolContext } from "@/lib/muthur/muthur-posture";
 import { appendMuthurStreamFooters } from "@/lib/muthur-core/muthur-stream-payload";
+import { formatPiControlLeaseStreamMarker } from "@/lib/muthur/control/pi-control-lease-stream";
 import {
   inlineCallsToOpenAiToolCalls,
   parseInlineToolCalls,
@@ -334,6 +335,9 @@ export async function muthurChatWithModelTools(options: {
             tool_call_id: o.id,
             content: o.content,
           });
+        }
+        if (toolCtx.piControlLeaseRequest) {
+          write(formatPiControlLeaseStreamMarker(toolCtx.piControlLeaseRequest));
         }
         continue;
       }

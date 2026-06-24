@@ -22,6 +22,17 @@ function main() {
   assert.equal(pending.operator, "pi");
   assert.equal(getPiControlLeaseSnapshot().pendingRequest?.leaseId, pending.leaseId);
 
+  resetPiControlLeaseForTests();
+  const grantedFromClient = grantPiControlLease(60_000, pending);
+  assert.equal(
+    grantedFromClient.granted,
+    true,
+    `grant with client pending override (${grantedFromClient.reason ?? "unknown"})`,
+  );
+  assert.ok(isPiControlLeaseActive());
+  userRetakePiControl("probe_reset");
+
+  createPiControlLeaseRequest(mission!);
   const granted = grantPiControlLease(60_000);
   assert.equal(granted.granted, true);
   assert.ok(isPiControlLeaseActive());
