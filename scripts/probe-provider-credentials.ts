@@ -9,6 +9,7 @@ import {
   buildProviderReceipt,
   classifyProviderAuthFailure,
   formatProviderReceiptText,
+  listServerConfiguredProviders,
   resolveServerProviderCredentials,
 } from "../src/lib/server/provider-credentials.server";
 
@@ -119,6 +120,25 @@ function testProviderIsolation(): void {
   console.log("  ok provider credential isolation");
 }
 
+function testServerConfiguredProbe(): void {
+  withEnv(
+    {
+      OPENROUTER_API_KEY: "sk-or-env-test",
+      OPENAI_API_KEY: undefined,
+      OPENCODE_API_KEY: undefined,
+      ZEN_API_KEY: undefined,
+      NEXT_PUBLIC_OPENROUTER_API_KEY: undefined,
+    },
+    () => {
+      const configured = listServerConfiguredProviders();
+      assert.equal(configured.openrouter, true);
+      assert.equal(configured.openai, false);
+      assert.equal(configured.opencode, false);
+    },
+  );
+  console.log("  ok server configured probe");
+}
+
 async function main(): Promise<void> {
   console.log("probe:provider-credentials");
   testServerEnvFallback();
@@ -128,6 +148,7 @@ async function main(): Promise<void> {
   testNoKeyReceipt();
   testInvalidKeyClassification();
   testProviderIsolation();
+  testServerConfiguredProbe();
   console.log("probe:provider-credentials PASS");
 }
 

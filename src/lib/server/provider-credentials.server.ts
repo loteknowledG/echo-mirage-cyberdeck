@@ -33,6 +33,11 @@ const PROVIDER_PRIVATE_ENV: Record<string, string[]> = {
   openrouter: ["OPENROUTER_API_KEY"],
 };
 
+/** Gateway providers that share unified credential resolution. */
+export const GATEWAY_PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
+
+export type GatewayProviderId = (typeof GATEWAY_PROVIDER_IDS)[number];
+
 const PROVIDER_PUBLIC_ENV: Record<string, string[]> = {
   opencode: ["NEXT_PUBLIC_OPENCODE_API_KEY", "NEXT_PUBLIC_ZEN_API_KEY"],
   openai: ["NEXT_PUBLIC_OPENAI_API_KEY"],
@@ -63,6 +68,19 @@ function envCredentialCandidates(provider: string): Array<{
   const pub = readEnv(PROVIDER_PUBLIC_ENV[provider] ?? []);
   if (pub && pub !== priv) out.push({ apiKey: pub, credentialSource: "session_key" });
   return out;
+}
+
+/** True when server env (private or public) supplies a key — no upstream probe. */
+export function providerServerConfigured(provider: string): boolean {
+  return envCredentialCandidates(provider).length > 0;
+}
+
+export function listServerConfiguredProviders(): Record<GatewayProviderId, boolean> {
+  return {
+    opencode: providerServerConfigured("opencode"),
+    openrouter: providerServerConfigured("openrouter"),
+    openai: providerServerConfigured("openai"),
+  };
 }
 
 export function resolveServerProviderCredentials(

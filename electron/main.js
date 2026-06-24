@@ -146,7 +146,10 @@ function operatorMimeTypeForFileName(name) {
     '.ppt': 'application/vnd.ms-powerpoint',
     '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     '.xls': 'application/vnd.ms-excel',
+    '.env': 'text/plain',
+    '.local': 'text/plain',
   };
+  if (name === '.env' || name.startsWith('.env.')) return 'text/plain';
   return map[ext] || 'application/octet-stream';
 }
 

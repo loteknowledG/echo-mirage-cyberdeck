@@ -4088,6 +4088,31 @@ export default function CyberdeckApp() {
     });
     const bootModels = caches[resolvedActive];
     if (bootModels?.length) setModelList(bootModels);
+
+    const bakedAvailable: Partial<Record<(typeof PROVIDER_IDS)[number], boolean>> = {};
+    for (const id of PROVIDER_IDS) {
+      if (DEFAULT_CLIENT_PROVIDER_KEYS[id]) bakedAvailable[id] = true;
+    }
+    if (Object.keys(bakedAvailable).length > 0) {
+      setDefaultKeyAvailableByProvider((prev) => ({ ...prev, ...bakedAvailable }));
+    }
+
+    void fetch("/api/provider-config")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { configured?: Record<string, boolean> } | null) => {
+        if (!data?.configured) return;
+        setDefaultKeyAvailableByProvider((prev) => {
+          const next = { ...prev };
+          for (const id of PROVIDER_IDS) {
+            if (data.configured?.[id]) next[id] = true;
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        /* offline / dev without route */
+      });
+
     setDidHydrateProviderState(true);
   }, []);
 
@@ -4488,11 +4513,11 @@ export default function CyberdeckApp() {
         return;
       }
       setModelList([]);
-      if (providerHasKey(providerId) && !rateLimitedProviders.has(providerId)) {
+      if (!rateLimitedProviders.has(providerId)) {
         void fetchModelsForProvider(providerId);
       }
     },
-    [fetchModelsForProvider, modelCacheByProvider, providerHasKey, rateLimitedProviders],
+    [fetchModelsForProvider, modelCacheByProvider, rateLimitedProviders],
   );
 
   const refreshProviderModelsDebounced = useCallback(
@@ -5058,16 +5083,12 @@ export default function CyberdeckApp() {
       setModelList(cached);
       return;
     }
-    if (providerKeys[activeProvider] || defaultKeyAvailableByProvider[activeProvider]) {
-      void fetchModelsForProvider(activeProvider);
-    }
+    void fetchModelsForProvider(activeProvider);
   }, [
     activeProvider,
-    defaultKeyAvailableByProvider,
     didHydrateProviderState,
     fetchModelsForProvider,
     modelCacheByProvider,
-    providerKeys,
   ]);
 
   useEffect(() => {

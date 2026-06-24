@@ -60,6 +60,15 @@ function main() {
     "office-unsupported",
   );
 
+  assert.equal(
+    resolveOperatorAssetSurface({
+      kind: "text",
+      name: ".env.local",
+      text: "OPENROUTER_API_KEY=sk-test\n",
+    }),
+    "text",
+  );
+
   console.log("probe-operator-file-surface: ok");
 }
 

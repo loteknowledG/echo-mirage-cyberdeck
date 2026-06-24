@@ -95,9 +95,17 @@ function matchesExtension(name: string, extensions: readonly string[]): boolean 
   return extensions.some((candidate) => ext === candidate);
 }
 
+/** `.env`, `.env.local`, `.env.production.local`, etc. */
+function isDotEnvFileName(name: string): boolean {
+  const base = name.toLowerCase().split(/[/\\]/).pop() ?? name.toLowerCase();
+  return base === ".env" || base.startsWith(".env.");
+}
+
 function detectSurfaceFromNameAndMime(file: File): OperatorAssetSurface | null {
   const lowerName = file.name.toLowerCase();
   const mime = (file.type || "").toLowerCase();
+
+  if (isDotEnvFileName(lowerName)) return "text";
 
   if (lowerName.endsWith(".pdf") || mime === "application/pdf") return "pdf";
   if (
@@ -283,6 +291,7 @@ export function isOperatorTextEditableSurface(surface: OperatorAssetSurface): bo
 /** True when a workspace path is a Monaco-editable text/markdown file. */
 export function isOperatorWorkspaceTextPath(filePath: string): boolean {
   const lower = filePath.toLowerCase();
+  if (isDotEnvFileName(lower)) return true;
   return matchesExtension(lower, TEXT_EDITABLE_EXTENSIONS);
 }
 
