@@ -84,7 +84,7 @@ import {
   type OperatorAssetSurface,
   type OperatorIngestHints,
 } from "@/lib/operator-file-surface";
-import { cleanOperatorPasteText } from "@/lib/operator-paste-cleaner";
+import { cleanOperatorPasteText, operatorPasteWasCleaned } from "@/lib/operator-paste-cleaner";
 import {
   normalizeMarkdownMechanical,
   operatorMarkdownWasHousekept,
@@ -171,7 +171,7 @@ import {
   type OperatorSaveIntent,
 } from "@/lib/operator-save";
 import { OPERATOR_FILE_SAVED_EVENT } from "@/lib/workspace-create-folder";
-import { readOperatorPaneSaveText } from "@/lib/operator-workbench";
+import { pasteIntoOperatorTextDocument, readOperatorPaneSaveText } from "@/lib/operator-workbench";
 import { get, set } from "idb-keyval";
 import {
   CyberdeckPaneHeader,
@@ -3599,19 +3599,44 @@ export default function CyberdeckApp() {
   const pasteClipboardToOperator = useCallback(async () => {
     operatorKindManualRef.current = false;
     try {
-      const clipboardText = await readEchoMirageClipboardText();
+      const raw = await readEchoMirageClipboardText();
 
-      if (!clipboardText.trim()) {
+      if (!raw.trim()) {
         toast.error("Clipboard has no text.");
         return;
       }
 
+      const clipboardText = cleanOperatorPasteText(raw);
+      const strippedWrapper = operatorPasteWasCleaned(raw, clipboardText);
+
+      if (
+        operatorDocMode === "edit" &&
+        operatorSurfaceIsDocument &&
+        operatorDroppedAsset
+      ) {
+        const merged = pasteIntoOperatorTextDocument(
+          clipboardText,
+          operatorDroppedAsset.text ?? "",
+        );
+        setOperatorTextAsset({
+          ...operatorDroppedAsset,
+          text: merged,
+          size: new Blob([merged]).size,
+        });
+        toast.success(
+          strippedWrapper
+            ? "Pasted at cursor — stripped chat code-fence wrapper."
+            : "Pasted into document.",
+        );
+        return;
+      }
+
       const pasteHistoryPath = `paste://${Date.now()}`;
-      let strippedWrapper = false;
+      let strippedWrapperOnDraft = false;
       await openOperatorFile(pasteHistoryPath, async () => {
-        strippedWrapper = setOperatorTextAsset({
+        strippedWrapperOnDraft = setOperatorTextAsset({
           kind: "text",
-          name: operatorDroppedAsset?.name ?? "",
+          name: operatorDroppedAsset?.name ?? "draft.txt",
           mimeType: "text/plain",
           size: new Blob([clipboardText]).size,
           text: clipboardText,
@@ -3620,14 +3645,20 @@ export default function CyberdeckApp() {
       setOperatorSurfaceMode("workspace");
       setOperatorDocMode("edit");
       toast.success(
-        strippedWrapper
+        strippedWrapperOnDraft
           ? "Pasted into operator — stripped chat code-fence wrapper."
           : "Pasted clipboard into a new operator draft.",
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not paste clipboard text.");
     }
-  }, [openOperatorFile, operatorDroppedAsset?.name, setOperatorTextAsset]);
+  }, [
+    openOperatorFile,
+    operatorDocMode,
+    operatorDroppedAsset,
+    operatorSurfaceIsDocument,
+    setOperatorTextAsset,
+  ]);
 
   const loadOperatorAssetFromFile = useCallback(async (file: File, hints?: OperatorIngestHints) => {
     operatorKindManualRef.current = false;

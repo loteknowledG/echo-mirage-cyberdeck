@@ -36,7 +36,8 @@ import {
   docxFilenameFromMarkdownName,
   pdfFilenameFromMarkdownName,
 } from "@/lib/markdown-to-docx-intent";
-import { cleanOperatorPasteText } from "@/lib/operator-paste-cleaner";
+import { cleanOperatorPasteText, operatorPasteWasCleaned } from "@/lib/operator-paste-cleaner";
+import { pasteIntoOperatorTextDocument } from "@/lib/operator-workbench";
 import {
   buildOperatorSaveIntent,
   canSaveOperatorDocumentInPlace,
@@ -371,26 +372,51 @@ export function CyberdeckTabDocumentPane({ tabId }: { tabId: string }) {
   const pasteFromClipboard = useCallback(async () => {
     kindManualRef.current = false;
     try {
-      const text = await readClipboardText();
-      if (!text.trim()) {
+      const raw = await readClipboardText();
+      if (!raw.trim()) {
         toast.error("Clipboard has no text.");
         return;
       }
+      const clipboardText = cleanOperatorPasteText(raw);
+      const strippedWrapper = operatorPasteWasCleaned(raw, clipboardText);
+
+      const surface = asset ? resolveOperatorAssetSurface(asset) : null;
+      const canInsertAtCursor =
+        docMode === "edit" && surface != null && isOperatorTextEditableSurface(surface);
+
+      if (canInsertAtCursor && asset) {
+        const merged = pasteIntoOperatorTextDocument(clipboardText, asset.text ?? "");
+        setTextAsset({
+          ...asset,
+          text: merged,
+          size: new Blob([merged]).size,
+        });
+        setDocMode("edit");
+        toast.success(
+          strippedWrapper
+            ? "Pasted at cursor — stripped chat code-fence wrapper."
+            : "Pasted into document.",
+        );
+        return;
+      }
+
       const stripped = setTextAsset({
         kind: "text",
         name: asset?.name || "draft.txt",
         mimeType: "text/plain",
-        size: new Blob([text]).size,
-        text,
+        size: new Blob([clipboardText]).size,
+        text: clipboardText,
       });
       setDocMode("edit");
       toast.success(
-        stripped ? "Pasted — stripped chat code-fence wrapper." : "Pasted clipboard into document.",
+        stripped
+          ? "Pasted — stripped chat code-fence wrapper."
+          : "Pasted clipboard into document.",
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not paste.");
     }
-  }, [asset?.name, setTextAsset]);
+  }, [asset, docMode, setTextAsset]);
 
   const clearDocument = useCallback(() => {
     kindManualRef.current = false;

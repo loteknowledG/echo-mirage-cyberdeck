@@ -192,6 +192,123 @@ export function readOperatorPaneSaveText(fallback = ""): string {
   return fallback;
 }
 
+/** @deprecated Prefer pasteIntoOperatorTextDocument with explicit fallback content. */
+export function tryPasteTextAtOperatorCursor(text: string, fallbackContent = ""): boolean {
+  if (typeof window === "undefined") return false;
+  const before = resolveOperatorDocumentContent(fallbackContent);
+  const after = pasteIntoOperatorTextDocument(text, fallbackContent);
+  return after !== before;
+}
+
+function resolveOperatorPasteSelectionContext(): Partial<OperatorEditSelectionContext> {
+  const ctx = getMonacoEditorContext();
+  const workbench = window.echoMirageOperatorWorkbench;
+
+  if (workbench) {
+    try {
+      const editor = workbench.readActiveEditor();
+      const range = editor.selection.range;
+      return {
+        cursorLine: editor.cursor.lineNumber,
+        cursorColumn: editor.cursor.column,
+        selectionStartLine: range?.startLineNumber ?? editor.cursor.lineNumber,
+        selectionStartColumn: range?.startColumn ?? editor.cursor.column,
+        selectionEndLine: range?.endLineNumber ?? editor.cursor.lineNumber,
+        selectionEndColumn: range?.endColumn ?? editor.cursor.column,
+      };
+    } catch {
+      // Fall through to Monaco context snapshot.
+    }
+  }
+
+  if (ctx.active && ctx.cursorLine != null && ctx.cursorColumn != null) {
+    return {
+      cursorLine: ctx.cursorLine,
+      cursorColumn: ctx.cursorColumn,
+      selectionStartLine: ctx.selectionStartLine ?? ctx.cursorLine,
+      selectionStartColumn: ctx.selectionStartColumn ?? ctx.cursorColumn,
+      selectionEndLine: ctx.selectionEndLine ?? ctx.cursorLine,
+      selectionEndColumn: ctx.selectionEndColumn ?? ctx.cursorColumn,
+    };
+  }
+
+  return {};
+}
+
+function operatorSelectionHasRange(selection: Partial<OperatorEditSelectionContext>): boolean {
+  const selectionStartLine = selection.selectionStartLine ?? selection.cursorLine ?? 0;
+  const selectionStartColumn = selection.selectionStartColumn ?? selection.cursorColumn ?? 0;
+  const selectionEndLine = selection.selectionEndLine ?? selection.cursorLine ?? 0;
+  const selectionEndColumn = selection.selectionEndColumn ?? selection.cursorColumn ?? 0;
+  return (
+    selectionStartLine !== selectionEndLine || selectionStartColumn !== selectionEndColumn
+  );
+}
+
+function resolveOperatorDocumentContent(fallbackContent: string): string {
+  const fromSave = readOperatorPaneSaveText(fallbackContent);
+  const ctx = getMonacoEditorContext();
+  const candidates = [fallbackContent, fromSave];
+  if (ctx.active && ctx.contentLength > 0) {
+    candidates.push(ctx.content);
+  }
+  return candidates.reduce((best, next) => (next.length > best.length ? next : best), "");
+}
+
+/** Insert clipboard text into the open operator document without replacing unrelated content. */
+export function pasteIntoOperatorTextDocument(
+  clipboardText: string,
+  fallbackContent: string,
+): string {
+  const ctx = getMonacoEditorContext();
+  const workbench = window.echoMirageOperatorWorkbench;
+  const editorSnapshot = workbench
+    ? (() => {
+        try {
+          return workbench.readActiveEditor();
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+
+  const current = resolveOperatorDocumentContent(fallbackContent);
+  const selection = resolveOperatorPasteSelectionContext();
+  const hasSelection =
+    operatorSelectionHasRange(selection) &&
+    Boolean(
+      editorSnapshot?.selection.text ||
+        (ctx.selectionText != null && ctx.selectionText.length > 0),
+    );
+
+  let edit: OperatorEditorEdit;
+  if (hasSelection) {
+    edit = { kind: "replace_selection", text: clipboardText };
+  } else if (selection.cursorLine != null && selection.cursorColumn != null) {
+    edit = { kind: "insert_at_cursor", text: clipboardText };
+  } else {
+    edit = { kind: "append_section", text: clipboardText };
+  }
+
+  const monacoSynced =
+    ctx.active &&
+    editorSnapshot != null &&
+    editorSnapshot.content.length > 0 &&
+    editorSnapshot.content === current;
+
+  if (monacoSynced && workbench?.applyEdit(edit)) {
+    try {
+      return workbench.readActiveEditor().content;
+    } catch {
+      // Fall through to plain-text merge.
+    }
+  }
+
+  const merged = applyOperatorEditToText(current, edit, selection);
+  workbench?.setDocumentText?.(merged);
+  return merged;
+}
+
 export function exposeOperatorWorkbench(controller: OperatorWorkbenchController): () => void {
   if (typeof window === "undefined") return () => {};
   window.echoMirageOperatorWorkbench = controller;
