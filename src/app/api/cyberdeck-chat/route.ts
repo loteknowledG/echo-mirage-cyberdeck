@@ -47,6 +47,7 @@ import {
   providerResponseHeaders,
   resolveServerProviderCredentials,
 } from "@/lib/server/provider-credentials.server";
+import { detectProviderModelMismatch } from "@/lib/server/provider-upstream-headers.server";
 
 const MUTHUR_COGNITION_DOCTRINE =
   "\n\nCOGNITION: You interpret operator intent and choose tools. The deck does not pre-run browser searches, file reads, or conversions from regex on the operator's message — call tools yourself (localfs, operator_browser, observe_operator_pane, etc.). Do not emit [GLYPH:...] unless the operator explicitly asked for a glyph render.";
@@ -523,6 +524,24 @@ export async function POST(request: Request) {
         const model =
           (typeof modelFromBody === "string" && modelFromBody.trim()) || defaultModelForProvider(providerId);
 
+        const modelMismatch = detectProviderModelMismatch(providerId, model);
+        if (modelMismatch) {
+          const receipt = buildProviderReceipt({
+            provider: providerId,
+            model,
+            credentialSource,
+            auth: "failed",
+            reason: "model_mismatch",
+          });
+          return new Response(modelMismatch, {
+            status: 400,
+            headers: {
+              "Content-Type": "text/plain; charset=utf-8",
+              ...providerResponseHeaders(receipt),
+            },
+          });
+        }
+
         if (!resolvedApiKey) {
           const receipt = buildProviderReceipt({
             provider: providerId,
@@ -615,6 +634,7 @@ export async function POST(request: Request) {
           posture,
           commanderMissionActive,
           providerReceipt,
+          providerId,
         });
       }
     }

@@ -51,6 +51,7 @@ function shouldTryStreamWithoutTools(status: number): boolean {
 
 import type { ProviderReceipt } from "@/lib/server/provider-credentials.server";
 import { classifyProviderAuthFailure } from "@/lib/server/provider-credentials.server";
+import { buildProviderUpstreamHeaders } from "@/lib/server/provider-upstream-headers.server";
 
 function upstreamErrorResponse(status: number, raw: string, receipt?: ProviderReceipt): Response {
   const detail = formatUplinkErrorDetail(status, raw);
@@ -117,7 +118,7 @@ function startEarlyUplinkStream(
           controller.close();
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Uplink failed";
-          write(`\n[MUTHUR] ${msg}`);
+          write(`\n${msg}`);
           controller.close();
         }
       },
@@ -140,15 +141,17 @@ async function pipeOpenAiStreamToWrite(
   }
 }
 
-async function fetchStreamPlainNoTools(endpoint: string, apiKey: string, model: string, messages: JsonMessage[]) {
+async function fetchStreamPlainNoTools(
+  endpoint: string,
+  headers: Record<string, string>,
+  model: string,
+  messages: JsonMessage[],
+) {
   return fetchWithTimeout(
     endpoint,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify({
         model,
         messages,
@@ -157,6 +160,13 @@ async function fetchStreamPlainNoTools(endpoint: string, apiKey: string, model: 
     },
     UPSTREAM_TOOL_TIMEOUT_MS,
   );
+}
+
+function inferProviderIdFromEndpoint(endpoint: string): string {
+  if (endpoint.includes("openrouter.ai")) return "openrouter";
+  if (endpoint.includes("opencode.ai")) return "opencode";
+  if (endpoint.includes("api.openai.com")) return "openai";
+  return "openai";
 }
 
 /**
@@ -173,8 +183,11 @@ export async function muthurChatWithModelTools(options: {
   posture?: MuthurPosture;
   commanderMissionActive?: boolean;
   providerReceipt?: ProviderReceipt;
+  providerId?: string;
 }): Promise<Response> {
   const { endpoint, apiKey, model, registry, providerReceipt } = options;
+  const providerId = options.providerId ?? inferProviderIdFromEndpoint(endpoint);
+  const upstreamHeaders = buildProviderUpstreamHeaders(providerId, apiKey);
   const posture = options.posture ?? "plan";
   const toolContext: MuthurPostureToolContext | undefined =
     typeof options.commanderMissionActive === "boolean"
@@ -196,7 +209,7 @@ export async function muthurChatWithModelTools(options: {
   if (!toolsEnabled) {
     let streamRes: Response;
     try {
-      streamRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, fallbackMessages);
+      streamRes = await fetchStreamPlainNoTools(endpoint, upstreamHeaders, model, fallbackMessages);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Upstream request failed";
       return upstreamErrorResponse(502, msg, providerReceipt);
@@ -226,10 +239,7 @@ export async function muthurChatWithModelTools(options: {
         endpoint,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
+          headers: upstreamHeaders,
           body: JSON.stringify({
             model,
             messages,
@@ -246,7 +256,7 @@ export async function muthurChatWithModelTools(options: {
         if (round === 0 && shouldTryStreamWithoutTools(res.status)) {
           console.warn("[muthur-openai-chat] tools request failed; falling back to stream without tools", res.status);
           write("⏳ MUTHUR // falling back to direct reply...\n\n");
-          const streamRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, fallbackMessages);
+          const streamRes = await fetchStreamPlainNoTools(endpoint, upstreamHeaders, model, fallbackMessages);
           if (!streamRes.ok) {
             const fallbackErr = await streamRes.text().catch(() => "");
             throw new Error(formatUplinkErrorDetail(streamRes.status, fallbackErr || errText));
@@ -364,7 +374,7 @@ export async function muthurChatWithModelTools(options: {
     await maybeFinalizeCodingVerify(toolCtx, write);
 
     write("⏳ MUTHUR // composing final reply...\n\n");
-    const finalRes = await fetchStreamPlainNoTools(endpoint, apiKey, model, messages);
+    const finalRes = await fetchStreamPlainNoTools(endpoint, upstreamHeaders, model, messages);
     if (!finalRes.ok) {
       const t = await finalRes.text().catch(() => "");
       throw new Error(formatUplinkErrorDetail(finalRes.status, t));
