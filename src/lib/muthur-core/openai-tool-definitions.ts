@@ -1,4 +1,5 @@
 import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
+import { isCalyxMuthurToolsEnabled } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
 import type { MuthurPosture, MuthurPostureToolContext } from "@/lib/muthur/muthur-posture";
 import { isToolAllowedForPosture } from "@/lib/muthur/muthur-posture";
 
@@ -401,13 +402,76 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "calyx_search",
+      description:
+        "Search the Echo Mirage Calyx vault (local association-native DB) with multi-lens fusion and optional guard.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Natural-language search query." },
+          vault: { type: "string", description: "Vault name (default echo-mirage)." },
+          k: { type: "integer", description: "Max hits (default 8)." },
+          guard: { type: "string", enum: ["off", "in_region"] },
+          explain: { type: "boolean" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "calyx_ingest",
+      description: "Ingest text into the Echo Mirage Calyx vault for grounded retrieval.",
+      parameters: {
+        type: "object",
+        properties: {
+          input: { type: "string", description: "Single document/text chunk to ingest." },
+          batch: {
+            type: "array",
+            items: { type: "string" },
+            description: "Multiple chunks to ingest in one call.",
+          },
+          vault: { type: "string", description: "Vault name (default echo-mirage)." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "calyx_kernel_answer",
+      description:
+        "Grounded answer from the Calyx kernel over ingested vault content. Fail-closed when unsupported.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Question to answer from the vault." },
+          vault: { type: "string", description: "Vault name (default echo-mirage)." },
+        },
+        required: ["query"],
+      },
+    },
+  },
 ];
 
 export function getMuthurOpenAiToolsForPosture(posture: MuthurPosture, context?: MuthurPostureToolContext) {
   const directPi = isMuthurDirectPiComputerUseEnabled();
+  const calyx = isCalyxMuthurToolsEnabled();
   return MUTHUR_OPENAI_TOOLS.filter((tool) => {
     if (tool.function.name === "pi_computer_use" && !directPi) return false;
     if (tool.function.name === "delegate_pi_computer_use" && directPi) return false;
+    if (
+      (tool.function.name === "calyx_search" ||
+        tool.function.name === "calyx_ingest" ||
+        tool.function.name === "calyx_kernel_answer") &&
+      !calyx
+    ) {
+      return false;
+    }
     return isToolAllowedForPosture(posture, tool.function.name, context);
   });
 }

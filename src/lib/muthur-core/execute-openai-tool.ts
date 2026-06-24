@@ -118,5 +118,12 @@ export async function executeRegistryToolForOpenAi(
   if (functionName === "pi_computer_use") {
     return JSON.stringify(result.output, null, 2);
   }
+  if (
+    functionName === "calyx_search" ||
+    functionName === "calyx_ingest" ||
+    functionName === "calyx_kernel_answer"
+  ) {
+    return JSON.stringify(result.output, null, 2);
+  }
   return formatJustBashResult(result.output);
 }

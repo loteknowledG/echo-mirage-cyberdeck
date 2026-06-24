@@ -41,6 +41,7 @@
     "probe:muthur-commander-posture": "tsx scripts/probe-muthur-commander-posture.ts",
     "probe:ambient-twinkle": "tsx scripts/probe-ambient-twinkle.ts",
     "probe:pi-computer-use": "tsx scripts/probe-pi-computer-use.ts",
+    "probe:calyx-smoke": "tsx scripts/probe-calyx-smoke.ts",
     "probe:pi-windows-use": "node scripts/pi/run-windows-use-probe.mjs",
     "probe:muthur-control-lease": "tsx scripts/probe-muthur-control-lease.ts",
     "probe:pi-control-lease-boundary": "tsx scripts/probe-pi-control-lease-boundary.ts",

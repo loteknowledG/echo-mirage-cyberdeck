@@ -28,6 +28,12 @@ import type {
   PiComputerUseCommandAction,
 } from "@/lib/pi/pi-computer-use-types";
 import type { PiControlCapability } from "@/lib/muthur/control/pi-control-lease-types";
+import {
+  isCalyxMuthurToolsEnabled,
+  runCalyxIngest,
+  runCalyxKernelAnswer,
+  runCalyxSearch,
+} from "@/lib/muthur/calyx/calyx-muthur-tools.server";
 import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
@@ -767,6 +773,28 @@ export function createMuthurToolRegistry(): ToolRegistry {
               description:
                 "Execute one desktop action via Synapse (preferred) under the active control lease. Screenshot first, then click/type/hotkey step by step.",
               run: runPiComputerUse,
+            },
+          }
+        : {}),
+      ...(isCalyxMuthurToolsEnabled()
+        ? {
+            calyx_search: {
+              name: "calyx_search",
+              description:
+                "Grounded multi-lens search in the Echo Mirage Calyx vault (association-native local DB). Use for repo knowledge retrieval.",
+              run: runCalyxSearch,
+            },
+            calyx_ingest: {
+              name: "calyx_ingest",
+              description:
+                "Ingest text into the Echo Mirage Calyx vault for later grounded search and kernel answers.",
+              run: runCalyxIngest,
+            },
+            calyx_kernel_answer: {
+              name: "calyx_kernel_answer",
+              description:
+                "Answer from the Calyx grounding kernel over ingested vault content — fail-closed when data cannot support the query.",
+              run: runCalyxKernelAnswer,
             },
           }
         : {}),

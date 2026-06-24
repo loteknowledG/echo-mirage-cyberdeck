@@ -167,6 +167,9 @@ dist
 # Pi computer-use Python venv (L-PI-001A)
 .venv-pi/
 
+# Calyx vault data (local association DB)
+.calyx/
+
 # Property Manager case evidence (runtime; folder scaffold stays tracked)
 data/property-manager/cases/*
 !data/property-manager/cases/.gitkeep

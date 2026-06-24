@@ -37,6 +37,7 @@ import {
 } from "@/lib/muthur/muthur-posture";
 import { MUTHUR_PI_CONTROL_DOCTRINE } from "@/lib/muthur/control/muthur-control-doctrine";
 import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
+import { isCalyxMuthurToolsEnabled } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
 import { PI_COMPUTER_USE_DOCTRINE } from "@/lib/pi/pi-computer-use-doctrine";
 import { messageReferencesLocalPath } from "@/lib/browser-intents";
 import {
@@ -52,6 +53,7 @@ const MUTHUR_COGNITION_DOCTRINE =
 
 function buildMuthurAvailableToolsPrompt(): string {
   const directPi = isMuthurDirectPiComputerUseEnabled();
+  const calyx = isCalyxMuthurToolsEnabled();
   return (
     "\n\nAVAILABLE TOOLS:" +
     "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane (file name, language, cursor, dirty, content excerpt)." +
@@ -67,6 +69,9 @@ function buildMuthurAvailableToolsPrompt(): string {
     (directPi
       ? "\n- pi_computer_use: Execute one Synapse desktop action (screenshot, click, type, hotkey, scroll, move) under an active control lease."
       : "\n- delegate_pi_computer_use: Delegate approved missions to Pi under an active control lease.") +
+    (calyx
+      ? "\n- calyx_ingest / calyx_search / calyx_kernel_answer: Local Calyx vault (echo-mirage) for grounded ingest, multi-lens search, and kernel answers."
+      : "") +
     "\n\nCODING ECHO MIRAGE (Phase A + B):" +
     "\n1. localfs write (or suggest_operator_edit for open operator files) to change code." +
     "\n2. git_status or git_diff to review changes." +

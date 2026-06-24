@@ -83,6 +83,9 @@ const EXECUTION_TOOLS = new Set([
   "request_pi_control_lease",
   "delegate_pi_computer_use",
   "pi_computer_use",
+  "calyx_search",
+  "calyx_ingest",
+  "calyx_kernel_answer",
 ]);
 
 const TOOLS_BY_POSTURE: Record<MuthurPosture, Set<string>> = {
