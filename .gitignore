@@ -170,3 +170,4 @@ dist
 # Property Manager case evidence (runtime; folder scaffold stays tracked)
 data/property-manager/cases/*
 !data/property-manager/cases/.gitkeep
+.env*

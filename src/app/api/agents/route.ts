@@ -11,6 +11,7 @@ import {
   getProviderConfig,
   runOrchestration,
 } from "@/lib/agents";
+import { readOpenCodeZenApiKeyFromEnv } from "@/lib/opencode-provider-env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -220,7 +221,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Provider config
-  const zenApiKey = body.zenApiKey || process.env.ZEN_API_KEY;
+  const zenApiKey = body.zenApiKey || readOpenCodeZenApiKeyFromEnv();
   const googleApiKey = body.googleApiKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   const hfApiKey = body.hfApiKey || process.env.HUGGINGFACE_API_KEY;
   const nvidiaApiKey = body.nvidiaApiKey || process.env.NVIDIA_API_KEY;

@@ -8,10 +8,7 @@ export type OutboundProviderCredentials = {
 };
 
 export const CLIENT_BAKED_PROVIDER_KEYS: Record<string, string> = {
-  opencode:
-    (process.env.NEXT_PUBLIC_OPENCODE_API_KEY ||
-      process.env.NEXT_PUBLIC_ZEN_API_KEY ||
-      "").trim(),
+  opencode: "",
   openrouter: (process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || "").trim(),
   openai: (process.env.NEXT_PUBLIC_OPENAI_API_KEY || "").trim(),
 };

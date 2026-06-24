@@ -1,3 +1,10 @@
+import {
+  OPENCODE_GO_API_KEY_ENV,
+  OPENCODE_ZEN_API_KEY_ENV,
+  openCodeGoConfiguredInEnv,
+  openCodeZenConfiguredInEnv,
+} from "@/lib/opencode-provider-env";
+
 // SERVER ONLY: provider credential resolution. Never log or return secrets.
 
 export type ProviderCredentialSource =
@@ -28,7 +35,8 @@ export type ProviderReceipt = {
 };
 
 const PROVIDER_PRIVATE_ENV: Record<string, string[]> = {
-  opencode: ["OPENCODE_API_KEY", "ZEN_API_KEY"],
+  opencode: [OPENCODE_ZEN_API_KEY_ENV],
+  "opencode-go": [OPENCODE_GO_API_KEY_ENV],
   openai: ["OPENAI_API_KEY"],
   openrouter: ["OPENROUTER_API_KEY"],
 };
@@ -39,7 +47,6 @@ export const GATEWAY_PROVIDER_IDS = ["opencode", "openrouter", "openai"] as cons
 export type GatewayProviderId = (typeof GATEWAY_PROVIDER_IDS)[number];
 
 const PROVIDER_PUBLIC_ENV: Record<string, string[]> = {
-  opencode: ["NEXT_PUBLIC_OPENCODE_API_KEY", "NEXT_PUBLIC_ZEN_API_KEY"],
   openai: ["NEXT_PUBLIC_OPENAI_API_KEY"],
   openrouter: ["NEXT_PUBLIC_OPENROUTER_API_KEY"],
 };
@@ -75,9 +82,14 @@ export function providerServerConfigured(provider: string): boolean {
   return envCredentialCandidates(provider).length > 0;
 }
 
-export function listServerConfiguredProviders(): Record<GatewayProviderId, boolean> {
+export function listServerConfiguredProviders(): Record<GatewayProviderId, boolean> & {
+  opencodeZen: boolean;
+  opencodeGo: boolean;
+} {
   return {
-    opencode: providerServerConfigured("opencode"),
+    opencode: openCodeZenConfiguredInEnv(),
+    opencodeZen: openCodeZenConfiguredInEnv(),
+    opencodeGo: openCodeGoConfiguredInEnv(),
     openrouter: providerServerConfigured("openrouter"),
     openai: providerServerConfigured("openai"),
   };

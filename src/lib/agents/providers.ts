@@ -1,4 +1,5 @@
 import { getLmstudioChatUrl } from '@/lib/lmstudio';
+import { readOpenCodeZenApiKeyFromEnv } from '@/lib/opencode-provider-env';
 
 export const LMSTUDIO_CHAT_URL = 'http://192.168.12.48:1234/v1/chat/completions';
 
@@ -41,7 +42,7 @@ export function getProviderConfig(
 ): ProviderConfig {
   switch (provider) {
     case 'zen': {
-      const apiKey = options.apiKey || options.zenApiKey || process.env.ZEN_API_KEY;
+      const apiKey = options.apiKey || options.zenApiKey || readOpenCodeZenApiKeyFromEnv();
       const model = options.model || process.env.ZEN_MODEL;
       return {
         url: ZEN_CHAT_URL,

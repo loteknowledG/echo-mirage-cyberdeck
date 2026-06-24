@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readOpenCodeZenApiKeyFromEnv } from "@/lib/opencode-provider-env";
 import {
   fetchWithTimeout,
   MEMORY_CONTEXT_TIMEOUT_MS,
@@ -647,7 +648,7 @@ export async function POST(request: Request) {
     }
 
     // Get API config from env or default to opencode
-    const envApiKey = process.env.OPENCODE_API_KEY || process.env.ZEN_API_KEY || process.env.NEXT_PUBLIC_ZEN_API_KEY || "";
+    const envApiKey = readOpenCodeZenApiKeyFromEnv();
     const envModel = process.env.OPENCODE_MODEL || "trinity-large-preview-free";
     const endpoint = "https://opencode.ai/zen/v1/chat/completions";
 

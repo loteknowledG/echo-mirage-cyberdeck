@@ -109,12 +109,14 @@ function testProviderIsolation(): void {
     {
       OPENROUTER_API_KEY: "sk-or-only",
       OPENAI_API_KEY: "sk-openai-only",
-      OPENCODE_API_KEY: "sk-opencode-only",
+      OPENCODE_ZEN_API_KEY: "sk-zen-only",
+      OPENCODE_GO_API_KEY: "sk-go-only",
     },
     () => {
       assert.equal(resolveServerProviderCredentials("openrouter", "").apiKey, "sk-or-only");
       assert.equal(resolveServerProviderCredentials("openai", "").apiKey, "sk-openai-only");
-      assert.equal(resolveServerProviderCredentials("opencode", "").apiKey, "sk-opencode-only");
+      assert.equal(resolveServerProviderCredentials("opencode", "").apiKey, "sk-zen-only");
+      assert.equal(resolveServerProviderCredentials("opencode-go", "").apiKey, "sk-go-only");
     },
   );
   console.log("  ok provider credential isolation");
@@ -125,15 +127,17 @@ function testServerConfiguredProbe(): void {
     {
       OPENROUTER_API_KEY: "sk-or-env-test",
       OPENAI_API_KEY: undefined,
-      OPENCODE_API_KEY: undefined,
-      ZEN_API_KEY: undefined,
+      OPENCODE_ZEN_API_KEY: "sk-zen-test",
+      OPENCODE_GO_API_KEY: undefined,
       NEXT_PUBLIC_OPENROUTER_API_KEY: undefined,
     },
     () => {
       const configured = listServerConfiguredProviders();
       assert.equal(configured.openrouter, true);
       assert.equal(configured.openai, false);
-      assert.equal(configured.opencode, false);
+      assert.equal(configured.opencode, true);
+      assert.equal(configured.opencodeZen, true);
+      assert.equal(configured.opencodeGo, false);
     },
   );
   console.log("  ok server configured probe");

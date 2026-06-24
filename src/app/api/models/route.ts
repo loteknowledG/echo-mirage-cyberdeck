@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { readOpenCodeZenApiKeyFromEnv } from '@/lib/opencode-provider-env';
 import { getLmstudioModelsUrl, normalizeLmstudioUrl } from '@/lib/lmstudio';
 
 export const runtime = 'nodejs';
@@ -97,7 +98,7 @@ export async function GET(req: NextRequest) {
   const googleOverrideKey = req.headers.get('x-google-api-key')?.trim() || null;
   const nvidiaOverrideKey = req.headers.get('x-nvidia-api-key')?.trim() || null;
 
-  const zenApiKey = overrideKey || process.env.ZEN_API_KEY;
+  const zenApiKey = overrideKey || readOpenCodeZenApiKeyFromEnv() || null;
   const googleApiKey = googleOverrideKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   const hfOverrideKey = req.headers.get('x-hf-api-key')?.trim() || null;
   const hfApiKey = hfOverrideKey || process.env.HUGGINGFACE_API_KEY;

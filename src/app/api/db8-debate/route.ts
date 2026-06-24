@@ -1,3 +1,4 @@
+import { readOpenCodeZenApiKeyFromEnv } from "@/lib/opencode-provider-env";
 import { NextResponse } from "next/server";
 import { getModel, streamSimple, type Message } from "@mariozechner/pi-ai";
 import type { Db8DebateRole } from "@/lib/db8-debate";
@@ -14,10 +15,7 @@ const PROVIDER_BASE_URL: Record<string, string> = {
 };
 
 const DEFAULT_PROVIDER_KEY_ENV: Record<string, string | undefined> = {
-  opencode:
-    process.env.OPENCODE_API_KEY ||
-    process.env.ZEN_API_KEY ||
-    process.env.NEXT_PUBLIC_ZEN_API_KEY,
+  opencode: readOpenCodeZenApiKeyFromEnv() || undefined,
   openai: process.env.OPENAI_API_KEY,
   openrouter: process.env.OPENROUTER_API_KEY,
 };

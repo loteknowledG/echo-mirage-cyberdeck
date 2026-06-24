@@ -1043,10 +1043,13 @@ export function CyberdeckOperatorPaneBody({
         }
       }
 
-      if (binaryPreview && canReloadFromDisk && onReloadOperatorFile) {
+      if (canReloadFromDisk && onReloadOperatorFile) {
         await onReloadOperatorFile(path);
+        setEditorMountKey((key) => key + 1);
         setSurfaceRefreshKey((key) => key + 1);
-        toast.success("Reloaded preview from disk.");
+        toast.success(
+          binaryPreview ? "Reloaded preview from disk." : "Reloaded document from disk.",
+        );
         return;
       }
 
@@ -1081,12 +1084,6 @@ export function CyberdeckOperatorPaneBody({
       }
       if (workbench?.setDocumentText?.(canonical)) {
         toast.success("Operator pane refreshed.");
-        return;
-      }
-
-      if (canReloadFromDisk && onReloadOperatorFile && !canonical.trim()) {
-        await onReloadOperatorFile(path);
-        toast.success("Reloaded document from disk.");
         return;
       }
 
