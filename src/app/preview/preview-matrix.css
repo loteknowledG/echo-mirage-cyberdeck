@@ -196,7 +196,7 @@
   overflow: hidden;
   width: 100%;
   min-height: 0;
-  height: 100%;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   padding: 6px 0;
@@ -230,11 +230,11 @@
   flex: 0 0 var(--pf-deck-band);
   height: var(--pf-deck-band);
   min-height: 0;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr);
-  align-content: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: 8px 16px 10px;
-  gap: 6px;
+  gap: 8px;
   transition: opacity 200ms ease;
 }
 
@@ -248,10 +248,13 @@
 
 .powerfist-preview-root .deckHeader {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   flex-shrink: 0;
+  width: 100%;
+  text-align: center;
 }
 
 .powerfist-preview-root .deckTitle {

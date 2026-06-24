@@ -562,6 +562,10 @@ export function PreviewMatrix() {
                         })}
                       </div>
                     </div>
+                    <header className="deckHeader" aria-label={`${deck.name} deck`}>
+                      <div className="deckTitle">{deck.name}</div>
+                      <div className="deckBadge">{deck.badge}</div>
+                    </header>
                   </section>
                 ))}
               </div>
