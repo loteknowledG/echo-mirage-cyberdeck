@@ -1,7 +1,5 @@
 /** MUTHUR operational postures — autonomy, tools, and disk commit policy. */
 
-import { getExecutableMuthurMission } from "@/lib/muthur/mission/muthur-mission-store";
-
 export type MuthurPosture = "plan" | "agent" | "commander";
 
 export type MuthurPostureCommitPolicy = "never" | "manual" | "immediate";
@@ -55,7 +53,8 @@ function resolveMissionExecutionActive(context?: MuthurPostureToolContext): bool
   if (typeof context?.missionActive === "boolean") {
     return context.missionActive;
   }
-  return Boolean(getExecutableMuthurMission());
+  // Server routes must pass missionActive from the client; never read localStorage here.
+  return false;
 }
 
 const PLAN_TOOLS = new Set([
@@ -155,8 +154,12 @@ export function isLocalFsWriteAllowedForPosture(posture: MuthurPosture, action: 
   return posture === "agent" || posture === "commander";
 }
 
-export function formatBlockedToolMessage(posture: MuthurPosture, toolName: string): string {
-  if (posture === "commander" && !getExecutableMuthurMission()) {
+export function formatBlockedToolMessage(
+  posture: MuthurPosture,
+  toolName: string,
+  context?: MuthurPostureToolContext,
+): string {
+  if (posture === "commander" && !resolveMissionExecutionActive(context)) {
     return (
       `[TOOL BLOCKED] ${toolName}\n\n` +
       "Commander cannot execute mission work until the mission is ACTIVE. Observe, summarize, and prepare the mission in conversation first."

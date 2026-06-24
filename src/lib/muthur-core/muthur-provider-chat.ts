@@ -189,7 +189,9 @@ export async function muthurChatWithModelTools(options: {
   const messages: JsonMessage[] = options.baseMessages.map((m) => ({ ...m }));
   const fallbackMessages = options.baseMessages.map((m) => ({ ...m }));
   const toolsUsed: string[] = [];
-  const toolCtx = createMuthurToolExecutionContext(posture);
+  const toolCtx = createMuthurToolExecutionContext(posture, {
+    commanderMissionActive: options.commanderMissionActive,
+  });
 
   if (!toolsEnabled) {
     let streamRes: Response;

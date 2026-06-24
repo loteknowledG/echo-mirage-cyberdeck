@@ -18,7 +18,7 @@ import { recordCodingTouch } from "@/lib/muthur-core/coding-touch";
 import { extractOperatorBrowserRef } from "@/lib/muthur-core/operator-browser-ref";
 import { extractOperatorConversionRef } from "@/lib/muthur-core/operator-conversion-ref";
 import { extractOperatorOpenRef } from "@/lib/muthur-core/operator-open-file-ref";
-import { formatBlockedToolMessage, isToolAllowedForPosture } from "@/lib/muthur/muthur-posture";
+import { formatBlockedToolMessage, isToolAllowedForPosture, type MuthurPostureToolContext } from "@/lib/muthur/muthur-posture";
 import type { MuthurToolExecutionContext, ToolCall, ToolRegistry } from "@/lib/muthur-core/types";
 
 /** MUTHUR chat hot path — run tools directly, no execution-loop allowlist or approval gates. */
@@ -50,8 +50,12 @@ export async function executeRegistryToolForOpenAi(
   }
 
   const posture = ctx?.posture ?? "plan";
-  if (!isToolAllowedForPosture(posture, functionName)) {
-    return formatBlockedToolMessage(posture, functionName);
+  const toolContext: MuthurPostureToolContext | undefined =
+    typeof ctx?.commanderMissionActive === "boolean"
+      ? { missionActive: ctx.commanderMissionActive }
+      : undefined;
+  if (!isToolAllowedForPosture(posture, functionName, toolContext)) {
+    return formatBlockedToolMessage(posture, functionName, toolContext);
   }
 
   const call: ToolCall = { toolName: functionName, args, executionContext: ctx };

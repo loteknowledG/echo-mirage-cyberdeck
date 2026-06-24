@@ -126,6 +126,7 @@ export function buildMuthurChatScrollKey(args: {
   lastDiagnosticId?: string;
   lastDiagnosticRepeatCount?: number;
   responseStallElapsedMs?: number;
+  cognitionStatusLine?: string | null;
 }): string {
   const last = args.messages.at(-1);
   const streamBody = formatMuthurStreamBody(args.streamText);
@@ -142,6 +143,7 @@ export function buildMuthurChatScrollKey(args: {
     args.lastDiagnosticId ?? "",
     args.lastDiagnosticRepeatCount ?? 0,
     args.responseStallElapsedMs ?? 0,
+    args.cognitionStatusLine ?? "",
   ].join(":");
 }
 

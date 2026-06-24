@@ -108,6 +108,7 @@ import {
   extractMuthurProgressStatus,
   toolTraceToDiagnostic,
 } from "@/lib/muthur-core/muthur-command-console";
+import { useMuthurChatAutoScroll } from "@/lib/muthur-core/use-muthur-chat-auto-scroll";
 import { partitionMuthurChannelUpdate } from "@/lib/muthur-core/muthur-response-channel";
 import { CADRE_MUTHUR_ARCHIVE_EVENT } from "@/lib/cadre/cadre-event-bus";
 import {
@@ -1292,6 +1293,7 @@ export default function CyberdeckApp() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<MuthurCommandInputHandle>(null);
   const messageScrollRef = useRef<HTMLDivElement>(null);
+  const muthurChatScrollContentRef = useRef<HTMLDivElement>(null);
   const serverRailRef = useRef<HTMLElement | null>(null);
   const chatColumnRef = useRef<HTMLDivElement>(null);
   const gatewayColumnRef = useRef<HTMLDivElement>(null);
@@ -4196,21 +4198,27 @@ export default function CyberdeckApp() {
       lastDiagnosticId: lastDiag?.id,
       lastDiagnosticRepeatCount: lastDiag?.repeatCount,
       responseStallElapsedMs: muthurStall?.elapsedMs,
+      cognitionStatusLine: muthurCognitionStatusLine,
     });
-  }, [messages, streamText, isStreaming, streamToolTrace, muthurDiagnostics, muthurStall]);
+  }, [
+    messages,
+    streamText,
+    isStreaming,
+    streamToolTrace,
+    muthurDiagnostics,
+    muthurStall,
+    muthurCognitionStatusLine,
+  ]);
 
-  useLayoutEffect(() => {
-    if (!chatPinnedToBottom) return;
-    const el = messageScrollRef.current;
-    if (!el) return;
-    const scrollToBottom = (behavior: ScrollBehavior) => {
-      el.scrollTo({ top: el.scrollHeight, behavior });
-    };
-    scrollToBottom(isStreaming ? "auto" : "smooth");
-    if (!isStreaming) return;
-    const frame = requestAnimationFrame(() => scrollToBottom("auto"));
-    return () => cancelAnimationFrame(frame);
-  }, [muthurChatScrollKey, chatPinnedToBottom, isStreaming]);
+  const { handleScroll: handleMuthurChatScroll, pinToBottom: pinMuthurChatToBottom } =
+    useMuthurChatAutoScroll({
+      scrollKey: muthurChatScrollKey,
+      isStreaming,
+      pinnedToBottom: chatPinnedToBottom,
+      setPinnedToBottom: setChatPinnedToBottom,
+      messageScrollRef,
+      scrollContentRef: muthurChatScrollContentRef,
+    });
 
   useEffect(() => {
     if (isStreaming) {
@@ -5293,7 +5301,7 @@ export default function CyberdeckApp() {
     const tabCommand = parseCustomTabCommand(userMessage);
     setInputHistory((prev) => [...prev, userMessage]);
     messageInputRef.current?.clear();
-    setChatPinnedToBottom(true);
+    pinMuthurChatToBottom();
     setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
 
     const computerUseMission = detectComputerUseMission(userMessage);
@@ -7886,13 +7894,10 @@ ${diff}`;
               tabIndex={-1}
               className="cyberdeck-chat-content custom-scrollbar flex min-h-0 flex-1 basis-0 flex-col overflow-y-auto p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
               onScroll={(event) => {
-                const el = event.currentTarget;
-                const threshold = 48;
-                setChatPinnedToBottom(
-                  el.scrollHeight - el.scrollTop - el.clientHeight <= threshold,
-                );
+                handleMuthurChatScroll(event.currentTarget);
               }}
             >
+              <div ref={muthurChatScrollContentRef} className="min-h-0">
               {isMobileLayout ? (
                 <div className="mb-2">
                   <EchoHeader />
@@ -7934,6 +7939,7 @@ ${diff}`;
                 }
               />
               <div ref={messagesEndRef} className="h-px" aria-hidden />
+              </div>
             </div>
 
             <footer className="cyberdeck-message-box realmorphism-host-surface shrink-0 border-t bg-black p-0">

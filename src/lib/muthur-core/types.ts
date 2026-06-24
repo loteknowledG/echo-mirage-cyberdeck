@@ -38,12 +38,15 @@ export type MuthurToolExecutionContext = {
   codingTouches: string[];
   codingVerify: MuthurCodingVerifyReceipt | null;
   posture: MuthurPosture;
+  /** When posture is commander, mirrors client mission ACTIVE state for server tool gates. */
+  commanderMissionActive?: boolean;
   piControlLeaseRequest: PiControlLeaseRequest | null;
   piMissionDelegated: boolean;
 };
 
 export function createMuthurToolExecutionContext(
   posture: MuthurPosture = "plan",
+  options?: { commanderMissionActive?: boolean },
 ): MuthurToolExecutionContext {
   return {
     operatorEdits: [],
@@ -53,6 +56,7 @@ export function createMuthurToolExecutionContext(
     codingTouches: [],
     codingVerify: null,
     posture,
+    commanderMissionActive: options?.commanderMissionActive,
     piControlLeaseRequest: null,
     piMissionDelegated: false,
   };
