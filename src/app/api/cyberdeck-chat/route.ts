@@ -36,6 +36,7 @@ import {
   type MuthurPosture,
 } from "@/lib/muthur/muthur-posture";
 import { MUTHUR_PI_CONTROL_DOCTRINE } from "@/lib/muthur/control/muthur-control-doctrine";
+import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
 import { PI_COMPUTER_USE_DOCTRINE } from "@/lib/pi/pi-computer-use-doctrine";
 import { messageReferencesLocalPath } from "@/lib/browser-intents";
 import {
@@ -49,29 +50,35 @@ import {
 const MUTHUR_COGNITION_DOCTRINE =
   "\n\nCOGNITION: You interpret operator intent and choose tools. The deck does not pre-run browser searches, file reads, or conversions from regex on the operator's message — call tools yourself (localfs, operator_browser, observe_operator_pane, etc.). Do not emit [GLYPH:...] unless the operator explicitly asked for a glyph render.";
 
-const MUTHUR_AVAILABLE_TOOLS_PROMPT =
-  "\n\nAVAILABLE TOOLS:" +
-  "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane (file name, language, cursor, dirty, content excerpt)." +
-  "\n- open_operator_file: Open a workspace text/markdown/code file in the operator Monaco editor on the operator's screen. Call before suggest_operator_edit when nothing is open." +
-  "\n- suggest_operator_edit: Propose typed edits to markdown/code/text open in the operator Monaco editor. Edits auto-apply in the operator pane (Ctrl+Z to undo). Not for DOCX/PDF previews." +
-  "\n- operator_browser: Operator web pane — goto URL or search query, snapshot page text, back/forward/reload, click/type/submit. Not for local disk paths." +
-  "\n- localfs: REAL disk — read anywhere; mkdir/write only inside the Echo Mirage repo. Use write to create or update source files." +
-  "\n- workspace_exec: REAL disk — allowlisted commands only (pnpm exec tsc --noEmit, pnpm lint, pnpm build, git diff, git log, etc.). Run after edits to verify." +
-  "\n- git_status / git_diff: REAL disk — inspect repo changes after coding." +
-  "\n- justbash: EPHEMERAL mirror only — rg/ls/cat search; writes do NOT persist. Never use for pnpm, git, or file changes." +
-  "\n- clock: Server date/time." +
-  "\n- request_pi_control_lease: Request operator grant for Pi desktop embodiment (mouse/keyboard/screen) before computer-use missions." +
-  "\n- delegate_pi_computer_use: Delegate approved missions to Pi under an active control lease." +
-  "\n\nCODING ECHO MIRAGE (Phase A + B):" +
-  "\n1. localfs write (or suggest_operator_edit for open operator files) to change code." +
-  "\n2. git_status or git_diff to review changes." +
-  "\n3. After file touches, MUTHUR auto-runs `git diff --stat` + `pnpm exec tsc --noEmit` and writes a receipt under `.muthur/receipts/coding/` — report PASS/FAIL from that receipt." +
-  "\n4. You may still call workspace_exec for extra checks (lint, build) when asked." +
-  "\n\nIMPORTANT: When the user asks what is currently visible in the operator pane, call observe_operator_pane." +
-  "\nWhen the user says open/read/show/view a specific file (e.g. L-ARCH-001.md), resolve that file — call open_operator_file with the path and localfs cat to read it. Do NOT call observe_operator_pane for document open commands." +
-  "\nWhen they ask to edit a file and Monaco is not active, call open_operator_file with the path, then suggest_operator_edit (prefer replace_line_range for targeted edits). Edits apply immediately — confirm what changed; mention Ctrl+Z if they want to undo." +
-  "\nWhen a file is already open in the operator pane, NEVER use localfs write on that file — only suggest_operator_edit." +
-  "\nNever use justbash/find to locate the user's open document — use observe_operator_pane for the file already open in the operator pane.";
+function buildMuthurAvailableToolsPrompt(): string {
+  const directPi = isMuthurDirectPiComputerUseEnabled();
+  return (
+    "\n\nAVAILABLE TOOLS:" +
+    "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane (file name, language, cursor, dirty, content excerpt)." +
+    "\n- open_operator_file: Open a workspace text/markdown/code file in the operator Monaco editor on the operator's screen. Call before suggest_operator_edit when nothing is open." +
+    "\n- suggest_operator_edit: Propose typed edits to markdown/code/text open in the operator Monaco editor. Edits auto-apply in the operator pane (Ctrl+Z to undo). Not for DOCX/PDF previews." +
+    "\n- operator_browser: Operator web pane — goto URL or search query, snapshot page text, back/forward/reload, click/type/submit. Not for local disk paths." +
+    "\n- localfs: REAL disk — read anywhere; mkdir/write only inside the Echo Mirage repo. Use write to create or update source files." +
+    "\n- workspace_exec: REAL disk — allowlisted commands only (pnpm exec tsc --noEmit, pnpm lint, pnpm build, git diff, git log, etc.). Run after edits to verify." +
+    "\n- git_status / git_diff: REAL disk — inspect repo changes after coding." +
+    "\n- justbash: EPHEMERAL mirror only — rg/ls/cat search; writes do NOT persist. Never use for pnpm, git, or file changes." +
+    "\n- clock: Server date/time." +
+    "\n- request_pi_control_lease: Request operator grant for Pi desktop embodiment (mouse/keyboard/screen) before computer-use missions." +
+    (directPi
+      ? "\n- pi_computer_use: Execute one Synapse desktop action (screenshot, click, type, hotkey, scroll, move) under an active control lease."
+      : "\n- delegate_pi_computer_use: Delegate approved missions to Pi under an active control lease.") +
+    "\n\nCODING ECHO MIRAGE (Phase A + B):" +
+    "\n1. localfs write (or suggest_operator_edit for open operator files) to change code." +
+    "\n2. git_status or git_diff to review changes." +
+    "\n3. After file touches, MUTHUR auto-runs `git diff --stat` + `pnpm exec tsc --noEmit` and writes a receipt under `.muthur/receipts/coding/` — report PASS/FAIL from that receipt." +
+    "\n4. You may still call workspace_exec for extra checks (lint, build) when asked." +
+    "\n\nIMPORTANT: When the user asks what is currently visible in the operator pane, call observe_operator_pane." +
+    "\nWhen the user says open/read/show/view a specific file (e.g. L-ARCH-001.md), resolve that file — call open_operator_file with the path and localfs cat to read it. Do NOT call observe_operator_pane for document open commands." +
+    "\nWhen they ask to edit a file and Monaco is not active, call open_operator_file with the path, then suggest_operator_edit (prefer replace_line_range for targeted edits). Edits apply immediately — confirm what changed; mention Ctrl+Z if they want to undo." +
+    "\nWhen a file is already open in the operator pane, NEVER use localfs write on that file — only suggest_operator_edit." +
+    "\nNever use justbash/find to locate the user's open document — use observe_operator_pane for the file already open in the operator pane."
+  );
+}
 
 function buildDocumentEditHint(
   message: string,
@@ -235,7 +242,7 @@ function buildMuthurSystemContent(args: {
   systemContent += buildMuthurPostureSystemPrompt(args.posture);
 
   if (toolsEnabled) {
-    systemContent += MUTHUR_AVAILABLE_TOOLS_PROMPT;
+    systemContent += buildMuthurAvailableToolsPrompt();
     systemContent += buildDocumentEditHint(args.message, args.operatorContext, args.posture);
     if (needsOperator) {
       systemContent += formatOperatorChatContextPrompt(args.operatorContext);
@@ -254,7 +261,9 @@ function buildMuthurSystemContent(args: {
   systemContent += MUTHUR_COGNITION_DOCTRINE;
   if (toolsEnabled) {
     systemContent += MUTHUR_PI_CONTROL_DOCTRINE;
-    systemContent += PI_COMPUTER_USE_DOCTRINE;
+    if (!isMuthurDirectPiComputerUseEnabled()) {
+      systemContent += PI_COMPUTER_USE_DOCTRINE;
+    }
   }
 
   if (messageReferencesLocalPath(args.message)) {

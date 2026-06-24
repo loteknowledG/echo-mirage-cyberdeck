@@ -82,6 +82,7 @@ const EXECUTION_TOOLS = new Set([
   "export_markdown_to_pdf",
   "request_pi_control_lease",
   "delegate_pi_computer_use",
+  "pi_computer_use",
 ]);
 
 const TOOLS_BY_POSTURE: Record<MuthurPosture, Set<string>> = {

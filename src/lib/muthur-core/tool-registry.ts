@@ -20,6 +20,13 @@ import {
   isPiControlLeaseActive,
 } from "@/lib/muthur/control/pi-control-lease-store";
 import { detectComputerUseMission } from "@/lib/muthur/control/computer-use-intent";
+import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
+import { executePiComputerUseCommand } from "@/lib/pi/pi-computer-use-manager";
+import { getPiComputerUseStatus } from "@/lib/pi/pi-computer-use-status";
+import type {
+  PiComputerUseCommand,
+  PiComputerUseCommandAction,
+} from "@/lib/pi/pi-computer-use-types";
 import type { PiControlCapability } from "@/lib/muthur/control/pi-control-lease-types";
 import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 
@@ -553,6 +560,14 @@ async function runRequestPiControlLease(call: ToolCall): Promise<ToolResult> {
 }
 
 async function runDelegatePiComputerUse(call: ToolCall): Promise<ToolResult> {
+  if (isMuthurDirectPiComputerUseEnabled()) {
+    return {
+      ok: false,
+      error:
+        "Direct Pi computer use is enabled — call pi_computer_use after operator grant instead of delegate_pi_computer_use.",
+    };
+  }
+
   const snapshot = getPiControlLeaseSnapshot();
   if (!isPiControlLeaseActive() || !snapshot.activeLease) {
     return {
@@ -583,6 +598,76 @@ async function runDelegatePiComputerUse(call: ToolCall): Promise<ToolResult> {
         "Mission delegated to Pi embodiment operator. Pi will execute via computer-use under the active lease.",
     },
   };
+}
+
+function isPiComputerUseCommandAction(value: unknown): value is PiComputerUseCommandAction {
+  return (
+    value === "screenshot" ||
+    value === "active_window" ||
+    value === "click" ||
+    value === "double_click" ||
+    value === "type" ||
+    value === "hotkey" ||
+    value === "scroll" ||
+    value === "move"
+  );
+}
+
+function toPiComputerUseCommand(args: Record<string, unknown>): PiComputerUseCommand | null {
+  if (!isPiComputerUseCommandAction(args.action)) return null;
+  return {
+    action: args.action,
+    x: typeof args.x === "number" ? args.x : undefined,
+    y: typeof args.y === "number" ? args.y : undefined,
+    text: typeof args.text === "string" ? args.text : undefined,
+    keys: Array.isArray(args.keys)
+      ? args.keys.filter((k): k is string => typeof k === "string")
+      : undefined,
+    direction: args.direction === "up" || args.direction === "down" ? args.direction : undefined,
+    amount: typeof args.amount === "number" ? args.amount : undefined,
+    button:
+      args.button === "left" || args.button === "right" || args.button === "middle"
+        ? args.button
+        : undefined,
+  };
+}
+
+async function runPiComputerUse(call: ToolCall): Promise<ToolResult> {
+  if (!isMuthurDirectPiComputerUseEnabled()) {
+    return { ok: false, error: "pi_computer_use is not enabled on this deployment." };
+  }
+
+  if (!isPiControlLeaseActive()) {
+    return {
+      ok: false,
+      error:
+        "No active Pi control lease. Call request_pi_control_lease and wait for operator [Grant Control] first.",
+    };
+  }
+
+  const status = await getPiComputerUseStatus();
+  if (status.status !== "READY") {
+    return {
+      ok: false,
+      error: `Pi computer use is ${status.status} (backend: ${status.backend}). ${status.remediation ?? ""}`.trim(),
+    };
+  }
+
+  const command = toPiComputerUseCommand(call.args);
+  if (!command) {
+    return { ok: false, error: "Invalid pi_computer_use arguments — action is required." };
+  }
+
+  const receipt = await executePiComputerUseCommand(command);
+  if (receipt.status === "blocked" || receipt.status === "failed") {
+    return {
+      ok: false,
+      error: receipt.error ?? `pi_computer_use ${receipt.status}`,
+      output: receipt,
+    };
+  }
+
+  return { ok: true, output: receipt };
 }
 
 export function createMuthurToolRegistry(): ToolRegistry {
@@ -675,6 +760,16 @@ export function createMuthurToolRegistry(): ToolRegistry {
           "Delegate an approved computer-use mission to Pi under the active control lease. Call only after the operator grants control.",
         run: runDelegatePiComputerUse,
       },
+      ...(isMuthurDirectPiComputerUseEnabled()
+        ? {
+            pi_computer_use: {
+              name: "pi_computer_use",
+              description:
+                "Execute one desktop action via Synapse (preferred) under the active control lease. Screenshot first, then click/type/hotkey step by step.",
+              run: runPiComputerUse,
+            },
+          }
+        : {}),
     },
   };
 }

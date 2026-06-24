@@ -115,5 +115,8 @@ export async function executeRegistryToolForOpenAi(
   if (functionName === "git_diff") {
     return formatGitDiffResult(result.output);
   }
+  if (functionName === "pi_computer_use") {
+    return JSON.stringify(result.output, null, 2);
+  }
   return formatJustBashResult(result.output);
 }

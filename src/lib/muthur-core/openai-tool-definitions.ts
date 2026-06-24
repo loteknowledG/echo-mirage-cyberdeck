@@ -1,3 +1,4 @@
+import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
 import type { MuthurPosture, MuthurPostureToolContext } from "@/lib/muthur/muthur-posture";
 import { isToolAllowedForPosture } from "@/lib/muthur/muthur-posture";
 
@@ -353,10 +354,60 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "pi_computer_use",
+      description:
+        "Execute one desktop action via Synapse (preferred) or windows-use fallback: screenshot, active_window, click, double_click, type, hotkey, scroll, move. " +
+        "Requires active operator control lease. Screenshot first, then act step by step.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: [
+              "screenshot",
+              "active_window",
+              "click",
+              "double_click",
+              "type",
+              "hotkey",
+              "scroll",
+              "move",
+            ],
+          },
+          x: { type: "number", description: "Screen X coordinate for click/move/type." },
+          y: { type: "number", description: "Screen Y coordinate for click/move/type." },
+          text: { type: "string", description: "Text to type (action=type)." },
+          keys: {
+            type: "array",
+            items: { type: "string" },
+            description: "Hotkey chord, e.g. [\"win\"], [\"ctrl\", \"c\"].",
+          },
+          direction: {
+            type: "string",
+            enum: ["up", "down"],
+            description: "Scroll direction.",
+          },
+          amount: { type: "number", description: "Scroll amount." },
+          button: {
+            type: "string",
+            enum: ["left", "right", "middle"],
+            description: "Mouse button for click actions.",
+          },
+        },
+        required: ["action"],
+      },
+    },
+  },
 ];
 
 export function getMuthurOpenAiToolsForPosture(posture: MuthurPosture, context?: MuthurPostureToolContext) {
-  return MUTHUR_OPENAI_TOOLS.filter((tool) =>
-    isToolAllowedForPosture(posture, tool.function.name, context),
-  );
+  const directPi = isMuthurDirectPiComputerUseEnabled();
+  return MUTHUR_OPENAI_TOOLS.filter((tool) => {
+    if (tool.function.name === "pi_computer_use" && !directPi) return false;
+    if (tool.function.name === "delegate_pi_computer_use" && directPi) return false;
+    return isToolAllowedForPosture(posture, tool.function.name, context);
+  });
 }
