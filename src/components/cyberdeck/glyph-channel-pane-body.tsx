@@ -33,6 +33,9 @@ import {
 import { CyberdeckIconSwitch } from "@/components/cyberdeck/cyberdeck-icon-switch";
 import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
+import { useMemo } from "react";
+import { CyberdeckRollingPicker } from "@/components/cyberdeck/cyberdeck-rolling-picker";
+import { RollerDialFlanks } from "@/components/cyberdeck/roller-dial-flanks";
 import { GlyphEnginePicker } from "@/components/cyberdeck/glyph-engine-picker";
 import { FigletFontPicker } from "@/components/cyberdeck/figlet-font-picker";
 import { FigletFontPreviewPanel } from "@/components/cyberdeck/figlet-font-preview-panel";
@@ -108,42 +111,55 @@ async function readEchoMirageClipboardText(): Promise<string> {
 
 type GlyphPaneMode = "view" | "edit";
 
-function GlyphDisplayZoomControls({
+const ZOOM_STEPS = Array.from({ length: 16 }, (_, i) => `${50 + i * 10}%`);
+
+function GlyphDisplayZoomRoller({
   zoomPercent,
-  onDecrease,
-  onIncrease,
+  onChange,
   className,
 }: {
   zoomPercent: number;
-  onDecrease: () => void;
-  onIncrease: () => void;
+  onChange: (next: number) => void;
   className?: string;
 }) {
-  return (
-    <div className={cn("deck-pane-depth-toolbar flex shrink-0 items-center gap-1", className)}>
-      <CyberdeckControlTooltip label="Decrease display zoom">
-        <CyberdeckControl
-          control={{ size: "compact", signal: true }}
-          onClick={onDecrease}
-          aria-label="Decrease display zoom"
-        >
-          −
-        </CyberdeckControl>
-      </CyberdeckControlTooltip>
-      <span className="min-w-[2.25rem] text-center font-mono text-[9px] text-[#6a6a6a]">
-        {zoomPercent}%
-      </span>
-      <CyberdeckControlTooltip label="Increase display zoom">
-        <CyberdeckControl
-          control={{ size: "compact", signal: true }}
-          onClick={onIncrease}
-          aria-label="Increase display zoom"
-        >
-          +
-        </CyberdeckControl>
-      </CyberdeckControlTooltip>
-    </div>
+  const deckMode = useDeckMode();
+  const value = `${zoomPercent}%`;
+  const resolvedValue = ZOOM_STEPS.includes(value) ? value : "100%";
+
+  const items = useMemo(
+    () =>
+      ZOOM_STEPS.map((step) => ({
+        value: step,
+        label: step,
+        slide: (
+          <span className="font-mono text-[9px] leading-none tracking-[0.04em]">{step}</span>
+        ),
+      })),
+    [],
   );
+
+  const picker = (
+    <CyberdeckRollingPicker
+      items={items}
+      value={resolvedValue}
+      onChange={(next) => onChange(Number.parseInt(next, 10))}
+      ariaLabel="Display zoom"
+      viewportClassName="h-7 min-w-[3rem] w-auto max-w-[4.75rem]"
+      alwaysShowLabel
+      showTextWhileScrolling
+      loop
+    />
+  );
+
+  if (deckMode === "ascii") {
+    return (
+      <RollerDialFlanks className={cn("glyph-zoom-roller shrink-0 font-mono text-[9px] tracking-[0.04em] text-[#8ca39a]", className)}>
+        {picker}
+      </RollerDialFlanks>
+    );
+  }
+
+  return picker;
 }
 
 export function CyberdeckGlyphChannelPaneBody() {
@@ -661,13 +677,6 @@ export function CyberdeckGlyphChannelPaneBody() {
     [composerHeight, updateComposerHeight],
   );
 
-  const bumpZoom = useCallback((delta: number) => {
-    setSettings((prev) => ({
-      ...prev,
-      zoomPercent: Math.min(200, Math.max(50, prev.zoomPercent + delta)),
-    }));
-  }, []);
-
   return (
     <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-black">
@@ -755,10 +764,11 @@ export function CyberdeckGlyphChannelPaneBody() {
         </CyberdeckControlTooltip>
 
         <div className="ml-1 border-l border-[#1c1c1c] pl-2">
-          <GlyphDisplayZoomControls
+          <GlyphDisplayZoomRoller
             zoomPercent={settings.zoomPercent}
-            onDecrease={() => bumpZoom(-10)}
-            onIncrease={() => bumpZoom(10)}
+            onChange={(next) =>
+              setSettings((prev) => ({ ...prev, zoomPercent: Math.min(200, Math.max(50, next)) }))
+            }
           />
         </div>
       </div>
