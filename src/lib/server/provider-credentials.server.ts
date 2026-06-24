@@ -21,6 +21,7 @@ export type ProviderAuthFailureReason =
   | "invalid_api_key"
   | "quota_exceeded"
   | "model_unavailable"
+  | "model_mismatch"
   | "provider_timeout"
   | "provider_unavailable"
   | "unknown";
