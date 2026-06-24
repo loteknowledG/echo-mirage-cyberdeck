@@ -622,6 +622,13 @@ function isUnassignedCustomTab(tab: { kind: string } | null | undefined): boolea
   return Boolean(tab && tab.kind === "blank");
 }
 
+function migrateLegacyTestPaneKind(kind: string): string {
+  if (kind === "test-pane" || kind === "test_pane" || kind === "test") {
+    return "rola-dex";
+  }
+  return kind;
+}
+
 function sanitizeCustomTabs(value: unknown): CustomTab[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
@@ -630,12 +637,8 @@ function sanitizeCustomTabs(value: unknown): CustomTab[] {
     const id = typeof tab.id === "string" && tab.id.trim() ? tab.id.trim() : "";
     const label = typeof tab.label === "string" && tab.label.trim() ? tab.label.trim() : "TAB";
     const kindRaw = typeof tab.kind === "string" ? tab.kind : "blank";
-    const kind =
-      kindRaw === "test-pane" || kindRaw === "test_pane" || kindRaw === "test"
-        ? "rola-dex"
-        : isCustomTabKind(kindRaw)
-          ? kindRaw
-          : "blank";
+    const migratedKind = migrateLegacyTestPaneKind(kindRaw);
+    const kind = isCustomTabKind(migratedKind) ? migratedKind : "blank";
     const rawGlyph = typeof tab.glyph === "string" && tab.glyph.trim() ? tab.glyph.trim() : "□";
     const glyph = kind === "rola-dex" ? defaultCustomTabGlyphForKind("rola-dex") : rawGlyph;
     const browserUrl = typeof tab.browserUrl === "string" && tab.browserUrl.trim() ? tab.browserUrl.trim() : undefined;
@@ -897,7 +900,7 @@ function normalizeCustomTabGlyph(label: string, glyph?: string) {
 }
 
 function normalizeCustomTabKind(kind: string) {
-  const nextKind = kind.trim().toLowerCase();
+  const nextKind = migrateLegacyTestPaneKind(kind.trim().toLowerCase());
   if (nextKind === "catelog") {
     return "catalog" as CustomTabKind;
   }
@@ -960,9 +963,6 @@ function normalizeCustomTabKind(kind: string) {
     nextKind === "realmorphism"
   ) {
     return "realmorphism-kit" as CustomTabKind;
-  }
-  if (nextKind === "test-pane" || nextKind === "test_pane" || nextKind === "test") {
-    return "rola-dex" as CustomTabKind;
   }
   if (nextKind === "debate" || nextKind === "debate-forum" || nextKind === "debate_forum") {
     return "db8" as CustomTabKind;
