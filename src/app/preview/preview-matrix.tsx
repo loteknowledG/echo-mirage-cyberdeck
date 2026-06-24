@@ -47,6 +47,13 @@ function cardNeedsComposer(card: { toolOverride?: { composerArg?: string } }): b
   return Boolean(card.toolOverride?.composerArg);
 }
 
+function attachMatrixGrabCursor(embla: EmblaCarouselType, viewport: HTMLElement) {
+  const onDown = () => viewport.classList.add("is-grabbing");
+  const onUp = () => viewport.classList.remove("is-grabbing");
+  embla.on("pointerDown", onDown);
+  embla.on("pointerUp", onUp);
+}
+
 function composerPlaceholderForArg(arg: string): string {
   switch (arg) {
     case "filePath":
@@ -172,6 +179,7 @@ export function PreviewMatrix() {
       });
 
       handEmblaRefs.current[deckIndex] = handEmbla;
+      attachMatrixGrabCursor(handEmbla, handViewport);
 
       handEmbla.on("select", () => {
         if (deckEmblaRef.current?.selectedScrollSnap() !== deckIndex) return;
@@ -199,6 +207,7 @@ export function PreviewMatrix() {
     });
 
     deckEmblaRef.current = deckEmbla;
+    attachMatrixGrabCursor(deckEmbla, deckViewport);
     deckEmbla.on("select", syncFromEmbla);
     deckEmbla.on("settle", syncFromEmbla);
     const next = scrollMatrixTo(

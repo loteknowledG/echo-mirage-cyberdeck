@@ -488,7 +488,6 @@ const CUSTOM_TAB_KINDS = [
   "glyph-channel",
   "rola-dex",
   "tunes",
-  "test-pane",
   "realmorphism-kit",
   "call-center",
   "photoshop",
@@ -525,6 +524,15 @@ function providerHasClientKey(
   defaultKeyAvailableByProvider: Record<string, boolean>,
 ): boolean {
   return providerHasUsableCredentials(providerId, providerKeys, defaultKeyAvailableByProvider);
+}
+
+function hasAnyProviderClientKey(
+  providerKeys: Record<string, string>,
+  defaultKeyAvailableByProvider: Record<string, boolean>,
+): boolean {
+  return PROVIDER_IDS.some((id) =>
+    providerHasClientKey(id, providerKeys, defaultKeyAvailableByProvider),
+  );
 }
 
 const GATEWAY_LINK_PARTS =
@@ -591,7 +599,6 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Kit", action: "kit-pane" },
   { label: "Powerfist", kind: "rola-dex", action: "convert" },
   { label: "Tunes", kind: "tunes", action: "convert" },
-  { label: "Test", kind: "test-pane", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
   { label: "Pi", kind: "pi", action: "convert" },
   { label: "DB8", kind: "db8", action: "convert" },
@@ -622,7 +629,13 @@ function sanitizeCustomTabs(value: unknown): CustomTab[] {
     const tab = item as Partial<CustomTab>;
     const id = typeof tab.id === "string" && tab.id.trim() ? tab.id.trim() : "";
     const label = typeof tab.label === "string" && tab.label.trim() ? tab.label.trim() : "TAB";
-    const kind = isCustomTabKind(tab.kind) ? tab.kind : "blank";
+    const kindRaw = typeof tab.kind === "string" ? tab.kind : "blank";
+    const kind =
+      kindRaw === "test-pane" || kindRaw === "test_pane" || kindRaw === "test"
+        ? "rola-dex"
+        : isCustomTabKind(kindRaw)
+          ? kindRaw
+          : "blank";
     const rawGlyph = typeof tab.glyph === "string" && tab.glyph.trim() ? tab.glyph.trim() : "□";
     const glyph = kind === "rola-dex" ? defaultCustomTabGlyphForKind("rola-dex") : rawGlyph;
     const browserUrl = typeof tab.browserUrl === "string" && tab.browserUrl.trim() ? tab.browserUrl.trim() : undefined;
@@ -949,7 +962,7 @@ function normalizeCustomTabKind(kind: string) {
     return "realmorphism-kit" as CustomTabKind;
   }
   if (nextKind === "test-pane" || nextKind === "test_pane" || nextKind === "test") {
-    return "test-pane" as CustomTabKind;
+    return "rola-dex" as CustomTabKind;
   }
   if (nextKind === "debate" || nextKind === "debate-forum" || nextKind === "debate_forum") {
     return "db8" as CustomTabKind;
@@ -998,7 +1011,6 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "glyph-channel") return "⟁";
   if (kind === "rola-dex") return "#";
   if (kind === "tunes") return "♫";
-  if (kind === "test-pane") return "T";
   if (kind === "call-center") return "CC";
   if (kind === "photoshop") return "Ps";
   if (kind === "db8") return "8";
@@ -1015,7 +1027,6 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "glyph-channel") return "⟁ GLYPH";
   if (kind === "rola-dex") return "Rola Dex";
   if (kind === "tunes") return "Tunes";
-  if (kind === "test-pane") return "Test";
   if (kind === "call-center") return "CALL CENTER";
   if (kind === "photoshop") return "PHOTOSHOP";
   if (kind === "db8") return "DB8";
@@ -1243,6 +1254,7 @@ export default function CyberdeckApp() {
   const [modelKeyboardHighlightId, setModelKeyboardHighlightId] = useState<string | null>(null);
   const [providerKeys, setProviderKeys] = useState<Record<string, string>>({});
   const [didHydrateProviderState, setDidHydrateProviderState] = useState(false);
+  const [providerConfigHydrated, setProviderConfigHydrated] = useState(false);
   const [defaultKeyAvailableByProvider, setDefaultKeyAvailableByProvider] = useState<Record<string, boolean>>({
     opencode: false,
     openrouter: false,
@@ -2676,6 +2688,8 @@ export default function CyberdeckApp() {
 
   useEffect(() => {
     if (!deckUiHydrated || uiFocusRestoredRef.current) return;
+    if (ENABLE_AUTOMATION && !providerConfigHydrated) return;
+    if (ENABLE_AUTOMATION && !startupRailResolvedRef.current) return;
     const id = window.requestAnimationFrame(() => {
       if (navRailContext === "tabs") {
         serverRailRef.current?.focus({ preventScroll: true });
@@ -2685,7 +2699,7 @@ export default function CyberdeckApp() {
       uiFocusRestoredRef.current = true;
     });
     return () => window.cancelAnimationFrame(id);
-  }, [deckUiHydrated, navRailContext]);
+  }, [deckUiHydrated, navRailContext, providerConfigHydrated]);
 
   const operatorSurfaceIsDocument = operatorDroppedAsset
     ? isOperatorTextEditableSurface(resolveOperatorAssetSurface(operatorDroppedAsset))
@@ -4142,6 +4156,9 @@ export default function CyberdeckApp() {
       })
       .catch(() => {
         /* offline / dev without route */
+      })
+      .finally(() => {
+        setProviderConfigHydrated(true);
       });
 
     setDidHydrateProviderState(true);
@@ -4237,7 +4254,7 @@ export default function CyberdeckApp() {
 
   // After keys hydrate: prompt only when this provider truly has no client key (gateway field handles entry).
   useEffect(() => {
-    if (!didHydrateProviderState) return;
+    if (!didHydrateProviderState || !providerConfigHydrated) return;
     if (providerHasClientKey(activeProvider, providerKeys, defaultKeyAvailableByProvider)) return;
     const tip = gatewayKeySysMessage(activeProvider);
     setMessages((prev) => {
@@ -4245,7 +4262,7 @@ export default function CyberdeckApp() {
       if (last?.role === "system" && last.text === tip) return prev;
       return [...prev, { role: "system", text: tip }];
     });
-  }, [activeProvider, defaultKeyAvailableByProvider, didHydrateProviderState, providerKeys]);
+  }, [activeProvider, defaultKeyAvailableByProvider, didHydrateProviderState, providerConfigHydrated, providerKeys]);
 
   // Drop stale key prompts from saved chat once a key is present.
   useEffect(() => {
@@ -6490,21 +6507,39 @@ ${diff}`;
     [handleModelLabelClick],
   );
 
+  const openOperatorPaneOnStartup = useCallback(() => {
+    useCyberdeckTabStore.getState().setActiveCustomTabId(null);
+    useCyberdeckTabStore.getState().setServer("m");
+    setNavRailContext("tabs");
+    setServerKeyboardHighlightId("m");
+    setOperatorSurfaceMode("workspace");
+    setOperatorDocMode("edit");
+    startupRailResolvedRef.current = true;
+  }, []);
+
   useEffect(() => {
     if (!ENABLE_AUTOMATION) return;
-    if (!didHydrateProviderState || startupRailResolvedRef.current) return;
-    if (hasProviderAuth) {
-      useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-      useCyberdeckTabStore.getState().setServer("m");
-      startupRailResolvedRef.current = true;
+    if (!didHydrateProviderState || !providerConfigHydrated || startupRailResolvedRef.current) return;
+
+    if (hasAnyProviderClientKey(providerKeys, defaultKeyAvailableByProvider)) {
+      openOperatorPaneOnStartup();
       return;
     }
+
     if (connectionState === "offline") {
       handleModelLabelClick("s");
       offlineAutoOpenedRef.current = true;
       startupRailResolvedRef.current = true;
     }
-  }, [connectionState, didHydrateProviderState, handleModelLabelClick, hasProviderAuth]);
+  }, [
+    connectionState,
+    defaultKeyAvailableByProvider,
+    didHydrateProviderState,
+    handleModelLabelClick,
+    openOperatorPaneOnStartup,
+    providerConfigHydrated,
+    providerKeys,
+  ]);
 
   useEffect(() => {
     if (!ENABLE_AUTOMATION) return;
@@ -6521,7 +6556,13 @@ ${diff}`;
       });
     }
 
-    if (didHydrateProviderState && connectionState === "offline" && !offlineAutoOpenedRef.current && !hasProviderAuth) {
+    if (
+      didHydrateProviderState &&
+      providerConfigHydrated &&
+      connectionState === "offline" &&
+      !offlineAutoOpenedRef.current &&
+      !hasAnyProviderClientKey(providerKeys, defaultKeyAvailableByProvider)
+    ) {
       handleModelLabelClick("s");
       offlineAutoOpenedRef.current = true;
       return;
@@ -6529,7 +6570,7 @@ ${diff}`;
     if (connectionState !== "offline") {
       offlineAutoOpenedRef.current = false;
     }
-  }, [activeProvider, connectionState, didHydrateProviderState, handleModelLabelClick, hasProviderAuth, modelID]);
+  }, [activeProvider, connectionState, didHydrateProviderState, defaultKeyAvailableByProvider, handleModelLabelClick, modelID, providerConfigHydrated, providerKeys]);
 
   const handleThirdColumnDragOver = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
     if (serverRef.current !== "m" && serverRef.current !== "s") return;
@@ -7399,17 +7440,6 @@ ${diff}`;
             data-pointer-target="tunes"
           >
             <ActivatedCyberdeckPane kind="tunes" />
-          </div>
-        );
-      }
-
-      if (tab.kind === "test-pane") {
-        return (
-          <div
-            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
-            data-pointer-target="test-pane"
-          >
-            <ActivatedCyberdeckPane kind="test-pane" />
           </div>
         );
       }

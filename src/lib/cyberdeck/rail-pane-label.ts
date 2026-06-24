@@ -17,7 +17,6 @@ const RAIL_KIND_DISPLAY: Partial<Record<CyberdeckPaneKind, string>> = {
   "voice-lab": "VOICE",
   tunes: "TUNES",
   "rola-dex": "POWERFIST",
-  "test-pane": "TEST",
   "call-center": "CALL CENTER",
   photoshop: "PHOTOSHOP",
   db8: "DB8",

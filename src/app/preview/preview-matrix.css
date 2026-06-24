@@ -204,7 +204,18 @@
   touch-action: pan-x pinch-zoom;
 }
 
-.powerfist-preview-root .handViewport:active {
+.powerfist-preview-root .handViewport:active,
+.powerfist-preview-root .handViewport.is-grabbing {
+  cursor: grabbing;
+}
+
+.powerfist-preview-root .handViewport.is-grabbing .cardSlide,
+.powerfist-preview-root .handViewport.is-grabbing .card {
+  cursor: grabbing;
+}
+
+.powerfist-preview-root .deckViewport:active,
+.powerfist-preview-root .deckViewport.is-grabbing {
   cursor: grabbing;
 }
 
@@ -214,10 +225,6 @@
   overflow: hidden;
   cursor: grab;
   touch-action: pan-y pinch-zoom;
-}
-
-.powerfist-preview-root .deckViewport:active {
-  cursor: grabbing;
 }
 
 .powerfist-preview-root .deckContainer {
@@ -297,6 +304,11 @@
   position: relative;
 }
 
+.powerfist-preview-root .cardSlide:active,
+.powerfist-preview-root .cardSlide:active .card {
+  cursor: grabbing;
+}
+
 .powerfist-preview-root .card {
   flex: 0 0 auto;
   width: min(100%, var(--pf-card-h));
@@ -309,6 +321,7 @@
   padding: 12px 14px;
   position: relative;
   overflow: hidden;
+  cursor: grab;
   background:
     linear-gradient(145deg, rgba(13, 31, 23, 0.95), rgba(5, 10, 8, 0.98)),
     radial-gradient(circle at top left, rgba(103, 232, 249, 0.12), transparent 40%);
