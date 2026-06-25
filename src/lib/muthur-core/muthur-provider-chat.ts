@@ -13,6 +13,7 @@ import {
   stripInlineToolMarkup,
 } from "@/lib/muthur-core/parse-inline-tool-calls";
 import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
+import { extractOpenAiMessageText } from "@/lib/muthur-core/extract-openai-message-text";
 import { maybeFinalizeCodingVerify } from "@/lib/muthur-core/coding-verify.server";
 import {
   createMuthurToolExecutionContext,
@@ -295,7 +296,7 @@ export async function muthurChatWithModelTools(options: {
       }
 
       let toolCalls = msg.tool_calls;
-      const rawContent = typeof msg.content === "string" ? msg.content : "";
+      const rawContent = extractOpenAiMessageText(msg);
       if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
         const inlineCalls = parseInlineToolCalls(rawContent);
         if (inlineCalls.length > 0) {
@@ -362,18 +363,23 @@ export async function muthurChatWithModelTools(options: {
         return;
       }
 
-      write(
-        appendMuthurStreamFooters(
-          "[MUTHUR] Model returned no text.",
-          toolsUsed,
-          toolCtx.operatorEdits,
-          toolCtx.operatorConversion,
-          toolCtx.operatorOpenFile,
-          toolCtx.codingVerify,
-          toolCtx.operatorBrowser,
-        ),
-      );
-      return;
+      if (round + 1 < MAX_TOOL_ROUNDS) {
+        write("⏳ MUTHUR // empty model turn — retrying with tool nudge...\n");
+        messages.push({
+          role: "assistant",
+          content: rawContent.trim() ? rawContent : null,
+        });
+        messages.push({
+          role: "user",
+          content:
+            "Your last reply had no executable tool calls and no visible text. " +
+            "Call real tools now (e.g. localfs mkdir + localfs write) or reply with plain text explaining the next step.",
+        });
+        continue;
+      }
+
+      write("⏳ MUTHUR // empty model turn — composing final reply...\n\n");
+      break;
     }
 
     await maybeFinalizeCodingVerify(toolCtx, write);

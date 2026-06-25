@@ -4,18 +4,21 @@ import {
   type ParsedDsmlToolCall,
 } from "@/lib/muthur-core/parse-dsml-tool-calls";
 import { parseXmlToolCalls, stripXmlToolMarkup } from "@/lib/muthur-core/parse-xml-tool-calls";
+import { parseProseToolCalls, stripProseToolMarkup } from "@/lib/muthur-core/parse-prose-tool-calls";
 
 export type ParsedInlineToolCall = ParsedDsmlToolCall;
 
 export function stripInlineToolMarkup(text: string): string {
-  return stripXmlToolMarkup(stripDsmlToolMarkup(text));
+  return stripProseToolMarkup(stripXmlToolMarkup(stripDsmlToolMarkup(text)));
 }
 
-/** Parse tool calls embedded in assistant content (DSML or XML). */
+/** Parse tool calls embedded in assistant content (DSML, XML, or prose localfs calls). */
 export function parseInlineToolCalls(text: string): ParsedInlineToolCall[] {
   const dsml = parseDsmlToolCalls(text);
   if (dsml.length > 0) return dsml;
-  return parseXmlToolCalls(text);
+  const xml = parseXmlToolCalls(text);
+  if (xml.length > 0) return xml;
+  return parseProseToolCalls(text);
 }
 
 export function inlineCallsToOpenAiToolCalls(
