@@ -36,6 +36,7 @@ import {
   type MuthurPosture,
 } from "@/lib/muthur/muthur-posture";
 import { buildMuthurPiControlDoctrine } from "@/lib/muthur/control/muthur-control-doctrine";
+import { buildOperatorDevWriteScopePrompt, resolveOperatorDevWriteRoot } from "@/lib/muthur/execution/localfs-write-scope.server";
 import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
 import { isCalyxMuthurToolsEnabled } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
 import { buildSamusHandsEyesDoctrine } from "@/lib/samus-manus/hands-eyes-doctrine";
@@ -58,6 +59,10 @@ function buildMuthurAvailableToolsPrompt(posture: MuthurPosture): string {
   const directPi = isMuthurDirectPiComputerUseEnabled();
   const calyx = isCalyxMuthurToolsEnabled();
   const handsEyes = isSamusHandsEyesEnabled();
+  const devWriteRoot = resolveOperatorDevWriteRoot();
+  const localFsWriteHint = devWriteRoot
+    ? `mkdir/write inside the Echo Mirage repo or sibling folders under ${devWriteRoot} (e.g. ${devWriteRoot}\\plasma).`
+    : "mkdir/write only inside the Echo Mirage repo (Vercel cannot write f:\\dev).";
   const piTools =
     posture === "commander"
       ? "\n- request_pi_control_lease: Request operator grant for Pi desktop embodiment (mouse/keyboard/screen) before computer-use missions." +
@@ -71,7 +76,9 @@ function buildMuthurAvailableToolsPrompt(posture: MuthurPosture): string {
     "\n- open_operator_file: Open a workspace text/markdown/code file in the operator Monaco editor on the operator's screen. Call before suggest_operator_edit when nothing is open." +
     "\n- suggest_operator_edit: Propose typed edits to markdown/code/text open in the operator Monaco editor. Edits auto-apply in the operator pane (Ctrl+Z to undo). Not for DOCX/PDF previews." +
     "\n- operator_browser: Operator web pane — goto URL or search query, snapshot page text, back/forward/reload, click/type/submit. Not for local disk paths." +
-    "\n- localfs: REAL disk — read anywhere; mkdir/write only inside the Echo Mirage repo. Use write to create or update source files." +
+    "\n- localfs: REAL disk — read anywhere; " +
+    localFsWriteHint +
+    " Use write to create or update source files." +
     "\n- workspace_exec: REAL disk — allowlisted commands only (pnpm exec tsc --noEmit, pnpm lint, pnpm build, git diff, git log, etc.). Run after edits to verify." +
     "\n- git_status / git_diff: REAL disk — inspect repo changes after coding." +
     "\n- justbash: EPHEMERAL mirror only — rg/ls/cat search; writes do NOT persist. Never use for pnpm, git, or file changes." +
@@ -275,6 +282,7 @@ function buildMuthurSystemContent(args: {
   }
 
   systemContent += MUTHUR_COGNITION_DOCTRINE;
+  systemContent += buildOperatorDevWriteScopePrompt();
   if (toolsEnabled) {
     systemContent += buildSamusHandsEyesDoctrine(
       args.posture === "agent" && isSamusHandsEyesEnabled(),
@@ -289,8 +297,13 @@ function buildMuthurSystemContent(args: {
   }
 
   if (messageReferencesLocalPath(args.message)) {
+    const devRoot = resolveOperatorDevWriteRoot();
     systemContent +=
-      "\n\nThe user referenced a local filesystem path. Use localfs ls/cat/stat on that path (paths outside the Echo Mirage repo are read-only). Do NOT search the web or open a browser for disk paths.";
+      "\n\nThe user referenced a local filesystem path. Use localfs ls/cat/stat on that path." +
+      (devRoot
+        ? ` For new projects under ${devRoot}, use localfs mkdir + write in Agent posture.`
+        : " Paths outside the Echo Mirage repo are read-only on this deployment.") +
+      " Do NOT search the web or open a browser for disk paths.";
   }
 
   systemContent += args.glyphDoctrine + args.memoryPrompt + args.browserPrompt + args.glyphPrompt;

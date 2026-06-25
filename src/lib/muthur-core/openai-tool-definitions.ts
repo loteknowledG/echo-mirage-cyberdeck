@@ -1,9 +1,21 @@
+import { resolveOperatorDevWriteRoot } from "@/lib/muthur/execution/localfs-write-scope.server";
 import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
 import { isCalyxMuthurToolsEnabled } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
 import { isSamusHandsEyesEnabled } from "@/lib/samus-manus/samus-manus-config.server";
 import { SAMUS_HANDS_EYES_ACTIONS } from "@/lib/samus-manus/hands-eyes.server";
 import type { MuthurPosture, MuthurPostureToolContext } from "@/lib/muthur/muthur-posture";
 import { isToolAllowedForPosture } from "@/lib/muthur/muthur-posture";
+
+function buildLocalFsToolDescription(): string {
+  const devRoot = resolveOperatorDevWriteRoot();
+  const scope = devRoot
+    ? `mkdir and write persist on REAL disk — inside the Echo Mirage repo or sibling projects under ${devRoot}.`
+    : "mkdir and write persist on REAL disk — only inside the Echo Mirage workspace project root.";
+  return (
+    `Filesystem on the machine running the Next dev server. ls, cat, stat on any readable path. ${scope} ` +
+    "Prefer localfs write for creating/updating source files."
+  );
+}
 
 /**
  * OpenAI-compatible `tools` for chat/completions.
@@ -171,8 +183,7 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
     type: "function",
     function: {
       name: "localfs",
-      description:
-        "Filesystem on the machine running the Next dev server. ls, cat, stat on any readable path. mkdir and write persist on REAL disk — only inside the Echo Mirage workspace project root. Prefer localfs write for creating/updating source files.",
+      description: buildLocalFsToolDescription(),
       parameters: {
         type: "object",
         properties: {

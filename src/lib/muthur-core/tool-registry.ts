@@ -7,6 +7,10 @@ import { convertMarkdownFileToPdf } from "@/lib/markdown-to-pdf.server";
 import { isOperatorWorkspaceTextPath } from "@/lib/operator-file-surface";
 import { getLatestMuthurObservation } from "@/lib/muthur/observation/observation-store.server";
 import { validateReadFilePath } from "@/lib/muthur/execution/safety-policy";
+import {
+  isLocalFsWritePathAllowed,
+  localFsWriteScopeError,
+} from "@/lib/muthur/execution/localfs-write-scope.server";
 import { isLocalFsWriteAllowedForPosture } from "@/lib/muthur/muthur-posture";
 import { parseSuggestOperatorEditArgs } from "@/lib/muthur-core/suggest-operator-edit";
 import {
@@ -53,12 +57,12 @@ function resolveLocalFsPath(targetPath: string): string {
   return path.resolve(targetPath);
 }
 
-function isPathInsideWorkspace(targetPath: string): boolean {
-  const root = path.resolve(WORKSPACE_ROOT);
-  const abs = path.resolve(targetPath);
-  if (abs === root) return true;
-  const prefix = root.endsWith(path.sep) ? root : root + path.sep;
-  return abs.startsWith(prefix);
+function assertLocalFsWritePath(targetPath: string): { ok: true; abs: string } | { ok: false; error: string } {
+  const abs = resolveLocalFsPath(targetPath);
+  if (!isLocalFsWritePathAllowed(abs)) {
+    return { ok: false, error: localFsWriteScopeError(abs) };
+  }
+  return { ok: true, abs };
 }
 
 const overlayFs = new OverlayFs({
@@ -181,10 +185,11 @@ async function runLocalFs(call: ToolCall): Promise<ToolResult> {
           error: "localfs mkdir requires Agent posture.",
         };
       }
-      const abs = path.resolve(targetPath);
-      if (!isPathInsideWorkspace(abs)) {
-        return { ok: false, error: "mkdir is only allowed under the Echo Mirage workspace root." };
+      const writePath = assertLocalFsWritePath(targetPath);
+      if (!writePath.ok) {
+        return { ok: false, error: writePath.error };
       }
+      const abs = writePath.abs;
       const recursive = getBoolArg(call, "recursive", true);
       await fs.mkdir(abs, { recursive });
       return {
@@ -206,10 +211,11 @@ async function runLocalFs(call: ToolCall): Promise<ToolResult> {
           error: "localfs write requires Agent posture.",
         };
       }
-      const abs = path.resolve(targetPath);
-      if (!isPathInsideWorkspace(abs)) {
-        return { ok: false, error: "write is only allowed under the Echo Mirage workspace root." };
+      const writePath = assertLocalFsWritePath(targetPath);
+      if (!writePath.ok) {
+        return { ok: false, error: writePath.error };
       }
+      const abs = writePath.abs;
       if (!("content" in call.args)) {
         return { ok: false, error: 'write requires a "content" field (string; may be empty).' };
       }
