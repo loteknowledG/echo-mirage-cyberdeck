@@ -594,6 +594,7 @@ async function runDelegatePiComputerUse(call: ToolCall): Promise<ToolResult> {
     };
   }
 
+  const snapshot = getPiControlLeaseSnapshot();
   const activeLease = snapshot.activeLease;
   if (isPiControlLeaseGatingEnabled() && !activeLease) {
     return {
