@@ -925,7 +925,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                   }}
                 />
                 {settings.engine === "figlet" ? (
-                  <div className="flex min-w-0 flex-1 items-stretch gap-2 overflow-hidden">
+                  <div className="flex h-[10rem] min-w-0 flex-1 items-stretch gap-2 overflow-hidden">
                     <FigletFontPicker
                       variant="price-is-right"
                       value={settings.figletFont}
@@ -938,7 +938,7 @@ export function CyberdeckGlyphChannelPaneBody() {
                       variant="toolbar"
                       font={settings.figletFont}
                       text={composer.trim() || "ECHO MIRAGE"}
-                      className="min-w-[5.5rem] flex-1"
+                      className="min-h-0 min-w-[5.5rem] flex-1 self-stretch"
                     />
                   </div>
                 ) : null}
