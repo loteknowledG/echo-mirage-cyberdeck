@@ -594,8 +594,8 @@ async function runDelegatePiComputerUse(call: ToolCall): Promise<ToolResult> {
     };
   }
 
-  const snapshot = getPiControlLeaseSnapshot();
-  if (isPiControlLeaseGatingEnabled() && !isPiControlLeaseActive()) {
+  const activeLease = snapshot.activeLease;
+  if (isPiControlLeaseGatingEnabled() && !activeLease) {
     return {
       ok: false,
       error:
@@ -606,7 +606,7 @@ async function runDelegatePiComputerUse(call: ToolCall): Promise<ToolResult> {
   const instructions =
     typeof call.args.instructions === "string"
       ? call.args.instructions.trim()
-      : snapshot.activeLease?.missionText ?? "";
+      : activeLease?.missionText ?? "";
   if (!instructions.trim()) {
     return { ok: false, error: "instructions required for delegate_pi_computer_use" };
   }
@@ -618,11 +618,11 @@ async function runDelegatePiComputerUse(call: ToolCall): Promise<ToolResult> {
     ok: true,
     output: {
       status: "PI_MISSION_DELEGATED",
-      leaseId: snapshot.activeLease.leaseId,
+      leaseId: activeLease?.leaseId ?? null,
       operator: "pi",
-      task: snapshot.activeLease.task,
+      task: activeLease?.task ?? instructions.slice(0, 80),
       instructions,
-      capabilities: snapshot.activeLease.capabilities,
+      capabilities: activeLease?.capabilities ?? ["mouse", "keyboard", "screen", "scroll"],
       message:
         "Mission delegated to Pi embodiment operator. Pi will execute via computer-use under the active lease.",
     },
