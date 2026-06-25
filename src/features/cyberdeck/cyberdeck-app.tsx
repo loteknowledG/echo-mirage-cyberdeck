@@ -7996,10 +7996,7 @@ ${diff}`;
             <footer className="cyberdeck-message-box realmorphism-host-surface shrink-0 border-t bg-black p-0">
               <div className="mx-2 mb-2 mt-2 flex flex-col gap-2">
                 <MuthurComposerShell deckMode={deckMode}>
-                  <div className="relative flex items-end px-2 py-2">
-                    <span className="pointer-events-none absolute left-3 top-3 text-lg font-bold leading-none text-green-500">
-                      $
-                    </span>
+                  <div className="flex px-2 py-2">
                     <MuthurCommandInput
                       ref={messageInputRef}
                       inputHistory={inputHistory}

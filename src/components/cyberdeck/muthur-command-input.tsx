@@ -263,27 +263,35 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
     );
 
     return (
-      <textarea
-        ref={inputRef}
-        rows={1}
-        data-pointer-target="command-input"
-        data-muthur-memorize-input=""
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onFocus={() => onFocusExtra?.()}
-        placeholder={
-          !hasProviderAuth
-            ? "ENTER GATEWAY KEY..."
-            : glyphModeActive
-              ? "⟁ Glyph mode on — compose on ⟁ tab; $ here is MUTHUR chat"
-              : "Enter command or message... (Shift+Enter for new line)"
-        }
-        style={{ height: TEXTAREA_MIN_HEIGHT_PX }}
-        className="muthur-command-input max-h-[200px] min-h-[44px] w-full resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-9 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"
-        disabled={false}
-        aria-label="MUTHUR command input"
-      />
+      <div className="muthur-command-input-row flex min-w-0 flex-1 items-start gap-1">
+        <span
+          aria-hidden
+          className="muthur-command-prompt shrink-0 select-none py-3 font-mono text-sm font-bold leading-relaxed text-green-500"
+        >
+          $
+        </span>
+        <textarea
+          ref={inputRef}
+          rows={1}
+          data-pointer-target="command-input"
+          data-muthur-memorize-input=""
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => onFocusExtra?.()}
+          placeholder={
+            !hasProviderAuth
+              ? "ENTER GATEWAY KEY..."
+              : glyphModeActive
+                ? "⟁ Glyph mode on — compose on ⟁ tab; $ here is MUTHUR chat"
+                : "Enter command or message... (Shift+Enter for new line)"
+          }
+          style={{ height: TEXTAREA_MIN_HEIGHT_PX }}
+          className="muthur-command-input min-h-[44px] max-h-[200px] min-w-0 flex-1 resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-1 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"
+          disabled={false}
+          aria-label="MUTHUR command input"
+        />
+      </div>
     );
   },
 );
