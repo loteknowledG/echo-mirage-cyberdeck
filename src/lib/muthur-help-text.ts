@@ -51,7 +51,7 @@ export type MuthurHelpIntent =
 export function parseMuthurClearChatIntent(input: string): boolean {
   const trimmed = input.trim();
   if (!trimmed) return false;
-  return /^(?:\/muthur\s+clear|muthur\s+clear|clear\s+(?:chat|muthur)|\/clear|clear)$/i.test(
+  return /^(?:\/muthur\s+clear|muthur\s+clear|clear\s+(?:chat|muthur)|\/clear)$/i.test(
     trimmed,
   );
 }
@@ -61,7 +61,7 @@ export function parseMuthurHelpIntent(input: string): MuthurHelpIntent | null {
   if (!trimmed) return null;
 
   const match = trimmed.match(
-    /^(?:\/muthur\s+help|muthur\s+help|\/help|help)(?:\s+([\w-]+))?$/i,
+    /^(?:\/muthur\s+help|muthur\s+help|\/help)(?:\s+([\w-]+))?$/i,
   );
   if (!match) return null;
 

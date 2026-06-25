@@ -5874,7 +5874,10 @@ ${diff}`;
       }
       setMessages((prev) => [
         ...prev,
-        { role: "system", text: `KEY FOR ${activeProvider.toUpperCase()} REGISTERED // VALIDATING_LINK` },
+        {
+          role: "system",
+          text: `KEY FOR ${activeProvider.toUpperCase()} REGISTERED // VALIDATING_LINK // If this was a message to MUTHUR, wait for model list to load, select a model, then resend.`,
+        },
       ]);
       void fetchModelsForProvider(activeProvider, { force: true });
       setIsStreaming(false);

@@ -66,6 +66,7 @@
     "probe:codex-runtime-adapter": "tsx scripts/probe-codex-runtime-adapter.ts",
     "probe:codex-readiness-detector": "tsx scripts/probe-codex-readiness-detector.ts",
     "probe:photoshop-text-on-gif": "tsx scripts/probe-photoshop-text-on-gif.ts",
+    "probe:capability-receipts": "tsx scripts/probe-capability-receipts.ts",
     "discover:continuity-artifacts": "tsx scripts/discover-continuity-artifacts.ts",
     "render:continuity-docs": "tsx scripts/render-continuity-docs.ts",
     "probe:muthur-lineage-discovery": "tsx scripts/probe-muthur-lineage-discovery.ts",

@@ -89,6 +89,10 @@ Build and refine Echo Mirage Cyberdeck features including computer use layer, MU
 
 **Playwright E2E timeout increased from 60000 to 120000** (Windows + Next.js dev server navigation can exceed 60s); playwright.config.ts timeout 120000ms; reuseExistingServer: true
 
+**Era 2 Capability Registry v0**: Upgraded `EnhancedCapabilityMetadata` with `owner`, `riskLevel`, `receiptType`, `verificationType`, `approvalMode` for every capability; new accessors `getRiskLevel()`, `getApprovalMode()`, `getReceiptType()`, `getVerificationType()`, `getCapabilityOwner()`, `getHighRiskActions()`, `getActionsByApprovalMode()`, `getCapabilityManifest()`; backward-compatible (all existing exports preserved)
+
+**Receipt System v0**: `receipt-types.ts` with 8 receipt types (memory.write, tool.exec, capability.register, capability.revoke, verify.pass, verify.fail, authority.delegate, authority.return); `receipt-store.ts` singleton store (max 1000, globalThis); `makeToolExecReceipt()`, `makeAuthorityReceipt()`, `makeVerifyReceipt()` factories; `computeContentHash()` for verifiable receipts; `queryReceipts()` with type/capabilityId/authority/status/sinceTimestamp/limit filters; `getReceiptSummary()` for introspection; action runner wired to generate `tool.exec` receipt after every action + `verify.pass`/`verify.fail` after verification; introspection `ComputerUseStatus.receipts` with byType/byStatus/byAuthority; `formatStatusText()` shows receipt counts; probe-capability-receipts.ts with 99 assertions all PASS
+
 ### In Progress
 - (none)
 
@@ -150,6 +154,7 @@ Build and refine Echo Mirage Cyberdeck features including computer use layer, MU
 - probe-workflow-observation.ts: 87 PASS
 - probe-execution-deck.ts: 89 PASS
 - probe-exec-deck-vocabulary.ts: 58 PASS
+- probe-capability-receipts.ts: 99 PASS
 
 **Routing order in page.tsx handleSend**:
 1. tab creation

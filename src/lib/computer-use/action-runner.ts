@@ -5,12 +5,14 @@ import * as screenCapture from "./screen-capture";
 import * as inputController from "./input-controller";
 import * as uiVerification from "./ui-verification";
 import * as indicateLayer from "./indicate-layer";
-import { getActionScope } from "./capability-registry";
+import { getActionScope, getCapabilityOwner } from "./capability-registry";
 import { getCurrentOwner, checkActionPermission, emitControlDenied } from "./control-lease";
 import { isPiProbeLeaseBypassEnabled } from "@/lib/muthur/control/pi-control-lease-probe";
 import { isPiControlLeaseActive } from "@/lib/muthur/control/pi-control-lease-store";
 import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
 import { narrate } from "./narration";
+import { makeToolExecReceipt, makeVerifyReceipt } from "./receipt-store";
+import type { ReceiptAuthority } from "./receipt-types";
 
 const safetyGuard = createSafetyGuard();
 
@@ -262,6 +264,21 @@ export async function runComputerUseAction(
 
   const result = await executeAction(action);
 
+  const durationMs = Date.now() - start;
+  const authority: ReceiptAuthority = owner === "USER" ? "user" : "muthur";
+  const capOwner = getCapabilityOwner(action.name);
+  const receiptAuthority: ReceiptAuthority = capOwner === "user" ? "user" : capOwner === "pi" ? "pi" : "muthur";
+
+  makeToolExecReceipt({
+    capabilityId: action.name,
+    authority: receiptAuthority,
+    status: result.success ? "success" : "failed",
+    inputs: action.params ?? {},
+    outputs: result.data,
+    durationMs,
+    error: result.error,
+  });
+
   if (action.verify && result.success) {
     let verificationResult;
     if (action.verify.type === "text_visible") {
@@ -272,6 +289,14 @@ export async function runComputerUseAction(
 
     if (verificationResult) {
       result.verification = verificationResult.data as { success: boolean; matches: boolean; reason?: string } | undefined;
+      const verifyMatches = (verificationResult.data as { matches?: boolean })?.matches ?? false;
+      makeVerifyReceipt({
+        authority: receiptAuthority,
+        claimReceiptId: action.name,
+        verificationType: "logical",
+        matches: verifyMatches,
+        details: (verificationResult.data as { reason?: string })?.reason,
+      });
     }
   }
 

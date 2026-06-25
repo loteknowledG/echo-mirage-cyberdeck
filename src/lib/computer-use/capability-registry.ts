@@ -1,18 +1,28 @@
 import type { ActionName } from "./computer-use-types";
+import type {
+  EnhancedCapabilityMetadata,
+  CapabilityCategory,
+  ConfirmationPolicy,
+  EnvironmentSupport,
+  RiskLevel,
+  ReceiptType,
+  VerificationType,
+  ApprovalMode,
+  ReceiptAuthority,
+} from "./receipt-types";
 
-export type CapabilityCategory = "observation" | "input" | "output" | "control";
-export type ConfirmationPolicy = "none" | "user" | "operator";
-export type EnvironmentSupport = "browser" | "electron" | "both" | "none";
+export type {
+  CapabilityCategory,
+  ConfirmationPolicy,
+  EnvironmentSupport,
+  RiskLevel,
+  ReceiptType,
+  VerificationType,
+  ApprovalMode,
+  ReceiptAuthority,
+};
 
-export interface CapabilityMetadata {
-  category: CapabilityCategory;
-  confirmationPolicy: ConfirmationPolicy;
-  environments: EnvironmentSupport;
-  description: string;
-  paramSchema?: Record<string, { required: boolean; type: string }>;
-}
-
-export type CapabilityRegistry = Record<ActionName, CapabilityMetadata>;
+export type CapabilityRegistry = Record<ActionName, EnhancedCapabilityMetadata>;
 
 export const CAPABILITY_REGISTRY: CapabilityRegistry = {
   get_active_window: {
@@ -20,24 +30,44 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     confirmationPolicy: "none",
     environments: "both",
     description: "Retrieve the currently focused window title and URL",
+    owner: "muthur",
+    riskLevel: "low",
+    receiptType: "tool.exec",
+    verificationType: "logical",
+    approvalMode: "auto",
   },
   list_open_windows: {
     category: "observation",
     confirmationPolicy: "none",
     environments: "electron",
     description: "Enumerate all open Electron windows",
+    owner: "muthur",
+    riskLevel: "low",
+    receiptType: "tool.exec",
+    verificationType: "logical",
+    approvalMode: "auto",
   },
   capture_screen: {
     category: "observation",
     confirmationPolicy: "none",
     environments: "none",
     description: "Capture a screenshot of the current screen (not implemented)",
+    owner: "muthur",
+    riskLevel: "medium",
+    receiptType: "tool.exec",
+    verificationType: "visual",
+    approvalMode: "operator",
   },
   focus_window: {
     category: "input",
     confirmationPolicy: "operator",
     environments: "none",
     description: "Focus a window by title or app name (not implemented)",
+    owner: "muthur",
+    riskLevel: "medium",
+    receiptType: "tool.exec",
+    verificationType: "logical",
+    approvalMode: "operator",
     paramSchema: {
       titleOrAppName: { required: true, type: "string" },
     },
@@ -47,6 +77,11 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     confirmationPolicy: "user",
     environments: "electron",
     description: "Write text to the system clipboard",
+    owner: "muthur",
+    riskLevel: "high",
+    receiptType: "tool.exec",
+    verificationType: "input_output",
+    approvalMode: "user",
     paramSchema: {
       text: { required: true, type: "string" },
     },
@@ -56,6 +91,11 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     confirmationPolicy: "user",
     environments: "electron",
     description: "Simulate a keyboard hotkey (limited allowlist)",
+    owner: "muthur",
+    riskLevel: "high",
+    receiptType: "tool.exec",
+    verificationType: "input_output",
+    approvalMode: "user",
     paramSchema: {
       keys: { required: true, type: "string" },
     },
@@ -65,6 +105,11 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     confirmationPolicy: "none",
     environments: "none",
     description: "Verify text is visible on screen via OCR (not implemented)",
+    owner: "muthur",
+    riskLevel: "low",
+    receiptType: "tool.exec",
+    verificationType: "visual",
+    approvalMode: "auto",
     paramSchema: {
       text: { required: true, type: "string" },
     },
@@ -74,6 +119,11 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     confirmationPolicy: "none",
     environments: "none",
     description: "Verify a specific window is currently focused (not implemented)",
+    owner: "muthur",
+    riskLevel: "low",
+    receiptType: "tool.exec",
+    verificationType: "logical",
+    approvalMode: "auto",
     paramSchema: {
       titleOrAppName: { required: true, type: "string" },
     },
@@ -83,12 +133,22 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     confirmationPolicy: "none",
     environments: "both",
     description: "Halt the current computer-use execution",
+    owner: "user",
+    riskLevel: "low",
+    receiptType: "tool.exec",
+    verificationType: "none",
+    approvalMode: "auto",
   },
   indicate_point: {
     category: "output",
     confirmationPolicy: "none",
     environments: "both",
     description: "Render a pointer ring at a screen position (MUTHUR pointer hand)",
+    owner: "muthur",
+    riskLevel: "low",
+    receiptType: "tool.exec",
+    verificationType: "visual",
+    approvalMode: "auto",
     paramSchema: {
       position: { required: true, type: "object" },
       label: { required: false, type: "string" },
@@ -104,6 +164,11 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     confirmationPolicy: "none",
     environments: "both",
     description: "Render a highlight glow at a screen position (MUTHUR pointer hand)",
+    owner: "muthur",
+    riskLevel: "low",
+    receiptType: "tool.exec",
+    verificationType: "visual",
+    approvalMode: "auto",
     paramSchema: {
       position: { required: true, type: "object" },
       label: { required: false, type: "string" },
@@ -119,18 +184,28 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     confirmationPolicy: "none",
     environments: "both",
     description: "Remove all active MUTHUR pointer/highlight overlays",
+    owner: "muthur",
+    riskLevel: "low",
+    receiptType: "tool.exec",
+    verificationType: "none",
+    approvalMode: "auto",
   },
   unknown: {
     category: "control",
     confirmationPolicy: "none",
     environments: "none",
     description: "Unknown or unrecognized action",
+    owner: "muthur",
+    riskLevel: "low",
+    receiptType: "tool.exec",
+    verificationType: "none",
+    approvalMode: "auto",
   },
 } as const;
 
 export function getCapability(
   actionName: ActionName
-): CapabilityMetadata | undefined {
+): EnhancedCapabilityMetadata | undefined {
   return CAPABILITY_REGISTRY[actionName];
 }
 
@@ -173,4 +248,60 @@ export function getActionScope(
   if (cap.category === "input") return "input";
   if (cap.category === "output") return "output";
   return "control";
+}
+
+export function getRiskLevel(actionName: ActionName): RiskLevel {
+  return CAPABILITY_REGISTRY[actionName]?.riskLevel ?? "low";
+}
+
+export function getApprovalMode(actionName: ActionName): ApprovalMode {
+  return CAPABILITY_REGISTRY[actionName]?.approvalMode ?? "auto";
+}
+
+export function getReceiptType(actionName: ActionName): ReceiptType {
+  return CAPABILITY_REGISTRY[actionName]?.receiptType ?? "tool.exec";
+}
+
+export function getVerificationType(actionName: ActionName): VerificationType {
+  return CAPABILITY_REGISTRY[actionName]?.verificationType ?? "none";
+}
+
+export function getCapabilityOwner(actionName: ActionName): ReceiptAuthority {
+  return CAPABILITY_REGISTRY[actionName]?.owner ?? "muthur";
+}
+
+export function getHighRiskActions(): ActionName[] {
+  return Object.entries(CAPABILITY_REGISTRY)
+    .filter(([, meta]) => meta.riskLevel === "high")
+    .map(([name]) => name as ActionName);
+}
+
+export function getActionsByApprovalMode(mode: ApprovalMode): ActionName[] {
+  return Object.entries(CAPABILITY_REGISTRY)
+    .filter(([, meta]) => meta.approvalMode === mode)
+    .map(([name]) => name as ActionName);
+}
+
+export function getCapabilityManifest(): Array<{
+  name: ActionName;
+  category: CapabilityCategory;
+  riskLevel: RiskLevel;
+  receiptType: ReceiptType;
+  verificationType: VerificationType;
+  approvalMode: ApprovalMode;
+  owner: ReceiptAuthority;
+  description: string;
+}> {
+  return Object.entries(CAPABILITY_REGISTRY)
+    .filter(([name]) => name !== "unknown")
+    .map(([name, meta]) => ({
+      name: name as ActionName,
+      category: meta.category,
+      riskLevel: meta.riskLevel,
+      receiptType: meta.receiptType,
+      verificationType: meta.verificationType,
+      approvalMode: meta.approvalMode,
+      owner: meta.owner,
+      description: meta.description,
+    }));
 }

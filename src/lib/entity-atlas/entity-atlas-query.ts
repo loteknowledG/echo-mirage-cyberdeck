@@ -50,39 +50,39 @@ export function parseEntityAtlasQuery(input: string): EntityAtlasQueryIntent | n
   const lower = trimmed.toLowerCase();
 
   const relatedMatch =
-    trimmed.match(/\bwhat(?:'s| is) related to\s+(.+)$/i) ??
-    trimmed.match(/\bwhat(?:'s| is) connected to\s+(.+)$/i) ??
-    trimmed.match(/\bshow (?:the )?continuity (?:for|around)\s+(.+)$/i);
+    trimmed.match(/^what(?:'s| is) related to\s+(.+)$/i) ??
+    trimmed.match(/^what(?:'s| is) connected to\s+(.+)$/i) ??
+    trimmed.match(/^show (?:the )?continuity (?:for|around)\s+(.+)$/i);
   if (relatedMatch) {
     return { kind: "relationship", subject: extractSubject(relatedMatch) };
   }
 
   const governsMatch =
-    trimmed.match(/\bwhat governs\s+(.+)$/i) ??
-    trimmed.match(/\bwhich (?:decision|adr) governs\s+(.+)$/i);
-  if (governsMatch && !/\bwhat adr governs\b/i.test(lower)) {
+    trimmed.match(/^what governs\s+(.+)$/i) ??
+    trimmed.match(/^which (?:decision|adr) governs\s+(.+)$/i);
+  if (governsMatch && !/^what adr governs\b/i.test(lower)) {
     return { kind: "governs", subject: extractSubject(governsMatch) };
   }
 
   const verifiesMatch =
-    trimmed.match(/\bwhat verifies\s+(.+)$/i) ??
-    trimmed.match(/\bwhat (?:is the )?verif(?:ier|ication) for\s+(.+)$/i) ??
-    trimmed.match(/\bwho verified\s+(.+)$/i);
+    trimmed.match(/^what verifies\s+(.+)$/i) ??
+    trimmed.match(/^what (?:is the )?verif(?:ier|ication) for\s+(.+)$/i) ??
+    trimmed.match(/^who verified\s+(.+)$/i);
   if (verifiesMatch) {
     return { kind: "verifies", subject: extractSubject(verifiesMatch) };
   }
 
   const dependsMatch =
-    trimmed.match(/\bwhat depends on\s+(.+)$/i) ??
-    trimmed.match(/\bwhat (?:work orders? )?depend on\s+(.+)$/i);
+    trimmed.match(/^what depends on\s+(.+)$/i) ??
+    trimmed.match(/^what (?:work orders? )?depend on\s+(.+)$/i);
   if (dependsMatch) {
     return { kind: "depends_on", subject: extractSubject(dependsMatch) };
   }
 
   const belongsMatch =
-    trimmed.match(/\bwhat subsystem (?:owns|contains)\s+(.+)$/i) ??
-    trimmed.match(/\bwhat does\s+(.+?)\s+belong to\??$/i) ??
-    trimmed.match(/\bwhich subsystem (?:is|owns)\s+(.+)$/i);
+    trimmed.match(/^what subsystem (?:owns|contains)\s+(.+)$/i) ??
+    trimmed.match(/^what does\s+(.+?)\s+belong to\??$/i) ??
+    trimmed.match(/^which subsystem (?:is|owns)\s+(.+)$/i);
   if (belongsMatch) {
     return { kind: "belongs_to", subject: extractSubject(belongsMatch) };
   }

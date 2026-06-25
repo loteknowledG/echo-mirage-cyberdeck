@@ -7,6 +7,7 @@ import { getPresenceState } from "./cursor-presence";
 import { getInspectionSummary } from "./inspect-layer";
 import { getSession, getEventCount, getNextPendingQuestion, getPendingQuestionCount, getConfirmedEvents } from "./workflow-observation";
 import { getCardTableState, getStagedCardCount, getStackDepth, isExecutionEnabled, getTopStackCard, getStackCards, getCurrentStatuses } from "./card-table";
+import { getReceiptSummary, getReceiptCount } from "./receipt-store";
 import type { ActionName } from "./computer-use-types";
 
 export interface MarkerInfo {
@@ -116,6 +117,13 @@ export interface ComputerUseStatus {
     timestamp: string;
     reason?: string;
   }[];
+  receipts: {
+    total: number;
+    byType: Record<string, number>;
+    byStatus: Record<string, number>;
+    byAuthority: Record<string, number>;
+    recentReceiptIds: string[];
+  };
 }
 
 export function getComputerUseStatus(): ComputerUseStatus {
@@ -233,6 +241,7 @@ export function getComputerUseStatus(): ComputerUseStatus {
       };
     })(),
     recentEvents,
+    receipts: getReceiptSummary(),
   };
 }
 
@@ -361,6 +370,11 @@ export function formatStatusText(): string {
     ...(status.executionDeck.lastResult ? [`  last result: ${status.executionDeck.lastResult}`] : []),
     "",
     "Electron bridge: unavailable",
+    "",
+    `Receipts: ${getReceiptCount()} total`,
+    ...Object.entries(status.receipts.byType).map(
+      ([type, count]) => `  ${type}: ${count}`,
+    ),
   ];
 
   return lines.join("\n");

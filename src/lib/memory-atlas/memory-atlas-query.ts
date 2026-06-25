@@ -37,18 +37,18 @@ export function parseMemoryAtlasQuery(input: string): MemoryAtlasQueryIntent | n
   const lower = trimmed.toLowerCase();
 
   if (
-    /\bwhat are (?:our )?active threads?\b/.test(lower) ||
-    /\bwhat are we working on\b/.test(lower) ||
-    /\bshow active (?:work orders?|threads?)\b/.test(lower)
+    /^what are (?:our )?active threads?\??$/i.test(trimmed) ||
+    /^what are we working on\??$/i.test(trimmed) ||
+    /^show active (?:work orders?|threads?)\??$/i.test(trimmed)
   ) {
     return { kind: "active_threads" };
   }
 
   if (
-    /\bwhat (?:remains )?unfinished\b/.test(lower) ||
-    /\bunfinished (?:memory )?tasks?\b/.test(lower) ||
-    /\bwhat (?:work )?remains\b/.test(lower) ||
-    /\bblocked threads?\b/.test(lower)
+    /^what (?:remains )?unfinished\??$/i.test(trimmed) ||
+    /^unfinished (?:memory )?tasks?\??$/i.test(trimmed) ||
+    /^what (?:work )?remains\??$/i.test(trimmed) ||
+    /^blocked threads?\??$/i.test(trimmed)
   ) {
     return { kind: "unfinished_threads" };
   }
@@ -75,9 +75,9 @@ export function parseMemoryAtlasQuery(input: string): MemoryAtlasQueryIntent | n
   const adrMatch =
     trimmed.match(/\bwhat adr (?:decided|governs|recorded)\s+(.+)$/i) ??
     trimmed.match(/\bwhich adr (?:decided|governs)\s+(.+)$/i) ??
-    trimmed.match(/\bwhy does\s+(.+?)\s+work this way\??$/i) ??
+    trimmed.match(/^why does\s+(.+?)\s+work this way\??$/i) ??
     trimmed.match(/\bshow (?:the )?decision (?:for|about|record for)\s+(.+)$/i) ??
-    trimmed.match(/\bwhy was\s+(.+?)\s+decided\b/i);
+    trimmed.match(/^why was\s+(.+?)\s+decided\??$/i);
   if (adrMatch) {
     return { kind: "adr", topic: extractTopic(adrMatch) };
   }
