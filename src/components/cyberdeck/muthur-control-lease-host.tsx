@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createRetakeSequenceTracker } from "@/lib/muthur/control/konami-retake-sequence";
-import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
+import { isPiControlLeaseUiGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating.client";
 import type { PiControlLeaseSnapshot } from "@/lib/muthur/control/pi-control-lease-types";
 
 type MuthurControlLeaseHostProps = {
@@ -24,7 +24,7 @@ export function MuthurControlLeaseHost({
 }: MuthurControlLeaseHostProps) {
   const retakeTrackerRef = useRef(createRetakeSequenceTracker());
   const conflictReportedRef = useRef(false);
-  const gatingEnabled = isPiControlLeaseGatingEnabled();
+  const gatingEnabled = isPiControlLeaseUiGatingEnabled();
   const leaseActive = snapshot.activeLease?.leaseStatus === "active";
   const pending = gatingEnabled ? snapshot.pendingRequest : null;
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isPiControlLeaseUiGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating.client";
 import type {
   PiControlLeaseRequest,
   PiControlLeaseSnapshot,
@@ -19,6 +20,14 @@ const PENDING_TTL_MS = 30 * 60 * 1000;
 
 function persistPendingRequest(pending: PiControlLeaseRequest | null): void {
   if (typeof window === "undefined") return;
+  if (!isPiControlLeaseUiGatingEnabled()) {
+    try {
+      window.sessionStorage.removeItem(PENDING_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
   try {
     if (!pending) {
       window.sessionStorage.removeItem(PENDING_STORAGE_KEY);
@@ -31,6 +40,7 @@ function persistPendingRequest(pending: PiControlLeaseRequest | null): void {
 }
 
 function loadPersistedPendingRequest(): PiControlLeaseRequest | null {
+  if (!isPiControlLeaseUiGatingEnabled()) return null;
   if (typeof window === "undefined") return null;
   try {
     const raw = window.sessionStorage.getItem(PENDING_STORAGE_KEY);
@@ -52,6 +62,14 @@ function mergeLeaseSnapshot(
   local: PiControlLeaseSnapshot,
   server: PiControlLeaseSnapshot,
 ): PiControlLeaseSnapshot {
+  if (!isPiControlLeaseUiGatingEnabled()) {
+    return {
+      ...server,
+      pendingRequest: null,
+      receipts: server.receipts.length > 0 ? server.receipts : local.receipts,
+    };
+  }
+
   if (server.activeLease?.leaseStatus === "active") {
     persistPendingRequest(null);
     return {
@@ -113,6 +131,10 @@ async function postLeaseAction(
 
 export function usePiControlLease() {
   const [snapshot, setSnapshot] = useState<PiControlLeaseSnapshot>(() => {
+    if (!isPiControlLeaseUiGatingEnabled()) {
+      persistPendingRequest(null);
+      return EMPTY_SNAPSHOT;
+    }
     const persisted = loadPersistedPendingRequest();
     return persisted ? { ...EMPTY_SNAPSHOT, pendingRequest: persisted } : EMPTY_SNAPSHOT;
   });
@@ -127,6 +149,11 @@ export function usePiControlLease() {
   const requestMission = useCallback(
     async (message: string, mission?: ComputerUseMission) => {
       const next = await postLeaseAction("request", { message, mission });
+      if (!isPiControlLeaseUiGatingEnabled()) {
+        persistPendingRequest(null);
+        setSnapshot({ ...next, pendingRequest: null });
+        return next;
+      }
       if (next.pendingRequest) {
         persistPendingRequest(next.pendingRequest);
       } else if (next.activeLease) {
@@ -139,6 +166,18 @@ export function usePiControlLease() {
   );
 
   const applyPendingRequest = useCallback((request: PiControlLeaseRequest) => {
+    if (!isPiControlLeaseUiGatingEnabled()) {
+      persistPendingRequest(null);
+      void (async () => {
+        try {
+          const next = await postLeaseAction("grant", { pendingRequest: request });
+          setSnapshot({ ...next, pendingRequest: null });
+        } catch {
+          setSnapshot((current) => ({ ...current, pendingRequest: null }));
+        }
+      })();
+      return;
+    }
     persistPendingRequest(request);
     setSnapshot((current) => ({ ...current, pendingRequest: request }));
   }, []);
@@ -187,10 +226,14 @@ export function usePiControlLease() {
   }, []);
 
   useEffect(() => {
+    if (!isPiControlLeaseUiGatingEnabled()) {
+      persistPendingRequest(null);
+    }
     void refresh();
   }, [refresh]);
 
   useEffect(() => {
+    if (!isPiControlLeaseUiGatingEnabled()) return;
     if (!snapshot.pendingRequest && snapshot.activeLease?.leaseStatus !== "active") return;
     const timer = window.setInterval(() => {
       void refresh();

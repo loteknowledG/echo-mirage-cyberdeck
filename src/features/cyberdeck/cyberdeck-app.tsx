@@ -268,7 +268,7 @@ import { setMuthurScreenSnapshot } from "@/lib/muthur-screen-context";
 import { formatPiScreenContextForMuthur, readPiScreenSnapshot } from "@/lib/pi-screen-context";
 import { setMUTHURMode } from "@/lib/computer-use/control-lease";
 import { detectComputerUseMission } from "@/lib/muthur/control/computer-use-intent";
-import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
+import { isPiControlLeaseUiGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating.client";
 import { parsePiControlLeaseStreamMarker } from "@/lib/muthur/control/pi-control-lease-stream";
 import { usePiControlLease } from "@/lib/muthur/control/use-pi-control-lease";
 import type { PiControlLeaseRequest } from "@/lib/muthur/control/pi-control-lease-types";
@@ -5310,7 +5310,7 @@ export default function CyberdeckApp() {
     if (computerUseMission && !piControlLease.snapshot.activeLease) {
       try {
         const leaseState = await piControlLease.requestMission(userMessage, computerUseMission);
-        if (!isPiControlLeaseGatingEnabled() && leaseState.activeLease) {
+        if (!isPiControlLeaseUiGatingEnabled() && leaseState.activeLease) {
           openOrFocusPiTab();
           queuePiMission({
             missionText: computerUseMission.missionText,
@@ -6016,7 +6016,7 @@ ${diff}`;
       const muthurToolsHeader = res.headers.get("x-muthur-tools-used")?.trim() ?? "";
       const operatorEdits = parseOperatorEditsHeader(res.headers.get("x-muthur-operator-edits"));
       const piControlHeader = res.headers.get("x-muthur-pi-control-request");
-      if (piControlHeader && isPiControlLeaseGatingEnabled()) {
+      if (piControlHeader && isPiControlLeaseUiGatingEnabled()) {
         try {
           const pending = JSON.parse(piControlHeader) as PiControlLeaseRequest;
           piControlLease.applyPendingRequest(pending);
@@ -6049,7 +6049,7 @@ ${diff}`;
           const chunk = decoder.decode(value, { stream: true });
           fullText += chunk;
           const pendingFromStream = parsePiControlLeaseStreamMarker(fullText);
-          if (pendingFromStream && isPiControlLeaseGatingEnabled()) {
+          if (pendingFromStream && isPiControlLeaseUiGatingEnabled()) {
             piControlLease.applyPendingRequest(pendingFromStream);
           }
           streamDisplayText = formatMuthurLiveStreamDisplay(fullText);
