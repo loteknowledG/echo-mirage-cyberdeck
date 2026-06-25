@@ -129,9 +129,11 @@ export function usePiControlLease() {
       const next = await postLeaseAction("request", { message, mission });
       if (next.pendingRequest) {
         persistPendingRequest(next.pendingRequest);
+      } else if (next.activeLease) {
+        persistPendingRequest(null);
       }
       setSnapshot(next);
-      return next.pendingRequest;
+      return next;
     },
     [],
   );

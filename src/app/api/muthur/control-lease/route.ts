@@ -19,6 +19,16 @@ import {
   releaseSynapseOperatorLease,
   syncSynapseLeaseWithPiGrant,
 } from "@/lib/pi/synapse/synapse-control-lease.server";
+import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
+
+async function trySyncSynapseLease(durationMs: number): Promise<string | null> {
+  try {
+    await syncSynapseLeaseWithPiGrant(durationMs);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "synapse_sync_failed";
+  }
+}
 
 function parsePendingOverride(body: Record<string, unknown>): PiControlLeaseRequest | undefined {
   const raw = body.pendingRequest;
@@ -43,7 +53,11 @@ type ControlLeaseAction =
   | "clear_conflict";
 
 export async function GET() {
-  return NextResponse.json({ ok: true, ...getPiControlLeaseSnapshot() });
+  return NextResponse.json({
+    ok: true,
+    gatingEnabled: isPiControlLeaseGatingEnabled(),
+    ...getPiControlLeaseSnapshot(),
+  });
 }
 
 export async function POST(request: Request) {
@@ -72,10 +86,15 @@ export async function POST(request: Request) {
         );
       }
       const pendingRequest = createPiControlLeaseRequest(mission);
+      if (!isPiControlLeaseGatingEnabled()) {
+        grantPiControlLease();
+        void trySyncSynapseLease(15 * 60 * 1000);
+      }
       return NextResponse.json({
         ok: true,
+        gatingEnabled: isPiControlLeaseGatingEnabled(),
         ...getPiControlLeaseSnapshot(),
-        pendingRequest,
+        pendingRequest: isPiControlLeaseGatingEnabled() ? pendingRequest : null,
       });
     }
     case "grant": {
@@ -90,25 +109,49 @@ export async function POST(request: Request) {
         );
       }
       try {
-        await syncSynapseLeaseWithPiGrant(result.lease?.leaseDurationMs ?? durationMs ?? 15 * 60 * 1000);
-      } catch (error) {
-        terminateActiveLease("synapse_lease_sync_failed", { emitReceipt: true });
-        return NextResponse.json(
-          {
-            ok: false,
-            error:
-              error instanceof Error
-                ? error.message
-                : "Failed to acquire Synapse operator lease",
-          },
-          { status: 503 },
+        const synapseWarning = await trySyncSynapseLease(
+          result.lease?.leaseDurationMs ?? durationMs ?? 15 * 60 * 1000,
         );
+        if (synapseWarning && isPiControlLeaseGatingEnabled()) {
+          terminateActiveLease("synapse_lease_sync_failed", { emitReceipt: true });
+          return NextResponse.json(
+            {
+              ok: false,
+              error: synapseWarning,
+            },
+            { status: 503 },
+          );
+        }
+        return NextResponse.json({
+          ok: true,
+          gatingEnabled: isPiControlLeaseGatingEnabled(),
+          synapseWarning: synapseWarning ?? undefined,
+          ...getPiControlLeaseSnapshot(),
+          activeLease: result.lease,
+        });
+      } catch (error) {
+        if (isPiControlLeaseGatingEnabled()) {
+          terminateActiveLease("synapse_lease_sync_failed", { emitReceipt: true });
+          return NextResponse.json(
+            {
+              ok: false,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to acquire Synapse operator lease",
+            },
+            { status: 503 },
+          );
+        }
+        return NextResponse.json({
+          ok: true,
+          gatingEnabled: false,
+          synapseWarning:
+            error instanceof Error ? error.message : "synapse_sync_skipped",
+          ...getPiControlLeaseSnapshot(),
+          activeLease: result.lease,
+        });
       }
-      return NextResponse.json({
-        ok: true,
-        ...getPiControlLeaseSnapshot(),
-        activeLease: result.lease,
-      });
     }
     case "deny": {
       const pendingOverride = parsePendingOverride(body);

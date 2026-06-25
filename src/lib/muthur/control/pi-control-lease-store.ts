@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { requestLease, retake } from "@/lib/computer-use/control-lease";
 import { createPiAuthorityReceipt } from "@/lib/muthur/control/pi-control-lease-receipts";
+import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
 import type {
   ComputerUseMission,
   PiControlLease,

@@ -9,6 +9,7 @@ import { getActionScope } from "./capability-registry";
 import { getCurrentOwner, checkActionPermission, emitControlDenied } from "./control-lease";
 import { isPiProbeLeaseBypassEnabled } from "@/lib/muthur/control/pi-control-lease-probe";
 import { isPiControlLeaseActive } from "@/lib/muthur/control/pi-control-lease-store";
+import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
 import { narrate } from "./narration";
 
 const safetyGuard = createSafetyGuard();
@@ -223,6 +224,7 @@ export async function runComputerUseAction(
   const actionScope = getActionScope(action.name);
   if (
     (actionScope === "input" || actionScope === "control") &&
+    isPiControlLeaseGatingEnabled() &&
     !isPiProbeLeaseBypassEnabled() &&
     !isPiControlLeaseActive()
   ) {

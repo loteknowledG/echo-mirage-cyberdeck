@@ -268,6 +268,7 @@ import { setMuthurScreenSnapshot } from "@/lib/muthur-screen-context";
 import { formatPiScreenContextForMuthur, readPiScreenSnapshot } from "@/lib/pi-screen-context";
 import { setMUTHURMode } from "@/lib/computer-use/control-lease";
 import { detectComputerUseMission } from "@/lib/muthur/control/computer-use-intent";
+import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
 import { parsePiControlLeaseStreamMarker } from "@/lib/muthur/control/pi-control-lease-stream";
 import { usePiControlLease } from "@/lib/muthur/control/use-pi-control-lease";
 import type { PiControlLeaseRequest } from "@/lib/muthur/control/pi-control-lease-types";
@@ -5308,13 +5309,27 @@ export default function CyberdeckApp() {
     const computerUseMission = detectComputerUseMission(userMessage);
     if (computerUseMission && !piControlLease.snapshot.activeLease) {
       try {
-        await piControlLease.requestMission(userMessage, computerUseMission);
-        setMuthurDiagnostics((current) =>
-          appendMuthurDiagnosticEntry(
-            current,
-            `CONTROL REQUEST // ${computerUseMission.task} // operator: Pi // awaiting grant`,
-          ),
-        );
+        const leaseState = await piControlLease.requestMission(userMessage, computerUseMission);
+        if (!isPiControlLeaseGatingEnabled() && leaseState.activeLease) {
+          openOrFocusPiTab();
+          queuePiMission({
+            missionText: computerUseMission.missionText,
+            task: computerUseMission.task,
+          });
+          setMuthurDiagnostics((current) =>
+            appendMuthurDiagnosticEntry(
+              current,
+              `CONTROL AUTO-GRANTED // ${computerUseMission.task} // operator: Pi`,
+            ),
+          );
+        } else if (leaseState.pendingRequest) {
+          setMuthurDiagnostics((current) =>
+            appendMuthurDiagnosticEntry(
+              current,
+              `CONTROL REQUEST // ${computerUseMission.task} // operator: Pi // awaiting grant`,
+            ),
+          );
+        }
       } catch {
         /* lease request best-effort */
       }
@@ -6001,7 +6016,7 @@ ${diff}`;
       const muthurToolsHeader = res.headers.get("x-muthur-tools-used")?.trim() ?? "";
       const operatorEdits = parseOperatorEditsHeader(res.headers.get("x-muthur-operator-edits"));
       const piControlHeader = res.headers.get("x-muthur-pi-control-request");
-      if (piControlHeader) {
+      if (piControlHeader && isPiControlLeaseGatingEnabled()) {
         try {
           const pending = JSON.parse(piControlHeader) as PiControlLeaseRequest;
           piControlLease.applyPendingRequest(pending);
@@ -6034,7 +6049,7 @@ ${diff}`;
           const chunk = decoder.decode(value, { stream: true });
           fullText += chunk;
           const pendingFromStream = parsePiControlLeaseStreamMarker(fullText);
-          if (pendingFromStream) {
+          if (pendingFromStream && isPiControlLeaseGatingEnabled()) {
             piControlLease.applyPendingRequest(pendingFromStream);
           }
           streamDisplayText = formatMuthurLiveStreamDisplay(fullText);

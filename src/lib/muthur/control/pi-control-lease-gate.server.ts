@@ -11,6 +11,7 @@ import type { PiComputerUseReceipt } from "@/lib/pi/pi-computer-use-types";
 import { resolvePiPlatform } from "@/lib/pi/pi-platform-resolver";
 import { resolvePiComputerUseBackend } from "@/lib/pi/pi-platform-resolver.server";
 import { isPiProbeLeaseBypassEnabled } from "@/lib/muthur/control/pi-control-lease-probe";
+import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
 
 export type PiExecutionGateOptions = {
   /** Test/probe scripts only — never enabled in production. */
@@ -53,6 +54,10 @@ export function assertPiControlLeaseForExecution(
   command: PiComputerUseCommand,
   options?: PiExecutionGateOptions,
 ): PiExecutionGateResult {
+  if (!isPiControlLeaseGatingEnabled()) {
+    return { allowed: true };
+  }
+
   if (options?.probeBypass && isPiProbeLeaseBypassEnabled()) {
     return { allowed: true };
   }

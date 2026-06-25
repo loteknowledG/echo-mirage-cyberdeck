@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createRetakeSequenceTracker } from "@/lib/muthur/control/konami-retake-sequence";
+import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
 import type { PiControlLeaseSnapshot } from "@/lib/muthur/control/pi-control-lease-types";
 
 type MuthurControlLeaseHostProps = {
@@ -23,11 +24,12 @@ export function MuthurControlLeaseHost({
 }: MuthurControlLeaseHostProps) {
   const retakeTrackerRef = useRef(createRetakeSequenceTracker());
   const conflictReportedRef = useRef(false);
+  const gatingEnabled = isPiControlLeaseGatingEnabled();
   const leaseActive = snapshot.activeLease?.leaseStatus === "active";
-  const pending = snapshot.pendingRequest;
+  const pending = gatingEnabled ? snapshot.pendingRequest : null;
 
   useEffect(() => {
-    if (!leaseActive) {
+    if (!gatingEnabled || !leaseActive) {
       conflictReportedRef.current = false;
       retakeTrackerRef.current.reset();
       return;
@@ -65,7 +67,7 @@ export function MuthurControlLeaseHost({
       window.removeEventListener("mousedown", onPointer);
       window.removeEventListener("keydown", onKey);
     };
-  }, [leaseActive, onReportConflict, onRetake, snapshot.conflictDetected]);
+  }, [gatingEnabled, leaseActive, onReportConflict, onRetake, snapshot.conflictDetected]);
 
   useEffect(() => {
     if (!snapshot.conflictDetected) {
@@ -140,7 +142,7 @@ export function MuthurControlLeaseHost({
         </div>
       ) : null}
 
-      {snapshot.conflictDetected && snapshot.activeLease ? (
+      {gatingEnabled && snapshot.conflictDetected && snapshot.activeLease ? (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/75 p-4">
           <div
             role="alertdialog"

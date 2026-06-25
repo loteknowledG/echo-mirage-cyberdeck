@@ -17,8 +17,10 @@ import {
 import {
   createPiControlLeaseRequest,
   getPiControlLeaseSnapshot,
+  grantPiControlLease,
   isPiControlLeaseActive,
 } from "@/lib/muthur/control/pi-control-lease-store";
+import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
 import { detectComputerUseMission } from "@/lib/muthur/control/computer-use-intent";
 import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
 import { executePiComputerUseCommand } from "@/lib/pi/pi-computer-use-manager";
@@ -549,6 +551,24 @@ async function runRequestPiControlLease(call: ToolCall): Promise<ToolResult> {
     reason: reason || detected.reason,
     missionText: missionText || detected.missionText,
   });
+
+  if (!isPiControlLeaseGatingEnabled()) {
+    const granted = grantPiControlLease();
+    const activeLease = granted.lease ?? getPiControlLeaseSnapshot().activeLease;
+    return {
+      ok: granted.granted,
+      error: granted.granted ? undefined : granted.reason,
+      output: {
+        status: granted.granted ? "CONTROL_GRANTED" : "CONTROL_GRANT_FAILED",
+        operator: "pi",
+        activeLease,
+        message: granted.granted
+          ? "Control lease auto-granted — proceed with pi_computer_use or delegate_pi_computer_use."
+          : (granted.reason ?? "Auto-grant failed"),
+      },
+    };
+  }
+
   if (call.executionContext) {
     call.executionContext.piControlLeaseRequest = pendingRequest;
   }
@@ -575,7 +595,7 @@ async function runDelegatePiComputerUse(call: ToolCall): Promise<ToolResult> {
   }
 
   const snapshot = getPiControlLeaseSnapshot();
-  if (!isPiControlLeaseActive() || !snapshot.activeLease) {
+  if (isPiControlLeaseGatingEnabled() && !isPiControlLeaseActive()) {
     return {
       ok: false,
       error:
@@ -586,7 +606,10 @@ async function runDelegatePiComputerUse(call: ToolCall): Promise<ToolResult> {
   const instructions =
     typeof call.args.instructions === "string"
       ? call.args.instructions.trim()
-      : snapshot.activeLease.missionText;
+      : snapshot.activeLease?.missionText ?? "";
+  if (!instructions.trim()) {
+    return { ok: false, error: "instructions required for delegate_pi_computer_use" };
+  }
   if (call.executionContext) {
     call.executionContext.piMissionDelegated = true;
   }
@@ -643,7 +666,7 @@ async function runPiComputerUse(call: ToolCall): Promise<ToolResult> {
     return { ok: false, error: "pi_computer_use is not enabled on this deployment." };
   }
 
-  if (!isPiControlLeaseActive()) {
+  if (isPiControlLeaseGatingEnabled() && !isPiControlLeaseActive()) {
     return {
       ok: false,
       error:

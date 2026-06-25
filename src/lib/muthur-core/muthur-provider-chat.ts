@@ -6,6 +6,7 @@ import { getMuthurOpenAiToolsForPosture } from "@/lib/muthur-core/openai-tool-de
 import type { MuthurPosture, MuthurPostureToolContext } from "@/lib/muthur/muthur-posture";
 import { appendMuthurStreamFooters } from "@/lib/muthur-core/muthur-stream-payload";
 import { formatPiControlLeaseStreamMarker } from "@/lib/muthur/control/pi-control-lease-stream";
+import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
 import {
   inlineCallsToOpenAiToolCalls,
   parseInlineToolCalls,
@@ -98,7 +99,7 @@ function toolsUsedHeaders(
   if (toolCtx.codingVerify) {
     headers["X-Muthur-Coding-Verify"] = JSON.stringify(toolCtx.codingVerify);
   }
-  if (toolCtx.piControlLeaseRequest) {
+  if (isPiControlLeaseGatingEnabled() && toolCtx.piControlLeaseRequest) {
     headers["X-Muthur-Pi-Control-Request"] = JSON.stringify(toolCtx.piControlLeaseRequest);
   }
   return headers;
@@ -336,7 +337,7 @@ export async function muthurChatWithModelTools(options: {
             content: o.content,
           });
         }
-        if (toolCtx.piControlLeaseRequest) {
+        if (isPiControlLeaseGatingEnabled() && toolCtx.piControlLeaseRequest) {
           write(formatPiControlLeaseStreamMarker(toolCtx.piControlLeaseRequest));
         }
         continue;
