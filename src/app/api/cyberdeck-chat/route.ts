@@ -36,7 +36,7 @@ import {
   type MuthurPosture,
 } from "@/lib/muthur/muthur-posture";
 import { buildMuthurPiControlDoctrine } from "@/lib/muthur/control/muthur-control-doctrine";
-import { buildOperatorDevWriteScopePrompt, resolveOperatorDevWriteRoot } from "@/lib/muthur/execution/localfs-write-scope.server";
+import { buildOperatorDevWriteScopePrompt, resolveLocalFsWriteMode, resolveOperatorDevWriteRoot } from "@/lib/muthur/execution/localfs-write-scope.server";
 import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
 import { isCalyxMuthurToolsEnabled } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
 import { buildSamusHandsEyesDoctrine } from "@/lib/samus-manus/hands-eyes-doctrine";
@@ -60,9 +60,13 @@ function buildMuthurAvailableToolsPrompt(posture: MuthurPosture): string {
   const calyx = isCalyxMuthurToolsEnabled();
   const handsEyes = isSamusHandsEyesEnabled();
   const devWriteRoot = resolveOperatorDevWriteRoot();
-  const localFsWriteHint = devWriteRoot
-    ? `mkdir/write inside the Echo Mirage repo or sibling folders under ${devWriteRoot} (e.g. ${devWriteRoot}\\plasma).`
-    : "mkdir/write only inside the Echo Mirage repo (Vercel cannot write f:\\dev).";
+  const localFsWriteMode = resolveLocalFsWriteMode();
+  const localFsWriteHint =
+    localFsWriteMode === "open"
+      ? "mkdir/write anywhere on operator disk (absolute paths like F:\\dev\\plasma) or /workspace/... for this repo."
+      : devWriteRoot
+        ? `mkdir/write inside the Echo Mirage repo or under ${devWriteRoot}.`
+        : "mkdir/write only inside the Echo Mirage repo (serverless — no F:\\dev on Vercel).";
   const piTools =
     posture === "commander"
       ? "\n- request_pi_control_lease: Request operator grant for Pi desktop embodiment (mouse/keyboard/screen) before computer-use missions." +
@@ -297,12 +301,14 @@ function buildMuthurSystemContent(args: {
   }
 
   if (messageReferencesLocalPath(args.message)) {
-    const devRoot = resolveOperatorDevWriteRoot();
+    const writeMode = resolveLocalFsWriteMode();
     systemContent +=
       "\n\nThe user referenced a local filesystem path. Use localfs ls/cat/stat on that path." +
-      (devRoot
-        ? ` For new projects under ${devRoot}, use localfs mkdir + write in Agent posture.`
-        : " Paths outside the Echo Mirage repo are read-only on this deployment.") +
+      (writeMode === "open"
+        ? " For new projects, use localfs mkdir + write with the absolute path they gave (Agent posture). Do NOT redirect to /workspace unless they asked for in-repo work."
+        : writeMode === "dev-tree" && resolveOperatorDevWriteRoot()
+          ? ` For new projects under ${resolveOperatorDevWriteRoot()}, use localfs mkdir + write in Agent posture.`
+          : " Paths outside the Echo Mirage repo are read-only on this deployment.") +
       " Do NOT search the web or open a browser for disk paths.";
   }
 

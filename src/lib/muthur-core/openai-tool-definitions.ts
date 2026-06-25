@@ -1,4 +1,8 @@
-import { resolveOperatorDevWriteRoot } from "@/lib/muthur/execution/localfs-write-scope.server";
+import {
+  buildLocalFsActionParamDescription,
+  buildLocalFsPathParamDescription,
+  buildLocalFsWriteScopeDescription,
+} from "@/lib/muthur/execution/localfs-write-scope.server";
 import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
 import { isCalyxMuthurToolsEnabled } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
 import { isSamusHandsEyesEnabled } from "@/lib/samus-manus/samus-manus-config.server";
@@ -7,12 +11,8 @@ import type { MuthurPosture, MuthurPostureToolContext } from "@/lib/muthur/muthu
 import { isToolAllowedForPosture } from "@/lib/muthur/muthur-posture";
 
 function buildLocalFsToolDescription(): string {
-  const devRoot = resolveOperatorDevWriteRoot();
-  const scope = devRoot
-    ? `mkdir and write persist on REAL disk — inside the Echo Mirage repo or sibling projects under ${devRoot}.`
-    : "mkdir and write persist on REAL disk — only inside the Echo Mirage workspace project root.";
   return (
-    `Filesystem on the machine running the Next dev server. ls, cat, stat on any readable path. ${scope} ` +
+    `Filesystem on the machine running the Next dev server. ls, cat, stat on any readable path. ${buildLocalFsWriteScopeDescription()} ` +
     "Prefer localfs write for creating/updating source files."
   );
 }
@@ -190,12 +190,11 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
           action: {
             type: "string",
             enum: ["ls", "cat", "stat", "mkdir", "write"],
-            description:
-              "ls = list directory, cat = read text file, stat = metadata. mkdir = create directory (workspace only). write = create/overwrite or append a text file (workspace only).",
+            description: buildLocalFsActionParamDescription(),
           },
           path: {
             type: "string",
-            description: "Absolute or relative path; writes are resolved under the workspace root only.",
+            description: buildLocalFsPathParamDescription(),
           },
           content: {
             type: "string",

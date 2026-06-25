@@ -8,6 +8,7 @@ import { isOperatorWorkspaceTextPath } from "@/lib/operator-file-surface";
 import { getLatestMuthurObservation } from "@/lib/muthur/observation/observation-store.server";
 import { validateReadFilePath } from "@/lib/muthur/execution/safety-policy";
 import {
+  buildLocalFsWriteScopeDescription,
   isLocalFsWritePathAllowed,
   localFsWriteScopeError,
 } from "@/lib/muthur/execution/localfs-write-scope.server";
@@ -757,8 +758,7 @@ export function createMuthurToolRegistry(): ToolRegistry {
       },
       localfs: {
         name: "localfs",
-        description:
-          "Real disk: ls, cat, stat anywhere; mkdir and write only inside the Echo Mirage workspace root.",
+        description: `Real disk: ls, cat, stat anywhere; ${buildLocalFsWriteScopeDescription()}`,
         run: runLocalFs,
       },
       clock: {
