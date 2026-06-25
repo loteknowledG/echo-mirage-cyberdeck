@@ -147,8 +147,16 @@ export function usePiControlLease() {
   }, []);
 
   const requestMission = useCallback(
-    async (message: string, mission?: ComputerUseMission) => {
-      const next = await postLeaseAction("request", { message, mission });
+    async (
+      message: string,
+      mission?: ComputerUseMission,
+      options?: { posture?: string },
+    ) => {
+      const next = await postLeaseAction("request", {
+        message,
+        mission,
+        posture: options?.posture,
+      });
       if (!isPiControlLeaseUiGatingEnabled()) {
         persistPendingRequest(null);
         setSnapshot({ ...next, pendingRequest: null });

@@ -20,6 +20,7 @@ import {
   syncSynapseLeaseWithPiGrant,
 } from "@/lib/pi/synapse/synapse-control-lease.server";
 import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
+import { normalizeMuthurPosture } from "@/lib/muthur/muthur-posture";
 
 async function trySyncSynapseLease(durationMs: number): Promise<string | null> {
   try {
@@ -75,6 +76,16 @@ export async function POST(request: Request) {
 
   switch (action) {
     case "request": {
+      const posture = normalizeMuthurPosture(body.posture);
+      if (posture !== "commander") {
+        return NextResponse.json(
+          {
+            error:
+              "Pi control lease requires Commander posture with an active mission. Agent uses glyph channel or samus_hands_eyes.",
+          },
+          { status: 403 },
+        );
+      }
       const message = typeof body.message === "string" ? body.message : "";
       const mission =
         (body.mission as ComputerUseMission | undefined) ??

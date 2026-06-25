@@ -1137,6 +1137,8 @@ export default function CyberdeckApp() {
     createEmptyMuthurDiagnosticsState(),
   );
   const piControlLease = usePiControlLease();
+  const piControlLeaseRefresh = piControlLease.refresh;
+  const piControlLeaseRetake = piControlLease.retake;
   const [muthurStall, setMuthurStall] = useState<MuthurResponseStall | null>(null);
   const [muthurResponseFailed, setMuthurResponseFailed] = useState(false);
   const composeStartedAtRef = useRef<number | null>(null);
@@ -2432,7 +2434,16 @@ export default function CyberdeckApp() {
   useEffect(() => {
     saveMuthurPosture(muthurPosture);
     setMUTHURMode(getMuthurPostureMeta(muthurPosture).internalMode);
-  }, [muthurPosture]);
+    if (muthurPosture !== "agent") return;
+    void (async () => {
+      try {
+        await piControlLeaseRefresh();
+        await piControlLeaseRetake();
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [muthurPosture, piControlLeaseRefresh, piControlLeaseRetake]);
 
   useEffect(() => {
     const onRequestEditMode = () => setOperatorDocMode("edit");
@@ -5306,10 +5317,27 @@ export default function CyberdeckApp() {
     pinMuthurChatToBottom();
     setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
 
-    const computerUseMission = detectComputerUseMission(userMessage);
-    if (computerUseMission && !piControlLease.snapshot.activeLease) {
+    if (muthurPosture === "agent" && piControlLease.snapshot.activeLease) {
       try {
-        const leaseState = await piControlLease.requestMission(userMessage, computerUseMission);
+        await piControlLease.retake();
+        setMuthurDiagnostics((current) =>
+          appendMuthurDiagnosticEntry(current, "AUTHORITY RETURN // agent mode // pi lease cleared"),
+        );
+      } catch {
+        /* best-effort — operator can use Retake Control banner */
+      }
+    }
+
+    const computerUseMission = detectComputerUseMission(userMessage);
+    if (
+      computerUseMission &&
+      muthurPosture === "commander" &&
+      !piControlLease.snapshot.activeLease
+    ) {
+      try {
+        const leaseState = await piControlLease.requestMission(userMessage, computerUseMission, {
+          posture: muthurPosture,
+        });
         if (!isPiControlLeaseUiGatingEnabled() && leaseState.activeLease) {
           openOrFocusPiTab();
           queuePiMission({
@@ -6016,7 +6044,7 @@ ${diff}`;
       const muthurToolsHeader = res.headers.get("x-muthur-tools-used")?.trim() ?? "";
       const operatorEdits = parseOperatorEditsHeader(res.headers.get("x-muthur-operator-edits"));
       const piControlHeader = res.headers.get("x-muthur-pi-control-request");
-      if (piControlHeader && isPiControlLeaseUiGatingEnabled()) {
+      if (piControlHeader && isPiControlLeaseUiGatingEnabled() && muthurPosture === "commander") {
         try {
           const pending = JSON.parse(piControlHeader) as PiControlLeaseRequest;
           piControlLease.applyPendingRequest(pending);
@@ -6049,7 +6077,7 @@ ${diff}`;
           const chunk = decoder.decode(value, { stream: true });
           fullText += chunk;
           const pendingFromStream = parsePiControlLeaseStreamMarker(fullText);
-          if (pendingFromStream && isPiControlLeaseUiGatingEnabled()) {
+          if (pendingFromStream && isPiControlLeaseUiGatingEnabled() && muthurPosture === "commander") {
             piControlLease.applyPendingRequest(pendingFromStream);
           }
           streamDisplayText = formatMuthurLiveStreamDisplay(fullText);

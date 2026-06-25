@@ -126,19 +126,31 @@ export function MuthurControlLeaseHost({
       ) : null}
 
       {leaseActive && snapshot.activeLease ? (
-        <div className="pointer-events-none fixed bottom-4 left-1/2 z-[110] w-[min(92vw,28rem)] -translate-x-1/2 rounded border border-emerald-500/35 bg-black/90 px-3 py-2 font-mono text-[10px] text-emerald-200 shadow-[0_0_18px_rgba(16,185,129,0.15)]">
-          <p className="text-[9px] uppercase tracking-[0.2em] text-emerald-400/90">
-            Echo Mirage Has Control
+        <div className="fixed bottom-4 left-1/2 z-[110] w-[min(92vw,32rem)] -translate-x-1/2 rounded border border-amber-500/50 bg-black/95 px-4 py-3 font-mono text-[11px] text-gray-200 shadow-[0_0_24px_rgba(251,191,36,0.2)]">
+          <p className="text-[9px] uppercase tracking-[0.2em] text-amber-400/90">
+            Pi lease still active
           </p>
-          <p className="mt-1">
-            Operator: <span className="text-emerald-300">Pi</span>
-          </p>
-          <p>
+          <p className="mt-1 text-[10px] text-gray-400">
             Task: <span className="text-gray-200">{snapshot.activeLease.task}</span>
+            {" · "}
+            Agent mode does not use Pi — release the lease to continue.
           </p>
-          <p>
-            Lease: <span className="text-emerald-300">Active</span>
-          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void onRetake()}
+              className="rounded border border-red-500/60 bg-red-950/50 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-red-100 hover:bg-red-900/60"
+            >
+              Retake Control
+            </button>
+            <button
+              type="button"
+              onClick={() => void onRetake()}
+              className="rounded border border-[#444] bg-[#111] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-gray-400 hover:border-gray-500 hover:text-gray-200"
+            >
+              Dismiss Pi
+            </button>
+          </div>
         </div>
       ) : null}
 

@@ -12,10 +12,14 @@ const COMPUTER_USE_PATTERNS: Array<{
   task: (match: RegExpMatchArray, message: string) => string;
 }> = [
   {
-    pattern: /\b(?:draw|paint|sketch|illustrate)\b(?:\s+(?:me\s+)?(?:a\s+)?(.+?))?(?:\s*$|[.!?])/i,
+    // Glyph-pane art ("draw a cat") is NOT desktop computer use — require explicit desktop/app targets.
+    pattern:
+      /\b(?:draw|paint|sketch|illustrate)\b.+\b(?:ms\s*paint|microsoft\s*paint|desktop|on\s+screen|notepad|photoshop|illustrator|gimp)\b/i,
     task: (_match, message) => {
-      const subject = message.match(/\b(?:draw|paint|sketch)\s+(?:me\s+)?(?:a\s+)?(.+?)[.!?]?$/i)?.[1];
-      return subject ? `Draw ${titleCase(subject.trim())}` : "Draw";
+      const subject = message.match(
+        /\b(?:draw|paint|sketch)\s+(?:me\s+)?(?:a\s+)?(.+?)(?:\s+on|\s+in|\s+using)[.!?]?$/i,
+      )?.[1];
+      return subject ? `Draw ${titleCase(subject.trim())}` : "Desktop Draw";
     },
   },
   {
@@ -60,7 +64,7 @@ function slugifyTask(task: string): string {
     .slice(0, 48);
 }
 
-/** Detect missions that require Pi computer-use embodiment. */
+/** Detect missions that require Pi computer-use embodiment (Commander + explicit desktop intent). */
 export function detectComputerUseMission(message: string): ComputerUseMission | null {
   const text = message.trim();
   if (!text) return null;
