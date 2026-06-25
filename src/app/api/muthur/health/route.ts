@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { getHealthState, formatHealthStatus, getHealthEmoji, type HealthStatus } from "@/lib/muthur/health";
+import {
+  buildLocalFsWriteScopeDescription,
+  resolveLocalFsWriteMode,
+  resolveOperatorDevWriteRoot,
+} from "@/lib/muthur/execution/localfs-write-scope.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +18,12 @@ export async function GET() {
     editorContext: { ...state.editorContext, statusLabel: formatHealthStatus(state.editorContext.status), statusEmoji: getHealthEmoji(state.editorContext.status) },
     browserContext: { ...state.browserContext, statusLabel: formatHealthStatus(state.browserContext.status), statusEmoji: getHealthEmoji(state.browserContext.status) },
     intentRouter: { ...state.intentRouter, statusLabel: formatHealthStatus(state.intentRouter.status), statusEmoji: getHealthEmoji(state.intentRouter.status) },
+    localFs: {
+      writeMode: resolveLocalFsWriteMode(),
+      description: buildLocalFsWriteScopeDescription(),
+      operatorDevRoot: resolveOperatorDevWriteRoot(),
+      vercel: process.env.VERCEL === "1",
+    },
     lastFailure: state.lastFailure ? {
       ...state.lastFailure,
       age: Date.now() - state.lastFailure.timestamp,

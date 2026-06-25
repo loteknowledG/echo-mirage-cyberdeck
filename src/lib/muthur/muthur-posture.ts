@@ -63,6 +63,7 @@ const PLAN_TOOLS = new Set([
   "clock",
   "git_status",
   "git_diff",
+  "localfs",
 ]);
 
 const PI_DELEGATION_TOOLS = new Set([
@@ -190,6 +191,13 @@ export function formatBlockedToolMessage(
     );
   }
   if (posture === "plan") {
+    if (toolName === "localfs") {
+      return (
+        `[TOOL BLOCKED] localfs write/mkdir\n\n` +
+        "Plan posture is read-only. Switch MUTHUR to Agent (USE), then retry with the absolute path (e.g. F:\\dev\\plasma). " +
+        "Do not substitute /workspace paths."
+      );
+    }
     return (
       `[TOOL BLOCKED] ${toolName}\n\n` +
       "Plan posture is read-only — observe panes and discuss, but no edits. Switch to Agent for directed execution or Commander for mission orchestration."
@@ -203,7 +211,8 @@ export function buildMuthurPostureSystemPrompt(posture: MuthurPosture): string {
     case "plan":
       return (
         "\n\nMUTHUR POSTURE: PLAN (ASSIST). Observe operator panes (observe_operator_pane, operator_browser), discuss architecture, work orders, and ADRs. " +
-        "Read-only — do NOT edit files, write to disk, or mutate operator state. If execution is needed, tell the operator to switch to Agent or Commander."
+        "Read-only — localfs ls/cat/stat only; no mkdir/write, edits, or disk mutations. " +
+        "If the operator asks to create files or projects (e.g. F:\\dev\\plasma), tell them to switch to Agent (USE) — do NOT substitute /workspace paths or invent fake tool calls."
       );
     case "agent":
       return (

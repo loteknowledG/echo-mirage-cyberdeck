@@ -286,7 +286,7 @@ function buildMuthurSystemContent(args: {
   }
 
   systemContent += MUTHUR_COGNITION_DOCTRINE;
-  systemContent += buildOperatorDevWriteScopePrompt();
+  systemContent += buildOperatorDevWriteScopePrompt(args.posture);
   if (toolsEnabled) {
     systemContent += buildSamusHandsEyesDoctrine(
       args.posture === "agent" && isSamusHandsEyesEnabled(),
@@ -302,6 +302,10 @@ function buildMuthurSystemContent(args: {
 
   if (messageReferencesLocalPath(args.message)) {
     const writeMode = resolveLocalFsWriteMode();
+    const planBlock =
+      args.posture === "plan"
+        ? " Plan posture cannot mkdir/write — tell the operator to switch to Agent (USE). Do NOT redirect to /workspace as a workaround."
+        : "";
     systemContent +=
       "\n\nThe user referenced a local filesystem path. Use localfs ls/cat/stat on that path." +
       (writeMode === "open"
@@ -309,6 +313,7 @@ function buildMuthurSystemContent(args: {
         : writeMode === "dev-tree" && resolveOperatorDevWriteRoot()
           ? ` For new projects under ${resolveOperatorDevWriteRoot()}, use localfs mkdir + write in Agent posture.`
           : " Paths outside the Echo Mirage repo are read-only on this deployment.") +
+      planBlock +
       " Do NOT search the web or open a browser for disk paths.";
   }
 

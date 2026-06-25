@@ -136,13 +136,18 @@ export function buildLocalFsActionParamDescription(): string {
   );
 }
 
-export function buildOperatorDevWriteScopePrompt(): string {
+export function buildOperatorDevWriteScopePrompt(posture?: "plan" | "agent" | "commander"): string {
   const mode = resolveLocalFsWriteMode();
   if (mode === "open") {
+    const planNote =
+      posture === "plan"
+        ? " Plan posture is read-only — switch to Agent (USE) before mkdir/write."
+        : "";
     return (
       "\n\nLOCALFS (operator disk): This deck runs on the operator machine with OPEN write scope — like Cursor or Codex. " +
       "Use localfs mkdir + write with absolute paths when asked (e.g. F:\\dev\\plasma\\index.html). " +
-      "/workspace/... maps to the Echo Mirage repo. Do NOT refuse valid operator paths or invent workspace-only workarounds."
+      "/workspace/... maps to the Echo Mirage repo. Do NOT refuse valid operator paths or invent workspace-only workarounds." +
+      planNote
     );
   }
   if (mode === "dev-tree") {
