@@ -47,6 +47,12 @@ export const MUTHUR_PI_CONTROL_DOCTRINE =
     : MUTHUR_PI_CONTROL_DELEGATE_FLOW) +
   MUTHUR_PI_CONTROL_FOOTER;
 
-export function buildMuthurPiControlDoctrine(): string {
+import type { MuthurPosture } from "@/lib/muthur/muthur-posture";
+
+/** Pi delegation doctrine — Commander + ACTIVE mission only. Agent executes directly. */
+export function buildMuthurPiControlDoctrine(posture: MuthurPosture): string {
+  if (posture !== "commander") {
+    return "";
+  }
   return MUTHUR_PI_CONTROL_DOCTRINE;
 }

@@ -11,6 +11,7 @@ import {
   formatOpenOperatorFileResult,
   formatOperatorBrowserResult,
   formatSuggestOperatorEditResult,
+  formatSamusHandsEyesResult,
   formatWorkspaceExecResult,
 } from "@/lib/muthur-core/format-tool-result";
 import { extractOperatorEditFromToolOutput } from "@/lib/muthur-core/suggest-operator-edit";
@@ -121,6 +122,9 @@ export async function executeRegistryToolForOpenAi(
   }
   if (functionName === "pi_computer_use") {
     return JSON.stringify(result.output, null, 2);
+  }
+  if (functionName === "samus_hands_eyes") {
+    return formatSamusHandsEyesResult(result.output);
   }
   if (
     functionName === "calyx_search" ||

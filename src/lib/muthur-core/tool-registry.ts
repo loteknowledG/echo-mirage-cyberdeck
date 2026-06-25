@@ -36,6 +36,8 @@ import {
   runCalyxKernelAnswer,
   runCalyxSearch,
 } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
+import { runSamusHandsEyes } from "@/lib/samus-manus/hands-eyes.server";
+import { isSamusHandsEyesEnabled } from "@/lib/samus-manus/samus-manus-config.server";
 import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
@@ -700,6 +702,10 @@ async function runPiComputerUse(call: ToolCall): Promise<ToolResult> {
   return { ok: true, output: receipt };
 }
 
+async function runSamusHandsEyesTool(call: ToolCall): Promise<ToolResult> {
+  return runSamusHandsEyes(call.args);
+}
+
 export function createMuthurToolRegistry(): ToolRegistry {
   return {
     tools: {
@@ -819,6 +825,16 @@ export function createMuthurToolRegistry(): ToolRegistry {
               description:
                 "Answer from the Calyx grounding kernel over ingested vault content — fail-closed when data cannot support the query.",
               run: runCalyxKernelAnswer,
+            },
+          }
+        : {}),
+      ...(isSamusHandsEyesEnabled()
+        ? {
+            samus_hands_eyes: {
+              name: "samus_hands_eyes",
+              description:
+                "Samus-Manus hands-eyes: local Windows pyautogui desktop control (Agent mode). Screenshot, click, type, hotkey, find-click.",
+              run: runSamusHandsEyesTool,
             },
           }
         : {}),

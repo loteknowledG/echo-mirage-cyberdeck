@@ -65,7 +65,13 @@ const PLAN_TOOLS = new Set([
   "git_diff",
 ]);
 
-const EXECUTION_TOOLS = new Set([
+const PI_DELEGATION_TOOLS = new Set([
+  "request_pi_control_lease",
+  "delegate_pi_computer_use",
+  "pi_computer_use",
+]);
+
+const DIRECT_EXECUTION_TOOLS = new Set([
   "observe_operator_pane",
   "clock",
   "git_status",
@@ -79,19 +85,27 @@ const EXECUTION_TOOLS = new Set([
   "convert_document_to_markdown",
   "export_markdown_to_docx",
   "export_markdown_to_pdf",
-  "request_pi_control_lease",
-  "delegate_pi_computer_use",
-  "pi_computer_use",
   "calyx_search",
   "calyx_ingest",
   "calyx_kernel_answer",
+  "samus_hands_eyes",
 ]);
+
+/** Commander may delegate desktop embodiment to Pi during an ACTIVE mission. */
+const COMMANDER_DIRECT_TOOLS = new Set(
+  [...DIRECT_EXECUTION_TOOLS].filter((tool) => tool !== "samus_hands_eyes"),
+);
+const COMMANDER_TOOLS = new Set([...COMMANDER_DIRECT_TOOLS, ...PI_DELEGATION_TOOLS]);
 
 const TOOLS_BY_POSTURE: Record<MuthurPosture, Set<string>> = {
   plan: PLAN_TOOLS,
-  agent: EXECUTION_TOOLS,
-  commander: EXECUTION_TOOLS,
+  agent: DIRECT_EXECUTION_TOOLS,
+  commander: COMMANDER_TOOLS,
 };
+
+export function isPiDelegationTool(toolName: string): boolean {
+  return PI_DELEGATION_TOOLS.has(toolName);
+}
 
 export function normalizeMuthurPosture(value: unknown): MuthurPosture {
   if (value === "plan" || value === "agent" || value === "commander") {
@@ -145,6 +159,9 @@ export function isToolAllowedForPosture(
   if (posture === "commander" && !resolveMissionExecutionActive(context)) {
     return false;
   }
+  if (isPiDelegationTool(toolName) && posture !== "commander") {
+    return false;
+  }
   return TOOLS_BY_POSTURE[posture].has(toolName);
 }
 
@@ -165,6 +182,13 @@ export function formatBlockedToolMessage(
       "Commander cannot execute mission work until the mission is ACTIVE. Observe, summarize, and prepare the mission in conversation first."
     );
   }
+  if (isPiDelegationTool(toolName) && posture === "agent") {
+    return (
+      `[TOOL BLOCKED] ${toolName}\n\n` +
+      "Agent executes directly with localfs, operator_browser, suggest_operator_edit, workspace_exec, samus_hands_eyes, and the glyph channel. " +
+      "Pi desktop delegation is Commander-only — switch to Commander and activate a mission for desktop embodiment (Paint, OS apps, mouse/keyboard)."
+    );
+  }
   if (posture === "plan") {
     return (
       `[TOOL BLOCKED] ${toolName}\n\n` +
@@ -183,7 +207,9 @@ export function buildMuthurPostureSystemPrompt(posture: MuthurPosture): string {
       );
     case "agent":
       return (
-        "\n\nMUTHUR POSTURE: AGENT (USE). Execute a single user-directed task end-to-end: observe, edit via suggest_operator_edit, localfs write when needed. " +
+        "\n\nMUTHUR POSTURE: AGENT (USE). Execute a single user-directed task end-to-end yourself — observe, edit via suggest_operator_edit, localfs write, operator_browser, workspace_exec, samus_hands_eyes (local Windows desktop), glyph channel. " +
+        "Do NOT delegate to Pi or request a control lease; desktop embodiment is Commander-only. " +
+        "For ASCII art use [GLYPH:…] / fenced ascii blocks; for web use operator_browser; for code use localfs. " +
         "Operator pane edits auto-save to disk when a writable path exists. Confirm what changed; Ctrl+Z still undoes in the pane."
       );
     case "commander":

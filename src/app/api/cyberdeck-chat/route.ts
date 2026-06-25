@@ -35,9 +35,11 @@ import {
   shouldEnableToolsForPosture,
   type MuthurPosture,
 } from "@/lib/muthur/muthur-posture";
-import { MUTHUR_PI_CONTROL_DOCTRINE } from "@/lib/muthur/control/muthur-control-doctrine";
+import { buildMuthurPiControlDoctrine } from "@/lib/muthur/control/muthur-control-doctrine";
 import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
 import { isCalyxMuthurToolsEnabled } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
+import { buildSamusHandsEyesDoctrine } from "@/lib/samus-manus/hands-eyes-doctrine";
+import { isSamusHandsEyesEnabled } from "@/lib/samus-manus/samus-manus-config.server";
 import { PI_COMPUTER_USE_DOCTRINE } from "@/lib/pi/pi-computer-use-doctrine";
 import { messageReferencesLocalPath } from "@/lib/browser-intents";
 import {
@@ -52,9 +54,17 @@ import { detectProviderModelMismatch } from "@/lib/server/provider-upstream-head
 const MUTHUR_COGNITION_DOCTRINE =
   "\n\nCOGNITION: You interpret operator intent and choose tools. The deck does not pre-run browser searches, file reads, or conversions from regex on the operator's message — call tools yourself (localfs, operator_browser, observe_operator_pane, etc.). Do not emit [GLYPH:...] unless the operator explicitly asked for a glyph render.";
 
-function buildMuthurAvailableToolsPrompt(): string {
+function buildMuthurAvailableToolsPrompt(posture: MuthurPosture): string {
   const directPi = isMuthurDirectPiComputerUseEnabled();
   const calyx = isCalyxMuthurToolsEnabled();
+  const handsEyes = isSamusHandsEyesEnabled();
+  const piTools =
+    posture === "commander"
+      ? "\n- request_pi_control_lease: Request operator grant for Pi desktop embodiment (mouse/keyboard/screen) before computer-use missions." +
+        (directPi
+          ? "\n- pi_computer_use: Execute one Synapse desktop action (screenshot, click, type, hotkey, scroll, move) under an active control lease."
+          : "\n- delegate_pi_computer_use: Delegate approved missions to Pi under an active control lease.")
+      : "";
   return (
     "\n\nAVAILABLE TOOLS:" +
     "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane (file name, language, cursor, dirty, content excerpt)." +
@@ -66,10 +76,10 @@ function buildMuthurAvailableToolsPrompt(): string {
     "\n- git_status / git_diff: REAL disk — inspect repo changes after coding." +
     "\n- justbash: EPHEMERAL mirror only — rg/ls/cat search; writes do NOT persist. Never use for pnpm, git, or file changes." +
     "\n- clock: Server date/time." +
-    "\n- request_pi_control_lease: Request operator grant for Pi desktop embodiment (mouse/keyboard/screen) before computer-use missions." +
-    (directPi
-      ? "\n- pi_computer_use: Execute one Synapse desktop action (screenshot, click, type, hotkey, scroll, move) under an active control lease."
-      : "\n- delegate_pi_computer_use: Delegate approved missions to Pi under an active control lease.") +
+    (posture === "agent" && handsEyes
+      ? "\n- samus_hands_eyes: Local Windows desktop control via samus-manus hands-eyes (pyautogui) — screenshot, click, type, hotkey, scroll, find-click. Agent direct embodiment."
+      : "") +
+    piTools +
     (calyx
       ? "\n- calyx_ingest / calyx_search / calyx_kernel_answer: Local Calyx vault (echo-mirage) for grounded ingest, multi-lens search, and kernel answers."
       : "") +
@@ -248,7 +258,7 @@ function buildMuthurSystemContent(args: {
   systemContent += buildMuthurPostureSystemPrompt(args.posture);
 
   if (toolsEnabled) {
-    systemContent += buildMuthurAvailableToolsPrompt();
+    systemContent += buildMuthurAvailableToolsPrompt(args.posture);
     systemContent += buildDocumentEditHint(args.message, args.operatorContext, args.posture);
     if (needsOperator) {
       systemContent += formatOperatorChatContextPrompt(args.operatorContext);
@@ -266,9 +276,15 @@ function buildMuthurSystemContent(args: {
 
   systemContent += MUTHUR_COGNITION_DOCTRINE;
   if (toolsEnabled) {
-    systemContent += MUTHUR_PI_CONTROL_DOCTRINE;
-    if (!isMuthurDirectPiComputerUseEnabled()) {
-      systemContent += PI_COMPUTER_USE_DOCTRINE;
+    systemContent += buildSamusHandsEyesDoctrine(
+      args.posture === "agent" && isSamusHandsEyesEnabled(),
+    );
+    const piDoctrine = buildMuthurPiControlDoctrine(args.posture);
+    if (piDoctrine) {
+      systemContent += piDoctrine;
+      if (!isMuthurDirectPiComputerUseEnabled()) {
+        systemContent += PI_COMPUTER_USE_DOCTRINE;
+      }
     }
   }
 

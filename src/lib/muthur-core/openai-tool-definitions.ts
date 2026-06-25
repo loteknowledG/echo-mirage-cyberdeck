@@ -1,5 +1,7 @@
 import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
 import { isCalyxMuthurToolsEnabled } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
+import { isSamusHandsEyesEnabled } from "@/lib/samus-manus/samus-manus-config.server";
+import { SAMUS_HANDS_EYES_ACTIONS } from "@/lib/samus-manus/hands-eyes.server";
 import type { MuthurPosture, MuthurPostureToolContext } from "@/lib/muthur/muthur-posture";
 import { isToolAllowedForPosture } from "@/lib/muthur/muthur-posture";
 
@@ -405,6 +407,51 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   {
     type: "function",
     function: {
+      name: "samus_hands_eyes",
+      description:
+        "Samus-Manus hands-eyes: local Windows desktop control via pyautogui (mouse, keyboard, screenshot, template find). " +
+        "Agent-mode direct embodiment on the machine running the dev server — not Pi delegation. " +
+        "Screenshot first when UI state is unknown.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: [...SAMUS_HANDS_EYES_ACTIONS],
+          },
+          x: { type: "number" },
+          y: { type: "number" },
+          x1: { type: "number" },
+          y1: { type: "number" },
+          x2: { type: "number" },
+          y2: { type: "number" },
+          dur: { type: "number", description: "Move/drag duration in seconds." },
+          button: { type: "string", enum: ["left", "right", "middle"] },
+          text: { type: "string", description: "Text for type/paste actions." },
+          key: { type: "string", description: "Single key for press (e.g. enter, tab)." },
+          keys: {
+            type: "array",
+            items: { type: "string" },
+            description: "Hotkey chord for hotkey action (e.g. [\"ctrl\", \"s\"]).",
+          },
+          amount: { type: "number", description: "Scroll amount (negative=down)." },
+          img: { type: "string", description: "Template image path for find_click / find_on_screen." },
+          out: { type: "string", description: "Output path for screenshot action." },
+          confidence: { type: "number", description: "Template match confidence 0–1 (default 0.8)." },
+          timeout: { type: "number", description: "Seconds to search for template (default 3)." },
+          click: { type: "boolean", description: "For find_click: click when found (default true)." },
+          wait: { type: "number", description: "Seconds to wait after open_paint or before focus_codex click." },
+          return_to_vscode: { type: "boolean", description: "Refocus VS Code after open_paint." },
+          no_click: { type: "boolean", description: "For focus_codex: activate window only." },
+          silent: { type: "boolean", description: "Suppress TTS announcements (default true)." },
+        },
+        required: ["action"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "calyx_search",
       description:
         "Search the Echo Mirage Calyx vault (local association-native DB) with multi-lens fusion and optional guard.",
@@ -461,9 +508,11 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
 export function getMuthurOpenAiToolsForPosture(posture: MuthurPosture, context?: MuthurPostureToolContext) {
   const directPi = isMuthurDirectPiComputerUseEnabled();
   const calyx = isCalyxMuthurToolsEnabled();
+  const handsEyes = isSamusHandsEyesEnabled();
   return MUTHUR_OPENAI_TOOLS.filter((tool) => {
     if (tool.function.name === "pi_computer_use" && !directPi) return false;
     if (tool.function.name === "delegate_pi_computer_use" && directPi) return false;
+    if (tool.function.name === "samus_hands_eyes" && !handsEyes) return false;
     if (
       (tool.function.name === "calyx_search" ||
         tool.function.name === "calyx_ingest" ||

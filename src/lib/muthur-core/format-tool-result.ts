@@ -29,6 +29,31 @@ export function formatWorkspaceExecResult(result: unknown): string {
   return parts.join("\n\n");
 }
 
+export function formatSamusHandsEyesResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] samus_hands_eyes returned no output.";
+  }
+
+  const payload = result as {
+    command?: string;
+    stdout?: string;
+    stderr?: string;
+    exitCode?: number;
+    duration_ms?: number;
+  };
+
+  const parts = [
+    "[TOOL] SAMUS_HANDS_EYES // LOCAL WINDOWS",
+    payload.command ? `COMMAND // ${payload.command}` : null,
+    typeof payload.exitCode === "number" ? `EXIT // ${payload.exitCode}` : null,
+    typeof payload.duration_ms === "number" ? `DURATION_MS // ${payload.duration_ms}` : null,
+    payload.stdout ? `STDOUT\n${payload.stdout.trimEnd()}` : null,
+    payload.stderr ? `STDERR\n${payload.stderr.trimEnd()}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
 export function formatGitStatusResult(result: unknown): string {
   if (!result || typeof result !== "object") {
     return "[TOOL] git_status returned no output.";
