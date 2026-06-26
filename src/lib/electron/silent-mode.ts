@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import {
+  hydrateSilentModeAudioGate,
+  setSilentModeForAudioGate,
+} from "@/lib/cyberdeck/audio-gate";
 
 export const SILENT_MODE_STORAGE_KEY = "echo-mirage-silent-mode-v1";
 
@@ -31,10 +35,14 @@ function writeCachedSilentMode(enabled: boolean): void {
 
 export async function fetchSilentModeEnabled(): Promise<boolean | null> {
   const bridge = window.echoMirageSilentMode;
-  if (!bridge) return null;
+  if (!bridge) {
+    hydrateSilentModeAudioGate(false);
+    return null;
+  }
   try {
     const result = await bridge.getEnabled();
     writeCachedSilentMode(result.enabled);
+    setSilentModeForAudioGate(result.enabled);
     return result.enabled;
   } catch {
     return null;
@@ -47,10 +55,28 @@ export async function requestSilentModeEnabled(enabled: boolean): Promise<boolea
   try {
     const result = await bridge.setEnabled(enabled);
     writeCachedSilentMode(result.enabled);
+    setSilentModeForAudioGate(result.enabled);
     return result.enabled;
   } catch {
     return null;
   }
+}
+
+/** Wire Silent Mode IPC to the central audio gate. */
+export function bindSilentModeAudioGate(): () => void {
+  const bridge = window.echoMirageSilentMode;
+  if (!bridge) {
+    hydrateSilentModeAudioGate(false);
+    return () => {};
+  }
+
+  hydrateSilentModeAudioGate(readCachedSilentMode());
+  void fetchSilentModeEnabled();
+
+  return bridge.subscribe((payload) => {
+    writeCachedSilentMode(payload.enabled);
+    setSilentModeForAudioGate(payload.enabled);
+  });
 }
 
 export function useSilentModeSetting(): {

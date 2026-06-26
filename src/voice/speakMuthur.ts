@@ -1,4 +1,5 @@
 import { MUTHUR_PRESET } from "@/voice/muthurPreset";
+import { isAudioAllowed } from "@/lib/cyberdeck/audio-gate";
 
 export function selectMuthurFallbackVoice(): SpeechSynthesisVoice | null {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
@@ -30,6 +31,9 @@ export type DryFallbackTuning = {
 };
 
 export function speakDryFallback(text: string, tuning?: DryFallbackTuning): Promise<void> {
+  if (!isAudioAllowed()) {
+    return Promise.resolve();
+  }
   return new Promise((resolve, reject) => {
     const run = () => {
       const voice = selectMuthurFallbackVoice();

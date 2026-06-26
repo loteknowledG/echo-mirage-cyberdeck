@@ -2,6 +2,7 @@ import {
   getDeckSfxVolume as readDeckSfxVolume,
   setDeckSfxVolumeRuntime,
 } from "@/lib/cyberdeck/deck-sfx-volume";
+import { isAudioAllowed } from "@/lib/cyberdeck/audio-gate";
 
 let audioCtx = null;
 let enabled = true;
@@ -78,7 +79,7 @@ function playTone({
   at,
   applyDeckSfx = true,
 }) {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   if (applyDeckSfx) {
     const sfxScale = readDeckSfxVolume();
     if (sfxScale <= 0) return;
@@ -120,7 +121,7 @@ function playTone({
 }
 
 function playNoiseClick({ duration = 0.02, volume = 0.07, filterFreq = 2600 }) {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   const sfxScale = readDeckSfxVolume();
   if (sfxScale <= 0) return;
   volume *= sfxScale;
@@ -158,7 +159,7 @@ function playNoiseClick({ duration = 0.02, volume = 0.07, filterFreq = 2600 }) {
 }
 
 function wobble(startFreq, endFreq, duration = 0.45, gain = 0.08, type = "sawtooth") {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   const ctx = getCtx();
   const t = ctx.currentTime;
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
@@ -237,7 +238,7 @@ function memorizePitchHz(key) {
 
 /** Stable pitch per key for MUTHUR chat — same character always same tone. */
 export function playMemorizeKeySound(key, options = {}) {
-  if (!enabled || isDeckSfxSilent()) return;
+  if (!enabled || !isAudioAllowed() || isDeckSfxSilent()) return;
   const hz = memorizePitchHz(key);
   if (!hz) return;
   const volume = (options.volume ?? 1) * 2.6 * KEYBOARD_EFFECTS_GAIN;
@@ -391,7 +392,7 @@ export function playKeySound(key, options = {}) {
 
 /** Short feedback for cyberdeck UI keyboard navigation (separate timbre from typing sfx). */
 export function playNavigationSound(variant = "step") {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   const navGain = KEYBOARD_NAV_GAIN;
   const v = variant || "step";
   if (v === "commit") {
@@ -423,7 +424,7 @@ export function playNavigationSound(variant = "step") {
 
 export function bindKeyboardSfx(target = window, options = {}) {
   const handler = (event) => {
-    if (!enabled || event.repeat) return;
+    if (!enabled || !isAudioAllowed() || event.repeat) return;
     const t = event.target;
     if (t instanceof HTMLElement && t.closest("[data-muthur-memorize-input]")) {
       return;
@@ -485,7 +486,7 @@ export function playSystemSound(type = "click", vol = 0.08) {
 }
 
 export function playNetworkScanSound(stage = "start") {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   if (stage === "start") {
     // Radar ping - clean sine wave with decay
     playTone({
@@ -576,7 +577,7 @@ function stopSonarSampleLoop() {
 }
 
 async function startSonarSampleLoop(volumeScale = 1) {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   const s = Math.min(1.5, Math.max(0.05, Number.isFinite(volumeScale) ? volumeScale : 1));
   const ctx = getCtx();
   if (ctx.state === "suspended") {
@@ -652,7 +653,7 @@ function stopUplinkSonarSampleLoop() {
 }
 
 async function startUplinkSonarSampleLoop(volumeScale = 1) {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   const s = Math.min(1.5, Math.max(0.05, Number.isFinite(volumeScale) ? volumeScale : 1));
   const ctx = getCtx();
   if (ctx.state === "suspended") {
@@ -730,7 +731,7 @@ export function stopUplinkSonarPingLoop() {
 }
 
 export function playBleepBloop() {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   const ctx = getCtx();
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
 
@@ -758,7 +759,7 @@ export function playBleepBloop() {
 }
 
 export function playWrongDoorShut() {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   const ctx = getCtx();
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
   const now = ctx.currentTime + 0.02;
@@ -808,7 +809,7 @@ export function playWrongDoorShut() {
 }
 
 export function playDeclined() {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   playTone({
     freqStart: 420,
     freqEnd: 120,
@@ -828,7 +829,7 @@ export function playDeclined() {
 }
 
 export function playDroidDizzy401() {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   playTone({ freqStart: 980, duration: 0.05, type: "triangle", volume: 0.08 });
   setTimeout(() => {
     playTone({ freqStart: 720, duration: 0.06, type: "square", volume: 0.07 });
@@ -842,7 +843,7 @@ export function playDroidDizzy401() {
 }
 
 export function playDroidDizzy400() {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   playTone({ freqStart: 640, duration: 0.045, type: "square", volume: 0.075 });
   setTimeout(() => {
     playTone({ freqStart: 920, duration: 0.04, type: "triangle", volume: 0.065 });
@@ -859,7 +860,7 @@ export function playDroidDizzy400() {
 }
 
 export function playOutOfGas429() {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   const ctx = getCtx();
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
   const now = ctx.currentTime + 0.02;
@@ -918,7 +919,7 @@ export function playOutOfGas429() {
 }
 
 export function playRaceReadySetGo() {
-  if (!enabled) return;
+  if (!enabled || !isAudioAllowed()) return;
   const ctx = getCtx();
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
 

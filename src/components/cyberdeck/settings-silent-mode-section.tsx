@@ -29,7 +29,7 @@ export function SettingsSilentModeSection() {
           <div className="min-w-0">
             <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">SILENT MODE</div>
             <div className="mt-0.5 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
-              Keep Echo Mirage running in the system tray only. Hide from taskbar until restored.
+              Tray-resident shell with all audio suppressed — speech, keyboard SFX, sonar, and alerts.
             </div>
           </div>
           <Switch

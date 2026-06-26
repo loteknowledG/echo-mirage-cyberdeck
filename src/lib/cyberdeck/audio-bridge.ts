@@ -2,12 +2,14 @@
 
 import { useEffect } from "react";
 import { subscribeSignals, type DeckSignal } from "@/lib/cyberdeck/signal-router";
+import { isAudioAllowed } from "@/lib/cyberdeck/audio-gate";
 import { playBack, playBeep, playClick } from "@/lib/deck-audio";
 
 let bridgeStarted = false;
 let bridgeDispose: (() => void) | null = null;
 
 function routeSignal(signal: DeckSignal): void {
+  if (!isAudioAllowed()) return;
   if (signal.source === "ui") {
     if (signal.type === "select") {
       playClick();

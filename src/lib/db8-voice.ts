@@ -1,6 +1,7 @@
 /** Per-speaker TTS profiles and sequential playback for DB8 debate. */
 
 import { ensureTtsTextLength } from "@/lib/cyberdeck-voice-tuning";
+import { isAudioAllowed, registerAudioStopHook } from "@/lib/cyberdeck/audio-gate";
 import type { Db8SpeakerId } from "@/lib/db8-debate";
 
 export type Db8VoiceSpeaker = Db8SpeakerId | "conclude";
@@ -385,6 +386,7 @@ export async function speakDb8Line(
   text: string,
   opts?: { signal?: AbortSignal; deckSpeak?: Db8DeckSpeakLine },
 ): Promise<void> {
+  if (!isAudioAllowed()) return;
   const trimmed = text.trim();
   if (!trimmed) return;
   if (opts?.signal?.aborted) return;
@@ -439,7 +441,7 @@ export class Db8VoiceQueue {
   }
 
   async speakSequence(items: Db8SpeechItem[], enabled: boolean): Promise<void> {
-    if (!enabled || items.length === 0) return;
+    if (!enabled || items.length === 0 || !isAudioAllowed()) return;
     const runId = ++this.generation;
 
     for (const item of items) {
@@ -456,4 +458,8 @@ export class Db8VoiceQueue {
 
 export function operatorPropositionSpeech(topic: string): string {
   return `Proposition. ${topic}`;
+}
+
+if (typeof window !== "undefined") {
+  registerAudioStopHook(stopDb8Audio);
 }

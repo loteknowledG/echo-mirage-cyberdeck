@@ -332,6 +332,12 @@ import type {
 } from "@/lib/muthur/cognition/muthur-cognition-types";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 import {
+  isAudioAllowed,
+  registerAudioStopHook,
+  subscribeAudioGate,
+} from "@/lib/cyberdeck/audio-gate";
+import { useSilentModeAudioGateSync } from "@/lib/cyberdeck/use-silent-mode-audio-gate-sync";
+import {
   POWERFIST_STACK_CHANNEL,
   POWERFIST_STACK_PUSH_EVENT,
   type PowerFistStackCommand,
@@ -1631,6 +1637,7 @@ export default function CyberdeckApp() {
   const inactiveTextGlow = "0 0 6px rgba(180, 180, 180, 0.14)";
 
   useDeckAudioBridge();
+  useSilentModeAudioGateSync();
 
   useEffect(() => {
     const onCadreArchive = (event: Event) => {
@@ -1963,6 +1970,7 @@ export default function CyberdeckApp() {
   }, []);
 
   const playMirageBuffer = useCallback(async (arrayBuffer: ArrayBuffer) => {
+    if (!isAudioAllowed()) return false;
     if (typeof window === "undefined") return false;
     const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return false;
@@ -2187,6 +2195,7 @@ export default function CyberdeckApp() {
   }, [motherReverbTail, unlockMotherAudio]);
 
   const speakMother = useCallback(async (text: string) => {
+    if (!isAudioAllowed()) return false;
     const speakId = ++speakSequenceRef.current;
     speakQueueActiveRef.current = true;
     stopMirageAudio();
@@ -2231,6 +2240,7 @@ export default function CyberdeckApp() {
 
   const speakDeckVoiceLine = useCallback<Db8DeckSpeakLine>(
     async (text, profile) => {
+      if (!isAudioAllowed()) return;
       await unlockMotherAudio();
       stopMirageAudio();
       try {
@@ -2281,6 +2291,32 @@ export default function CyberdeckApp() {
     }
     setVoicePlaybackBusy(false);
   }, [stopMirageAudio]);
+
+  const clearNetworkFeedbackAudio = useCallback(() => {
+    if (networkFeedbackRepeatRef.current !== null) {
+      window.clearInterval(networkFeedbackRepeatRef.current);
+      networkFeedbackRepeatRef.current = null;
+    }
+    if (networkFeedbackDelayRef.current !== null) {
+      window.clearTimeout(networkFeedbackDelayRef.current);
+      networkFeedbackDelayRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    const unregisterMirage = registerAudioStopHook(stopMirageAudio);
+    const unregisterNetwork = registerAudioStopHook(clearNetworkFeedbackAudio);
+    const unsubscribeGate = subscribeAudioGate(() => {
+      if (!isAudioAllowed()) {
+        clearNetworkFeedbackAudio();
+      }
+    });
+    return () => {
+      unregisterMirage();
+      unregisterNetwork();
+      unsubscribeGate();
+    };
+  }, [clearNetworkFeedbackAudio, stopMirageAudio]);
 
   const speakVoiceBlockAtIndex = useCallback(
     (index: number) => {
@@ -4234,37 +4270,28 @@ export default function CyberdeckApp() {
     });
 
   useEffect(() => {
-    if (isStreaming) {
+    if (isStreaming && isAudioAllowed()) {
       if (networkFeedbackDelayRef.current == null) {
         networkFeedbackDelayRef.current = window.setTimeout(() => {
           networkFeedbackDelayRef.current = null;
+          if (!isAudioAllowed()) return;
           playDeckBleepBloop();
           networkFeedbackRepeatRef.current = window.setInterval(() => {
+            if (!isAudioAllowed()) {
+              clearNetworkFeedbackAudio();
+              return;
+            }
             playDeckBleepBloop();
           }, 7000);
         }, 2800);
       }
     } else {
-      if (networkFeedbackRepeatRef.current !== null) {
-        window.clearInterval(networkFeedbackRepeatRef.current);
-        networkFeedbackRepeatRef.current = null;
-      }
-      if (networkFeedbackDelayRef.current !== null) {
-        window.clearTimeout(networkFeedbackDelayRef.current);
-        networkFeedbackDelayRef.current = null;
-      }
+      clearNetworkFeedbackAudio();
     }
     return () => {
-      if (networkFeedbackRepeatRef.current !== null) {
-        window.clearInterval(networkFeedbackRepeatRef.current);
-        networkFeedbackRepeatRef.current = null;
-      }
-      if (networkFeedbackDelayRef.current !== null) {
-        window.clearTimeout(networkFeedbackDelayRef.current);
-        networkFeedbackDelayRef.current = null;
-      }
+      clearNetworkFeedbackAudio();
     };
-  }, [isStreaming]);
+  }, [clearNetworkFeedbackAudio, isStreaming]);
 
   // After keys hydrate: prompt only when this provider truly has no client key (gateway field handles entry).
   useEffect(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { getDeckSfxVolume } from "@/lib/cyberdeck/deck-sfx-volume";
+import { isAudioAllowed } from "@/lib/cyberdeck/audio-gate";
 
 let context: AudioContext | null = null;
 
@@ -18,6 +19,7 @@ function deckSfxScale() {
 }
 
 function playTone(type: OscillatorType, hz: number, durationMs: number, gainValue: number) {
+  if (!isAudioAllowed()) return;
   const scale = deckSfxScale();
   if (scale <= 0) return;
   const ctx = ensureContext();
@@ -37,6 +39,7 @@ function playTone(type: OscillatorType, hz: number, durationMs: number, gainValu
 }
 
 export function playClick() {
+  if (!isAudioAllowed()) return;
   const scale = deckSfxScale();
   if (scale <= 0) return;
   const ctx = ensureContext();

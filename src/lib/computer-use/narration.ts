@@ -1,3 +1,5 @@
+import { isAudioAllowed } from "@/lib/cyberdeck/audio-gate";
+
 export type NarrationEvent =
   | "INDICATE_POINT"
   | "INDICATE_HIGHLIGHT"
@@ -97,6 +99,7 @@ export function narrate(event: NarrationEvent): Narration | null {
 }
 
 export function speakNarration(text: string): void {
+  if (!isAudioAllowed()) return;
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
   const cleanup = () => {
@@ -131,7 +134,7 @@ export function speakNarration(text: string): void {
 
 export function narrateAndSpeak(event: NarrationEvent, speakEnabled: boolean): Narration | null {
   const narration = narrate(event);
-  if (!narration || !speakEnabled) return narration;
+  if (!narration || !speakEnabled || !isAudioAllowed()) return narration;
   void speakNarration(narration.text);
   return narration;
 }
