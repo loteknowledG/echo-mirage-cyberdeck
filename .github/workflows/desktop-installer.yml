@@ -45,7 +45,7 @@ jobs:
         run: node scripts/prepare-electron-standalone.mjs
 
       - name: Package Windows installer
-        run: pnpm exec electron-builder --win
+        run: pnpm exec electron-builder --win --publish never
 
       - name: Verify installer artifact
         shell: pwsh

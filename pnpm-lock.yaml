@@ -127,9 +127,6 @@ importers:
       docx-preview:
         specifier: ^0.3.7
         version: 0.3.7
-      electron:
-        specifier: 41.3.0
-        version: 41.3.0
       embla-carousel:
         specifier: ^8.6.0
         version: 8.6.0
@@ -314,6 +311,9 @@ importers:
       concurrently:
         specifier: ^9.1.2
         version: 9.2.1
+      electron:
+        specifier: 41.3.0
+        version: 41.3.0
       electron-builder:
         specifier: ^26.0.12
         version: 26.15.3(electron-builder-squirrel-windows@26.15.3)
