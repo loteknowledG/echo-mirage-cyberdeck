@@ -163,7 +163,7 @@
     "next-themes": "^0.4.6",
     "node-pty": "^1.1.0",
     "node-screenshots": "^0.2.8",
-    "pako": "^3.0.0",
+    "pako": "2.1.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.0.227",
     "perfect-scrollbar": "^1.5.6",
@@ -217,7 +217,9 @@
   },
   "pnpm": {
     "overrides": {
-      "pdfjs-dist": "^6.0.227"
+      "pdfjs-dist": "^6.0.227",
+      "parse5": "^7.3.0",
+      "pako": "2.1.0"
     },
     "onlyBuiltDependencies": [
       "@google/genai",

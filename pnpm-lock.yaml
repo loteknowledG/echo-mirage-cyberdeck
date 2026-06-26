@@ -6,6 +6,8 @@ settings:
 
 overrides:
   pdfjs-dist: ^6.0.227
+  parse5: ^7.3.0
+  pako: 2.1.0
 
 importers:
 
@@ -198,8 +200,8 @@ importers:
         specifier: ^0.2.8
         version: 0.2.8
       pako:
-        specifier: ^3.0.0
-        version: 3.0.0
+        specifier: 2.1.0
+        version: 2.1.0
       pdf-lib:
         specifier: ^1.17.1
         version: 1.17.1
@@ -6590,14 +6592,8 @@ packages:
   package-manager-detector@1.6.0:
     resolution: {integrity: sha512-61A5ThoTiDG/C8s8UMZwSorAGwMJ0ERVGj2OjoW5pAalsNOg15+iQiPzrLJ4jhZ1HJzmC2PIHT2oEiH3R5fzNA==}
 
-  pako@1.0.11:
-    resolution: {integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==}
-
   pako@2.1.0:
     resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
-
-  pako@3.0.0:
-    resolution: {integrity: sha512-TGPtlCI1pSUSbkOIxOUUHNrBa0muz4mAp32cYUF3RoSa5c73jiQTKOKo22gaa4DxLggQrda/DAdax5QkcHPvYA==}
 
   papaparse@5.5.3:
     resolution: {integrity: sha512-5QvjGxYVjxO59MGU2lHVYpRWBBtKHnlIAcSe1uNFCkkptUh63NFRj0FJQm7nR67puEruUci/ZkjmEFrjCAyP4A==}
@@ -6630,12 +6626,6 @@ packages:
 
   parse5-htmlparser2-tree-adapter@6.0.1:
     resolution: {integrity: sha512-qPuWvbLgvDGilKc5BoicRovlT4MtYT6JfJyBOMDsKoiT+GiuP5qyrPCnR9HcPECIJJmZh5jRndyNThnhhb/vlA==}
-
-  parse5@5.1.1:
-    resolution: {integrity: sha512-ugq4DFI0Ptb+WWjAdOK16+u/nHfiIrcE+sh8kZMaM0WllQKLI9rOUq6c2b7cwPkXdzfQESqvoqK6ug7U/Yyzug==}
-
-  parse5@6.0.1:
-    resolution: {integrity: sha512-Ofn/CTFzRGTTxwpNEs9PP93gXShHcTq255nzRYSKe8AkVpZY7e1fpmTfOyoIvjP5HG7Z2ZM7VS9PPhQGW2pOpw==}
 
   parse5@7.3.0:
     resolution: {integrity: sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw==}
@@ -10453,11 +10443,11 @@ snapshots:
 
   '@pdf-lib/standard-fonts@1.0.0':
     dependencies:
-      pako: 1.0.11
+      pako: 2.1.0
 
   '@pdf-lib/upng@1.0.1':
     dependencies:
-      pako: 1.0.11
+      pako: 2.1.0
 
   '@peculiar/asn1-schema@2.8.0':
     dependencies:
@@ -12537,7 +12527,7 @@ snapshots:
       chalk: 4.1.2
       highlight.js: 10.7.3
       mz: 2.7.0
-      parse5: 5.1.1
+      parse5: 7.3.0
       parse5-htmlparser2-tree-adapter: 6.0.1
       yargs: 16.2.2
 
@@ -14721,7 +14711,7 @@ snapshots:
   jszip@3.10.1:
     dependencies:
       lie: 3.3.0
-      pako: 1.0.11
+      pako: 2.1.0
       readable-stream: 2.3.8
       setimmediate: 1.0.5
 
@@ -15860,11 +15850,7 @@ snapshots:
 
   package-manager-detector@1.6.0: {}
 
-  pako@1.0.11: {}
-
   pako@2.1.0: {}
-
-  pako@3.0.0: {}
 
   papaparse@5.5.3: {}
 
@@ -15906,11 +15892,7 @@ snapshots:
 
   parse5-htmlparser2-tree-adapter@6.0.1:
     dependencies:
-      parse5: 6.0.1
-
-  parse5@5.1.1: {}
-
-  parse5@6.0.1: {}
+      parse5: 7.3.0
 
   parse5@7.3.0:
     dependencies:
@@ -15958,7 +15940,7 @@ snapshots:
     dependencies:
       '@pdf-lib/standard-fonts': 1.0.0
       '@pdf-lib/upng': 1.0.1
-      pako: 1.0.11
+      pako: 2.1.0
       tslib: 1.14.1
 
   pdfjs-dist@6.0.227:
@@ -17678,7 +17660,7 @@ snapshots:
 
   utif2@4.1.0:
     dependencies:
-      pako: 1.0.11
+      pako: 2.1.0
 
   util-deprecate@1.0.2: {}
 
