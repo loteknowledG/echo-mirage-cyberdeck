@@ -9,7 +9,7 @@
     "dev:stop": "node scripts/dev-stop.mjs",
     "dev:reset": "powershell -ExecutionPolicy Bypass -File scripts/dev-reset.ps1",
     "dev:turbo": "node scripts/next-dev.mjs --turbopack",
-    "build": "node scripts/copy-figlet-npm-fonts.mjs && node scripts/write-figlet-font-manifest.mjs && next build --webpack",
+    "build": "node scripts/clean-windows-build-blockers.mjs && node scripts/copy-figlet-npm-fonts.mjs && node scripts/write-figlet-font-manifest.mjs && next build --webpack",
     "fonts:normalize": "node scripts/run-python.mjs scripts/normalize-commodore-figlet-fonts.py",
     "start": "next start -p 3050",
     "preview": "next build && next start -p 3050",

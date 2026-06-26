@@ -44,6 +44,8 @@
     ".memory",
     ".atlas",
     ".powerfist",
+    ".venv-pi",
+    "notebooks",
     "logs",
     "generated",
     "screenshots",

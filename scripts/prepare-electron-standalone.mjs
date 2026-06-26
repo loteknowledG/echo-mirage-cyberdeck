@@ -37,6 +37,9 @@ async function copyRecursive(from, to) {
 }
 
 async function main() {
+  console.log('[electron:prepare] clearing Windows build blockers…');
+  await run('node', ['scripts/clean-windows-build-blockers.mjs']);
+
   console.log('[electron:prepare] building Next.js standalone bundle…');
   await run('pnpm', ['run', 'build'], {
     ECHO_MIRAGE_ELECTRON_BUILD: '1',

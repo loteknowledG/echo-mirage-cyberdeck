@@ -37,6 +37,8 @@ const RUNTIME_WATCH_IGNORE = [
 	"**/.powerfist/**",
 	"**/.cursor/**",
 	"**/.tmp/**",
+	"**/.venv-pi/**",
+	"**/notebooks/**",
 	"**/data/**",
 	"**/logs/**",
 	"**/generated/**",
@@ -58,6 +60,15 @@ const nextConfig = {
 	devIndicators: false,
 	distDir: process.env.CYBERDECK_NEXT_DIST_DIR || ".next",
 	...(process.env.ECHO_MIRAGE_ELECTRON_BUILD === "1" ? { output: "standalone" } : {}),
+	outputFileTracingRoot: projectRoot,
+	outputFileTracingExcludes: {
+		"*": [
+			".venv-pi/**",
+			"notebooks/**",
+			"**/*.ipynb",
+			"**/__pycache__/**",
+		],
+	},
 	transpilePackages: [
 		"realmorphism",
 		"@eigenpal/docx-editor-react",
@@ -107,6 +118,12 @@ const nextConfig = {
 		"windows-use",
 	],
 	webpack: (config, { dev, isServer }) => {
+		// Avoid Windows EPERM readlink failures on Jupyter runtime / Pi venv symlinks.
+		config.resolve.symlinks = false;
+		if (!dev) {
+			config.cache = false;
+		}
+
 		if (isServer) {
 			const playwrightExternals = ["playwright", "playwright-core"];
 			if (Array.isArray(config.externals)) {
@@ -158,6 +175,14 @@ const nextConfig = {
 			if (config.experiments?.lazyCompilation) {
 				config.experiments.lazyCompilation = false;
 			}
+			config.watchOptions = {
+				...(config.watchOptions ?? {}),
+				ignored: [
+					...normalizeWebpackWatchIgnored(config.watchOptions?.ignored),
+					...RUNTIME_WATCH_IGNORE,
+				],
+			};
+		} else {
 			config.watchOptions = {
 				...(config.watchOptions ?? {}),
 				ignored: [
