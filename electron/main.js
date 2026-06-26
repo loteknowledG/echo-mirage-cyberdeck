@@ -1,7 +1,7 @@
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const path = require('path');
-const { app, BrowserWindow, Menu, shell, ipcMain, clipboard, dialog, protocol, net, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, clipboard, dialog, protocol, net, nativeImage, Tray } = require('electron');
 const { pathToFileURL } = require('url');
 const {
   initializeMediaProtection,
@@ -9,6 +9,21 @@ const {
   setMediaProtectionEnabled,
   setMediaProtectionMainWindow,
 } = require('./media-protection');
+const {
+  initializeSilentMode,
+  loadSilentModeState,
+  getSilentMode,
+  ensureTray,
+  destroyTray,
+  showMainWindow,
+  hideMainWindowToTray,
+  applySilentModeWindowState,
+  shouldPreventWindowClose,
+  setMainWindow,
+  registerSilentModeIpc,
+} = require('./silent-mode');
+
+initializeSilentMode({ app, Tray, Menu, nativeImage });
 
 if (!app.isPackaged && process.platform === 'win32') {
   // Dev-only: reduce GPU/network subprocess crashes while hot-reloading a heavy page.
@@ -457,15 +472,26 @@ function buildContextMenu(win, params) {
 }
 
 async function createWindow() {
+  const startInSilentTray = getSilentMode();
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    show: !startInSilentTray,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       webviewTag: true,
       preload: path.join(__dirname, 'preload.js'),
     },
+  });
+
+  setMainWindow(win);
+
+  win.on('close', (event) => {
+    if (shouldPreventWindowClose()) {
+      event.preventDefault();
+      hideMainWindowToTray();
+    }
   });
 
   win.webContents.on('context-menu', (_event, params) => {
@@ -475,7 +501,15 @@ async function createWindow() {
   // Load your Next.js app (dev server)
   // Keep in sync with package.json dev/start port (avoids clash with Weyland-Yutani on :3000).
   const origin = await getDevOrigin();
-  win.loadURL(`${origin}/cyberdeck`);
+  await win.loadURL(`${origin}/cyberdeck`);
+
+  if (!startInSilentTray) {
+    win.show();
+    win.focus();
+  } else {
+    ensureTray();
+    applySilentModeWindowState(win, false);
+  }
 
   if (!app.isPackaged && process.env.CYBERDECK_ELECTRON_FORCE_RELOAD === '1') {
     setupDevRendererReload(win);
@@ -1135,10 +1169,16 @@ ipcMain.handle('computer-use:run-action', async (_event, action) => {
 app.whenReady().then(async () => {
   registerEchoMirageFileProtocol();
   await initializeMediaProtection();
+  await loadSilentModeState();
+  registerSilentModeIpc(ipcMain);
+  if (getSilentMode()) {
+    ensureTray();
+  }
   return createWindow();
 });
 
 app.on('before-quit', async () => {
+  destroyTray();
   if (playrightBrowserState?.browser) {
     try {
       await playrightBrowserState.browser.close();
@@ -1151,6 +1191,9 @@ app.on('before-quit', async () => {
 });
 
 app.on('window-all-closed', () => {
+  if (getSilentMode()) {
+    return;
+  }
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -1158,6 +1201,8 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+    void createWindow();
+    return;
   }
+  showMainWindow();
 });

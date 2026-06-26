@@ -38,6 +38,16 @@ contextBridge.exposeInMainWorld('echoMirageMediaProtection', {
   },
 });
 
+contextBridge.exposeInMainWorld('echoMirageSilentMode', {
+  getEnabled: () => ipcRenderer.invoke('echo:get-silent-mode'),
+  setEnabled: (enabled) => ipcRenderer.invoke('echo:set-silent-mode', Boolean(enabled)),
+  subscribe: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on('echo:silent-mode-changed', listener);
+    return () => ipcRenderer.removeListener('echo:silent-mode-changed', listener);
+  },
+});
+
 contextBridge.exposeInMainWorld('echoMirageOpen', {
   pickConvertDocument: () => ipcRenderer.invoke('echo-mirage-open:pick-convert-document'),
   pickOperatorFolder: () => ipcRenderer.invoke('echo-mirage-open:pick-operator-folder'),

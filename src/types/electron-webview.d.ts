@@ -144,12 +144,19 @@ declare global {
     ): () => void;
   }
 
+  interface EchoMirageSilentModeBridge {
+    getEnabled(): Promise<{ enabled: boolean }>;
+    setEnabled(enabled: boolean): Promise<{ enabled: boolean }>;
+    subscribe(callback: (payload: { enabled: boolean }) => void): () => void;
+  }
+
   interface Window {
     echoMirageClipboard?: EchoMirageClipboardBridge;
     echoMirageBrowser?: EchoMirageBrowserBridge;
     echoMirageSave?: EchoMirageSaveBridge;
     echoMirageOpen?: EchoMirageOpenBridge;
     echoMirageMediaProtection?: EchoMirageMediaProtectionBridge;
+    echoMirageSilentMode?: EchoMirageSilentModeBridge;
   }
 }
 
