@@ -29,8 +29,7 @@ const piWebUiPdfjsLoader = path.join(
 	projectRoot,
 	"scripts/pi-attachment-utils-loader.cjs",
 );
-const parse5Root = path.dirname(require.resolve("parse5/package.json"));
-const parse5EsmEntry = path.join(parse5Root, "dist/index.js");
+const parse5EsmEntry = path.join(projectRoot, "node_modules/parse5/dist/index.js");
 
 /** @type {import('next').NextConfig} */
 const RUNTIME_WATCH_IGNORE = [
