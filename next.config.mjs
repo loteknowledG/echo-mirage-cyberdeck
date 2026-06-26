@@ -120,6 +120,9 @@ const nextConfig = {
 	webpack: (config, { dev, isServer }) => {
 		// Avoid Windows EPERM readlink failures on Jupyter runtime / Pi venv symlinks.
 		config.resolve.symlinks = false;
+		if (process.env.CI && !dev) {
+			config.parallelism = 1;
+		}
 		if (!dev) {
 			config.cache = false;
 		}

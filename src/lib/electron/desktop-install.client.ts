@@ -42,6 +42,9 @@ export async function fetchDesktopInstallInfo(): Promise<DesktopInstallInfo | nu
 }
 
 export function openDesktopInstaller(info: DesktopInstallInfo): void {
-  const target = info.downloadUrl ?? info.releasePageUrl;
+  const target =
+    info.installerAvailable && info.downloadUrl
+      ? info.downloadUrl
+      : info.releasePageUrl;
   window.open(target, "_blank", "noopener,noreferrer");
 }

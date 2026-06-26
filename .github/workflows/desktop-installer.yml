@@ -6,10 +6,16 @@ on:
     tags:
       - "desktop-v*"
 
+env:
+  NODE_OPTIONS: --max-old-space-size=7168
+  NEXT_TELEMETRY_DISABLED: "1"
+  ECHO_MIRAGE_ELECTRON_BUILD: "1"
+  CI: true
+
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     permissions:
       contents: write
     steps:
@@ -27,11 +33,29 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Windows installer
-        run: pnpm electron:pack
-        env:
-          ECHO_MIRAGE_ELECTRON_BUILD: "1"
-          CI: true
+      - name: Cache Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-win-${{ hashFiles('pnpm-lock.yaml', 'next.config.mjs', 'src/**') }}
+          restore-keys: |
+            next-win-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Build Next.js standalone bundle
+        run: node scripts/prepare-electron-standalone.mjs
+
+      - name: Package Windows installer
+        run: pnpm exec electron-builder --win
+
+      - name: Verify installer artifact
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem dist-electron/*.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) {
+            Get-ChildItem dist-electron -Recurse -ErrorAction SilentlyContinue | Format-Table FullName, Length
+            throw "No installer .exe found under dist-electron"
+          }
+          Write-Host "Installer ready: $($exe.FullName) ($([math]::Round($exe.Length / 1MB, 1)) MB)"
 
       - name: Publish GitHub Release
         shell: pwsh

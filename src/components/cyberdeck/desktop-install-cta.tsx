@@ -33,6 +33,10 @@ export function DesktopInstallCta({ compact = false }: DesktopInstallCtaProps) {
     openDesktopInstaller(info);
   }, [info]);
 
+  const installLabel = info?.installerAvailable
+    ? "INSTALL DESKTOP CYBERDECK"
+    : "OPEN GITHUB RELEASES";
+
   if (isEchoMirageDesktopShell()) {
     return null;
   }
@@ -78,12 +82,8 @@ export function DesktopInstallCta({ compact = false }: DesktopInstallCtaProps) {
         </ul>
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
-        <CyberdeckActionButton
-          variant="accent"
-          disabled={!info.supported && !info.downloadUrl}
-          onClick={handleInstall}
-        >
-          {info.supported ? "INSTALL DESKTOP CYBERDECK" : "VIEW RELEASES"}
+        <CyberdeckActionButton variant="accent" onClick={handleInstall}>
+          {info.supported ? installLabel : "VIEW RELEASES"}
         </CyberdeckActionButton>
         {info.fileName ? (
           <span className="text-[9px] tracking-[0.04em] text-[#5f5f5f]">
@@ -92,6 +92,20 @@ export function DesktopInstallCta({ compact = false }: DesktopInstallCtaProps) {
           </span>
         ) : null}
       </div>
+      {info.statusMessage ? (
+        <p className="text-[9px] leading-relaxed tracking-[0.04em] text-[#6a5a40]">
+          {info.statusMessage}{" "}
+          <a
+            href="https://github.com/loteknowledG/echo-mirage-cyberdeck/actions/workflows/desktop-installer.yml"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#9a8a6a] underline-offset-2 hover:underline"
+          >
+            Check build status
+          </a>
+          .
+        </p>
+      ) : null}
       {!info.supported ? (
         <p className="text-[9px] leading-relaxed tracking-[0.04em] text-[#6a5a40]">
           Packaged installers are Windows-first today. Other platforms can build from source with{" "}

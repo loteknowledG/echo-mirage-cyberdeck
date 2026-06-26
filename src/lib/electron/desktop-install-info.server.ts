@@ -7,9 +7,12 @@ export type DesktopInstallInfo = {
   version: string;
   platform: DesktopInstallPlatform;
   supported: boolean;
+  /** True when a published GitHub release asset exists for this platform. */
+  installerAvailable: boolean;
   downloadUrl: string | null;
   fileName: string | null;
   releasePageUrl: string;
+  statusMessage: string | null;
   features: string[];
 };
 
@@ -39,10 +42,45 @@ function desktopInstallerFileName(version: string, platform: DesktopInstallPlatf
   }
 }
 
-function defaultDownloadUrl(version: string, platform: DesktopInstallPlatform): string | null {
-  const fileName = desktopInstallerFileName(version, platform);
-  if (!fileName) return null;
-  return `${GITHUB_RELEASE_PAGE}/download/${fileName}`;
+type GitHubReleaseAsset = {
+  name: string;
+  browser_download_url: string;
+};
+
+type GitHubRelease = {
+  assets?: GitHubReleaseAsset[];
+};
+
+async function resolvePublishedGitHubAssetUrl(
+  fileName: string,
+): Promise<string | null> {
+  try {
+    const headers: Record<string, string> = {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "echo-mirage-cyberdeck",
+    };
+    const token = process.env.GITHUB_TOKEN?.trim();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const res = await fetch(
+      "https://api.github.com/repos/loteknowledG/echo-mirage-cyberdeck/releases/latest",
+      {
+        headers,
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    if (!res.ok) {
+      return null;
+    }
+
+    const release = (await res.json()) as GitHubRelease;
+    const asset = release.assets?.find((entry) => entry.name === fileName);
+    return asset?.browser_download_url ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function resolveDesktopInstallPlatform(userAgent: string): DesktopInstallPlatform {
@@ -53,21 +91,37 @@ export function resolveDesktopInstallPlatform(userAgent: string): DesktopInstall
   return "unsupported";
 }
 
-export function getDesktopInstallInfo(userAgent: string): DesktopInstallInfo {
+export async function getDesktopInstallInfo(
+  userAgent: string,
+): Promise<DesktopInstallInfo> {
   const version = readPackageVersion();
   const platform = resolveDesktopInstallPlatform(userAgent);
   const supported = platform === "win";
   const fileName = desktopInstallerFileName(version, platform);
   const envUrl = process.env.ECHO_MIRAGE_DESKTOP_INSTALLER_URL?.trim();
   let downloadUrl: string | null = null;
+  let installerAvailable = false;
+  let statusMessage: string | null = null;
+
   if (supported && fileName) {
     if (envUrl) {
       downloadUrl = envUrl;
+      installerAvailable = true;
     } else {
       const localInstaller = path.join(process.cwd(), "public", "downloads", fileName);
-      downloadUrl = existsSync(localInstaller)
-        ? `/downloads/${fileName}`
-        : defaultDownloadUrl(version, platform);
+      if (existsSync(localInstaller)) {
+        downloadUrl = `/downloads/${fileName}`;
+        installerAvailable = true;
+      } else {
+        const publishedUrl = await resolvePublishedGitHubAssetUrl(fileName);
+        if (publishedUrl) {
+          downloadUrl = publishedUrl;
+          installerAvailable = true;
+        } else {
+          statusMessage =
+            "The Windows installer is not published yet. Open GitHub Releases or wait for the desktop-installer workflow to finish.";
+        }
+      }
     }
   }
 
@@ -75,9 +129,11 @@ export function getDesktopInstallInfo(userAgent: string): DesktopInstallInfo {
     version,
     platform,
     supported,
+    installerAvailable,
     downloadUrl,
     fileName,
     releasePageUrl: GITHUB_RELEASE_PAGE,
+    statusMessage,
     features: [
       "Silent Mode and system tray",
       "Local disk operator folders (F:\\dev, etc.)",

@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const userAgent = request.headers.get("user-agent") ?? "";
-  const info = getDesktopInstallInfo(userAgent);
+  const info = await getDesktopInstallInfo(userAgent);
   return NextResponse.json(info, {
     headers: {
       "Cache-Control": "public, max-age=300",
