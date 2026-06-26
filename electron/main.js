@@ -22,6 +22,10 @@ const {
   setMainWindow,
   registerSilentModeIpc,
 } = require('./silent-mode');
+const {
+  startPackagedNextServer,
+  stopPackagedNextServer,
+} = require('./packaged-server');
 
 initializeSilentMode({ app, Tray, Menu, nativeImage });
 
@@ -78,6 +82,10 @@ function getEchoMirageProjectRoot() {
 async function getDevOrigin() {
   if (process.env.ECHO_MIRAGE_DEV_ORIGIN) {
     return process.env.ECHO_MIRAGE_DEV_ORIGIN;
+  }
+
+  if (app.isPackaged) {
+    return startPackagedNextServer();
   }
 
   if (!app.isPackaged) {
@@ -1179,6 +1187,7 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', async () => {
   destroyTray();
+  stopPackagedNextServer();
   if (playrightBrowserState?.browser) {
     try {
       await playrightBrowserState.browser.close();

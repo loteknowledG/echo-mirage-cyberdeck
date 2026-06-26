@@ -57,6 +57,7 @@ function normalizeWebpackWatchIgnored(ignored) {
 const nextConfig = {
 	devIndicators: false,
 	distDir: process.env.CYBERDECK_NEXT_DIST_DIR || ".next",
+	...(process.env.ECHO_MIRAGE_ELECTRON_BUILD === "1" ? { output: "standalone" } : {}),
 	transpilePackages: [
 		"realmorphism",
 		"@eigenpal/docx-editor-react",

@@ -85,12 +85,13 @@ export function useSilentModeSetting(): {
   hydrated: boolean;
   setEnabled: (enabled: boolean) => Promise<void>;
 } {
-  const [available] = useState(() => isSilentModeBridgeAvailable());
+  const [available, setAvailable] = useState(false);
   const [enabled, setEnabledState] = useState(() => readCachedSilentMode());
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     const bridge = window.echoMirageSilentMode;
+    setAvailable(Boolean(bridge));
     if (!bridge) {
       setHydrated(true);
       return;

@@ -38,8 +38,8 @@ bower_components
 # Compiled binary addons (https://nodejs.org/api/addons.html)
 build/Release
 
-# Dependency directories
-node_modules/
+# Electron installer output
+dist-electron/
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)
@@ -174,3 +174,4 @@ dist
 data/property-manager/cases/*
 !data/property-manager/cases/.gitkeep
 .env*
+node_modules

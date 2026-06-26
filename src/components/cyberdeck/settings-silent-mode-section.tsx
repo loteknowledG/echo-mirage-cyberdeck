@@ -1,6 +1,7 @@
 "use client";
 
 import { Switch } from "@/components/ui/switch";
+import { DesktopInstallCta } from "@/components/cyberdeck/desktop-install-cta";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
 import { useSilentModeSetting } from "@/lib/electron/silent-mode";
 import { cn } from "@/lib/utils";
@@ -12,10 +13,6 @@ const SWITCH_LEGACY_EMERALD =
 export function SettingsSilentModeSection() {
   const { available, enabled, hydrated, setEnabled } = useSilentModeSetting();
 
-  if (!available) {
-    return null;
-  }
-
   return (
     <section className="flex flex-col gap-2">
       <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">DESKTOP SHELL</div>
@@ -25,29 +22,53 @@ export function SettingsSilentModeSection() {
           icon always exposes Open and Quit — this is tray-resident mode, not a hidden background
           process.
         </p>
-        <div className="flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3">
-          <div className="min-w-0">
-            <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">SILENT MODE</div>
-            <div className="mt-0.5 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
-              Tray-resident shell with all audio suppressed — speech, keyboard SFX, sonar, and alerts.
+        {!available ? (
+          <div className="space-y-3 border-t border-[#1c1c1c] pt-3">
+            <DesktopInstallCta />
+            <div className="space-y-2 border-t border-[#1c1c1c] pt-3">
+              <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">SILENT MODE</div>
+              <p className="text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
+                Available after installing the desktop shell above. Silent Mode keeps Echo Mirage in
+                the system tray and suppresses all audio.
+              </p>
+              <div className="flex items-center justify-between gap-3 pt-1">
+                <div className="min-w-0 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
+                  Unavailable in this PWA session.
+                </div>
+                <Switch
+                  checked={false}
+                  disabled
+                  aria-label="Silent mode unavailable outside Electron desktop shell"
+                  className={cn("realmorphism-switch shrink-0 opacity-40", SWITCH_LEGACY_EMERALD)}
+                />
+              </div>
             </div>
           </div>
-          <Switch
-            checked={enabled}
-            disabled={!hydrated}
-            onCheckedChange={(checked) => {
-              void setEnabled(checked);
-              emitSignal({
-                source: "settings",
-                type: "updated",
-                payload: { key: "silent_mode", value: checked },
-                severity: "info",
-              });
-            }}
-            aria-label={enabled ? "Silent mode on" : "Silent mode off"}
-            className={cn("realmorphism-switch shrink-0", SWITCH_LEGACY_EMERALD)}
-          />
-        </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3">
+            <div className="min-w-0">
+              <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">SILENT MODE</div>
+              <div className="mt-0.5 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
+                Tray-resident shell with all audio suppressed — speech, keyboard SFX, sonar, and alerts.
+              </div>
+            </div>
+            <Switch
+              checked={enabled}
+              disabled={!hydrated}
+              onCheckedChange={(checked) => {
+                void setEnabled(checked);
+                emitSignal({
+                  source: "settings",
+                  type: "updated",
+                  payload: { key: "silent_mode", value: checked },
+                  severity: "info",
+                });
+              }}
+              aria-label={enabled ? "Silent mode on" : "Silent mode off"}
+              className={cn("realmorphism-switch shrink-0", SWITCH_LEGACY_EMERALD)}
+            />
+          </div>
+        )}
       </div>
     </section>
   );

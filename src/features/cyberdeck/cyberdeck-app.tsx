@@ -337,6 +337,7 @@ import {
   subscribeAudioGate,
 } from "@/lib/cyberdeck/audio-gate";
 import { useSilentModeAudioGateSync } from "@/lib/cyberdeck/use-silent-mode-audio-gate-sync";
+import { DesktopShellInstallBanner } from "@/components/cyberdeck/desktop-shell-install-banner";
 import {
   POWERFIST_STACK_CHANNEL,
   POWERFIST_STACK_PUSH_EVENT,
@@ -7618,6 +7619,7 @@ ${diff}`;
       className="terminal-window box-border flex h-full min-h-0 w-full flex-1 overflow-hidden bg-background font-mono text-green-500 max-md:min-h-0 max-md:flex-col md:h-screen"
     >
       <DeckModeProvider mode={deckMode}>
+      <DesktopShellInstallBanner />
       <CyberdeckScrollbarHost />
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence
