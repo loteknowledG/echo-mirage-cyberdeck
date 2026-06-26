@@ -164,6 +164,7 @@
     "node-pty": "^1.1.0",
     "node-screenshots": "^0.2.8",
     "pako": "2.1.0",
+    "parse5": "^7.3.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.0.227",
     "perfect-scrollbar": "^1.5.6",

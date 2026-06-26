@@ -202,6 +202,9 @@ importers:
       pako:
         specifier: 2.1.0
         version: 2.1.0
+      parse5:
+        specifier: ^7.3.0
+        version: 7.3.0
       pdf-lib:
         specifier: ^1.17.1
         version: 1.17.1
