@@ -38,7 +38,7 @@ async function copyRecursive(from, to) {
 
 async function main() {
   console.log('[electron:prepare] building Next.js standalone bundle…');
-  await run('pnpm', ['exec', 'next', 'build', '--webpack'], {
+  await run('pnpm', ['run', 'build'], {
     ECHO_MIRAGE_ELECTRON_BUILD: '1',
   });
 

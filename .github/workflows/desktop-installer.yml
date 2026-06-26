@@ -1,0 +1,58 @@
+name: Desktop installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "desktop-v*"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Windows installer
+        run: pnpm electron:pack
+        env:
+          ECHO_MIRAGE_ELECTRON_BUILD: "1"
+          CI: true
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = node -p "require('./package.json').version"
+          if ($env:GITHUB_REF -like 'refs/tags/*') {
+            $tag = $env:GITHUB_REF -replace 'refs/tags/', ''
+          } else {
+            $tag = "desktop-v$version"
+          }
+          $exe = Get-ChildItem dist-electron/*.exe | Select-Object -First 1
+          if (-not $exe) { throw "No installer .exe found under dist-electron" }
+          Write-Host "Publishing $($exe.Name) to release $tag"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag $exe.FullName `
+              --title "Echo Mirage Desktop $version" `
+              --notes "Windows desktop installer — Silent Mode, system tray, local disk IPC, and full cyberdeck bridges." `
+              --latest
+          } else {
+            gh release upload $tag $exe.FullName --clobber
+          }

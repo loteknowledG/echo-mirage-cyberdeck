@@ -40,6 +40,12 @@ build/Release
 
 # Electron installer output
 dist-electron/
+
+# Local notebooks (unrelated analysis — keep out of cyberdeck repo)
+notebooks/
+
+# Dependency directories
+node_modules/
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)
