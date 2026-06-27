@@ -479,12 +479,18 @@ function buildContextMenu(win, params) {
   menu.popup({ window: win });
 }
 
+async function loadStartupErrorPage(win, message) {
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Echo Mirage Cyberdeck</title></head><body style="margin:0;background:#000;color:#8fd88f;font-family:Consolas,monospace;padding:24px"><h1 style="font-size:14px;letter-spacing:0.08em">ECHO MIRAGE // STARTUP FAILED</h1><p style="font-size:12px;line-height:1.5;color:#9a9a9a">The embedded cyberdeck server did not start. Try reinstalling from GitHub Releases, or run the latest installer build.</p><pre style="white-space:pre-wrap;font-size:11px;line-height:1.45;color:#c8c8c8;border:1px solid #1f1f1f;padding:12px;background:#050505">${message.replace(/[<>&]/g, (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[ch] || ch)}</pre></body></html>`;
+  await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+}
+
 async function createWindow() {
   const startInSilentTray = getSilentMode();
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
-    show: !startInSilentTray,
+    show: false,
+    backgroundColor: '#000000',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -506,10 +512,24 @@ async function createWindow() {
     buildContextMenu(win, params);
   });
 
-  // Load your Next.js app (dev server)
-  // Keep in sync with package.json dev/start port (avoids clash with Weyland-Yutani on :3000).
-  const origin = await getDevOrigin();
-  await win.loadURL(`${origin}/cyberdeck`);
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    if (validatedURL.startsWith('data:')) return;
+    process.stderr.write(
+      `[echo-mirage] did-fail-load code=${errorCode} url=${validatedURL} ${errorDescription}\n`,
+    );
+  });
+
+  try {
+    const origin = await getDevOrigin();
+    await win.loadURL(`${origin}/cyberdeck`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`[echo-mirage] startup error: ${message}\n`);
+    await loadStartupErrorPage(win, message);
+    if (app.isPackaged) {
+      dialog.showErrorBox('Echo Mirage Cyberdeck', message.slice(0, 2000));
+    }
+  }
 
   if (!startInSilentTray) {
     win.show();
@@ -1175,6 +1195,9 @@ ipcMain.handle('computer-use:run-action', async (_event, action) => {
 });
 
 app.whenReady().then(async () => {
+  if (app.isPackaged) {
+    Menu.setApplicationMenu(null);
+  }
   registerEchoMirageFileProtocol();
   await initializeMediaProtection();
   await loadSilentModeState();

@@ -8,13 +8,31 @@ const path = require('path');
 let serverProcess = null;
 /** @type {string | null} */
 let serverOrigin = null;
+/** @type {string} */
+let serverLogTail = '';
 
 function getStandaloneDir() {
   const { app } = require('electron');
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'app');
   }
+  const electronStandalone = path.resolve(__dirname, '..', '.next', 'standalone-electron');
+  if (fs.existsSync(path.join(electronStandalone, 'server.js'))) {
+    return electronStandalone;
+  }
   return path.resolve(__dirname, '..', '.next', 'standalone');
+}
+
+function appendServerLog(text) {
+  serverLogTail = `${serverLogTail}${text}`.slice(-8000);
+  try {
+    const { app } = require('electron');
+    const logDir = path.join(app.getPath('userData'), 'logs');
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(path.join(logDir, 'next-server.log'), text);
+  } catch {
+    /* best-effort logging */
+  }
 }
 
 function findFreePort() {
@@ -32,10 +50,19 @@ function findFreePort() {
   });
 }
 
-function waitForHttpOk(url, deadlineMs = 180_000) {
+function waitForHttpOk(url, childProcess, deadlineMs = 180_000) {
   const started = Date.now();
   return new Promise((resolve, reject) => {
     const attempt = () => {
+      if (childProcess && childProcess.exitCode != null) {
+        reject(
+          new Error(
+            `Next.js server exited before becoming ready (code ${childProcess.exitCode}). ${serverLogTail}`,
+          ),
+        );
+        return;
+      }
+
       const request = http.get(url, (response) => {
         response.resume();
         if (response.statusCode && response.statusCode >= 200 && response.statusCode < 400) {
@@ -43,14 +70,18 @@ function waitForHttpOk(url, deadlineMs = 180_000) {
           return;
         }
         if (Date.now() - started > deadlineMs) {
-          reject(new Error(`Timed out waiting for ${url} (HTTP ${response.statusCode ?? 'unknown'})`));
+          reject(
+            new Error(
+              `Timed out waiting for ${url} (HTTP ${response.statusCode ?? 'unknown'}). ${serverLogTail}`,
+            ),
+          );
           return;
         }
         setTimeout(attempt, 750);
       });
       request.on('error', () => {
         if (Date.now() - started > deadlineMs) {
-          reject(new Error(`Timed out waiting for ${url}`));
+          reject(new Error(`Timed out waiting for ${url}. ${serverLogTail}`));
           return;
         }
         setTimeout(attempt, 750);
@@ -67,10 +98,11 @@ async function startPackagedNextServer() {
   const serverJs = path.join(appDir, 'server.js');
   if (!fs.existsSync(serverJs)) {
     throw new Error(
-      `Packaged Next server not found at ${serverJs}. Run pnpm electron:pack after a successful standalone build.`,
+      `Packaged Next server not found at ${serverJs}. Reinstall Echo Mirage or rebuild with pnpm electron:pack.`,
     );
   }
 
+  serverLogTail = '';
   const port = await findFreePort();
   serverProcess = spawn(process.execPath, [serverJs], {
     cwd: appDir,
@@ -80,27 +112,35 @@ async function startPackagedNextServer() {
       NODE_ENV: 'production',
       PORT: String(port),
       HOSTNAME: '127.0.0.1',
+      NEXT_TELEMETRY_DISABLED: '1',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
+    shell: false,
   });
 
   serverProcess.stdout?.on('data', (chunk) => {
-    process.stdout.write(`[echo-next] ${chunk}`);
+    const text = chunk.toString();
+    appendServerLog(text);
+    process.stdout.write(`[echo-next] ${text}`);
   });
   serverProcess.stderr?.on('data', (chunk) => {
-    process.stderr.write(`[echo-next] ${chunk}`);
+    const text = chunk.toString();
+    appendServerLog(text);
+    process.stderr.write(`[echo-next] ${text}`);
   });
   serverProcess.on('exit', (code, signal) => {
     if (serverProcess) {
-      process.stderr.write(`[echo-next] exited code=${code ?? 'null'} signal=${signal ?? 'null'}\n`);
+      const line = `[echo-next] exited code=${code ?? 'null'} signal=${signal ?? 'null'}\n`;
+      appendServerLog(line);
+      process.stderr.write(line);
     }
     serverProcess = null;
     serverOrigin = null;
   });
 
   serverOrigin = `http://127.0.0.1:${port}`;
-  await waitForHttpOk(`${serverOrigin}/cyberdeck`);
+  await waitForHttpOk(`${serverOrigin}/cyberdeck`, serverProcess);
   return serverOrigin;
 }
 

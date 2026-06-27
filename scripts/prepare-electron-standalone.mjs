@@ -62,12 +62,22 @@ async function main() {
     await copyRecursive(assetsDir, path.join(standaloneDir, 'assets'));
   }
 
+  const packagedDir = path.join(root, '.next', 'standalone-electron');
+  console.log('[electron:prepare] materializing standalone for electron (dereference symlinks)…');
+  await fs.rm(packagedDir, { recursive: true, force: true });
+  await fs.cp(standaloneDir, packagedDir, { recursive: true, force: true, dereference: true });
+
+  const packagedServerJs = path.join(packagedDir, 'server.js');
+  if (!(await pathExists(packagedServerJs))) {
+    throw new Error(`Missing ${packagedServerJs} after materialize.`);
+  }
+
   const buildIdPath = path.join(root, '.next', 'BUILD_ID');
   if (await pathExists(buildIdPath)) {
     const buildId = (await fs.readFile(buildIdPath, 'utf8')).trim();
-    console.log(`[electron:prepare] standalone ready (build ${buildId})`);
+    console.log(`[electron:prepare] standalone-electron ready (build ${buildId})`);
   } else {
-    console.log('[electron:prepare] standalone ready');
+    console.log('[electron:prepare] standalone-electron ready');
   }
 }
 
