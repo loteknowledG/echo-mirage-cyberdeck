@@ -48,6 +48,17 @@ contextBridge.exposeInMainWorld('echoMirageSilentMode', {
   },
 });
 
+contextBridge.exposeInMainWorld('echoMirageAppUpdate', {
+  getVersion: () => ipcRenderer.invoke('echo:app-update:get-version'),
+  checkForUpdates: () => ipcRenderer.invoke('echo:app-update:check'),
+  quitAndInstall: () => ipcRenderer.invoke('echo:app-update:quit-and-install'),
+  subscribe: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on('echo:app-update:event', listener);
+    return () => ipcRenderer.removeListener('echo:app-update:event', listener);
+  },
+});
+
 contextBridge.exposeInMainWorld('echoMirageOpen', {
   pickConvertDocument: () => ipcRenderer.invoke('echo-mirage-open:pick-convert-document'),
   pickOperatorFolder: () => ipcRenderer.invoke('echo-mirage-open:pick-operator-folder'),

@@ -70,13 +70,19 @@ jobs:
           }
           $exe = Get-ChildItem dist-electron/*.exe | Select-Object -First 1
           if (-not $exe) { throw "No installer .exe found under dist-electron" }
-          Write-Host "Publishing $($exe.Name) to release $tag"
+          $assets = @($exe.FullName)
+          $latestYml = Join-Path dist-electron "latest.yml"
+          if (Test-Path $latestYml) { $assets += $latestYml }
+          Get-ChildItem dist-electron -Filter "*.blockmap" -File -ErrorAction SilentlyContinue | ForEach-Object {
+            $assets += $_.FullName
+          }
+          Write-Host "Publishing $($assets.Count) release asset(s) to release $tag"
           gh release view $tag 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag $exe.FullName `
+            gh release create $tag @assets `
               --title "Echo Mirage Desktop $version" `
-              --notes "Windows desktop installer — Silent Mode, system tray, local disk IPC, and full cyberdeck bridges." `
+              --notes "Windows desktop installer — auto-update via Settings or restart prompt. Silent Mode, system tray, local disk IPC, and full cyberdeck bridges." `
               --latest
           } else {
-            gh release upload $tag $exe.FullName --clobber
+            gh release upload $tag @assets --clobber
           }

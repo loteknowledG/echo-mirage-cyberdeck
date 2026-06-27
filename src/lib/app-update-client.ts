@@ -8,19 +8,46 @@ type AppVersionResponse = {
 
 export type AppUpdateCheckResult =
   | { status: "up-to-date"; running: string; latest: string }
-  | { status: "update-available"; running: string; latest: string }
-  | { status: "unavailable" }
+  | { status: "update-available"; running: string; latest: string; downloaded?: boolean }
+  | { status: "unavailable"; message?: string }
   | { status: "local-dev"; message: string };
 
-export function shouldPollForAppUpdates(): boolean {
-  if (typeof window === "undefined") return false;
-  if (process.env.NODE_ENV === "development") return false;
+type DesktopUpdateBridge = {
+  getVersion: () => Promise<string>;
+  checkForUpdates: () => Promise<
+    AppUpdateCheckResult | { status: "unavailable"; message?: string }
+  >;
+  quitAndInstall: () => Promise<{ ok: boolean; error?: string }>;
+  subscribe: (
+    callback: (payload: {
+      type: string;
+      version?: string;
+      percent?: number;
+      message?: string;
+    }) => void,
+  ) => () => void;
+};
 
-  const host = window.location.hostname;
-  return host !== "localhost" && host !== "127.0.0.1";
+function getDesktopUpdateBridge(): DesktopUpdateBridge | null {
+  if (typeof window === "undefined") return null;
+  return window.echoMirageAppUpdate ?? null;
+}
+
+export function isDesktopAutoUpdateShell(): boolean {
+  return getDesktopUpdateBridge() != null;
 }
 
 export async function fetchAppReleaseVersion(): Promise<string | null> {
+  const desktop = getDesktopUpdateBridge();
+  if (desktop) {
+    try {
+      const version = (await desktop.getVersion()).trim();
+      return version || null;
+    } catch {
+      return null;
+    }
+  }
+
   try {
     const res = await fetch("/api/app-version", { cache: "no-store" });
     if (!res.ok) return null;
@@ -106,6 +133,12 @@ export function promptForAppUpdate(version: string, options?: { force?: boolean 
 }
 
 export async function restartAppForUpdate(waitingWorker?: ServiceWorker | null) {
+  const desktop = getDesktopUpdateBridge();
+  if (desktop) {
+    await desktop.quitAndInstall();
+    return;
+  }
+
   const latest = await fetchAppReleaseVersion();
   if (latest) {
     setStoredRunningVersion(latest);
@@ -124,6 +157,18 @@ export async function checkForAppUpdate(options?: {
   manual?: boolean;
 }): Promise<AppUpdateCheckResult> {
   const manual = options?.manual ?? false;
+  const desktop = getDesktopUpdateBridge();
+
+  if (desktop) {
+    const result = await desktop.checkForUpdates();
+    if (result.status === "up-to-date" || result.status === "update-available") {
+      setStoredRunningVersion(result.running);
+      if (result.status === "update-available" && !manual) {
+        promptForAppUpdate(result.latest);
+      }
+    }
+    return result;
+  }
 
   if (!manual && !shouldPollForAppUpdates()) {
     return {
@@ -158,4 +203,26 @@ export async function checkForAppUpdate(options?: {
   }
 
   return { status: "up-to-date", running, latest };
+}
+
+export function shouldPollForAppUpdates(): boolean {
+  if (typeof window === "undefined") return false;
+  if (isDesktopAutoUpdateShell()) return true;
+  if (process.env.NODE_ENV === "development") return false;
+
+  const host = window.location.hostname;
+  return host !== "localhost" && host !== "127.0.0.1";
+}
+
+export function subscribeDesktopAppUpdateEvents(
+  callback: (payload: {
+    type: string;
+    version?: string;
+    percent?: number;
+    message?: string;
+  }) => void,
+): () => void {
+  const desktop = getDesktopUpdateBridge();
+  if (!desktop) return () => {};
+  return desktop.subscribe(callback);
 }

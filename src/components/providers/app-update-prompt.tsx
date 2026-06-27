@@ -7,9 +7,11 @@ import {
   checkForAppUpdate,
   dismissAppUpdate,
   fetchAppReleaseVersion,
+  isDesktopAutoUpdateShell,
   promptForAppUpdate,
   restartAppForUpdate,
   shouldPollForAppUpdates,
+  subscribeDesktopAppUpdateEvents,
   syncRunningReleaseVersion,
 } from "@/lib/app-update-client";
 
@@ -63,6 +65,14 @@ export function AppUpdatePrompt() {
   useEffect(() => {
     if (!shouldPollForAppUpdates()) return;
 
+    const unsubscribeDesktop = isDesktopAutoUpdateShell()
+      ? subscribeDesktopAppUpdateEvents((payload) => {
+          if (payload.type === "update-downloaded" && payload.version) {
+            showUpdate(payload.version);
+          }
+        })
+      : () => {};
+
     void checkForUpdate();
 
     const onFocus = () => {
@@ -83,14 +93,16 @@ export function AppUpdatePrompt() {
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
+      unsubscribeDesktop();
       window.clearInterval(intervalId);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [checkForUpdate]);
+  }, [checkForUpdate, showUpdate]);
 
   useEffect(() => {
     if (!shouldPollForAppUpdates()) return;
+    if (isDesktopAutoUpdateShell()) return;
     if (!("serviceWorker" in navigator)) return;
 
     let cancelled = false;
@@ -166,7 +178,9 @@ export function AppUpdatePrompt() {
         <div className="min-w-0">
           <p className="text-sm font-medium tracking-wide text-[#d8ffd8]">Update ready</p>
           <p className="mt-1 text-xs leading-relaxed text-[#8fd88f]">
-            A newer Echo Mirage build is available. Restart to load the latest version.
+            {isDesktopAutoUpdateShell()
+              ? "A newer Echo Mirage build downloaded in the background. Restart to install it."
+              : "A newer Echo Mirage build is available. Restart to load the latest version."}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

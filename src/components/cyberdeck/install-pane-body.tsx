@@ -68,8 +68,10 @@ export function InstallPaneBody() {
                   <li>Run the installer and choose your install directory when prompted.</li>
                   <li>Launch Echo Mirage Cyberdeck from the Start menu or desktop shortcut.</li>
                   <li>
-                    Open Settings (§) for Silent Mode, tray behavior, and desktop-only controls.
+                    Future updates download automatically — use Settings → App Updates → Restart when
+                    prompted.
                   </li>
+                  <li>Open Settings (§) for Silent Mode, tray behavior, and desktop-only controls.</li>
                 </ol>
               </section>
             </>

@@ -26,6 +26,7 @@ const {
   startPackagedNextServer,
   stopPackagedNextServer,
 } = require('./packaged-server');
+const { initializeAutoUpdater } = require('./auto-updater');
 
 initializeSilentMode({ app, Tray, Menu, nativeImage });
 
@@ -1202,6 +1203,7 @@ app.whenReady().then(async () => {
   await initializeMediaProtection();
   await loadSilentModeState();
   registerSilentModeIpc(ipcMain);
+  initializeAutoUpdater();
   if (getSilentMode()) {
     ensureTray();
   }

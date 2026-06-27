@@ -150,6 +150,26 @@ declare global {
     subscribe(callback: (payload: { enabled: boolean }) => void): () => void;
   }
 
+  interface EchoMirageAppUpdateBridge {
+    getVersion(): Promise<string>;
+    checkForUpdates(): Promise<{
+      status: "up-to-date" | "update-available" | "unavailable";
+      running?: string;
+      latest?: string;
+      downloaded?: boolean;
+      message?: string;
+    }>;
+    quitAndInstall(): Promise<{ ok: boolean; error?: string }>;
+    subscribe(
+      callback: (payload: {
+        type: string;
+        version?: string;
+        percent?: number;
+        message?: string;
+      }) => void,
+    ): () => void;
+  }
+
   interface Window {
     echoMirageClipboard?: EchoMirageClipboardBridge;
     echoMirageBrowser?: EchoMirageBrowserBridge;
@@ -157,6 +177,7 @@ declare global {
     echoMirageOpen?: EchoMirageOpenBridge;
     echoMirageMediaProtection?: EchoMirageMediaProtectionBridge;
     echoMirageSilentMode?: EchoMirageSilentModeBridge;
+    echoMirageAppUpdate?: EchoMirageAppUpdateBridge;
   }
 }
 

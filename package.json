@@ -1,6 +1,6 @@
 {
   "name": "echo-mirage-cyberdeck",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "packageManager": "pnpm@10.33.2",
   "main": "electron/main.js",
@@ -139,6 +139,7 @@
     "cmdk": "^1.1.1",
     "cropperjs": "^2.1.0",
     "docx-preview": "^0.3.7",
+    "electron-updater": "^6.6.2",
     "embla-carousel": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "figlet": "^1.11.0",
@@ -269,6 +270,10 @@
       "uninstallerIcon": "public/icon.ico",
       "artifactName": "Echo-Mirage-Cyberdeck-Setup-${version}.${ext}",
       "shortcutName": "Echo Mirage Cyberdeck"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/latest/download"
     }
   }
 }

@@ -6,6 +6,7 @@ import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-
 import {
   checkForAppUpdate,
   fetchAppReleaseVersion,
+  isDesktopAutoUpdateShell,
   promptForAppUpdate,
   restartAppForUpdate,
   syncRunningReleaseVersion,
@@ -23,7 +24,9 @@ function resultMessage(result: AppUpdateCheckResult): string {
     case "up-to-date":
       return "You're on the latest build.";
     case "update-available":
-      return "A newer build is ready. Restart to load it.";
+      return isDesktopAutoUpdateShell()
+        ? "Update downloaded. Restart to install the new desktop build."
+        : "A newer build is ready. Restart to load it.";
     case "unavailable":
       return "Could not reach the update server. Try again in a moment.";
     case "local-dev":
@@ -80,8 +83,9 @@ export function SettingsAppUpdateSection() {
       <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">APP UPDATES</div>
       <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">
         <p className="mb-3 text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
-          Echo Mirage checks for new builds in the background. Use this if you want to check right now
-          after a deploy.
+          {isDesktopAutoUpdateShell()
+            ? "The desktop shell checks GitHub Releases for new installers, downloads them in the background, and installs on restart."
+            : "Echo Mirage checks for new builds in the background. Use this if you want to check right now after a deploy."}
         </p>
 
         <div className="space-y-2 border-t border-[#1c1c1c] pt-3">
