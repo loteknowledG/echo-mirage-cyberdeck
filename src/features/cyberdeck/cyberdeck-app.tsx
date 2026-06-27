@@ -337,7 +337,7 @@ import {
   subscribeAudioGate,
 } from "@/lib/cyberdeck/audio-gate";
 import { useSilentModeAudioGateSync } from "@/lib/cyberdeck/use-silent-mode-audio-gate-sync";
-import { DesktopShellInstallBanner } from "@/components/cyberdeck/desktop-shell-install-banner";
+import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
 import {
   POWERFIST_STACK_CHANNEL,
   POWERFIST_STACK_PUSH_EVENT,
@@ -504,6 +504,7 @@ const CUSTOM_TAB_KINDS = [
   "photoshop",
   "db8",
   "cadre",
+  "install",
   "catelog",
 ] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -614,6 +615,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Pi", kind: "pi", action: "convert" },
   { label: "DB8", kind: "db8", action: "convert" },
   { label: "Cadre", kind: "cadre", action: "convert" },
+  { label: "Install", kind: "install", action: "convert" },
   { label: "Settings", action: "settings-pane" },
 ] as CustomTabContextMenuAction[]).sort((a, b) =>
   a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
@@ -982,6 +984,14 @@ function normalizeCustomTabKind(kind: string) {
     return "cadre" as CustomTabKind;
   }
   if (
+    nextKind === "install" ||
+    nextKind === "install-desktop" ||
+    nextKind === "install_desktop" ||
+    nextKind === "desktop-install"
+  ) {
+    return "install" as CustomTabKind;
+  }
+  if (
     nextKind === "call-center" ||
     nextKind === "call_center" ||
     nextKind === "callcenter"
@@ -1026,6 +1036,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "photoshop") return "Ps";
   if (kind === "db8") return "8";
   if (kind === "cadre") return "C";
+  if (kind === "install") return "I";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
@@ -1042,6 +1053,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "photoshop") return "PHOTOSHOP";
   if (kind === "db8") return "DB8";
   if (kind === "cadre") return "CADRE";
+  if (kind === "install") return "INSTALL";
   return kind.toUpperCase();
 }
 
@@ -2713,6 +2725,28 @@ export default function CyberdeckApp() {
     }
 
     setOperatorActiveFilePath(logicalPath);
+  }, [deckUiHydrated]);
+
+  useEffect(() => {
+    if (!deckUiHydrated) return;
+    if (isEchoMirageDesktopShell()) {
+      useCyberdeckTabStore.getState().setCustomTabs((prev) =>
+        prev.filter((tab) => tab.kind !== "install"),
+      );
+      return;
+    }
+    useCyberdeckTabStore.getState().setCustomTabs((prev) => {
+      if (prev.some((tab) => tab.kind === "install")) return prev;
+      return [
+        {
+          id: "echo-install-pane",
+          label: "INSTALL",
+          glyph: "I",
+          kind: "install",
+        },
+        ...prev,
+      ];
+    });
   }, [deckUiHydrated]);
 
   const buildCyberdeckUiPayload = useCallback(
@@ -7513,6 +7547,10 @@ ${diff}`;
         return shell(<ActivatedCyberdeckPane kind="cadre" />);
       }
 
+      if (tab.kind === "install") {
+        return shell(<ActivatedCyberdeckPane kind="install" />);
+      }
+
       if (tab.kind === "glyph-channel") {
         return (
           <div
@@ -7619,7 +7657,6 @@ ${diff}`;
       className="terminal-window box-border flex h-full min-h-0 w-full flex-1 overflow-hidden bg-background font-mono text-green-500 max-md:min-h-0 max-md:flex-col md:h-screen"
     >
       <DeckModeProvider mode={deckMode}>
-      <DesktopShellInstallBanner />
       <CyberdeckScrollbarHost />
       <CyberdeckBootSequence />
       <CyberdeckTabPersistence

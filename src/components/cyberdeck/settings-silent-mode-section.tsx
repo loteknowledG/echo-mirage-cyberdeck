@@ -1,7 +1,6 @@
 "use client";
 
 import { Switch } from "@/components/ui/switch";
-import { DesktopInstallCta } from "@/components/cyberdeck/desktop-install-cta";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
 import { useSilentModeSetting } from "@/lib/electron/silent-mode";
 import { cn } from "@/lib/utils";
@@ -24,7 +23,10 @@ export function SettingsSilentModeSection() {
         </p>
         {!available ? (
           <div className="space-y-3 border-t border-[#1c1c1c] pt-3">
-            <DesktopInstallCta />
+            <p className="text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
+              Open the <span className="text-[#8a8a8a]">INSTALL</span> tab on the server rail to
+              download the desktop cyberdeck shell.
+            </p>
             <div className="space-y-2 border-t border-[#1c1c1c] pt-3">
               <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">SILENT MODE</div>
               <p className="text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">

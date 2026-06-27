@@ -3,6 +3,7 @@
 import { useEffect, type MouseEvent, type RefObject, type WheelEvent } from "react";
 import { motion, useMotionValue, type PanInfo } from "motion/react";
 import { CadreRailIcon } from "@/components/cyberdeck/cadre-rail-icon";
+import { InstallDesktopRailIcon } from "@/components/cyberdeck/install-desktop-rail-icon";
 import { RailAsciiButton } from "@/components/cyberdeck/rail-ascii-button";
 import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import {
@@ -58,6 +59,9 @@ export function CyberdeckServerRail({
   const railIconForCustomTab = (tab: { kind: string }) => {
     if (tab.kind === "cadre") {
       return <CadreRailIcon />;
+    }
+    if (tab.kind === "install") {
+      return <InstallDesktopRailIcon />;
     }
     return undefined;
   };
