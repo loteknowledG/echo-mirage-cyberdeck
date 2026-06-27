@@ -11,6 +11,7 @@ import type { Identity } from "@/lib/identity/identity-types";
 import { cn } from "@/lib/utils";
 import { DepthButton, DepthPanel } from "@/components/realmorphism";
 import { SettingsAppUpdateSection } from "@/components/cyberdeck/settings-app-update-section";
+import { SettingsPowerfistPairingSection } from "@/components/cyberdeck/settings-powerfist-pairing-section";
 import { SettingsSilentModeSection } from "@/components/cyberdeck/settings-silent-mode-section";
 import { MuthurComposerAudioKnobs } from "@/components/cyberdeck/muthur-composer-audio-knobs";
 
@@ -129,6 +130,7 @@ export function CyberdeckSettingsPaneBody({
             </div>
           </section>
           <SettingsSilentModeSection />
+          <SettingsPowerfistPairingSection />
           <SettingsAppUpdateSection />
           <section className="flex flex-col gap-2">
             <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">DEPTH PANEL LAB</div>

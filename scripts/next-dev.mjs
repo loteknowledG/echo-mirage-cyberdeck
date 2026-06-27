@@ -227,6 +227,8 @@ const nextArgs = [
   `--max-old-space-size=${HEAP_MB}`,
   nextCli,
   'dev',
+  '-H',
+  '0.0.0.0',
   '-p',
   String(appPort),
   ...(bundler === 'turbopack' ? [] : ['--webpack']),

@@ -91,6 +91,7 @@ const nextConfig = {
 	},
 	experimental: {
 		webpackMemoryOptimizations: true,
+		instrumentationHook: true,
 	},
 	outputFileTracingIncludes: {
 		"/api/glyph/*": ["./assets/figlet-fonts/**"],
@@ -116,6 +117,7 @@ const nextConfig = {
 		"@nut-tree-fork/nut-js",
 		"node-screenshots",
 		"windows-use",
+		"ws",
 	],
 	webpack: (config, { dev, isServer }) => {
 		// Avoid Windows EPERM readlink failures on Jupyter runtime / Pi venv symlinks.

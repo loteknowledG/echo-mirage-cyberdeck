@@ -343,6 +343,12 @@ import {
   POWERFIST_STACK_PUSH_EVENT,
   type PowerFistStackCommand,
 } from "@/lib/cyberdeck/powerfist-events";
+import { connectPowerfistDeckSocket, fetchPowerfistDeckConnect } from "@/lib/cyberdeck/powerfist-remote-socket";
+import {
+  ESPIONAGE_MISSION_SOLVE_EVENT,
+  type EspionageMissionSolveDetail,
+} from "@/lib/cyberdeck/powerfist-mission.types";
+import { ESPIONAGE_ECHO_DISPLAY, ESPIONAGE_MIRAGE_DISPLAY } from "@/lib/cyberdeck/espionage-mode";
 import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
@@ -6576,6 +6582,29 @@ ${diff}`;
       if (!message) return;
       void handleSend(message, { preserveSelectedSurface: true });
     };
+    const handleEspionageMissionSolve = (detail: EspionageMissionSolveDetail) => {
+      revokeOperatorBlobUrl(operatorPreviewBlobUrlRef.current);
+      operatorPreviewBlobUrlRef.current = null;
+      setOperatorDroppedAsset({
+        kind: "image",
+        name: `echo-${detail.missionId.slice(0, 8)}.png`,
+        mimeType: "image/png",
+        size: 0,
+        surface: "image",
+        imageSrc: detail.imageDataUrl,
+      });
+      setOperatorSurfaceMode("workspace");
+      setOperatorDocMode("edit");
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          text: `ESPIONAGE // ${ESPIONAGE_ECHO_DISPLAY} capture → ${ESPIONAGE_MIRAGE_DISPLAY} // mission ${detail.missionId.slice(0, 8)}…`,
+        },
+      ]);
+      const prompt = `${detail.prompt}\n\n[System: ${ESPIONAGE_ECHO_DISPLAY} screenshot is in the operator image preview. Use observe_operator_pane (surface operator) to inspect it before answering.]`;
+      void handleSend(prompt, { preserveSelectedSurface: true });
+    };
     const handlePowerFistPush = (event: Event) => {
       event.preventDefault();
       void pushToChat((event as CustomEvent<PowerFistStackCommand>).detail);
@@ -6589,10 +6618,32 @@ ${diff}`;
         void pushToChat(event.data);
       };
     }
+    let deckSocket: ReturnType<typeof connectPowerfistDeckSocket> | null = null;
+    let cancelled = false;
+    void (async () => {
+      const pairing = await fetchPowerfistDeckConnect();
+      if (cancelled || !pairing.ok || !pairing.deckWsUrl) return;
+      deckSocket = connectPowerfistDeckSocket({
+        wsUrl: pairing.deckWsUrl,
+        onStackPush: (command) => {
+          void pushToChat(command);
+        },
+        onMissionSolve: handleEspionageMissionSolve,
+      });
+    })();
+    const handleEspionageMissionEvent = (event: Event) => {
+      handleEspionageMissionSolve(
+        (event as CustomEvent<EspionageMissionSolveDetail>).detail,
+      );
+    };
     window.addEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
+    window.addEventListener(ESPIONAGE_MISSION_SOLVE_EVENT, handleEspionageMissionEvent);
     return () => {
+      cancelled = true;
       window.removeEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
+      window.removeEventListener(ESPIONAGE_MISSION_SOLVE_EVENT, handleEspionageMissionEvent);
       channel?.close();
+      deckSocket?.close();
     };
   });
 

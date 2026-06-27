@@ -19,6 +19,16 @@ import {
   POWERFIST_STACK_PUSH_EVENT,
   type PowerFistStackCommand,
 } from "@/lib/cyberdeck/powerfist-events";
+import {
+  buildPowerfistRemoteWsUrl,
+  clearPowerfistPairQueryFromUrl,
+  completePowerfistPairFromQr,
+  connectPowerfistRemoteSocket,
+  readPowerfistPairParamsFromQuery,
+  readPowerfistRemoteCredentials,
+  type PowerfistSocketStatus,
+} from "@/lib/cyberdeck/powerfist-remote-socket";
+import { PowerfistRemoteLinkBanner } from "@/components/cyberdeck/powerfist-remote-link-banner";
 import { ALL_PREVIEW_DECKS } from "./preview-data";
 import { scrollMatrixTo, wrapIndex } from "./preview-matrix-nav";
 import { PowerfistJoystickControls } from "./powerfist-joystick-controls";
@@ -75,9 +85,12 @@ export function PreviewMatrix() {
   const [armingCardKey, setArmingCardKey] = useState<string | null>(null);
   const [armedCardKey, setArmedCardKey] = useState<string | null>(null);
   const [pushReceiptHtml, setPushReceiptHtml] = useState<string | null>(null);
+  const [remoteSocketStatus, setRemoteSocketStatus] = useState<PowerfistSocketStatus>("disconnected");
+  const [pairMessage, setPairMessage] = useState<string | null>(null);
 
   const matrixRef = useRef<HTMLElement>(null);
   const paneRef = useRef<HTMLElement>(null);
+  const remoteSocketRef = useRef<ReturnType<typeof connectPowerfistRemoteSocket> | null>(null);
   const deckViewportRef = useRef<HTMLDivElement>(null);
   const handViewportRefs = useRef<(HTMLDivElement | null)[]>([]);
   const deckEmblaRef = useRef<EmblaCarouselType | null>(null);
@@ -352,10 +365,31 @@ export function PreviewMatrix() {
   );
 
   const handlePushCard = useCallback(
-    (deckIndex: number, cardIndex: number) => {
+    async (deckIndex: number, cardIndex: number) => {
       applyFocus(deckIndex, cardIndex);
       const deck = activeDecks[deckIndex];
       const card = deck.cards[cardIndex];
+
+      if (card.title === "Espionage Capture") {
+        const remote = remoteSocketRef.current;
+        if (!remote) {
+          setPushReceiptHtml("Espionage Capture requires a paired PowerFist link to Mirage.");
+          return;
+        }
+        const result = await remote.sendEspionageCaptureMission();
+        if (pushReceiptTimerRef.current) clearTimeout(pushReceiptTimerRef.current);
+        setPushReceiptHtml(
+          result.ok
+            ? `Espionage mission <strong>${result.missionId?.slice(0, 8) ?? "—"}…</strong> — Echo captures, Mirage solves.`
+            : `Espionage mission failed: ${result.error ?? "unknown error"}`,
+        );
+        pushReceiptTimerRef.current = setTimeout(() => {
+          setPushReceiptHtml(null);
+          pushReceiptTimerRef.current = null;
+        }, CARD_PUSH_RECEIPT_DURATION_MS);
+        return;
+      }
+
       const deckTargetLabel = CYBERDECK_PANE_REGISTRY[deck.targetPane].label;
       const composerSupplement = composerText.trim() || undefined;
       const chatMessage = cardChatMessage(deck.name, deckTargetLabel, card);
@@ -378,19 +412,32 @@ export function PreviewMatrix() {
       if (composerSupplement && card.toolOverride?.composerArg) {
         setComposerText("");
       }
-      const event = new CustomEvent<PowerFistStackCommand>(POWERFIST_STACK_PUSH_EVENT, {
-        cancelable: true,
-        detail,
-      });
-      window.dispatchEvent(event);
-      if (!event.defaultPrevented && "BroadcastChannel" in window) {
-        const channel = new BroadcastChannel(POWERFIST_STACK_CHANNEL);
-        channel.postMessage(detail);
-        channel.close();
+
+      let deliveredRemotely = false;
+      const remote = remoteSocketRef.current;
+      if (remote) {
+        const result = await remote.sendStackPush(detail);
+        deliveredRemotely = result.ok;
       }
+
+      if (!deliveredRemotely) {
+        const event = new CustomEvent<PowerFistStackCommand>(POWERFIST_STACK_PUSH_EVENT, {
+          cancelable: true,
+          detail,
+        });
+        window.dispatchEvent(event);
+        if (!event.defaultPrevented && "BroadcastChannel" in window) {
+          const channel = new BroadcastChannel(POWERFIST_STACK_CHANNEL);
+          channel.postMessage(detail);
+          channel.close();
+        }
+      }
+
       if (pushReceiptTimerRef.current) clearTimeout(pushReceiptTimerRef.current);
       setPushReceiptHtml(
-        `Pushed <strong>${card.title}</strong> from <strong>${deck.name}</strong> onto the Echo Mirage command stack against <strong>${deckTargetLabel}</strong>.`,
+        deliveredRemotely
+          ? `Remote push <strong>${card.title}</strong> from <strong>${deck.name}</strong> to desktop Echo Mirage.`
+          : `Pushed <strong>${card.title}</strong> from <strong>${deck.name}</strong> onto the Echo Mirage command stack against <strong>${deckTargetLabel}</strong>.`,
       );
       pushReceiptTimerRef.current = setTimeout(() => {
         setPushReceiptHtml(null);
@@ -399,6 +446,54 @@ export function PreviewMatrix() {
     },
     [activeDecks, applyFocus, composerText],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    let socket: ReturnType<typeof connectPowerfistRemoteSocket> | null = null;
+
+    const connectRemote = (host: string, port: number, remoteToken: string, deviceId: string) => {
+      const wsUrl = buildPowerfistRemoteWsUrl(host, port, remoteToken, deviceId);
+      socket = connectPowerfistRemoteSocket({
+        wsUrl,
+        onStatus: (status) => {
+          if (!cancelled) setRemoteSocketStatus(status);
+        },
+      });
+      remoteSocketRef.current = socket;
+    };
+
+    void (async () => {
+      const pairParams = readPowerfistPairParamsFromQuery();
+      if (pairParams) {
+        setRemoteSocketStatus("pairing");
+        const result = await completePowerfistPairFromQr(pairParams.pairId, pairParams.pairSecret);
+        clearPowerfistPairQueryFromUrl();
+        if (cancelled) return;
+        if (!result.ok) {
+          setPairMessage(result.reason);
+          setRemoteSocketStatus("error");
+          return;
+        }
+        setPairMessage("Paired with desktop Echo Mirage.");
+        connectRemote(result.wsHost, result.wsPort, result.remoteToken, result.deviceId);
+        return;
+      }
+
+      const saved = readPowerfistRemoteCredentials();
+      if (!saved || cancelled) {
+        setPairMessage("Scan desktop Settings → PowerFist QR to pair.");
+        return;
+      }
+
+      connectRemote(saved.host, saved.port, saved.remoteToken, saved.deviceId);
+    })();
+
+    return () => {
+      cancelled = true;
+      socket?.close();
+      remoteSocketRef.current = null;
+    };
+  }, []);
 
   const cancelCardHold = useCallback(() => {
     const hold = cardHoldRef.current;
@@ -488,6 +583,7 @@ export function PreviewMatrix() {
   return (
     <div className="powerfist-preview-root" data-compact-cards={isCompactCards ? "true" : "false"}>
       <main className="shell" ref={paneRef}>
+        <PowerfistRemoteLinkBanner status={remoteSocketStatus} pairMessage={pairMessage} />
         <div className="powerfistMainLayout">
           <section className="matrixStage">
           <section className="matrix" ref={matrixRef} data-testid="preview-matrix">

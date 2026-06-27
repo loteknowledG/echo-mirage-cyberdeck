@@ -104,6 +104,9 @@ async function startPackagedNextServer() {
 
   serverLogTail = '';
   const port = await findFreePort();
+  const { app } = require('electron');
+  const powerfistStatePath = path.join(app.getPath('userData'), 'powerfist-ws.json');
+
   serverProcess = spawn(process.execPath, [serverJs], {
     cwd: appDir,
     env: {
@@ -111,8 +114,10 @@ async function startPackagedNextServer() {
       ELECTRON_RUN_AS_NODE: '1',
       NODE_ENV: 'production',
       PORT: String(port),
-      HOSTNAME: '127.0.0.1',
+      HOSTNAME: '0.0.0.0',
       NEXT_TELEMETRY_DISABLED: '1',
+      ECHO_MIRAGE_POWERFIST_STATE_PATH: powerfistStatePath,
+      ECHO_MIRAGE_POWERFIST_WS_HOST: '0.0.0.0',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
