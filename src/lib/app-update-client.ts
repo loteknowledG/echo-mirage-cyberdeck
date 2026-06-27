@@ -12,23 +12,9 @@ export type AppUpdateCheckResult =
   | { status: "unavailable"; message?: string }
   | { status: "local-dev"; message: string };
 
-type DesktopUpdateBridge = {
-  getVersion: () => Promise<string>;
-  checkForUpdates: () => Promise<
-    AppUpdateCheckResult | { status: "unavailable"; message?: string }
-  >;
-  quitAndInstall: () => Promise<{ ok: boolean; error?: string }>;
-  subscribe: (
-    callback: (payload: {
-      type: string;
-      version?: string;
-      percent?: number;
-      message?: string;
-    }) => void,
-  ) => () => void;
-};
+type DesktopAppUpdateCheckResult = Exclude<AppUpdateCheckResult, { status: "local-dev" }>;
 
-function getDesktopUpdateBridge(): DesktopUpdateBridge | null {
+function getDesktopUpdateBridge(): EchoMirageAppUpdateBridge | null {
   if (typeof window === "undefined") return null;
   return window.echoMirageAppUpdate ?? null;
 }
@@ -160,7 +146,7 @@ export async function checkForAppUpdate(options?: {
   const desktop = getDesktopUpdateBridge();
 
   if (desktop) {
-    const result = await desktop.checkForUpdates();
+    const result: DesktopAppUpdateCheckResult = await desktop.checkForUpdates();
     if (result.status === "up-to-date" || result.status === "update-available") {
       setStoredRunningVersion(result.running);
       if (result.status === "update-available" && !manual) {

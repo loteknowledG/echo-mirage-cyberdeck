@@ -152,13 +152,11 @@ declare global {
 
   interface EchoMirageAppUpdateBridge {
     getVersion(): Promise<string>;
-    checkForUpdates(): Promise<{
-      status: "up-to-date" | "update-available" | "unavailable";
-      running?: string;
-      latest?: string;
-      downloaded?: boolean;
-      message?: string;
-    }>;
+    checkForUpdates(): Promise<
+      | { status: "up-to-date"; running: string; latest: string }
+      | { status: "update-available"; running: string; latest: string; downloaded?: boolean }
+      | { status: "unavailable"; message?: string }
+    >;
     quitAndInstall(): Promise<{ ok: boolean; error?: string }>;
     subscribe(
       callback: (payload: {
