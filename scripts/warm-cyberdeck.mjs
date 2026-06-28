@@ -3,18 +3,30 @@
  * so the first load does not race the dev bundler and blow the Node stack.
  */
 import fs from 'node:fs/promises';
-import { cyberdeckRouteUrl, devStatePath, resolveDevOrigin } from './resolve-dev-origin.mjs';
+import {
+  cyberdeckRouteUrl,
+  devStatePath,
+  resolveDevOrigin,
+  DEV_ROUTE_FETCH_MS,
+  DEV_STARTUP_DEADLINE_MS,
+  DEV_STARTUP_HEARTBEAT_MS,
+} from './resolve-dev-origin.mjs';
 
-const DEADLINE_MS = 300_000;
-const FETCH_MS = 120_000;
 const RETRY_MS = 2_000;
 /** Let webpack finish writing before Electron opens a second browser session. */
 const SETTLE_MS = 4_000;
 
-/** @param {string} url @param {RequestInit} [init] */
-async function fetchWithDeadline(url, init = {}) {
+/** @param {string} url @param {RequestInit} [init] @param {() => void} [onWaiting] */
+async function fetchWithDeadline(url, init = {}, onWaiting) {
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), FETCH_MS);
+  const started = Date.now();
+  const heartbeat = onWaiting
+    ? setInterval(() => {
+        const elapsedSec = Math.round((Date.now() - started) / 1000);
+        onWaiting(elapsedSec);
+      }, DEV_STARTUP_HEARTBEAT_MS)
+    : null;
+  const timer = setTimeout(() => ac.abort(), DEV_ROUTE_FETCH_MS);
   try {
     return await fetch(url, {
       ...init,
@@ -24,6 +36,7 @@ async function fetchWithDeadline(url, init = {}) {
     });
   } finally {
     clearTimeout(timer);
+    if (heartbeat) clearInterval(heartbeat);
   }
 }
 
@@ -56,7 +69,7 @@ async function waitForSidecarReady() {
   if (!Number.isFinite(readyPort)) return;
 
   const healthUrl = `http://127.0.0.1:${readyPort}/health`;
-  const deadline = Date.now() + 120_000;
+  const deadline = Date.now() + DEV_STARTUP_DEADLINE_MS;
   while (Date.now() < deadline) {
     try {
       const res = await fetch(healthUrl);
@@ -70,10 +83,12 @@ async function waitForSidecarReady() {
 
 async function warmCyberdeck() {
   const origin = await resolveDevOrigin();
-  process.stdout.write(`[warm] waiting for sidecar before compile (${origin})...\n`);
+  process.stdout.write(
+    `[warm] waiting for sidecar before compile (${origin}) · budget ${Math.round(DEV_STARTUP_DEADLINE_MS / 60_000)} min…\n`,
+  );
   await waitForSidecarReady();
 
-  const deadline = Date.now() + DEADLINE_MS;
+  const deadline = Date.now() + DEV_STARTUP_DEADLINE_MS;
   let attempt = 0;
 
   while (Date.now() < deadline) {
@@ -96,7 +111,11 @@ async function warmCyberdeck() {
         );
       }
 
-      const res = await fetchWithDeadline(route);
+      const res = await fetchWithDeadline(route, {}, (elapsedSec) => {
+        process.stdout.write(
+          `[warm] compiling /cyberdeck — still waiting (${elapsedSec}s, first compile can take several minutes)…\n`,
+        );
+      });
       if (!res.ok) {
         process.stdout.write(`[warm] /cyberdeck HTTP ${res.status} - retrying\n`);
         await new Promise((r) => setTimeout(r, RETRY_MS));
@@ -155,7 +174,12 @@ async function warmCyberdeck() {
       }
       return;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg =
+        err instanceof Error && err.name === 'AbortError'
+          ? `/cyberdeck compile exceeded ${Math.round(DEV_ROUTE_FETCH_MS / 60_000)} min per attempt`
+          : err instanceof Error
+            ? err.message
+            : String(err);
       process.stdout.write(`[warm] ${msg || 'fetch failed'} - retrying\n`);
       await new Promise((r) => setTimeout(r, RETRY_MS));
     }

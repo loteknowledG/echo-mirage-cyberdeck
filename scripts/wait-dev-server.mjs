@@ -1,12 +1,12 @@
 import fs from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { cyberdeckRouteUrl, devStatePath } from './resolve-dev-origin.mjs';
-
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DEADLINE_MS = 300_000;
+import {
+  cyberdeckRouteUrl,
+  devStatePath,
+  DEV_ROUTE_FETCH_MS,
+  DEV_STARTUP_DEADLINE_MS,
+  DEV_STARTUP_HEARTBEAT_MS,
+} from './resolve-dev-origin.mjs';
 const RETRY_MS = 1_000;
-const ROUTE_FETCH_MS = 120_000;
 const waitStartedAt = Date.now();
 
 async function readState() {
@@ -21,7 +21,15 @@ async function readState() {
 /** @param {string} url */
 async function fetchCyberdeckRoute(url) {
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), ROUTE_FETCH_MS);
+  const started = Date.now();
+  const heartbeat = setInterval(() => {
+    const elapsedSec = Math.round((Date.now() - started) / 1000);
+    process.stdout.write(
+      `[wait] compiling /cyberdeck — still waiting (${elapsedSec}s, first compile can take several minutes)…\n`,
+    );
+  }, DEV_STARTUP_HEARTBEAT_MS);
+
+  const timer = setTimeout(() => ac.abort(), DEV_ROUTE_FETCH_MS);
   try {
     return await fetch(url, {
       signal: ac.signal,
@@ -30,6 +38,7 @@ async function fetchCyberdeckRoute(url) {
     });
   } finally {
     clearTimeout(timer);
+    clearInterval(heartbeat);
   }
 }
 
@@ -40,10 +49,14 @@ function isFreshSession(state) {
 }
 
 async function waitForDevServer() {
-  const deadline = Date.now() + DEADLINE_MS;
+  const deadline = Date.now() + DEV_STARTUP_DEADLINE_MS;
   let lastMessage = 'waiting for dev-server.json';
   let sidecarReady = false;
   let announcedPorts = false;
+
+  process.stdout.write(
+    `[wait] startup budget ${Math.round(DEV_STARTUP_DEADLINE_MS / 60_000)} min · route fetch ${Math.round(DEV_ROUTE_FETCH_MS / 60_000)} min max\n`,
+  );
 
   while (Date.now() < deadline) {
     try {
@@ -78,6 +91,7 @@ async function waitForDevServer() {
       }
 
       const routeUrl = cyberdeckRouteUrl(`http://127.0.0.1:${state.appPort}`);
+      process.stdout.write(`[wait] requesting ${routeUrl} (webpack may compile on first hit)…\n`);
       const routeRes = await fetchCyberdeckRoute(routeUrl);
       if (routeRes.ok) {
         process.stdout.write(`[wait] /cyberdeck route ready (${routeUrl})\n`);
@@ -89,7 +103,11 @@ async function waitForDevServer() {
         process.stdout.write(`[wait] /cyberdeck HTTP 404 - compiling or stale cache; retrying\n`);
       }
     } catch (error) {
-      lastMessage = error instanceof Error ? error.message : String(error);
+      if (error instanceof Error && error.name === 'AbortError') {
+        lastMessage = `/cyberdeck compile exceeded ${Math.round(DEV_ROUTE_FETCH_MS / 60_000)} min per attempt`;
+      } else {
+        lastMessage = error instanceof Error ? error.message : String(error);
+      }
     }
 
     await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
