@@ -1,6 +1,7 @@
 use crate::capture::capture_primary_monitor_png_base64;
 use crate::config::{SatelliteCredentials, WsRuntimeStatus};
 use crate::mission::{build_capture_ws_url, ingest_mission_png, MissionEnvelope};
+use crate::startup_log;
 use futures_util::StreamExt;
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -10,7 +11,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 pub struct WsController {
     stop: Arc<AtomicBool>,
-    join: parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>,
+    join: parking_lot::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 impl WsController {
@@ -56,21 +57,25 @@ pub fn spawn_capture_deck_loop(
     let stop_flag = stop.clone();
 
     let handle = tauri::async_runtime::spawn(async move {
+        startup_log::log("ws-client: loop started");
         while !stop_flag.load(Ordering::SeqCst) {
             shared.set_status(WsRuntimeStatus::Connecting);
             shared.set_error(None);
 
             let ws_url = build_capture_ws_url(&creds);
+            startup_log::log(format!("ws-client: connecting to {ws_url}"));
             let connect_result = connect_async(&ws_url).await;
 
             let Ok((mut ws, _)) = connect_result else {
                 shared.set_status(WsRuntimeStatus::Error);
                 shared.set_error(Some("WebSocket connect failed.".to_string()));
+                startup_log::log("ws-client: connect FAILED, retry in 2.5s");
                 tokio::time::sleep(Duration::from_millis(2500)).await;
                 continue;
             };
 
             shared.set_status(WsRuntimeStatus::Connected);
+            startup_log::log("ws-client: connected");
 
             loop {
                 if stop_flag.load(Ordering::SeqCst) {

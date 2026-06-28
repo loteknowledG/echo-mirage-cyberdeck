@@ -116,44 +116,54 @@ fn arm_with_credentials(
 
 fn ensure_pair_server(app: AppHandle, state: Arc<AppState>) {
     if state.pair_server.lock().is_some() {
+        startup_log::step("boot", 5, 8, "pair HTTP server already running");
         return;
     }
 
+    startup_log::step("boot", 5, 8, "spawning pair HTTP server on port 3050");
     let port = state.pair_http_port;
     let app_for_pair = app.clone();
     let state_for_pair = state.clone();
 
     let on_paired = Arc::new(move |creds: SatelliteCredentials| {
+        startup_log::log("pair-server: credentials received from Mirage");
         let _ = arm_with_credentials(&app_for_pair, &state_for_pair, creds, true);
     });
 
     let server = spawn_pair_http_server(app.clone(), port, on_paired);
     *state.pair_server.lock() = Some(server);
+    startup_log::step("boot", 5, 8, "pair HTTP server task spawned");
 }
 
 #[cfg(feature = "system-tray")]
 fn setup_system_tray(app: &AppHandle, state: &AppState) {
+    startup_log::step("boot", 7, 8, "creating system tray (Windows build)");
+
     let Ok(show_item) = MenuItem::with_id(app, "show", "Show setup", true, None::<&str>) else {
-        startup_log::log("tray: failed to create show menu item");
+        startup_log::log("tray: FAILED create show menu item");
         return;
     };
     let Ok(disarm_item) = MenuItem::with_id(app, "disarm", "Disarm", true, None::<&str>) else {
-        startup_log::log("tray: failed to create disarm menu item");
+        startup_log::log("tray: FAILED create disarm menu item");
         return;
     };
     let Ok(quit_item) = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>) else {
-        startup_log::log("tray: failed to create quit menu item");
+        startup_log::log("tray: FAILED create quit menu item");
         return;
     };
     let Ok(tray_menu) = Menu::with_items(app, &[&show_item, &disarm_item, &quit_item]) else {
-        startup_log::log("tray: failed to create menu");
+        startup_log::log("tray: FAILED create menu");
         return;
     };
 
+    startup_log::step("boot", 6, 8, "tray menu created, loading icon");
+
     let Some(icon) = app.default_window_icon() else {
-        startup_log::log("tray: no default window icon");
+        startup_log::log("tray: FAILED no default window icon");
         return;
     };
+
+    startup_log::step("boot", 7, 8, "building tray icon");
 
     if TrayIconBuilder::new()
         .icon(icon.clone())
@@ -183,39 +193,45 @@ fn setup_system_tray(app: &AppHandle, state: &AppState) {
         .is_ok()
     {
         state.tray_ready.store(true, Ordering::SeqCst);
-        startup_log::log("tray: ready");
+        startup_log::step("boot", 7, 8, "tray icon ready");
     } else {
-        startup_log::log("tray: build failed");
+        startup_log::log("tray: FAILED build returned error");
     }
 }
 
 fn initialize_after_ready(app: &AppHandle) {
-    startup_log::log("init: RunEvent::Ready");
+    startup_log::step("boot", 3, 8, "RunEvent::Ready — starting init");
 
     let state = app.state::<Arc<AppState>>().inner().clone();
     if state.initialized.swap(true, Ordering::SeqCst) {
-        startup_log::log("init: already initialized");
+        startup_log::log("init: already initialized — skipping");
         return;
     }
 
+    startup_log::step("boot", 4, 8, "AppState acquired");
+
     ensure_pair_server(app.clone(), state.clone());
-    startup_log::log("init: pair HTTP server on port 3050");
 
     if let Some(creds) = load_credentials(app) {
-        startup_log::log("init: restoring saved credentials");
+        startup_log::step("boot", 6, 8, "restoring saved credentials");
         if let Err(reason) = arm_with_credentials(app, &state, creds, false) {
-            startup_log::log(format!("init: restore failed: {reason}"));
+            startup_log::log(format!("boot: credential restore FAILED: {reason}"));
+        } else {
+            startup_log::step("boot", 6, 8, "credentials restored, WebSocket loop started");
         }
+    } else {
+        startup_log::step("boot", 6, 8, "no saved credentials — fresh setup");
     }
 
     #[cfg(feature = "system-tray")]
     setup_system_tray(app, &state);
 
     #[cfg(not(feature = "system-tray"))]
-    startup_log::log("init: macOS/window-only mode (no system tray — avoids macOS 15 tao crash)");
+    startup_log::step("boot", 7, 8, "window-only mode (no tray — macOS 15 safe)");
 
+    startup_log::step("boot", 8, 8, "showing setup window");
     show_main_window(app);
-    startup_log::log("init: setup window shown");
+    startup_log::mark_session_ok("[boot 8/8] setup window shown — startup complete");
 }
 
 #[tauri::command]
@@ -354,20 +370,19 @@ fn open_screen_recording_settings() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn read_startup_log() -> String {
-    std::fs::read_to_string(startup_log::log_file_path()).unwrap_or_else(|_| {
-        "No startup log yet. Launch Echo Satellite once, then try again.".to_string()
-    })
+fn get_diagnostics() -> startup_log::DiagnosticsReport {
+    startup_log::build_diagnostics_report()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    startup_log::log("run: entry");
+    startup_log::begin_session(env!("CARGO_PKG_VERSION"));
+    startup_log::step("boot", 1, 8, "run() entry — constructing Tauri app");
 
     tauri::Builder::default()
         .manage(Arc::new(AppState::new()))
         .setup(|_app| {
-            startup_log::log("setup: ok");
+            startup_log::step("boot", 2, 8, "Tauri setup hook OK (window created)");
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -390,20 +405,28 @@ pub fn run() {
             hide_to_tray,
             check_permissions,
             open_screen_recording_settings,
-            read_startup_log,
+            get_diagnostics,
         ])
         .build(tauri::generate_context!())
+        .map_err(|e| {
+            startup_log::log(format!("FATAL: tauri build() failed: {e}"));
+            e
+        })
         .expect("error while running tauri application")
         .run(|app, event| {
-            if let RunEvent::Ready = event {
-                initialize_after_ready(app);
-            }
-            if let RunEvent::ExitRequested { api, .. } = event {
-                let state = app.state::<Arc<AppState>>();
-                if state.tray_ready.load(Ordering::SeqCst) {
-                    api.prevent_exit();
-                    hide_main_window(app);
+            match event {
+                RunEvent::Ready => {
+                    initialize_after_ready(app);
                 }
+                RunEvent::ExitRequested { api, .. } => {
+                    startup_log::log("event: ExitRequested");
+                    let state = app.state::<Arc<AppState>>();
+                    if state.tray_ready.load(Ordering::SeqCst) {
+                        api.prevent_exit();
+                        hide_main_window(app);
+                    }
+                }
+                _ => {}
             }
         });
 }

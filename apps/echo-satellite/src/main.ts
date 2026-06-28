@@ -30,6 +30,28 @@ type PermissionStatus = {
   hint?: string | null;
 };
 
+type SessionRecord = {
+  sessionId: string;
+  version: string;
+  platform: string;
+  trayMode: string;
+  startedAtUnix: number;
+  status: string;
+  lastMessage?: string | null;
+};
+
+type DiagnosticsReport = {
+  version: string;
+  platform: string;
+  trayMode: string;
+  logPath: string;
+  sessionId: string;
+  previousSessionCrashed: boolean;
+  previousSession?: SessionRecord | null;
+  logTail: string;
+  supportHint: string;
+};
+
 const pairPortEl = document.querySelector<HTMLElement>("#pair-port")!;
 const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
 const permissionResultEl = document.querySelector<HTMLElement>("#permission-result")!;
@@ -38,6 +60,54 @@ const statusArmedEl = document.querySelector<HTMLElement>("#status-armed")!;
 const statusWsEl = document.querySelector<HTMLElement>("#status-ws")!;
 const statusMissionsEl = document.querySelector<HTMLElement>("#status-missions")!;
 const statusErrorEl = document.querySelector<HTMLElement>("#status-error")!;
+const crashBannerEl = document.querySelector<HTMLElement>("#crash-banner")!;
+const crashBannerDetailEl = document.querySelector<HTMLElement>("#crash-banner-detail")!;
+const diagHintEl = document.querySelector<HTMLElement>("#diag-hint")!;
+const diagVersionEl = document.querySelector<HTMLElement>("#diag-version")!;
+const diagSessionEl = document.querySelector<HTMLElement>("#diag-session")!;
+const diagModeEl = document.querySelector<HTMLElement>("#diag-mode")!;
+const diagLogPathEl = document.querySelector<HTMLElement>("#diag-log-path")!;
+const diagLogTailEl = document.querySelector<HTMLElement>("#diag-log-tail")!;
+
+function formatDiagnostics(report: DiagnosticsReport): string {
+  return [
+    `Echo Satellite diagnostics`,
+    `version: ${report.version}`,
+    `platform: ${report.platform}`,
+    `trayMode: ${report.trayMode}`,
+    `sessionId: ${report.sessionId}`,
+    `logPath: ${report.logPath}`,
+    `previousSessionCrashed: ${report.previousSessionCrashed}`,
+    report.previousSession
+      ? `previousSession: ${JSON.stringify(report.previousSession)}`
+      : "previousSession: null",
+    "",
+    "--- startup.log (tail) ---",
+    report.logTail,
+  ].join("\n");
+}
+
+async function refreshDiagnostics(): Promise<DiagnosticsReport> {
+  const report = await invoke<DiagnosticsReport>("get_diagnostics");
+
+  diagHintEl.textContent = report.supportHint;
+  diagVersionEl.textContent = `${report.version} (${report.platform})`;
+  diagSessionEl.textContent = report.sessionId;
+  diagModeEl.textContent = report.trayMode;
+  diagLogPathEl.textContent = report.logPath;
+  diagLogTailEl.textContent = report.logTail || "(empty)";
+
+  if (report.previousSessionCrashed && report.previousSession) {
+    crashBannerEl.classList.remove("hidden");
+    crashBannerDetailEl.textContent =
+      `Last session ${report.previousSession.sessionId} stopped at: ` +
+      `${report.previousSession.lastMessage ?? "unknown"}. See Diagnostics below.`;
+  } else {
+    crashBannerEl.classList.add("hidden");
+  }
+
+  return report;
+}
 
 async function refreshPermissions(): Promise<void> {
   const perm = await invoke<PermissionStatus>("check_permissions");
@@ -102,8 +172,25 @@ document.querySelector<HTMLButtonElement>("#disarm")!.addEventListener("click", 
   await refreshStatus();
 });
 
+document.querySelector<HTMLButtonElement>("#refresh-diagnostics")!.addEventListener("click", async () => {
+  await refreshDiagnostics();
+});
+
+document.querySelector<HTMLButtonElement>("#copy-diagnostics")!.addEventListener("click", async () => {
+  const report = await refreshDiagnostics();
+  const text = formatDiagnostics(report);
+  try {
+    await navigator.clipboard.writeText(text);
+    diagHintEl.textContent = "Diagnostics copied to clipboard.";
+  } catch {
+    diagHintEl.textContent = "Could not copy — select text in the log box manually.";
+  }
+});
+
 void refreshPermissions();
 void refreshStatus();
+void refreshDiagnostics();
 window.setInterval(() => {
   void refreshStatus();
-}, 2000);
+  void refreshDiagnostics();
+}, 5000);
