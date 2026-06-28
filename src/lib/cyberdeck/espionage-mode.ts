@@ -2,6 +2,9 @@
 
 export type EspionageNodeRole = "echo" | "mirage" | "off";
 
+/** Spy tab internal sub-panes: Echo, Mirage, PowerFist. */
+export type SpySubPane = "echo" | "mirage" | "powerfist";
+
 export const ESPIONAGE_MODE_STORAGE_KEY = "echo-mirage-espionage-role";
 export const ESPIONAGE_NODE_ID_STORAGE_KEY = "echo-mirage-espionage-node-id";
 
@@ -24,6 +27,12 @@ export const ESPIONAGE_MIRAGE_DISPLAY = "MIRAGE";
 export const ESPIONAGE_ECHO_TAGLINE = "Screenshot computer — silent capture of the coding question.";
 export const ESPIONAGE_MIRAGE_TAGLINE = "Answer computer — AI solves from Echo's capture.";
 export const ESPIONAGE_POWERFIST_TAGLINE = "Phone trigger — PowerFist starts the mission.";
+
+/** Shown on Mirage/PowerFist when Echo closes its Spy tab. */
+export const ECHO_SPY_TERMINATED_MESSAGE = "ECHO TERMINATED";
+
+/** Same-browser broadcast when Echo Spy session ends. */
+export const SPY_ECHO_LINK_CHANNEL = "echo-mirage-spy-echo-link";
 
 export function espionageRoleLabel(role: EspionageNodeRole): string {
   switch (role) {

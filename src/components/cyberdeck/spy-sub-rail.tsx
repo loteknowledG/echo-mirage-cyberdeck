@@ -6,7 +6,7 @@ import {
   ESPIONAGE_MIRAGE_DISPLAY,
   ESPIONAGE_POWERFIST_LABEL,
 } from "@/lib/cyberdeck/espionage-mode";
-import type { SpySubPane } from "@/lib/cyberdeck/spy-context";
+import type { SpySubPane } from "@/lib/cyberdeck/espionage-mode";
 import {
   CyberdeckRailTooltipProvider,
   CyberdeckRailTabTooltip,

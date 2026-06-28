@@ -349,6 +349,7 @@ import {
   type EspionageMissionSolveDetail,
 } from "@/lib/cyberdeck/powerfist-mission.types";
 import { ESPIONAGE_ECHO_DISPLAY, ESPIONAGE_MIRAGE_DISPLAY } from "@/lib/cyberdeck/espionage-mode";
+import { terminateEchoSpySession } from "@/lib/cyberdeck/spy-pairing-client";
 import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
@@ -4105,19 +4106,31 @@ export default function CyberdeckApp() {
     closeGatewayPaneContextMenu();
     const activeCustomTabId = useCyberdeckTabStore.getState().activeCustomTabId;
     if (!activeCustomTabId) return;
+    const closingTab = useCyberdeckTabStore
+      .getState()
+      .customTabs.find((tab) => tab.id === activeCustomTabId);
+    const isSpyTab = closingTab?.kind === "spy";
     useCyberdeckTabStore.getState().setCustomTabs((prev) => prev.filter((tab) => tab.id !== activeCustomTabId));
     useCyberdeckTabStore.setState((state) => ({
       mountedCustomTabIds: state.mountedCustomTabIds.filter((id) => id !== activeCustomTabId),
     }));
     useCyberdeckTabStore.getState().setActiveCustomTabId(null);
+    if (isSpyTab) {
+      void terminateEchoSpySession();
+    }
     playDeckSystemSound("click", 0.02);
   }, [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
 
   const clearSavedCustomTabState = useCallback(() => {
-    const removedCount = useCyberdeckTabStore.getState().customTabs.length;
+    const tabs = useCyberdeckTabStore.getState().customTabs;
+    const removedCount = tabs.length;
+    const hasSpyTab = tabs.some((tab) => tab.kind === "spy");
     useCyberdeckTabStore.getState().setCustomTabs([]);
     useCyberdeckTabStore.setState({ mountedCustomTabIds: [] });
     useCyberdeckTabStore.getState().setActiveCustomTabId(null);
+    if (hasSpyTab) {
+      void terminateEchoSpySession();
+    }
 
     try {
       const raw = window.localStorage.getItem(UI_STATE_STORAGE_KEY);

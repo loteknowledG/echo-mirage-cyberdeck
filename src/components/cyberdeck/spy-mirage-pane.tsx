@@ -1,113 +1,121 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
-import { EspionageMirageHubPanel } from "@/components/cyberdeck/espionage-mirage-hub-panel";
 import {
+  ECHO_SPY_TERMINATED_MESSAGE,
+  ESPIONAGE_ECHO_DISPLAY,
   ESPIONAGE_MIRAGE_DISPLAY,
   ESPIONAGE_MIRAGE_TAGLINE,
   ESPIONAGE_MODE_TITLE,
-  readEspionageNodeRole,
-  writeEspionageNodeRole,
-  type EspionageNodeRole,
 } from "@/lib/cyberdeck/espionage-mode";
-import { ESPIONAGE_SILENT_CAPTURE_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
-import { useSpyContext } from "@/lib/cyberdeck/spy-context";
+import { useSpyEchoLinkWatch } from "@/lib/cyberdeck/spy-echo-link-watch";
+import {
+  enterSpyPairCode,
+  saveSpyMiragePairCredentials,
+} from "@/lib/cyberdeck/spy-pairing-client";
 
 export function SpyMiragePane() {
-  const { capture, analysis, analysisError, analyzing, setAnalysis, setAnalyzing } = useSpyContext();
-  const [role, setRole] = useState<EspionageNodeRole>("off");
-  const [showHub, setShowHub] = useState(true);
+  const { paired, terminated, terminatedMessage, resetLinkWatch } = useSpyEchoLinkWatch("mirage");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
-  useEffect(() => {
-    setRole(readEspionageNodeRole());
-  }, []);
-
-  const handleAnalyze = useCallback(async () => {
-    if (!capture.pngBase64) return;
-    setAnalyzing(true);
-    setAnalysis(null, null);
-    try {
-      const res = await fetch("/api/spy/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pngBase64: capture.pngBase64,
-          prompt: ESPIONAGE_SILENT_CAPTURE_PROMPT,
-          provider: "openai",
-        }),
-      });
-      const payload = (await res.json()) as { ok?: boolean; text?: string; error?: string };
-      if (!payload.ok || !payload.text) {
-        setAnalysis(null, payload.error || "Analysis failed.");
-        return;
-      }
-      setAnalysis(payload.text, null);
-    } catch {
-      setAnalysis(null, "Analysis request failed.");
-    } finally {
-      setAnalyzing(false);
+  const handlePair = useCallback(async () => {
+    const trimmed = code.trim();
+    if (!trimmed) {
+      setError("Paste the Mirage pairing code from Echo.");
+      return;
     }
-  }, [capture.pngBase64, setAnalysis, setAnalyzing]);
+    if (!trimmed.endsWith(":M")) {
+      setError(`Use the ${ESPIONAGE_MIRAGE_DISPLAY} code from Echo (ends with :M).`);
+      return;
+    }
 
-  const handleRoleMirage = useCallback(() => {
-    writeEspionageNodeRole("mirage");
-    setRole("mirage");
-  }, []);
+    setBusy(true);
+    setError(null);
+    setStatus(null);
+
+    const result = await enterSpyPairCode(trimmed);
+    setBusy(false);
+
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+
+    if (result.role !== "mirage") {
+      setError("That code is for PowerFist, not Mirage.");
+      return;
+    }
+
+    const creds = {
+      echoHost: result.echoHost,
+      httpPort: result.httpPort,
+      echoNodeId: result.echoNodeId,
+      mirageToken: result.token,
+      nodeId: result.nodeId ?? "",
+      sessionEpoch: result.sessionEpoch,
+      pairedAt: new Date().toISOString(),
+    };
+    saveSpyMiragePairCredentials(creds);
+    resetLinkWatch();
+    setCode("");
+    setStatus(`Paired with ${ESPIONAGE_ECHO_DISPLAY} at ${result.echoHost}.`);
+  }, [code, resetLinkWatch]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
+      {terminated ? (
+        <div className="rounded border border-red-900/50 bg-red-950/20 px-3 py-3 text-center">
+          <p className="text-sm tracking-[0.12em] text-red-400/95">
+            {terminatedMessage ?? ECHO_SPY_TERMINATED_MESSAGE}
+          </p>
+          <p className="mt-1 text-[9px] text-[#8a8a8a]">
+            {ESPIONAGE_ECHO_DISPLAY} closed its Spy tab. Re-pair when it is active again.
+          </p>
+        </div>
+      ) : null}
+
       <div>
         <p className="text-fuchsia-300/90">{ESPIONAGE_MODE_TITLE} // {ESPIONAGE_MIRAGE_DISPLAY}</p>
         <p className="mt-1 text-[9px] text-[#6a6a8a]">{ESPIONAGE_MIRAGE_TAGLINE}</p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <CyberdeckActionButton disabled={role === "mirage"} onClick={handleRoleMirage}>
-          This is {ESPIONAGE_MIRAGE_DISPLAY}
-        </CyberdeckActionButton>
-        <CyberdeckActionButton onClick={() => setShowHub((prev) => !prev)}>
-          {showHub ? "Hide hub pairing" : "Show hub pairing"}
-        </CyberdeckActionButton>
-        <CyberdeckActionButton
-          disabled={!capture.pngBase64 || analyzing}
-          onClick={() => void handleAnalyze()}
-        >
-          {analyzing ? "Analyzing…" : "Analyze capture"}
-        </CyberdeckActionButton>
-      </div>
+      <p className="text-[9px] leading-relaxed text-[#5f5f5f]">
+        On the {ESPIONAGE_MIRAGE_DISPLAY} computer: paste the code from {ESPIONAGE_ECHO_DISPLAY} Spy →{" "}
+        {ESPIONAGE_ECHO_DISPLAY} (CODE FOR {ESPIONAGE_MIRAGE_DISPLAY}).
+      </p>
 
-      {showHub ? (
-        <div className="rounded border border-[#1c1c1c] bg-black/60 p-3">
-          <EspionageMirageHubPanel />
-        </div>
-      ) : null}
-
-      {capture.imageDataUrl ? (
-        <div className="flex flex-col gap-2">
-          <p className="text-[9px] text-[#8a8a8a]">
-            CAPTURE // {capture.capturedAt ? new Date(capture.capturedAt).toLocaleTimeString() : "—"}
-            {capture.missionId ? ` // mission ${capture.missionId.slice(0, 8)}…` : ""}
-          </p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={capture.imageDataUrl}
-            alt="Spy capture"
-            className="max-h-64 w-full rounded border border-[#2d2d2d] object-contain bg-[#0a0a0a]"
-          />
-        </div>
-      ) : (
-        <p className="text-[9px] text-[#5f5f5f]">
-          No capture yet — use Echo sub-pane or wait for an ingested mission.
+      {paired && !terminated ? (
+        <p className="text-emerald-300/80">
+          LINKED // {ESPIONAGE_ECHO_DISPLAY} {paired.echoHost} · node {paired.nodeId.slice(0, 8)}…
         </p>
-      )}
-
-      {analysisError ? <p className="text-red-300/90">{analysisError}</p> : null}
-      {analysis ? (
-        <div className="rounded border border-[#2d2d2d] bg-black/80 p-3 text-[10px] leading-relaxed text-[#cfcfcf] whitespace-pre-wrap">
-          {analysis}
-        </div>
+      ) : !terminated ? (
+        <p className="text-[#8a8a8a]">Not paired with {ESPIONAGE_ECHO_DISPLAY}.</p>
       ) : null}
+
+      <label className="flex flex-col gap-2">
+        <span className="text-[9px] tracking-[0.08em] text-[#8a8a8a]">Echo pairing code</span>
+        <textarea
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+          rows={3}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoComplete="off"
+          placeholder="192.168.x.x:3050:12345:secret:M"
+          className="min-h-[4rem] resize-y border border-[#2d2d2d] bg-black px-2 py-2 font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none focus:border-fuchsia-900/60"
+        />
+      </label>
+
+      <CyberdeckActionButton disabled={busy} onClick={() => void handlePair()}>
+        {terminated ? `Re-pair with ${ESPIONAGE_ECHO_DISPLAY}` : `Pair with ${ESPIONAGE_ECHO_DISPLAY}`}
+      </CyberdeckActionButton>
+
+      {status ? <p className="text-emerald-300/80">{status}</p> : null}
+      {error ? <p className="text-red-300/90">{error}</p> : null}
     </div>
   );
 }
