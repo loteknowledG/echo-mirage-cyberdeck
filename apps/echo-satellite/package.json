@@ -1,7 +1,7 @@
 {
   "name": "echo-satellite",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:build:mac": "tauri build",
+    "tauri:build:win": "tauri build -- --features system-tray"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

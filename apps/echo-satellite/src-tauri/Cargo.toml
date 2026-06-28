@@ -1,6 +1,6 @@
 [package]
 name = "echo-satellite"
-version = "0.1.5"
+version = "0.1.6"
 description = "Echo Mirage capture satellite — silent screenshots on PowerFist signal"
 authors = ["Craftwerk Corp"]
 edition = "2021"
@@ -8,6 +8,12 @@ edition = "2021"
 [lib]
 name = "echo_satellite_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# tauri tray-icon crashes on macOS 15+ at applicationDidFinishLaunching (tao #1205).
+# Windows builds enable this; macOS CI builds with --no-default-features.
+default = []
+system-tray = ["tauri/tray-icon"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -21,7 +27,7 @@ parking_lot = "0.12"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = [] }
 thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = "0.26"
