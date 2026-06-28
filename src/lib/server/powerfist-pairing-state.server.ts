@@ -30,6 +30,8 @@ export type PowerfistCapturePairingSession = {
   pairId: string;
   pairSecret: string;
   expiresAt: string;
+  echoHost?: string;
+  echoHttpPort?: number;
 };
 
 export type PowerfistPairingState = {

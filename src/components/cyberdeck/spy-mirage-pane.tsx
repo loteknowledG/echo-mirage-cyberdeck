@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
+import { EspionageMirageHubPanel } from "@/components/cyberdeck/espionage-mirage-hub-panel";
 import {
   ECHO_SPY_TERMINATED_MESSAGE,
   ESPIONAGE_ECHO_DISPLAY,
@@ -12,6 +13,7 @@ import {
 import { useSpyEchoLinkWatch } from "@/lib/cyberdeck/spy-echo-link-watch";
 import {
   enterSpyPairCode,
+  readSpyMiragePairCredentials,
   saveSpyMiragePairCredentials,
 } from "@/lib/cyberdeck/spy-pairing-client";
 
@@ -116,6 +118,13 @@ export function SpyMiragePane() {
 
       {status ? <p className="text-emerald-300/80">{status}</p> : null}
       {error ? <p className="text-red-300/90">{error}</p> : null}
+
+      <div className="border-t border-[#1c1c1c] pt-4">
+        <EspionageMirageHubPanel
+          echoHost={paired?.echoHost ?? readSpyMiragePairCredentials()?.echoHost ?? null}
+          echoHttpPort={paired?.httpPort ?? readSpyMiragePairCredentials()?.httpPort ?? null}
+        />
+      </div>
     </div>
   );
 }

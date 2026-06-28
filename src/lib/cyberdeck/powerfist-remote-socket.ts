@@ -135,7 +135,10 @@ export async function createPowerfistQrSession(): Promise<
   }
 }
 
-export async function createPowerfistCaptureQrSession(): Promise<
+export async function createPowerfistCaptureQrSession(args: {
+  echoHost: string;
+  echoHttpPort: number;
+}): Promise<
   | {
       ok: true;
       capturePairUrl: string;
@@ -145,7 +148,11 @@ export async function createPowerfistCaptureQrSession(): Promise<
   | { ok: false; reason: string }
 > {
   try {
-    const res = await fetch("/api/powerfist/pairing/capture/qr", { method: "POST" });
+    const res = await fetch("/api/powerfist/pairing/capture/qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(args),
+    });
     return (await res.json()) as
       | {
           ok: true;

@@ -121,6 +121,7 @@ const nextConfig = {
 	},
 	outputFileTracingIncludes: {
 		"/api/glyph/*": ["./assets/figlet-fonts/**"],
+		"/api/spy/capture": ["./node_modules/node-screenshots/**", "./node_modules/node-screenshots-*/**/*"],
 		"/*": ["./assets/figlet-fonts/**"],
 	},
 	// Treat as external in the Node.js server runtime (native / optional / E2E-only).

@@ -9,11 +9,13 @@ import {
   ESPIONAGE_MODE_TITLE,
   ESPIONAGE_POWERFIST_LABEL,
 } from "@/lib/cyberdeck/espionage-mode";
+import { startStealthCaptureDeck } from "@/lib/cyberdeck/espionage-stealth-capture-deck";
 import {
   fetchEchoSpyCodes,
   formatCodeExpiry,
   regenerateEchoSpyCodes,
 } from "@/lib/cyberdeck/spy-pairing-client";
+import { readPowerfistCaptureCredentials } from "@/lib/cyberdeck/powerfist-capture-client";
 
 function PairCodeBlock({
   label,
@@ -61,6 +63,8 @@ export function SpyEchoPane() {
   const [pairedMirage, setPairedMirage] = useState<{ nodeId: string } | null>(null);
   const [pairedPowerfist, setPairedPowerfist] = useState<{ deviceId: string } | null>(null);
   const [notEchoMachine, setNotEchoMachine] = useState(false);
+  const [captureRelayActive, setCaptureRelayActive] = useState(() => Boolean(readPowerfistCaptureCredentials()));
+  const [relayBusy, setRelayBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -101,6 +105,18 @@ export function SpyEchoPane() {
     setPowerfistExpiresAt(status.powerfistExpiresAt);
     setPairedMirage(status.pairedMirage);
     setPairedPowerfist(status.pairedPowerfist);
+  }, []);
+
+  const handleActivateCaptureRelay = useCallback(async () => {
+    setRelayBusy(true);
+    const handle = await startStealthCaptureDeck();
+    setRelayBusy(false);
+    setCaptureRelayActive(Boolean(handle));
+    if (!handle) {
+      setError("Capture relay not active — scan Mirage Echo QR on this machine first.");
+    } else {
+      setError(null);
+    }
   }, []);
 
   if (notEchoMachine) {
@@ -153,6 +169,22 @@ export function SpyEchoPane() {
           <CyberdeckActionButton disabled={busy} onClick={() => void handleRegenerate()}>
             New codes
           </CyberdeckActionButton>
+
+          <div className="rounded border border-[#1c1c1c] bg-black/50 p-3">
+            <p className="mb-2 text-[9px] tracking-[0.08em] text-[#8a8a8a]">Silent capture relay</p>
+            <p className="mb-3 text-[8px] leading-relaxed text-[#5f5f5f]">
+              After Mirage shows an Echo QR, scan it on this machine (or open the link). Then activate
+              the relay — it runs hidden in the desktop app tray.
+            </p>
+            {captureRelayActive ? (
+              <p className="mb-2 text-emerald-300/80">RELAY ACTIVE // silent capture armed</p>
+            ) : (
+              <p className="mb-2 text-[#8a8a8a]">Relay not active.</p>
+            )}
+            <CyberdeckActionButton disabled={relayBusy} onClick={() => void handleActivateCaptureRelay()}>
+              Activate capture relay
+            </CyberdeckActionButton>
+          </div>
         </>
       )}
 

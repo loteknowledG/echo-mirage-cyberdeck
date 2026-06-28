@@ -29,9 +29,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, reason: "Capture QR is solver-hub only." }, { status: 403 });
   }
 
+  let body: { echoHost?: string; echoHttpPort?: number } = {};
+  try {
+    body = (await request.json()) as { echoHost?: string; echoHttpPort?: number };
+  } catch {
+    return NextResponse.json({ ok: false, reason: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const echoHost = body.echoHost?.trim();
+  const echoHttpPort = body.echoHttpPort;
+  if (!echoHost || !Number.isFinite(echoHttpPort) || !echoHttpPort || echoHttpPort <= 0) {
+    return NextResponse.json(
+      { ok: false, reason: "echoHost and echoHttpPort are required (pair Spy Mirage with Echo first)." },
+      { status: 400 },
+    );
+  }
+
   await ensurePowerfistWsServer();
   try {
-    const session = await createPowerfistCaptureQrSession();
+    const session = await createPowerfistCaptureQrSession({ echoHost, echoHttpPort });
     return NextResponse.json(session);
   } catch (error) {
     return NextResponse.json(

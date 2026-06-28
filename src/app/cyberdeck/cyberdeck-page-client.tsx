@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 import { CyberdeckStartupLoader } from "@/components/cyberdeck/cyberdeck-startup-loader";
+import { EspionageCaptureDeckHost } from "@/components/cyberdeck/espionage-capture-deck-host";
 import { GlyphCatalogPrefetch } from "@/components/providers/glyph-catalog-prefetch";
 
 const CyberdeckApp = dynamic(() => import("@/features/cyberdeck/cyberdeck-app"), {
@@ -61,6 +62,7 @@ export function CyberdeckPageClient() {
   return (
     <>
       <GlyphCatalogPrefetch />
+      <EspionageCaptureDeckHost />
       <CyberdeckErrorBoundary>
         <CyberdeckApp />
       </CyberdeckErrorBoundary>

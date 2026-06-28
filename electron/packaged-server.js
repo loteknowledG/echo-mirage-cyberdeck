@@ -4,6 +4,8 @@ const http = require('http');
 const net = require('net');
 const path = require('path');
 
+const { loadDesktopProviderEnv } = require('../scripts/load-desktop-provider-env');
+
 /** @type {import('child_process').ChildProcess | null} */
 let serverProcess = null;
 /** @type {string | null} */
@@ -107,10 +109,13 @@ async function startPackagedNextServer() {
   const { app } = require('electron');
   const powerfistStatePath = path.join(app.getPath('userData'), 'powerfist-ws.json');
 
+  const desktopProviderEnv = loadDesktopProviderEnv(appDir);
+
   serverProcess = spawn(process.execPath, [serverJs], {
     cwd: appDir,
     env: {
       ...process.env,
+      ...desktopProviderEnv,
       ELECTRON_RUN_AS_NODE: '1',
       NODE_ENV: 'production',
       PORT: String(port),

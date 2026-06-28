@@ -251,6 +251,9 @@
       "electron/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
     "extraResources": [
       {
         "from": ".next/standalone-electron",

@@ -29,7 +29,10 @@ function formatExpiry(expiresAt: string | null): string {
 }
 
 /** Mirage hub — PowerFist + Echo pairing QRs (Spy tab or Settings). */
-export function EspionageMirageHubPanel() {
+export function EspionageMirageHubPanel(props: {
+  echoHost: string | null;
+  echoHttpPort: number | null;
+}) {
   const [nodeId, setNodeId] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
@@ -91,9 +94,16 @@ export function EspionageMirageHubPanel() {
   }, []);
 
   const handleGenerateEchoQr = useCallback(async () => {
+    if (!props.echoHost || !props.echoHttpPort) {
+      setError(`Pair Spy ${ESPIONAGE_MIRAGE_DISPLAY} with ${ESPIONAGE_ECHO_DISPLAY} first (paste :M code).`);
+      return;
+    }
     setBusy(true);
     setError(null);
-    const session = await createPowerfistCaptureQrSession();
+    const session = await createPowerfistCaptureQrSession({
+      echoHost: props.echoHost,
+      echoHttpPort: props.echoHttpPort,
+    });
     setBusy(false);
     if (!session.ok) {
       setError(session.reason);
@@ -103,7 +113,7 @@ export function EspionageMirageHubPanel() {
     setCaptureExpiresAt(session.expiresAt);
     setPairedEchoNodeId(session.pairedCapture?.nodeId ?? null);
     void refresh();
-  }, [refresh]);
+  }, [props.echoHost, props.echoHttpPort, refresh]);
 
   const handleUnpairPhone = useCallback(async () => {
     setBusy(true);

@@ -4,6 +4,7 @@ import {
   connectPowerfistCaptureSocket,
   readPowerfistCaptureCredentials,
   readPowerfistCapturePairParamsFromQuery,
+  saveMirageHubCredentials,
   savePowerfistCaptureCredentials,
 } from "@/lib/cyberdeck/powerfist-capture-client";
 import { requestHideToTray, requestSilentModeEnabled } from "@/lib/electron/silent-mode";
@@ -40,7 +41,10 @@ export async function startStealthCaptureDeck(): Promise<StealthCaptureDeckHandl
   const pairParams = readPowerfistCapturePairParamsFromQuery();
 
   if (pairParams) {
-    const result = await completePowerfistCapturePairFromQr(pairParams.pairId, pairParams.pairSecret);
+    if (pairParams.mirageHost && pairParams.mirageHttpPort) {
+      saveMirageHubCredentials(pairParams.mirageHost, pairParams.mirageHttpPort);
+    }
+    const result = await completePowerfistCapturePairFromQr(pairParams);
     stripPairQueryFromAddressBar();
     if (!result.ok) return null;
 

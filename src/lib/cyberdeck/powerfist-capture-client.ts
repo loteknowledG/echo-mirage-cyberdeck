@@ -9,18 +9,50 @@ const CAPTURE_HOST_STORAGE_KEY = "echo-mirage-espionage-capture-host";
 const CAPTURE_PORT_STORAGE_KEY = "echo-mirage-espionage-capture-port";
 const CAPTURE_TOKEN_STORAGE_KEY = "echo-mirage-espionage-capture-token";
 const CAPTURE_NODE_STORAGE_KEY = "echo-mirage-espionage-capture-node";
+const MIRAGE_HUB_HOST_STORAGE_KEY = "echo-mirage-espionage-mirage-hub-host";
+const MIRAGE_HUB_HTTP_PORT_STORAGE_KEY = "echo-mirage-espionage-mirage-hub-http-port";
+
+export type PowerfistCapturePairParams = {
+  pairId: string;
+  pairSecret: string;
+  mirageHost?: string;
+  mirageHttpPort?: number;
+};
 
 export type PowerfistCapturePairCompleteResult =
   | { ok: true; captureToken: string; nodeId: string; wsHost: string; wsPort: number }
   | { ok: false; reason: string };
 
-export function readPowerfistCapturePairParamsFromQuery(): { pairId: string; pairSecret: string } | null {
+export function readPowerfistCapturePairParamsFromQuery(): PowerfistCapturePairParams | null {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
   const pairId = params.get("pairId")?.trim();
   const pairSecret = params.get("pairSecret")?.trim();
   if (!pairId || !pairSecret) return null;
-  return { pairId, pairSecret };
+  const mirageHost = params.get("mirageHost")?.trim() || undefined;
+  const mirageHttpPortRaw = params.get("mirageHttpPort")?.trim();
+  const mirageHttpPort = mirageHttpPortRaw ? Number(mirageHttpPortRaw) : undefined;
+  return {
+    pairId,
+    pairSecret,
+    mirageHost,
+    mirageHttpPort: Number.isFinite(mirageHttpPort) && mirageHttpPort! > 0 ? mirageHttpPort : undefined,
+  };
+}
+
+export function saveMirageHubCredentials(mirageHost: string, mirageHttpPort: number): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(MIRAGE_HUB_HOST_STORAGE_KEY, mirageHost);
+  window.localStorage.setItem(MIRAGE_HUB_HTTP_PORT_STORAGE_KEY, String(mirageHttpPort));
+}
+
+export function readMirageHubCredentials(): { mirageHost: string; mirageHttpPort: number } | null {
+  if (typeof window === "undefined") return null;
+  const mirageHost = window.localStorage.getItem(MIRAGE_HUB_HOST_STORAGE_KEY)?.trim();
+  const portRaw = window.localStorage.getItem(MIRAGE_HUB_HTTP_PORT_STORAGE_KEY)?.trim();
+  const mirageHttpPort = Number(portRaw);
+  if (!mirageHost || !Number.isFinite(mirageHttpPort) || mirageHttpPort <= 0) return null;
+  return { mirageHost, mirageHttpPort };
 }
 
 export function savePowerfistCaptureCredentials(
@@ -66,22 +98,45 @@ export function buildPowerfistCaptureWsUrl(
 }
 
 export async function completePowerfistCapturePairFromQr(
-  pairId: string,
-  pairSecret: string,
+  params: PowerfistCapturePairParams,
 ): Promise<PowerfistCapturePairCompleteResult> {
   const nodeId = getOrCreateEspionageNodeId();
+  const mirageHub =
+    params.mirageHost && params.mirageHttpPort
+      ? { mirageHost: params.mirageHost, mirageHttpPort: params.mirageHttpPort }
+      : readMirageHubCredentials();
+
   try {
-    const res = await fetch("/api/powerfist/pair/capture", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        pairId,
-        pairSecret,
-        nodeId,
-        label: ESPIONAGE_ECHO_NODE_LABEL,
-      }),
-    });
-    return (await res.json()) as PowerfistCapturePairCompleteResult;
+    const res = await fetch(
+      mirageHub
+        ? "/api/spy/relay/pair-capture"
+        : "/api/powerfist/pair/capture",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          mirageHub
+            ? {
+                mirageHost: mirageHub.mirageHost,
+                mirageHttpPort: mirageHub.mirageHttpPort,
+                pairId: params.pairId,
+                pairSecret: params.pairSecret,
+                nodeId,
+              }
+            : {
+                pairId: params.pairId,
+                pairSecret: params.pairSecret,
+                nodeId,
+                label: ESPIONAGE_ECHO_NODE_LABEL,
+              },
+        ),
+      },
+    );
+    const payload = (await res.json()) as PowerfistCapturePairCompleteResult;
+    if (payload.ok && mirageHub) {
+      saveMirageHubCredentials(mirageHub.mirageHost, mirageHub.mirageHttpPort);
+    }
+    return payload;
   } catch {
     return { ok: false, reason: "Echo pair request failed." };
   }
@@ -104,18 +159,33 @@ async function ingestEchoCaptureToMirage(
   envelope: EspionageMissionEnvelope,
   pngBase64: string,
 ): Promise<{ ok: boolean; reason?: string }> {
+  const mirageHub = readMirageHubCredentials();
   try {
-    const res = await fetch(envelope.ingestUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        missionId: envelope.missionId,
-        kind: envelope.kind,
-        missionSecret: envelope.missionSecret,
-        prompt: envelope.prompt,
-        pngBase64,
-      }),
-    });
+    const res = await fetch(
+      mirageHub ? "/api/spy/relay/mission-ingest" : envelope.ingestUrl,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          mirageHub
+            ? {
+                ingestUrl: envelope.ingestUrl,
+                missionId: envelope.missionId,
+                kind: envelope.kind,
+                missionSecret: envelope.missionSecret,
+                prompt: envelope.prompt,
+                pngBase64,
+              }
+            : {
+                missionId: envelope.missionId,
+                kind: envelope.kind,
+                missionSecret: envelope.missionSecret,
+                prompt: envelope.prompt,
+                pngBase64,
+              },
+        ),
+      },
+    );
     const payload = (await res.json()) as { ok?: boolean; reason?: string };
     return { ok: payload.ok === true, reason: payload.reason };
   } catch {

@@ -235,17 +235,33 @@ function ensureMirageNode(state: PowerfistPairingState): PowerfistPairedMirage {
   };
 }
 
-function buildCapturePairUrl(state: PowerfistPairingState, pairId: string, pairSecret: string): string {
-  const host = state.lanHosts[0] || "127.0.0.1";
-  const httpPort = state.httpPort ?? resolveHttpPort();
-  const params = new URLSearchParams({ pairId, pairSecret });
-  return `http://${host}:${httpPort}/powerfist/capture-pair?${params.toString()}`;
+function buildCapturePairUrl(
+  state: PowerfistPairingState,
+  pairId: string,
+  pairSecret: string,
+  echoHost: string,
+  echoHttpPort: number,
+): string {
+  const mirageHost = state.lanHosts[0] || "127.0.0.1";
+  const mirageHttpPort = state.httpPort ?? resolveHttpPort();
+  const params = new URLSearchParams({
+    pairId,
+    pairSecret,
+    mirageHost,
+    mirageHttpPort: String(mirageHttpPort),
+  });
+  return `http://${echoHost}:${echoHttpPort}/powerfist/capture-pair?${params.toString()}`;
 }
 
 function capturePairUrl(state: PowerfistPairingState): string | null {
   const session = state.capturePairingSession;
   if (!session || capturePairingSessionExpired(state)) return null;
-  return buildCapturePairUrl(state, session.pairId, session.pairSecret);
+  const echoHost = session.echoHost?.trim();
+  const echoHttpPort = session.echoHttpPort;
+  if (!echoHost || !Number.isFinite(echoHttpPort) || !echoHttpPort || echoHttpPort <= 0) {
+    return null;
+  }
+  return buildCapturePairUrl(state, session.pairId, session.pairSecret, echoHost, echoHttpPort);
 }
 
 export async function ensurePowerfistMissionSecret(state: PowerfistPairingState): Promise<string> {
@@ -255,12 +271,21 @@ export async function ensurePowerfistMissionSecret(state: PowerfistPairingState)
   return state.missionSecret;
 }
 
-export async function createPowerfistCaptureQrSession(): Promise<{
+export async function createPowerfistCaptureQrSession(input: {
+  echoHost: string;
+  echoHttpPort: number;
+}): Promise<{
   ok: true;
   capturePairUrl: string;
   expiresAt: string;
   pairedCapture: PowerfistPairedCapture | null;
 }> {
+  const echoHost = input.echoHost.trim();
+  const echoHttpPort = input.echoHttpPort;
+  if (!echoHost || !Number.isFinite(echoHttpPort) || echoHttpPort <= 0) {
+    throw new Error("Echo LAN host and HTTP port are required for capture QR.");
+  }
+
   const state = await loadPowerfistPairingRegistry();
   if (!state?.deckToken) {
     throw new Error("PowerFist relay is not running.");
@@ -271,6 +296,8 @@ export async function createPowerfistCaptureQrSession(): Promise<{
     pairId: crypto.randomUUID(),
     pairSecret: crypto.randomBytes(18).toString("base64url"),
     expiresAt: new Date(Date.now() + PAIRING_TTL_MS).toISOString(),
+    echoHost,
+    echoHttpPort,
   };
   await ensurePowerfistMissionSecret(state);
   state.httpPort = state.httpPort ?? resolveHttpPort();
