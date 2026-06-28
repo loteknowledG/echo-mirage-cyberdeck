@@ -17,6 +17,11 @@
         </p>
       </header>
 
+      <div id="crash-banner" class="crash-banner hidden" role="alert">
+        <strong>Previous launch crashed or did not finish.</strong>
+        <p id="crash-banner-detail" class="mono"></p>
+      </div>
+
       <section class="card">
         <h2>1 · Permissions (before missions)</h2>
         <p class="hint">
@@ -63,6 +68,28 @@
           <button id="hide-tray" type="button">Hide to tray</button>
           <button id="disarm" type="button">Disarm</button>
         </div>
+      </section>
+
+      <section class="card diagnostics-card">
+        <h2>Diagnostics</h2>
+        <p id="diag-hint" class="hint">
+          Startup is logged as numbered steps <code>[boot N/8]</code>. If the app crashes, reopen it — the last step is where it stopped.
+        </p>
+        <dl class="status-grid">
+          <dt>Version</dt>
+          <dd id="diag-version">—</dd>
+          <dt>Session</dt>
+          <dd id="diag-session" class="mono">—</dd>
+          <dt>Mode</dt>
+          <dd id="diag-mode">—</dd>
+          <dt>Log file</dt>
+          <dd id="diag-log-path" class="mono">—</dd>
+        </dl>
+        <div class="actions">
+          <button id="copy-diagnostics" type="button">Copy diagnostics</button>
+          <button id="refresh-diagnostics" type="button">Refresh</button>
+        </div>
+        <pre id="diag-log-tail" class="log-tail mono muted">Loading…</pre>
       </section>
     </main>
     <script type="module" src="/src/main.ts"></script>

@@ -1,5 +1,6 @@
 use crate::config::{get_or_create_node_id, DEFAULT_PAIR_HTTP_PORT, SatelliteCredentials};
 use crate::pair::{complete_capture_pair, parse_capture_pair_url, PairParams};
+use crate::startup_log;
 use axum::{
     extract::{Query, State},
     response::{Html, IntoResponse},
@@ -69,7 +70,7 @@ async fn health_handler() -> impl IntoResponse {
 
 pub struct PairHttpServer {
     shutdown: tokio::sync::watch::Sender<bool>,
-    join: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    join: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 impl PairHttpServer {
@@ -90,6 +91,7 @@ pub fn spawn_pair_http_server(
     let state = PairServerState { app, on_paired };
 
     let handle = tauri::async_runtime::spawn(async move {
+        startup_log::log("pair-server: async task started, binding port");
         let router = Router::new()
             .route("/powerfist/capture-pair", get(capture_pair_handler))
             .route("/health", get(health_handler))
@@ -98,8 +100,13 @@ pub fn spawn_pair_http_server(
         let addr = SocketAddr::from(([0, 0, 0, 0], port));
         let listener = match tokio::net::TcpListener::bind(addr).await {
             Ok(listener) => listener,
-            Err(_) => return,
+            Err(e) => {
+                startup_log::log(format!("pair-server: FAILED bind {addr}: {e}"));
+                return;
+            }
         };
+
+        startup_log::log(format!("pair-server: listening on {addr}"));
 
         let server = axum::serve(listener, router).with_graceful_shutdown(async move {
             loop {

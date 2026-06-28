@@ -144,3 +144,32 @@ button:hover {
 .hidden.show {
   display: inline-block;
 }
+
+.crash-banner {
+  border: 1px solid #5a2a2a;
+  background: #1a0a0a;
+  color: #f0a0a0;
+  padding: 0.75rem;
+  margin-bottom: 0.85rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+}
+
+.crash-banner p {
+  margin: 0.35rem 0 0;
+  color: #c08080;
+}
+
+.diagnostics-card .log-tail {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem;
+  max-height: 12rem;
+  overflow: auto;
+  border: 1px solid #1c1c1c;
+  border-radius: 4px;
+  background: #000;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
