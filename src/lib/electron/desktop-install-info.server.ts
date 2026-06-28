@@ -96,7 +96,7 @@ export async function getDesktopInstallInfo(
 ): Promise<DesktopInstallInfo> {
   const version = readPackageVersion();
   const platform = resolveDesktopInstallPlatform(userAgent);
-  const supported = platform === "win";
+  const supported = platform === "win" || platform === "mac";
   const fileName = desktopInstallerFileName(version, platform);
   const envUrl = process.env.ECHO_MIRAGE_DESKTOP_INSTALLER_URL?.trim();
   let downloadUrl: string | null = null;
@@ -119,7 +119,9 @@ export async function getDesktopInstallInfo(
           installerAvailable = true;
         } else {
           statusMessage =
-            "The Windows installer is not published yet. Open GitHub Releases or wait for the desktop-installer workflow to finish.";
+            platform === "mac"
+              ? "The macOS installer is not published yet. Open GitHub Releases or wait for the desktop-installer workflow to finish."
+              : "The Windows installer is not published yet. Open GitHub Releases or wait for the desktop-installer workflow to finish.";
         }
       }
     }

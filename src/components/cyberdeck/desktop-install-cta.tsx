@@ -61,7 +61,7 @@ export function DesktopInstallCta({ compact = false }: DesktopInstallCtaProps) {
         >
           GitHub Releases
         </a>{" "}
-        and download the Windows setup package.
+          and download the {info.platform === "mac" ? "macOS" : "Windows"} setup package.
       </p>
     );
   }
@@ -88,7 +88,11 @@ export function DesktopInstallCta({ compact = false }: DesktopInstallCtaProps) {
         {info.fileName ? (
           <span className="text-[9px] tracking-[0.04em] text-[#5f5f5f]">
             v{info.version}
-            {info.platform === "win" ? " // Windows" : ` // ${info.platform}`}
+            {info.platform === "win"
+              ? " // Windows"
+              : info.platform === "mac"
+                ? " // macOS"
+                : ` // ${info.platform}`}
           </span>
         ) : null}
       </div>
@@ -108,7 +112,8 @@ export function DesktopInstallCta({ compact = false }: DesktopInstallCtaProps) {
       ) : null}
       {!info.supported ? (
         <p className="text-[9px] leading-relaxed tracking-[0.04em] text-[#6a5a40]">
-          Packaged installers are Windows-first today. Other platforms can build from source with{" "}
+          Packaged installers are available for Windows and macOS (Apple Silicon). Linux builds
+          from source with{" "}
           <code className="rounded border border-[#2d2d2d] bg-black px-1 py-0.5 text-[8px] text-[#8a8a8a]">
             pnpm electron:pack
           </code>
