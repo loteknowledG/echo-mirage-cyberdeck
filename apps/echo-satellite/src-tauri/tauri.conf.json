@@ -36,6 +36,18 @@
       "icons/icon.ico"
     ],
     "shortDescription": "Echo capture drone for Mirage espionage",
-    "longDescription": "Minimal tray agent: screenshot on PowerFist signal, relay PNG to Mirage. No cyberdeck UI."
+    "longDescription": "Minimal tray agent: screenshot on PowerFist signal, relay PNG to Mirage. No cyberdeck UI.",
+    "windows": {
+      "nsis": {
+        "artifactName": "Echo-Satellite-${version}-setup.${ext}"
+      }
+    },
+    "macOS": {
+      "signingIdentity": "-",
+      "hardenedRuntime": false,
+      "minimumSystemVersion": "12.0",
+      "targets": ["dmg"],
+      "artifactName": "Echo-Satellite-${version}.${ext}"
+    }
   }
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import type { DesktopInstallInfo } from "@/lib/electron/desktop-install-info.server";
+import type { SatelliteInstallInfo } from "@/lib/electron/satellite-install-info.server";
 import {
   ESPIONAGE_ECHO_DISPLAY,
   ESPIONAGE_MIRAGE_DISPLAY,
@@ -12,10 +13,12 @@ import {
 } from "@/lib/cyberdeck/espionage-mode";
 import {
   fetchDesktopInstallInfo,
+  fetchSatelliteInstallInfo,
   isEchoMirageDesktopShell,
   isPwaStandaloneSession,
   openDesktopCyberdeckApp,
   openDesktopInstaller,
+  openSatelliteInstaller,
   probeLocalDesktopShell,
   promptPwaInstall,
   subscribePwaInstallPrompt,
@@ -30,13 +33,13 @@ function isMobileUserAgent(): boolean {
 function spyInstallHint(activeSubPane: SpySubPane): string {
   switch (activeSubPane) {
     case "echo":
-      return `${ESPIONAGE_ECHO_DISPLAY} capture, pairing codes, and the silent relay require the desktop cyberdeck — not a hosted PWA or browser tab.`;
+      return `${ESPIONAGE_ECHO_DISPLAY} capture needs the lightweight Echo Satellite tray agent (~MB) — not the full cyberdeck and not a browser tab.`;
     case "mirage":
       return `${ESPIONAGE_MIRAGE_DISPLAY} can pair from PWA, but the desktop cyberdeck is recommended on the solver laptop for MUTHUR, hub QRs, and local disk.`;
     case "powerfist":
       return isMobileUserAgent()
         ? `${ESPIONAGE_POWERFIST_LABEL} runs on your phone — install the PWA for quick access, or use the mobile browser.`
-        : `${ESPIONAGE_POWERFIST_LABEL} pairs from any device. Install the desktop cyberdeck if this machine is ${ESPIONAGE_ECHO_DISPLAY} or ${ESPIONAGE_MIRAGE_DISPLAY}.`;
+        : `${ESPIONAGE_POWERFIST_LABEL} pairs from any device. Install the desktop cyberdeck if this machine is ${ESPIONAGE_MIRAGE_DISPLAY}.`;
     default: {
       const exhaustive: never = activeSubPane;
       return exhaustive;
@@ -48,9 +51,11 @@ type SpyDesktopInstallPanelProps = {
   activeSubPane: SpySubPane;
 };
 
-/** Spy tab — install/open desktop cyberdeck (and PWA when offered) outside the desktop shell. */
+/** Spy tab — install Echo Satellite (Echo) or cyberdeck (Mirage). */
 export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanelProps) {
-  const [info, setInfo] = useState<DesktopInstallInfo | null>(null);
+  const echoPane = activeSubPane === "echo";
+  const [desktopInfo, setDesktopInfo] = useState<DesktopInstallInfo | null>(null);
+  const [satelliteInfo, setSatelliteInfo] = useState<SatelliteInstallInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [localShell, setLocalShell] = useState<Awaited<ReturnType<typeof probeLocalDesktopShell>> | null>(
     null,
@@ -67,21 +72,36 @@ export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanel
       return;
     }
 
-    void Promise.all([fetchDesktopInstallInfo(), probeLocalDesktopShell()])
-      .then(([installInfo, probe]) => {
-        setInfo(installInfo);
-        setLocalShell(probe);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    void (async () => {
+      const probe = await probeLocalDesktopShell();
+      setLocalShell(probe);
+      if (echoPane) {
+        setSatelliteInfo(await fetchSatelliteInstallInfo());
+      } else {
+        setDesktopInfo(await fetchDesktopInstallInfo());
+      }
+    })().finally(() => setLoading(false));
+  }, [echoPane]);
 
   useEffect(() => {
     if (isEchoMirageDesktopShell()) return;
     return subscribePwaInstallPrompt((event) => setPwaPrompt(event));
   }, []);
 
+  const handleInstallSatellite = useCallback(() => {
+    if (!satelliteInfo) {
+      window.open(
+        "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      return;
+    }
+    openSatelliteInstaller(satelliteInfo);
+  }, [satelliteInfo]);
+
   const handleInstallDesktop = useCallback(() => {
-    if (!info) {
+    if (!desktopInfo) {
       window.open(
         "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/latest",
         "_blank",
@@ -89,8 +109,8 @@ export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanel
       );
       return;
     }
-    openDesktopInstaller(info);
-  }, [info]);
+    openDesktopInstaller(desktopInfo);
+  }, [desktopInfo]);
 
   const handleOpenDesktop = useCallback(() => {
     openDesktopCyberdeckApp({
@@ -120,16 +140,23 @@ export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanel
   if (loading) {
     return (
       <div className="border-b border-[#1c1c1c] px-4 py-3">
-        <p className="font-mono text-[9px] tracking-[0.04em] text-[#5f5f5f]">Checking desktop cyberdeck…</p>
+        <p className="font-mono text-[9px] tracking-[0.04em] text-[#5f5f5f]">
+          {echoPane ? "Checking Echo Satellite…" : "Checking desktop cyberdeck…"}
+        </p>
       </div>
     );
   }
 
-  const installLabel = info?.installerAvailable
-    ? "Install desktop cyberdeck"
-    : "Download desktop installer";
+  const installInfo = echoPane ? satelliteInfo : desktopInfo;
+  const installLabel = installInfo?.installerAvailable
+    ? echoPane
+      ? "Install Echo Satellite"
+      : "Install desktop cyberdeck"
+    : echoPane
+      ? "Download Echo Satellite"
+      : "Download desktop installer";
   const platformLabel =
-    info?.platform === "mac" ? "macOS" : info?.platform === "win" ? "Windows" : "desktop";
+    installInfo?.platform === "mac" ? "macOS" : installInfo?.platform === "win" ? "Windows" : "desktop";
   const accentClass =
     activeSubPane === "echo"
       ? "border-cyan-950/50 bg-cyan-950/10"
@@ -147,10 +174,17 @@ export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanel
         {isPwaStandaloneSession() ? " You are in the installed PWA shell." : null}
       </p>
 
-      {showDesktopActions && localShell?.shell ? (
+      {echoPane ? (
+        <p className="mb-2 text-[8px] leading-relaxed text-[#5a5a5a]">
+          After install: grant Screen Recording (macOS), pair via Mirage Echo QR on port{" "}
+          <strong className="text-[#7a7a7a]">3050</strong>, then hide to tray.
+        </p>
+      ) : null}
+
+      {showDesktopActions && !echoPane && localShell?.shell ? (
         <p className="mb-2 text-[9px] text-emerald-300/80">Desktop cyberdeck detected on this machine.</p>
       ) : null}
-      {showDesktopActions && localShell?.running && !localShell.shell ? (
+      {showDesktopActions && !echoPane && localShell?.running && !localShell.shell ? (
         <p className="mb-2 text-[9px] text-[#8a8a8a]">
           Local server running — open the desktop app for full Spy features.
         </p>
@@ -159,12 +193,20 @@ export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanel
       <div className="flex flex-wrap gap-2">
         {showDesktopActions ? (
           <>
-            <CyberdeckActionButton variant="accent" onClick={handleOpenDesktop}>
-              Open desktop cyberdeck
-            </CyberdeckActionButton>
-            <CyberdeckActionButton onClick={handleInstallDesktop}>
-              {info?.supported ? installLabel : "View releases"}
-            </CyberdeckActionButton>
+            {echoPane ? (
+              <CyberdeckActionButton variant="accent" onClick={handleInstallSatellite}>
+                {satelliteInfo?.supported ? installLabel : "View satellite releases"}
+              </CyberdeckActionButton>
+            ) : (
+              <>
+                <CyberdeckActionButton variant="accent" onClick={handleOpenDesktop}>
+                  Open desktop cyberdeck
+                </CyberdeckActionButton>
+                <CyberdeckActionButton onClick={handleInstallDesktop}>
+                  {desktopInfo?.supported ? installLabel : "View releases"}
+                </CyberdeckActionButton>
+              </>
+            )}
           </>
         ) : null}
         {pwaPrompt ? (
@@ -174,13 +216,13 @@ export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanel
         ) : null}
       </div>
 
-      {showDesktopActions && info?.fileName ? (
+      {showDesktopActions && installInfo?.fileName ? (
         <p className="mt-2 text-[8px] tracking-[0.04em] text-[#5f5f5f]">
-          Latest {platformLabel} build · v{info.version}
+          Latest {platformLabel} {echoPane ? "satellite" : "build"} · v{installInfo.version}
         </p>
       ) : null}
-      {showDesktopActions && info?.statusMessage ? (
-        <p className="mt-2 text-[8px] leading-relaxed text-[#6a5a40]">{info.statusMessage}</p>
+      {showDesktopActions && installInfo?.statusMessage ? (
+        <p className="mt-2 text-[8px] leading-relaxed text-[#6a5a40]">{installInfo.statusMessage}</p>
       ) : null}
       {status ? <p className="mt-2 text-[9px] text-emerald-300/80">{status}</p> : null}
     </div>

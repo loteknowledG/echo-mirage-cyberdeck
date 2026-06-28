@@ -137,6 +137,10 @@ button:hover {
   color: #6a6a6a;
 }
 
-code {
-  color: #9a8a6a;
+.hidden {
+  display: none;
+}
+
+.hidden.show {
+  display: inline-block;
 }

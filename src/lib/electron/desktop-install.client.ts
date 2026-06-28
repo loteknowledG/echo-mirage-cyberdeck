@@ -4,6 +4,7 @@ import type {
   DesktopInstallInfo,
   DesktopInstallPlatform,
 } from "@/lib/electron/desktop-install-info.server";
+import type { SatelliteInstallInfo } from "@/lib/electron/satellite-install-info.server";
 
 export const DESKTOP_INSTALL_DISMISS_KEY = "echo-mirage-desktop-install-dismissed-v1";
 export const DESKTOP_CYBERDECK_PROTOCOL = "echomirage";
@@ -69,7 +70,25 @@ export async function fetchDesktopInstallInfo(): Promise<DesktopInstallInfo | nu
   }
 }
 
-export function openDesktopInstaller(info: DesktopInstallInfo): void {
+export async function fetchSatelliteInstallInfo(): Promise<SatelliteInstallInfo | null> {
+  try {
+    const platform = resolveClientDesktopPlatform();
+    const query =
+      platform === "unsupported" ? "" : `?platform=${encodeURIComponent(platform)}`;
+    const res = await fetch(`/api/satellite-install${query}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as SatelliteInstallInfo;
+  } catch {
+    return null;
+  }
+}
+
+export function openInstallDownload(
+  info: Pick<
+    DesktopInstallInfo | SatelliteInstallInfo,
+    "platform" | "fileName" | "installerAvailable" | "downloadUrl" | "releasePageUrl"
+  >,
+): void {
   const clientPlatform = resolveClientDesktopPlatform();
   const platformMismatch =
     clientPlatform !== "unsupported" &&
@@ -86,6 +105,14 @@ export function openDesktopInstaller(info: DesktopInstallInfo): void {
       ? info.downloadUrl
       : info.releasePageUrl;
   window.open(target, "_blank", "noopener,noreferrer");
+}
+
+export function openDesktopInstaller(info: DesktopInstallInfo): void {
+  openInstallDownload(info);
+}
+
+export function openSatelliteInstaller(info: SatelliteInstallInfo): void {
+  openInstallDownload(info);
 }
 
 function localProbeOrigins(): string[] {

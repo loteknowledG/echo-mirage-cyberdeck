@@ -23,6 +23,15 @@ The satellite listens on **`0.0.0.0:3050`** for that path (same as the full cybe
 
 You can also paste the full URL into the setup UI.
 
+## CI release
+
+Push tag `satellite-v0.1.0` (or run **Satellite installer** workflow) to publish:
+
+- `Echo-Satellite-{version}-setup.exe` (Windows)
+- `Echo-Satellite-{version}.dmg` (macOS Apple Silicon)
+
+Spy tab **Echo** pane links to `/api/satellite-install` for platform-correct downloads.
+
 ## Development
 
 Prerequisites: [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.

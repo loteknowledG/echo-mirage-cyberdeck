@@ -24,12 +24,34 @@ type PairResult = {
   reason?: string;
 };
 
+type PermissionStatus = {
+  platform: string;
+  screenRecording: boolean;
+  hint?: string | null;
+};
+
 const pairPortEl = document.querySelector<HTMLElement>("#pair-port")!;
 const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
+const permissionResultEl = document.querySelector<HTMLElement>("#permission-result")!;
+const openScreenSettingsBtn = document.querySelector<HTMLButtonElement>("#open-screen-settings")!;
 const statusArmedEl = document.querySelector<HTMLElement>("#status-armed")!;
 const statusWsEl = document.querySelector<HTMLElement>("#status-ws")!;
 const statusMissionsEl = document.querySelector<HTMLElement>("#status-missions")!;
 const statusErrorEl = document.querySelector<HTMLElement>("#status-error")!;
+
+async function refreshPermissions(): Promise<void> {
+  const perm = await invoke<PermissionStatus>("check_permissions");
+  if (perm.screenRecording) {
+    permissionResultEl.textContent = "Screen Recording: granted";
+    openScreenSettingsBtn.classList.remove("show");
+  } else {
+    permissionResultEl.textContent =
+      perm.hint ?? "Screen Recording not granted — required before missions.";
+    if (perm.platform === "macos") {
+      openScreenSettingsBtn.classList.add("show");
+    }
+  }
+}
 
 async function refreshStatus(): Promise<void> {
   const status = await invoke<SatelliteStatus>("get_status");
@@ -48,6 +70,11 @@ document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("cl
   } else {
     captureResultEl.textContent = result.error ?? "Capture failed";
   }
+  await refreshPermissions();
+});
+
+openScreenSettingsBtn.addEventListener("click", async () => {
+  await invoke("open_screen_recording_settings");
 });
 
 document.querySelector<HTMLButtonElement>("#pair-url-btn")!.addEventListener("click", async () => {
@@ -75,6 +102,7 @@ document.querySelector<HTMLButtonElement>("#disarm")!.addEventListener("click", 
   await refreshStatus();
 });
 
+void refreshPermissions();
 void refreshStatus();
 window.setInterval(() => {
   void refreshStatus();

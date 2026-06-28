@@ -3,6 +3,7 @@ mod config;
 mod mission;
 mod pair;
 mod pair_server;
+mod permissions;
 mod ws_client;
 
 use config::{
@@ -11,6 +12,11 @@ use config::{
 };
 use mission::TestCaptureResult;
 use pair::{complete_capture_pair, parse_capture_pair_url, PairParams, PairResult};
+use permissions::{
+    open_screen_recording_settings as open_macos_screen_recording_settings,
+    permission_status,
+    PermissionStatus,
+};
 use pair_server::{spawn_pair_http_server, PairHttpServer};
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -233,6 +239,17 @@ fn hide_to_tray(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn check_permissions() -> PermissionStatus {
+    permission_status()
+}
+
+#[tauri::command]
+fn open_screen_recording_settings() -> Result<(), String> {
+    open_macos_screen_recording_settings();
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -291,6 +308,8 @@ pub fn run() {
             disarm,
             show_setup,
             hide_to_tray,
+            check_permissions,
+            open_screen_recording_settings,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
