@@ -1,6 +1,9 @@
 "use client";
 
-import type { DesktopInstallInfo } from "@/lib/electron/desktop-install-info.server";
+import type {
+  DesktopInstallInfo,
+  DesktopInstallPlatform,
+} from "@/lib/electron/desktop-install-info.server";
 
 export const DESKTOP_INSTALL_DISMISS_KEY = "echo-mirage-desktop-install-dismissed-v1";
 export const DESKTOP_CYBERDECK_PROTOCOL = "echomirage";
@@ -44,9 +47,21 @@ export function dismissDesktopInstallBanner(): void {
   }
 }
 
+export function resolveClientDesktopPlatform(): DesktopInstallPlatform {
+  if (typeof navigator === "undefined") return "unsupported";
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes("windows")) return "win";
+  if (ua.includes("macintosh") || ua.includes("mac os")) return "mac";
+  if (ua.includes("linux")) return "linux";
+  return "unsupported";
+}
+
 export async function fetchDesktopInstallInfo(): Promise<DesktopInstallInfo | null> {
   try {
-    const res = await fetch("/api/desktop-install", { cache: "no-store" });
+    const platform = resolveClientDesktopPlatform();
+    const query =
+      platform === "unsupported" ? "" : `?platform=${encodeURIComponent(platform)}`;
+    const res = await fetch(`/api/desktop-install${query}`, { cache: "no-store" });
     if (!res.ok) return null;
     return (await res.json()) as DesktopInstallInfo;
   } catch {
@@ -55,6 +70,17 @@ export async function fetchDesktopInstallInfo(): Promise<DesktopInstallInfo | nu
 }
 
 export function openDesktopInstaller(info: DesktopInstallInfo): void {
+  const clientPlatform = resolveClientDesktopPlatform();
+  const platformMismatch =
+    clientPlatform !== "unsupported" &&
+    info.platform !== clientPlatform &&
+    info.fileName != null;
+  const wrongExtension =
+    clientPlatform === "mac" && info.fileName?.endsWith(".exe") === true;
+  if (platformMismatch || wrongExtension) {
+    window.open(info.releasePageUrl, "_blank", "noopener,noreferrer");
+    return;
+  }
   const target =
     info.installerAvailable && info.downloadUrl
       ? info.downloadUrl
