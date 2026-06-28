@@ -5,7 +5,6 @@ import {
   ESPIONAGE_ECHO_DISPLAY,
   ESPIONAGE_MODE_TITLE,
 } from "@/lib/cyberdeck/espionage-mode";
-import { isBrowserScreenCaptureSupported } from "@/lib/cyberdeck/browser-screen-capture";
 import {
   buildPowerfistCaptureWsUrl,
   completePowerfistCapturePairFromQr,
@@ -16,7 +15,6 @@ import {
 
 export default function PowerfistCapturePairPage() {
   const [status, setStatus] = useState(`${ESPIONAGE_ECHO_DISPLAY} // pairing with Mirage hub…`);
-  const browserCapture = isBrowserScreenCaptureSupported();
 
   useEffect(() => {
     let socket: ReturnType<typeof connectPowerfistCaptureSocket> | null = null;
@@ -49,16 +47,11 @@ export default function PowerfistCapturePairPage() {
         onStatus: (next) => {
           if (next === "connected") {
             setStatus(
-              browserCapture
-                ? `${ESPIONAGE_MODE_TITLE} // ${ESPIONAGE_ECHO_DISPLAY} // LINKED // pick screen when PowerFist triggers`
-                : `${ESPIONAGE_MODE_TITLE} // ${ESPIONAGE_ECHO_DISPLAY} // LINKED // awaiting PowerFist capture missions`,
+              `${ESPIONAGE_MODE_TITLE} // ${ESPIONAGE_ECHO_DISPLAY} // LINKED // silent capture on PowerFist trigger`,
             );
           } else if (next === "error") {
             setStatus(`${ESPIONAGE_ECHO_DISPLAY} // relay error — re-scan Echo QR on Mirage`);
           }
-        },
-        onCapturePrompt: () => {
-          setStatus(`${ESPIONAGE_ECHO_DISPLAY} // CAPTURE // choose screen or window in browser dialog…`);
         },
         onMissionResult: (detail) => {
           if (detail.ok) {
@@ -76,22 +69,16 @@ export default function PowerfistCapturePairPage() {
       cancelled = true;
       socket?.close();
     };
-  }, [browserCapture]);
+  }, []);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-black p-6 font-mono text-sm text-cyan-200">
       <div className="max-w-md text-center tracking-[0.08em]">
         <p>{status}</p>
-        {browserCapture ? (
-          <p className="mt-4 text-[11px] leading-relaxed text-cyan-200/60">
-            Keep this tab open. When PowerFist triggers capture, your browser will ask which screen or
-            window to share.
-          </p>
-        ) : (
-          <p className="mt-4 text-[11px] leading-relaxed text-amber-200/70">
-            Browser screen capture unavailable — using localhost silent capture when missions arrive.
-          </p>
-        )}
+        <p className="mt-4 text-[11px] leading-relaxed text-cyan-200/60">
+          Keep Echo running locally on the screenshot computer. Silent capture uses the localhost
+          desktop agent (Windows + samus-manus).
+        </p>
       </div>
     </main>
   );

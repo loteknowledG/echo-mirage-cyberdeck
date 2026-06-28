@@ -1,9 +1,5 @@
 import type { EspionageMissionEnvelope } from "@/lib/cyberdeck/powerfist-mission.types";
 import {
-  captureBrowserScreenPngBase64,
-  isBrowserScreenCaptureSupported,
-} from "@/lib/cyberdeck/browser-screen-capture";
-import {
   ESPIONAGE_ECHO_NODE_LABEL,
   getOrCreateEspionageNodeId,
 } from "@/lib/cyberdeck/espionage-mode";
@@ -91,40 +87,17 @@ export async function completePowerfistCapturePairFromQr(
   }
 }
 
-async function runEchoServerSilentCapture(): Promise<
-  { ok: true; pngBase64: string } | { ok: false; error: string }
-> {
+async function runEchoSilentCapture(): Promise<{ ok: true; pngBase64: string } | { ok: false; error: string }> {
   try {
     const res = await fetch("/api/spy/capture", { method: "POST" });
     const payload = (await res.json()) as { ok?: boolean; pngBase64?: string; error?: string };
     if (!payload.ok || !payload.pngBase64?.trim()) {
-      return { ok: false, error: payload.error || "Server silent capture failed." };
+      return { ok: false, error: payload.error || "Echo silent capture failed." };
     }
     return { ok: true, pngBase64: payload.pngBase64.trim() };
   } catch {
-    return { ok: false, error: "Server capture request failed." };
+    return { ok: false, error: "Echo capture request failed." };
   }
-}
-
-/** Browser screen share first (PWA MVP); Windows localhost silent capture as fallback. */
-async function runEchoSilentCapture(): Promise<{ ok: true; pngBase64: string } | { ok: false; error: string }> {
-  if (isBrowserScreenCaptureSupported()) {
-    const browser = await captureBrowserScreenPngBase64();
-    if (browser.ok) {
-      return { ok: true, pngBase64: browser.pngBase64 };
-    }
-    if (!browser.cancelled) {
-      const server = await runEchoServerSilentCapture();
-      if (server.ok) return server;
-      return {
-        ok: false,
-        error: `${browser.error} Server fallback: ${server.error}`,
-      };
-    }
-    return { ok: false, error: browser.error };
-  }
-
-  return runEchoServerSilentCapture();
 }
 
 async function ingestEchoCaptureToMirage(
@@ -158,7 +131,6 @@ type CaptureSocketController = {
 export function connectPowerfistCaptureSocket(options: {
   wsUrl: string;
   onStatus?: (status: PowerfistSocketStatus) => void;
-  onCapturePrompt?: () => void;
   onMissionResult?: (detail: { missionId: string; ok: boolean; reason?: string }) => void;
 }): CaptureSocketController {
   let status: PowerfistSocketStatus = "disconnected";
@@ -172,7 +144,6 @@ export function connectPowerfistCaptureSocket(options: {
   };
 
   const handleMission = async (envelope: EspionageMissionEnvelope) => {
-    options.onCapturePrompt?.();
     const captured = await runEchoSilentCapture();
     if (!captured.ok) {
       options.onMissionResult?.({
