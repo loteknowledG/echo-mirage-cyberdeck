@@ -3,11 +3,13 @@
  */
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const devStatePath = path.join(root, '.tmp', 'dev-server.json');
+const isWindows = process.platform === 'win32';
 const PORTS = new Set([3050, 3051]);
 for (let port = 3052; port <= 3059; port += 1) PORTS.add(port);
 
@@ -20,7 +22,7 @@ try {
 }
 
 /** @param {number} port */
-function pidsOnPort(port) {
+function pidsOnPortWindows(port) {
   try {
     const out = execSync(`netstat -ano | findstr :${port}`, { encoding: 'utf8' });
     const pids = new Set();
@@ -36,6 +38,40 @@ function pidsOnPort(port) {
   }
 }
 
+/** @param {number} port */
+function pidsOnPortUnix(port) {
+  try {
+    const out = execSync(`lsof -nP -iTCP:${port} -sTCP:LISTEN -t`, { encoding: 'utf8' });
+    const pids = new Set();
+    for (const line of out.split(/\r?\n/)) {
+      const pid = Number(line.trim());
+      if (Number.isFinite(pid) && pid > 0) pids.add(pid);
+    }
+    return [...pids];
+  } catch {
+    return [];
+  }
+}
+
+/** @param {number} port */
+function pidsOnPort(port) {
+  return isWindows ? pidsOnPortWindows(port) : pidsOnPortUnix(port);
+}
+
+/** @param {number} pid */
+function stopPid(pid) {
+  try {
+    if (isWindows) {
+      execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
+    } else {
+      execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
+    }
+    process.stdout.write(`[dev:stop] stopped PID ${pid}\n`);
+  } catch {
+    process.stderr.write(`[dev:stop] failed to stop PID ${pid}\n`);
+  }
+}
+
 const targets = new Set();
 for (const port of PORTS) {
   for (const pid of pidsOnPort(port)) targets.add(pid);
@@ -47,10 +83,5 @@ if (targets.size === 0) {
 }
 
 for (const pid of targets) {
-  try {
-    execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
-    process.stdout.write(`[dev:stop] stopped PID ${pid}\n`);
-  } catch {
-    process.stderr.write(`[dev:stop] failed to stop PID ${pid}\n`);
-  }
+  stopPid(pid);
 }
