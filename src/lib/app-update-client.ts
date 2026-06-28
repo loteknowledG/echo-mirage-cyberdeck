@@ -12,8 +12,6 @@ export type AppUpdateCheckResult =
   | { status: "unavailable"; message?: string }
   | { status: "local-dev"; message: string };
 
-type DesktopAppUpdateCheckResult = Exclude<AppUpdateCheckResult, { status: "local-dev" }>;
-
 function getDesktopUpdateBridge(): EchoMirageAppUpdateBridge | null {
   if (typeof window === "undefined") return null;
   return window.echoMirageAppUpdate ?? null;
@@ -146,14 +144,21 @@ export async function checkForAppUpdate(options?: {
   const desktop = getDesktopUpdateBridge();
 
   if (desktop) {
-    const result: DesktopAppUpdateCheckResult = await desktop.checkForUpdates();
-    if (result.status === "up-to-date" || result.status === "update-available") {
-      setStoredRunningVersion(result.running);
-      if (result.status === "update-available" && !manual) {
-        promptForAppUpdate(result.latest);
+    try {
+      const result = await desktop.checkForUpdates();
+      if (result.status === "up-to-date" || result.status === "update-available") {
+        setStoredRunningVersion(result.running);
+        if (result.status === "update-available" && !manual) {
+          promptForAppUpdate(result.latest);
+        }
       }
+      return result;
+    } catch (error) {
+      return {
+        status: "unavailable",
+        message: error instanceof Error ? error.message : "Desktop update check failed.",
+      };
     }
-    return result;
   }
 
   if (!manual && !shouldPollForAppUpdates()) {

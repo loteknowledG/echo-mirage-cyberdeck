@@ -8,8 +8,17 @@
 export const OPENCODE_ZEN_API_KEY_ENV = "OPENCODE_ZEN_API_KEY" as const;
 export const OPENCODE_GO_API_KEY_ENV = "OPENCODE_GO_API_KEY" as const;
 
+/** Legacy Vercel/demo names still accepted for Zen lane. */
+const OPENCODE_ZEN_LEGACY_ENVS = ["OPENCODE_API_KEY", "ZEN_API_KEY"] as const;
+
 export function readOpenCodeZenApiKeyFromEnv(): string {
-  return process.env[OPENCODE_ZEN_API_KEY_ENV]?.trim() ?? "";
+  const primary = process.env[OPENCODE_ZEN_API_KEY_ENV]?.trim();
+  if (primary) return primary;
+  for (const key of OPENCODE_ZEN_LEGACY_ENVS) {
+    const value = process.env[key]?.trim();
+    if (value) return value;
+  }
+  return "";
 }
 
 export function readOpenCodeGoApiKeyFromEnv(): string {
