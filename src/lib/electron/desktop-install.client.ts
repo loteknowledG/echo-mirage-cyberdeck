@@ -3,6 +3,19 @@
 import type { DesktopInstallInfo } from "@/lib/electron/desktop-install-info.server";
 
 export const DESKTOP_INSTALL_DISMISS_KEY = "echo-mirage-desktop-install-dismissed-v1";
+export const DESKTOP_CYBERDECK_PROTOCOL = "echomirage";
+export const DEFAULT_LOCAL_CYBERDECK_ORIGIN = "http://127.0.0.1:3050";
+
+export type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+export type LocalDesktopShellProbe = {
+  running: boolean;
+  shell: boolean;
+  origin: string | null;
+};
 
 export function isEchoMirageDesktopShell(): boolean {
   if (typeof window === "undefined") return false;
@@ -47,4 +60,90 @@ export function openDesktopInstaller(info: DesktopInstallInfo): void {
       ? info.downloadUrl
       : info.releasePageUrl;
   window.open(target, "_blank", "noopener,noreferrer");
+}
+
+function localProbeOrigins(): string[] {
+  if (typeof window === "undefined") return [];
+  const origins = new Set<string>();
+  const { protocol, hostname, origin, port } = window.location;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    origins.add(origin);
+  }
+  origins.add(DEFAULT_LOCAL_CYBERDECK_ORIGIN);
+  if (port && port !== "3050") {
+    origins.add(`${protocol}//127.0.0.1:${port}`);
+  }
+  return [...origins];
+}
+
+export async function probeLocalDesktopShell(): Promise<LocalDesktopShellProbe> {
+  for (const origin of localProbeOrigins()) {
+    try {
+      const res = await fetch(`${origin}/api/desktop-shell/status`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(1500),
+      });
+      if (!res.ok) continue;
+      const payload = (await res.json()) as { shell?: boolean };
+      return {
+        running: true,
+        shell: payload.shell === true,
+        origin,
+      };
+    } catch {
+      /* try next origin */
+    }
+  }
+  return { running: false, shell: false, origin: null };
+}
+
+export function buildDesktopCyberdeckProtocolUrl(path = "/cyberdeck"): string {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return `${DESKTOP_CYBERDECK_PROTOCOL}://open${normalized}`;
+}
+
+/** Launch the installed desktop cyberdeck via custom protocol (or localhost when probed). */
+export function openDesktopCyberdeckApp(input?: {
+  path?: string;
+  localOrigin?: string | null;
+}): void {
+  const path = input?.path ?? "/cyberdeck";
+  const protocolUrl = buildDesktopCyberdeckProtocolUrl(path);
+
+  if (input?.localOrigin) {
+    window.open(`${input.localOrigin}${path}`, "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  window.location.href = protocolUrl;
+}
+
+export function isPwaStandaloneSession(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
+
+export function subscribePwaInstallPrompt(
+  onPrompt: (event: BeforeInstallPromptEvent) => void,
+): () => void {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const handler = (event: Event) => {
+    event.preventDefault();
+    onPrompt(event as BeforeInstallPromptEvent);
+  };
+
+  window.addEventListener("beforeinstallprompt", handler);
+  return () => window.removeEventListener("beforeinstallprompt", handler);
+}
+
+export async function promptPwaInstall(event: BeforeInstallPromptEvent): Promise<boolean> {
+  await event.prompt();
+  const choice = await event.userChoice;
+  return choice.outcome === "accepted";
 }
