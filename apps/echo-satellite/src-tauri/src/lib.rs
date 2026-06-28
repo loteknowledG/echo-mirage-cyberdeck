@@ -24,7 +24,7 @@ use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, RunEvent, State,
+    AppHandle, Manager, RunEvent, State, WindowEvent,
 };
 use ws_client::{spawn_capture_deck_loop, WsController, WsSharedState};
 
@@ -92,11 +92,18 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
-fn arm_with_credentials(app: &AppHandle, state: &AppState, creds: SatelliteCredentials) -> Result<(), String> {
+fn arm_with_credentials(
+    app: &AppHandle,
+    state: &AppState,
+    creds: SatelliteCredentials,
+    hide_window: bool,
+) -> Result<(), String> {
     save_credentials(app, &creds)?;
     state.start_ws(creds);
     state.armed.store(true, Ordering::SeqCst);
-    hide_main_window(app);
+    if hide_window {
+        hide_main_window(app);
+    }
     Ok(())
 }
 
@@ -110,7 +117,7 @@ fn ensure_pair_server(app: AppHandle, state: Arc<AppState>) {
     let state_for_pair = state.clone();
 
     let on_paired = Arc::new(move |creds: SatelliteCredentials| {
-        let _ = arm_with_credentials(&app_for_pair, &state_for_pair, creds);
+        let _ = arm_with_credentials(&app_for_pair, &state_for_pair, creds, true);
     });
 
     let server = spawn_pair_http_server(app.clone(), port, on_paired);
@@ -146,7 +153,7 @@ async fn pair_from_url(
 
     let result = complete_capture_pair(params).await;
     if let Some(creds) = result.credentials.clone() {
-        if let Err(reason) = arm_with_credentials(&app, &state, creds) {
+        if let Err(reason) = arm_with_credentials(&app, &state, creds, true) {
             return Ok(PairResult {
                 ok: false,
                 credentials: None,
@@ -188,7 +195,7 @@ async fn pair_manual(
     .await;
 
     if let Some(creds) = result.credentials.clone() {
-        if let Err(reason) = arm_with_credentials(&app, &state, creds) {
+        if let Err(reason) = arm_with_credentials(&app, &state, creds, true) {
             return Ok(PairResult {
                 ok: false,
                 credentials: None,
@@ -260,8 +267,9 @@ pub fn run() {
             let state = app.state::<Arc<AppState>>().inner().clone();
             ensure_pair_server(app.handle().clone(), state.clone());
 
+            // Restore armed session but keep setup visible — user can hide to tray manually.
             if let Some(creds) = load_credentials(app.handle()) {
-                let _ = arm_with_credentials(app.handle(), &state, creds);
+                let _ = arm_with_credentials(app.handle(), &state, creds, false);
             }
 
             let show_item = MenuItem::with_id(app, "show", "Show setup", true, None::<&str>)?;
@@ -302,6 +310,12 @@ pub fn run() {
 
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             get_status,
             pair_from_url,
@@ -317,11 +331,9 @@ pub fn run() {
         .expect("error while running tauri application")
         .run(|app, event| {
             if let RunEvent::ExitRequested { api, .. } = event {
-                let state = app.state::<Arc<AppState>>();
-                if state.armed.load(Ordering::SeqCst) {
-                    api.prevent_exit();
-                    hide_main_window(app);
-                }
+                // Tray agent: red-dot close or Cmd+Q hides instead of quitting.
+                api.prevent_exit();
+                hide_main_window(app);
             }
         });
 }
