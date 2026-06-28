@@ -515,6 +515,19 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   place-items: start;
 }
 
+/* Spy tab — horizontal E/M/P sub-rail reuses server-rail ASCII button styling */
+.spy-sub-rail.cyberdeck-server-rail {
+  flex-direction: row;
+  align-items: flex-end;
+  width: 100%;
+  min-height: auto;
+  overflow-x: auto;
+}
+
+.spy-sub-rail.cyberdeck-server-rail .cyberdeck-rail-tab {
+  flex-shrink: 0;
+}
+
 .cyberdeck-server-rail .ascii-btn-shadow,
 .cyberdeck-server-rail .ascii-btn-face-shell {
   grid-area: 1 / 1;

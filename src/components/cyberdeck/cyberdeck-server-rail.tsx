@@ -5,6 +5,7 @@ import { motion, useMotionValue, type PanInfo } from "motion/react";
 import { CadreRailIcon } from "@/components/cyberdeck/cadre-rail-icon";
 import { InstallDesktopRailIcon } from "@/components/cyberdeck/install-desktop-rail-icon";
 import { PowerfistRailIcon } from "@/components/cyberdeck/powerfist-rail-icon";
+import { SpyRailIcon } from "@/components/cyberdeck/spy-rail-icon";
 import { RailAsciiButton } from "@/components/cyberdeck/rail-ascii-button";
 import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import {
@@ -66,6 +67,9 @@ export function CyberdeckServerRail({
     }
     if (tab.kind === "rola-dex") {
       return <PowerfistRailIcon />;
+    }
+    if (tab.kind === "spy") {
+      return <SpyRailIcon className="h-4 w-4 text-[#8a8a8a]" />;
     }
     return undefined;
   };

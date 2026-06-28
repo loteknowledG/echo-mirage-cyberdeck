@@ -36,6 +36,22 @@ export function savePowerfistCaptureCredentials(
   window.localStorage.setItem(CAPTURE_NODE_STORAGE_KEY, nodeId);
 }
 
+export function readPowerfistCaptureCredentials(): {
+  host: string;
+  port: number;
+  captureToken: string;
+  nodeId: string;
+} | null {
+  if (typeof window === "undefined") return null;
+  const host = window.localStorage.getItem(CAPTURE_HOST_STORAGE_KEY)?.trim();
+  const portRaw = window.localStorage.getItem(CAPTURE_PORT_STORAGE_KEY)?.trim();
+  const captureToken = window.localStorage.getItem(CAPTURE_TOKEN_STORAGE_KEY)?.trim();
+  const nodeId = window.localStorage.getItem(CAPTURE_NODE_STORAGE_KEY)?.trim();
+  const port = Number(portRaw);
+  if (!host || !captureToken || !nodeId || !Number.isFinite(port) || port <= 0) return null;
+  return { host, port, captureToken, nodeId };
+}
+
 export function buildPowerfistCaptureWsUrl(
   host: string,
   port: number,
@@ -73,7 +89,7 @@ export async function completePowerfistCapturePairFromQr(
 
 async function runEchoSilentCapture(): Promise<{ ok: true; pngBase64: string } | { ok: false; error: string }> {
   try {
-    const res = await fetch("/api/powerfist/mission/capture", { method: "POST" });
+    const res = await fetch("/api/spy/capture", { method: "POST" });
     const payload = (await res.json()) as { ok?: boolean; pngBase64?: string; error?: string };
     if (!payload.ok || !payload.pngBase64?.trim()) {
       return { ok: false, error: payload.error || "Echo capture failed." };

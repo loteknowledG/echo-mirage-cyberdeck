@@ -511,6 +511,7 @@ const CUSTOM_TAB_KINDS = [
   "db8",
   "cadre",
   "install",
+  "spy",
   "catelog",
 ] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -615,6 +616,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Drop Bay", kind: "drop-bay", action: "convert" },
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Kit", action: "kit-pane" },
+  { label: "Spy", kind: "spy", action: "convert" },
   { label: "Powerfist", kind: "rola-dex", action: "convert" },
   { label: "Tunes", kind: "tunes", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
@@ -659,7 +661,7 @@ function sanitizeCustomTabs(value: unknown): CustomTab[] {
     const migratedKind = migrateLegacyTestPaneKind(kindRaw);
     const kind = isCustomTabKind(migratedKind) ? migratedKind : "blank";
     const rawGlyph = typeof tab.glyph === "string" && tab.glyph.trim() ? tab.glyph.trim() : "□";
-    const glyph = kind === "rola-dex" ? defaultCustomTabGlyphForKind("rola-dex") : rawGlyph;
+    const glyph = kind === "rola-dex" ? defaultCustomTabGlyphForKind("rola-dex") : kind === "spy" ? defaultCustomTabGlyphForKind("spy") : rawGlyph;
     const browserUrl = typeof tab.browserUrl === "string" && tab.browserUrl.trim() ? tab.browserUrl.trim() : undefined;
     const asset = tab.asset && typeof tab.asset === "object" ? (tab.asset as DroppedOperatorAsset) : null;
 
@@ -965,6 +967,9 @@ function normalizeCustomTabKind(kind: string) {
   ) {
     return "rola-dex" as CustomTabKind;
   }
+  if (nextKind === "spy" || nextKind === "espionage") {
+    return "spy" as CustomTabKind;
+  }
   if (
     nextKind === "sound-profile" ||
     nextKind === "sound_profile" ||
@@ -1037,6 +1042,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "drop-bay") return "⬇";
   if (kind === "glyph-channel") return "⟁";
   if (kind === "rola-dex") return "#";
+  if (kind === "spy") return "◉";
   if (kind === "tunes") return "♫";
   if (kind === "call-center") return "CC";
   if (kind === "photoshop") return "Ps";
@@ -1054,6 +1060,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "drop-bay") return "DROP BAY";
   if (kind === "glyph-channel") return "⟁ GLYPH";
   if (kind === "rola-dex") return "Rola Dex";
+  if (kind === "spy") return "Spy";
   if (kind === "tunes") return "Tunes";
   if (kind === "call-center") return "CALL CENTER";
   if (kind === "photoshop") return "PHOTOSHOP";
@@ -1128,7 +1135,7 @@ function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|sound-profile|soundprofile|tunes|music|test-pane|test|call-center|callcenter|call_center|photoshop|photo-shop|photo_shop)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|spy|espionage|sound-profile|soundprofile|tunes|music|test-pane|test|call-center|callcenter|call_center|photoshop|photo-shop|photo_shop)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
@@ -7620,6 +7627,17 @@ ${diff}`;
             data-pointer-target="rola-dex"
           >
             <ActivatedCyberdeckPane kind="rola-dex" />
+          </div>
+        );
+      }
+
+      if (tab.kind === "spy") {
+        return (
+          <div
+            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
+            data-pointer-target="spy"
+          >
+            <ActivatedCyberdeckPane kind="spy" />
           </div>
         );
       }
