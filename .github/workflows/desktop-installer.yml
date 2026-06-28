@@ -98,12 +98,14 @@ jobs:
           Get-ChildItem dist-electron -Filter "*.blockmap" -File -ErrorAction SilentlyContinue | ForEach-Object {
             $assets += $_.FullName
           }
+          $notesFile = New-TemporaryFile
+          node --input-type=module -e "import { desktopReleaseNotes } from './scripts/desktop-release-notes.mjs'; console.log(desktopReleaseNotes('$version'))" | Set-Content -Path $notesFile.FullName -Encoding utf8
           Write-Host "Publishing $($assets.Count) Windows asset(s) to release $tag"
           gh release view $tag 2>$null
           if ($LASTEXITCODE -ne 0) {
             gh release create $tag @assets `
               --title "Echo Mirage Desktop $version" `
-              --notes "Desktop installers for Windows and macOS (Apple Silicon). Auto-update via Settings or restart prompt. Silent Mode, system tray, local disk IPC, and full cyberdeck bridges." `
+              --notes-file $notesFile.FullName `
               --latest
           } else {
             gh release upload $tag @assets --clobber
@@ -194,12 +196,16 @@ jobs:
             echo "No macOS release assets found under dist-electron"
             exit 1
           fi
+          notes_file="$(mktemp)"
+          node --input-type=module -e "import { desktopReleaseNotes } from './scripts/desktop-release-notes.mjs'; console.log(desktopReleaseNotes('${version}'))" > "$notes_file"
           echo "Publishing ${#assets[@]} macOS asset(s) to release ${tag}"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "${assets[@]}" --clobber
+            gh release edit "$tag" --notes-file "$notes_file"
           else
             gh release create "$tag" "${assets[@]}" \
               --title "Echo Mirage Desktop ${version}" \
-              --notes "Desktop installers for Windows and macOS (Apple Silicon). Auto-update via Settings or restart prompt. Silent Mode, system tray, local disk IPC, and full cyberdeck bridges." \
+              --notes-file "$notes_file" \
               --latest
           fi
+          rm -f "$notes_file"

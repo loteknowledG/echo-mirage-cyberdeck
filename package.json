@@ -305,7 +305,11 @@
       ],
       "artifactName": "Echo-Mirage-Cyberdeck-${version}.${ext}",
       "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "LSMinimumSystemVersion": "12.0",
+        "NSHumanReadableCopyright": "Copyright © Craftwerk Corp"
+      }
     },
     "dmg": {
       "title": "Echo Mirage Cyberdeck ${version}",
