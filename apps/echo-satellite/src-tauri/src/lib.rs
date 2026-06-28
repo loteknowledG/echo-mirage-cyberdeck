@@ -30,6 +30,7 @@ use ws_client::{spawn_capture_deck_loop, WsController, WsSharedState};
 
 struct AppState {
     initialized: AtomicBool,
+    tray_ready: AtomicBool,
     armed: AtomicBool,
     pair_http_port: u16,
     ws_shared: Arc<WsSharedState>,
@@ -41,6 +42,7 @@ impl AppState {
     fn new() -> Self {
         Self {
             initialized: AtomicBool::new(false),
+            tray_ready: AtomicBool::new(false),
             armed: AtomicBool::new(false),
             pair_http_port: DEFAULT_PAIR_HTTP_PORT,
             ws_shared: Arc::new(WsSharedState::new()),
@@ -139,23 +141,28 @@ fn initialize_after_ready(app: &AppHandle) {
     }
 
     let Ok(show_item) = MenuItem::with_id(app, "show", "Show setup", true, None::<&str>) else {
+        show_main_window(app);
         return;
     };
     let Ok(disarm_item) = MenuItem::with_id(app, "disarm", "Disarm", true, None::<&str>) else {
+        show_main_window(app);
         return;
     };
     let Ok(quit_item) = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>) else {
+        show_main_window(app);
         return;
     };
     let Ok(tray_menu) = Menu::with_items(app, &[&show_item, &disarm_item, &quit_item]) else {
+        show_main_window(app);
         return;
     };
 
     let Some(icon) = app.default_window_icon() else {
+        show_main_window(app);
         return;
     };
 
-    let _tray = TrayIconBuilder::new()
+    if TrayIconBuilder::new()
         .icon(icon.clone())
         .menu(&tray_menu)
         .tooltip("Echo Satellite")
@@ -184,7 +191,13 @@ fn initialize_after_ready(app: &AppHandle) {
                 show_main_window(&app);
             }
         })
-        .build(app);
+        .build(app)
+        .is_ok()
+    {
+        state.tray_ready.store(true, Ordering::SeqCst);
+    }
+
+    show_main_window(app);
 }
 
 #[tauri::command]
@@ -329,8 +342,12 @@ pub fn run() {
         .setup(|_app| Ok(()))
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+                let app = window.app_handle();
+                let state = app.state::<Arc<AppState>>();
+                if state.tray_ready.load(Ordering::SeqCst) {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -351,9 +368,11 @@ pub fn run() {
                 initialize_after_ready(app);
             }
             if let RunEvent::ExitRequested { api, .. } = event {
-                // Tray agent: red-dot close or Cmd+Q hides instead of quitting.
-                api.prevent_exit();
-                hide_main_window(app);
+                let state = app.state::<Arc<AppState>>();
+                if state.tray_ready.load(Ordering::SeqCst) {
+                    api.prevent_exit();
+                    hide_main_window(app);
+                }
             }
         });
 }
