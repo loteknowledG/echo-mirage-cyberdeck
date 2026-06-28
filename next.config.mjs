@@ -56,6 +56,33 @@ function normalizeWebpackWatchIgnored(ignored) {
 	return list.filter((item) => typeof item === "string" && item.length > 0);
 }
 
+/** Webpack dev cannot resolve `node:` URIs when bundling instrumentation. */
+function nodeProtocolAliases() {
+	const builtins = [
+		"assert",
+		"buffer",
+		"child_process",
+		"crypto",
+		"fs",
+		"http",
+		"https",
+		"net",
+		"os",
+		"path",
+		"readline",
+		"stream",
+		"url",
+		"util",
+		"zlib",
+	];
+	/** @type {Record<string, string>} */
+	const aliases = { "node:fs/promises": "fs/promises" };
+	for (const name of builtins) {
+		aliases[`node:${name}`] = name;
+	}
+	return aliases;
+}
+
 const nextConfig = {
 	devIndicators: false,
 	distDir: process.env.CYBERDECK_NEXT_DIST_DIR || ".next",
@@ -91,7 +118,6 @@ const nextConfig = {
 	},
 	experimental: {
 		webpackMemoryOptimizations: true,
-		instrumentationHook: true,
 	},
 	outputFileTracingIncludes: {
 		"/api/glyph/*": ["./assets/figlet-fonts/**"],
@@ -142,6 +168,7 @@ const nextConfig = {
 
 		config.resolve.alias = {
 			...config.resolve.alias,
+			...nodeProtocolAliases(),
 			[realmorphismWheelCss]: echoWheelCss,
 			"realmorphism/styles/kit.css": path.join(
 				realmorphismPackageRoot,

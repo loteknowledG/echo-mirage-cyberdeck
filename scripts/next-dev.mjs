@@ -220,6 +220,21 @@ function noteNextReady(line) {
     process.stdout.write(`[dev] Next ready - sidecar :${readyPort}/health open\n`);
     void writeDevState(true);
     void normalizeGeneratedTypePaths();
+    void primePowerfistWs();
+  }
+}
+
+async function primePowerfistWs() {
+  if (process.env.ECHO_MIRAGE_POWERFIST_WS === '0') return;
+  try {
+    const res = await fetch(`http://127.0.0.1:${appPort}/api/powerfist/pairing/status`);
+    if (res.ok) {
+      process.stdout.write('[dev] powerfist WS primed\n');
+      return;
+    }
+    process.stdout.write(`[dev] powerfist WS priming skipped (HTTP ${res.status})\n`);
+  } catch {
+    process.stdout.write('[dev] powerfist WS priming skipped (route not ready)\n');
   }
 }
 

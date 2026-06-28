@@ -1,7 +1,7 @@
 // SERVER ONLY — WebSocket relay: phone remote, solver deck, capture deck.
 
-import crypto from "node:crypto";
-import os from "node:os";
+import crypto from "crypto";
+import os from "os";
 import { WebSocket, WebSocketServer } from "ws";
 import type { PowerFistStackCommand } from "@/lib/cyberdeck/powerfist-events";
 import type {

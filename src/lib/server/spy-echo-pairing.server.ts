@@ -1,9 +1,9 @@
 // SERVER ONLY — Echo-centric Spy pairing (Mirage + PowerFist enter codes from Echo).
 
-import crypto from "node:crypto";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import crypto from "crypto";
+import fs from "fs/promises";
+import os from "os";
+import path from "path";
 import { resolveHttpPort } from "@/lib/server/is-localhost-request.server";
 
 export type SpyPairRole = "mirage" | "powerfist";
