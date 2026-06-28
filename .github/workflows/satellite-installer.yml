@@ -67,10 +67,12 @@ jobs:
           node --input-type=module -e "import { satelliteReleaseNotes } from './scripts/satellite-release-notes.mjs'; console.log(satelliteReleaseNotes('$version'))" | Set-Content -Path $notesFile -Encoding utf8
           Write-Host "Publishing $($assets.Count) asset(s) to release $tag"
           if (gh release view $tag 2>$null) {
-            gh release upload $tag @assets --clobber
+            foreach ($asset in $assets) {
+              gh release upload $tag $asset --clobber
+            }
             gh release edit $tag --notes-file $notesFile
           } else {
-            gh release create $tag @assets --title "Echo Satellite $version" --notes-file $notesFile
+            gh release create $tag --title "Echo Satellite $version" --notes-file $notesFile -- $assets
           }
 
   build-macos:
