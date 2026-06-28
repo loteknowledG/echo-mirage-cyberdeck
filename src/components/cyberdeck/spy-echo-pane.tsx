@@ -16,8 +16,6 @@ import {
   regenerateEchoSpyCodes,
 } from "@/lib/cyberdeck/spy-pairing-client";
 import { readPowerfistCaptureCredentials } from "@/lib/cyberdeck/powerfist-capture-client";
-import { EchoDesktopInstallPanel } from "@/components/cyberdeck/echo-desktop-install-panel";
-import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
 
 function PairPinBlock({
   label,
@@ -123,20 +121,15 @@ export function SpyEchoPane() {
 
   if (notEchoMachine) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-        <EchoDesktopInstallPanel />
-        <div className="flex flex-1 items-center justify-center p-2">
-          <p className="max-w-md text-center leading-relaxed">
-            {ESPIONAGE_ECHO_DISPLAY} pairing codes are shown on the screenshot computer. Install or open
-            the desktop cyberdeck on the machine that captures the screen, then return to Spy →{" "}
-            {ESPIONAGE_ECHO_DISPLAY}.
-          </p>
-        </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
+        <p className="max-w-md text-center leading-relaxed">
+          {ESPIONAGE_ECHO_DISPLAY} pairing codes are shown on the screenshot computer. Install or open
+          the desktop cyberdeck on that machine (see setup bar above), then return to Spy →{" "}
+          {ESPIONAGE_ECHO_DISPLAY}.
+        </p>
       </div>
     );
   }
-
-  const inDesktopShell = isEchoMirageDesktopShell();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
@@ -150,8 +143,6 @@ export function SpyEchoPane() {
           </p>
         ) : null}
       </div>
-
-      {!inDesktopShell ? <EchoDesktopInstallPanel /> : null}
 
       {loading ? (
         <p className="text-[#8a8a8a]">Loading pairing codes…</p>
