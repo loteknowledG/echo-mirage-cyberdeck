@@ -1,0 +1,53 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Echo Satellite",
+  "version": "0.1.0",
+  "identifier": "com.craftwerk.echo-satellite",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Echo Satellite",
+        "width": 520,
+        "height": 640,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "Echo capture drone for Mirage espionage",
+    "longDescription": "Minimal tray agent: screenshot on PowerFist signal, relay PNG to Mirage. No cyberdeck UI.",
+    "windows": {
+      "nsis": {
+        "artifactName": "Echo-Satellite-${version}-setup.${ext}"
+      }
+    },
+    "macOS": {
+      "signingIdentity": "-",
+      "hardenedRuntime": false,
+      "minimumSystemVersion": "12.0",
+      "targets": ["dmg"],
+      "artifactName": "Echo-Satellite-${version}.${ext}"
+    }
+  }
+}

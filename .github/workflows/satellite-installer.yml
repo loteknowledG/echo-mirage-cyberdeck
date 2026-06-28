@@ -1,0 +1,141 @@
+name: Satellite installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "satellite-v*"
+
+env:
+  CI: true
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: apps/echo-satellite/pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install satellite frontend dependencies
+        working-directory: apps/echo-satellite
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Echo Satellite (Windows)
+        working-directory: apps/echo-satellite
+        run: pnpm tauri:build
+
+      - name: Verify Windows installer
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path apps/echo-satellite/src-tauri/target/release/bundle/nsis -Filter *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) {
+            Get-ChildItem -Recurse apps/echo-satellite/src-tauri/target/release/bundle -ErrorAction SilentlyContinue
+            throw "No Windows satellite installer found"
+          }
+          Write-Host "Installer ready: $($exe.FullName)"
+
+      - name: Publish GitHub Release (Windows)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = node -p "require('./apps/echo-satellite/package.json').version"
+          if ("${{ github.ref }}" -like "refs/tags/*") {
+            $tag = "${{ github.ref }}".Replace("refs/tags/", "")
+          } else {
+            $tag = "satellite-v$version"
+          }
+          $assets = Get-ChildItem -Path apps/echo-satellite/src-tauri/target/release/bundle -Recurse -Include *.exe,*.exe.sig,*.exe.zip | ForEach-Object { $_.FullName }
+          if ($assets.Count -eq 0) { throw "No Windows release assets found" }
+          $notesFile = New-TemporaryFile
+          node --input-type=module -e "import { satelliteReleaseNotes } from './scripts/satellite-release-notes.mjs'; console.log(satelliteReleaseNotes('$version'))" | Set-Content -Path $notesFile -Encoding utf8
+          Write-Host "Publishing $($assets.Count) asset(s) to release $tag"
+          if (gh release view $tag 2>$null) {
+            gh release upload $tag @assets --clobber
+            gh release edit $tag --notes-file $notesFile
+          } else {
+            gh release create $tag @assets --title "Echo Satellite $version" --notes-file $notesFile
+          }
+
+  build-macos:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: apps/echo-satellite/pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install satellite frontend dependencies
+        working-directory: apps/echo-satellite
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Echo Satellite (macOS)
+        working-directory: apps/echo-satellite
+        env:
+          CI: true
+        run: pnpm tauri:build
+
+      - name: Verify macOS DMG
+        run: |
+          dmg="$(find apps/echo-satellite/src-tauri/target/release/bundle -name '*.dmg' | head -1)"
+          if [ -z "$dmg" ]; then
+            find apps/echo-satellite/src-tauri/target/release/bundle -maxdepth 4 -type f || true
+            exit 1
+          fi
+          echo "Installer ready: $dmg"
+
+      - name: Publish GitHub Release (macOS)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p "require('./apps/echo-satellite/package.json').version")"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+          else
+            tag="satellite-v${version}"
+          fi
+          assets=()
+          while IFS= read -r file; do
+            assets+=("$file")
+          done < <(find apps/echo-satellite/src-tauri/target/release/bundle -type f \( -name '*.dmg' -o -name '*.dmg.sig' \))
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "No macOS satellite assets found"
+            exit 1
+          fi
+          notes_file="$(mktemp)"
+          node --input-type=module -e "import { satelliteReleaseNotes } from './scripts/satellite-release-notes.mjs'; console.log(satelliteReleaseNotes('${version}'))" > "$notes_file"
+          echo "Publishing ${#assets[@]} macOS asset(s) to release ${tag}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${assets[@]}" --clobber
+            gh release edit "$tag" --notes-file "$notes_file"
+          else
+            gh release create "$tag" "${assets[@]}" \
+              --title "Echo Satellite ${version}" \
+              --notes-file "$notes_file"
+          fi
