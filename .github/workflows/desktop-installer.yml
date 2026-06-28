@@ -57,7 +57,7 @@ jobs:
           }
           Write-Host "Installer ready: $($exe.FullName) ($([math]::Round($exe.Length / 1MB, 1)) MB)"
 
-      - name: Publish GitHub Release
+      - name: Publish GitHub Release (Windows)
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -76,13 +76,86 @@ jobs:
           Get-ChildItem dist-electron -Filter "*.blockmap" -File -ErrorAction SilentlyContinue | ForEach-Object {
             $assets += $_.FullName
           }
-          Write-Host "Publishing $($assets.Count) release asset(s) to release $tag"
+          Write-Host "Publishing $($assets.Count) Windows asset(s) to release $tag"
           gh release view $tag 2>$null
           if ($LASTEXITCODE -ne 0) {
             gh release create $tag @assets `
               --title "Echo Mirage Desktop $version" `
-              --notes "Windows desktop installer — auto-update via Settings or restart prompt. Silent Mode, system tray, local disk IPC, and full cyberdeck bridges." `
+              --notes "Desktop installers for Windows and macOS (Apple Silicon). Auto-update via Settings or restart prompt. Silent Mode, system tray, local disk IPC, and full cyberdeck bridges." `
               --latest
           } else {
             gh release upload $tag @assets --clobber
           }
+
+  build-macos:
+    runs-on: macos-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-mac-${{ hashFiles('pnpm-lock.yaml', 'next.config.mjs', 'src/**') }}
+          restore-keys: |
+            next-mac-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Build Next.js standalone bundle
+        run: node scripts/prepare-electron-standalone.mjs
+
+      - name: Package macOS DMG
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: pnpm exec electron-builder --mac --publish never
+
+      - name: Verify installer artifact
+        run: |
+          dmg="$(find dist-electron -maxdepth 1 -name '*.dmg' | head -1)"
+          if [ -z "$dmg" ]; then
+            ls -la dist-electron || true
+            exit 1
+          fi
+          echo "Installer ready: $dmg"
+
+      - name: Publish GitHub Release (macOS)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+          else
+            tag="desktop-v${version}"
+          fi
+          assets=()
+          while IFS= read -r file; do
+            assets+=("$file")
+          done < <(find dist-electron -maxdepth 1 \( -name '*.dmg' -o -name 'latest-mac.yml' -o -name '*.dmg.blockmap' \))
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "No macOS release assets found under dist-electron"
+            exit 1
+          fi
+          echo "Publishing ${#assets[@]} macOS asset(s) to release ${tag}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${assets[@]}" --clobber
+          else
+            gh release create "$tag" "${assets[@]}" \
+              --title "Echo Mirage Desktop ${version}" \
+              --notes "Desktop installers for Windows and macOS (Apple Silicon). Auto-update via Settings or restart prompt. Silent Mode, system tray, local disk IPC, and full cyberdeck bridges." \
+              --latest
+          fi

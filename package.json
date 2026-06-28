@@ -22,6 +22,8 @@
     "electron:prepare": "node scripts/prepare-electron-standalone.mjs",
     "electron:pack": "node scripts/prepare-electron-standalone.mjs && electron-builder --win",
     "electron:pack:dir": "node scripts/prepare-electron-standalone.mjs && electron-builder --win --dir",
+    "electron:pack:mac": "node scripts/prepare-electron-standalone.mjs && electron-builder --mac",
+    "electron:pack:mac:dir": "node scripts/prepare-electron-standalone.mjs && electron-builder --mac --dir",
     "lint": "eslint .",
     "lint:fix": "eslint --ext .js,.jsx,.ts,.tsx . --fix",
     "lint:watch": "eslint --ext .js,.jsx,.ts,.tsx . --fix --watch",
@@ -277,6 +279,25 @@
       "uninstallerIcon": "public/icon.ico",
       "artifactName": "Echo-Mirage-Cyberdeck-Setup-${version}.${ext}",
       "shortcutName": "Echo Mirage Cyberdeck"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "public/icon-512.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "Echo-Mirage-Cyberdeck-${version}.${ext}",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "Echo Mirage Cyberdeck ${version}",
+      "icon": "public/icon-512.png"
     },
     "publish": {
       "provider": "generic",
