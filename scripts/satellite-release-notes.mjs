@@ -22,6 +22,8 @@ codesign --force --deep --sign - "/Applications/Echo-Satellite.app"
 ### Windows (x64)
 - **Echo-Satellite_${version}_x64-setup.exe** (NOT "Source code zip")
 
+Requires **Microsoft Edge WebView2 Runtime** (usually preinstalled on Windows 10/11). If the app closes instantly, install WebView2 from Microsoft, then reinstall Echo Satellite.
+
 ### Pairing
 Mirage Spy → Echo QR → use this machine's LAN IP and port **3050** (\`/powerfist/capture-pair\`).
 
