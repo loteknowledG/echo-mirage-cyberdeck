@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Echo Satellite",
+  "productName": "Echo-Satellite",
   "version": "0.1.0",
   "identifier": "com.craftwerk.echo-satellite",
   "build": {
@@ -37,17 +37,10 @@
     ],
     "shortDescription": "Echo capture drone for Mirage espionage",
     "longDescription": "Minimal tray agent: screenshot on PowerFist signal, relay PNG to Mirage. No cyberdeck UI.",
-    "windows": {
-      "nsis": {
-        "artifactName": "Echo-Satellite-${version}-setup.${ext}"
-      }
-    },
     "macOS": {
       "signingIdentity": "-",
       "hardenedRuntime": false,
-      "minimumSystemVersion": "12.0",
-      "targets": ["dmg"],
-      "artifactName": "Echo-Satellite-${version}.${ext}"
+      "minimumSystemVersion": "12.0"
     }
   }
 }
