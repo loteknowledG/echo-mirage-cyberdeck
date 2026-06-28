@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('echoMirageMediaProtection', {
 contextBridge.exposeInMainWorld('echoMirageSilentMode', {
   getEnabled: () => ipcRenderer.invoke('echo:get-silent-mode'),
   setEnabled: (enabled) => ipcRenderer.invoke('echo:set-silent-mode', Boolean(enabled)),
+  hideToTray: () => ipcRenderer.invoke('echo:hide-to-tray'),
   subscribe: (callback) => {
     const listener = (_event, payload) => callback(payload);
     ipcRenderer.on('echo:silent-mode-changed', listener);

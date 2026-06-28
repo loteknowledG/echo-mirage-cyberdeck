@@ -204,6 +204,15 @@ function registerSilentModeIpc(ipcMain) {
   ipcMain.handle('echo:set-silent-mode', async (_event, enabled) => ({
     enabled: await setSilentMode(Boolean(enabled)),
   }));
+  ipcMain.handle('echo:hide-to-tray', async () => {
+    if (!silentModeEnabled) {
+      await setSilentMode(true);
+    } else {
+      ensureTray();
+    }
+    hideMainWindowToTray();
+    return { hidden: true };
+  });
 }
 
 function initializeSilentMode(deps) {

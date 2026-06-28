@@ -147,6 +147,7 @@ declare global {
   interface EchoMirageSilentModeBridge {
     getEnabled(): Promise<{ enabled: boolean }>;
     setEnabled(enabled: boolean): Promise<{ enabled: boolean }>;
+    hideToTray?(): Promise<{ hidden: boolean }>;
     subscribe(callback: (payload: { enabled: boolean }) => void): () => void;
   }
 

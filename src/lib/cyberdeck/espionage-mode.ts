@@ -24,7 +24,8 @@ export const ESPIONAGE_MODE_SHORT = "Espionage";
 export const ESPIONAGE_ECHO_DISPLAY = "ECHO";
 export const ESPIONAGE_MIRAGE_DISPLAY = "MIRAGE";
 
-export const ESPIONAGE_ECHO_TAGLINE = "Screenshot computer — silent capture of the coding question.";
+export const ESPIONAGE_ECHO_TAGLINE =
+  "Screenshot computer — silent OS capture, no on-screen mission feedback.";
 export const ESPIONAGE_MIRAGE_TAGLINE = "Answer computer — AI solves from Echo's capture.";
 export const ESPIONAGE_POWERFIST_TAGLINE = "Phone trigger — PowerFist starts the mission.";
 

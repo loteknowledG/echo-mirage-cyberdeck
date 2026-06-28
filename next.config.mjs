@@ -143,6 +143,7 @@ const nextConfig = {
 		"@nut-tree-fork/nut-js",
 		"node-screenshots",
 		"windows-use",
+		"node-screenshots",
 		"ws",
 	],
 	webpack: (config, { dev, isServer }) => {

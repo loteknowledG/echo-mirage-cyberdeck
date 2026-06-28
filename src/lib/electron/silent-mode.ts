@@ -62,6 +62,17 @@ export async function requestSilentModeEnabled(enabled: boolean): Promise<boolea
   }
 }
 
+export async function requestHideToTray(): Promise<boolean> {
+  const bridge = window.echoMirageSilentMode;
+  if (!bridge?.hideToTray) return false;
+  try {
+    await bridge.hideToTray();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Wire Silent Mode IPC to the central audio gate. */
 export function bindSilentModeAudioGate(): () => void {
   const bridge = window.echoMirageSilentMode;
