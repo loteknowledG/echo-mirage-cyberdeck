@@ -9,6 +9,8 @@ Minimal capture drone for the **Echo** screenshot machine — tray-only, screens
 
 Grant **Screen Recording** during first launch (Arm phase), then pair with Mirage Echo QR on port **3050**.
 
+If the setup window disappears, Echo Satellite is still running in the **menu bar** (top-right). Click the tray icon → **Show setup**. Use tray → **Quit** to fully exit.
+
 \`\`\`bash
 xattr -cr ~/Downloads/Echo-Satellite_${version}_aarch64.dmg
 hdiutil attach ~/Downloads/Echo-Satellite_${version}_aarch64.dmg
