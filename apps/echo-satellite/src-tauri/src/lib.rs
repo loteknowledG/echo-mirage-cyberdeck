@@ -29,6 +29,7 @@ use tauri::{
 use ws_client::{spawn_capture_deck_loop, WsController, WsSharedState};
 
 struct AppState {
+    initialized: AtomicBool,
     armed: AtomicBool,
     pair_http_port: u16,
     ws_shared: Arc<WsSharedState>,
@@ -39,6 +40,7 @@ struct AppState {
 impl AppState {
     fn new() -> Self {
         Self {
+            initialized: AtomicBool::new(false),
             armed: AtomicBool::new(false),
             pair_http_port: DEFAULT_PAIR_HTTP_PORT,
             ws_shared: Arc::new(WsSharedState::new()),
@@ -122,6 +124,67 @@ fn ensure_pair_server(app: AppHandle, state: Arc<AppState>) {
 
     let server = spawn_pair_http_server(app.clone(), port, on_paired);
     *state.pair_server.lock() = Some(server);
+}
+
+fn initialize_after_ready(app: &AppHandle) {
+    let state = app.state::<Arc<AppState>>().inner().clone();
+    if state.initialized.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    ensure_pair_server(app.clone(), state.clone());
+
+    if let Some(creds) = load_credentials(app) {
+        let _ = arm_with_credentials(app, &state, creds, false);
+    }
+
+    let Ok(show_item) = MenuItem::with_id(app, "show", "Show setup", true, None::<&str>) else {
+        return;
+    };
+    let Ok(disarm_item) = MenuItem::with_id(app, "disarm", "Disarm", true, None::<&str>) else {
+        return;
+    };
+    let Ok(quit_item) = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>) else {
+        return;
+    };
+    let Ok(tray_menu) = Menu::with_items(app, &[&show_item, &disarm_item, &quit_item]) else {
+        return;
+    };
+
+    let Some(icon) = app.default_window_icon() else {
+        return;
+    };
+
+    let _tray = TrayIconBuilder::new()
+        .icon(icon.clone())
+        .menu(&tray_menu)
+        .tooltip("Echo Satellite")
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => {
+                show_main_window(&app);
+            }
+            "disarm" => {
+                let state = app.state::<Arc<AppState>>();
+                state.disarm(&app);
+                show_main_window(&app);
+            }
+            "quit" => {
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                let app = tray.app_handle();
+                show_main_window(&app);
+            }
+        })
+        .build(app);
 }
 
 #[tauri::command]
@@ -263,53 +326,7 @@ fn open_screen_recording_settings() -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(Arc::new(AppState::new()))
-        .setup(|app| {
-            let state = app.state::<Arc<AppState>>().inner().clone();
-            ensure_pair_server(app.handle().clone(), state.clone());
-
-            // Restore armed session but keep setup visible — user can hide to tray manually.
-            if let Some(creds) = load_credentials(app.handle()) {
-                let _ = arm_with_credentials(app.handle(), &state, creds, false);
-            }
-
-            let show_item = MenuItem::with_id(app, "show", "Show setup", true, None::<&str>)?;
-            let disarm_item = MenuItem::with_id(app, "disarm", "Disarm", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let tray_menu = Menu::with_items(app, &[&show_item, &disarm_item, &quit_item])?;
-
-            let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .menu(&tray_menu)
-                .tooltip("Echo Satellite")
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        show_main_window(&app);
-                    }
-                    "disarm" => {
-                        let state = app.state::<Arc<AppState>>();
-                        state.disarm(&app);
-                        show_main_window(&app);
-                    }
-                    "quit" => {
-                        app.exit(0);
-                    }
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        show_main_window(&app);
-                    }
-                })
-                .build(app)?;
-
-            Ok(())
-        })
+        .setup(|_app| Ok(()))
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
@@ -330,6 +347,9 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| {
+            if let RunEvent::Ready = event {
+                initialize_after_ready(app);
+            }
             if let RunEvent::ExitRequested { api, .. } = event {
                 // Tray agent: red-dot close or Cmd+Q hides instead of quitting.
                 api.prevent_exit();
