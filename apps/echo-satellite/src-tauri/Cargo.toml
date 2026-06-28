@@ -1,6 +1,6 @@
 [package]
 name = "echo-satellite"
-version = "0.1.0"
+version = "0.1.1"
 description = "Echo Mirage capture satellite — silent screenshots on PowerFist signal"
 authors = ["Craftwerk Corp"]
 edition = "2021"
