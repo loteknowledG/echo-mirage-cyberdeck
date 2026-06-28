@@ -1,6 +1,6 @@
 {
   "name": "echo-mirage-cyberdeck",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "packageManager": "pnpm@10.33.2",
   "main": "electron/main.js",
@@ -236,7 +236,8 @@
     "onlyBuiltDependencies": [
       "@google/genai",
       "@mongodb-js/zstd",
-      "electron"
+      "electron",
+      "node-screenshots"
     ]
   },
   "build": {
