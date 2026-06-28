@@ -1,0 +1,33 @@
+---
+description: Use feature branches and PRs — never commit directly to main
+alwaysApply: true
+---
+
+# Feature branches
+
+Do not commit directly to `main`. Treat `main` as merge-only.
+
+## Workflow
+
+1. **Branch** off the latest `main` (or the agreed base branch):
+   - `cursor/<short-kebab-description>`
+   - Cloud agents may append a run suffix, e.g. `cursor/<description>-745b`
+2. **Implement** on that branch only.
+3. **Commit** with clear, focused messages.
+4. **Push** the branch: `git push -u origin <branch-name>`
+5. **Open or update a PR** before calling the task done.
+
+## When fixing CI or follow-ups
+
+- Continue on the same feature branch when the change belongs to that PR.
+- Start a new `cursor/...` branch for unrelated work.
+
+## Merging
+
+- Prefer review + merge via PR.
+- Do not force-push `main` or land unreviewed work on `main` from agent sessions.
+
+## Why
+
+- Keeps `main` deployable.
+- One PR per focused change — easier to review, revert, and stack (e.g. espionage → OTP → Spy install bar).
