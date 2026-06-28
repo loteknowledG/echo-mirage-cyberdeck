@@ -42,11 +42,28 @@ function satelliteInstallerFileName(
 ): string | null {
   switch (platform) {
     case "win":
-      return `Echo-Satellite-${version}-setup.exe`;
+      return `Echo-Satellite_${version}_x64-setup.exe`;
     case "mac":
-      return `Echo-Satellite-${version}.dmg`;
+      return `Echo-Satellite_${version}_aarch64.dmg`;
     default:
       return null;
+  }
+}
+
+/** Tauri default bundle names vary slightly — try these when resolving GitHub assets. */
+function satelliteInstallerFileCandidates(
+  version: string,
+  platform: DesktopInstallPlatform,
+): string[] {
+  const primary = satelliteInstallerFileName(version, platform);
+  if (!primary) return [];
+  switch (platform) {
+    case "win":
+      return [primary, `Echo-Satellite-${version}-setup.exe`];
+    case "mac":
+      return [primary, `Echo-Satellite-${version}.dmg`, `Echo Satellite_${version}_aarch64.dmg`];
+    default:
+      return [primary];
   }
 }
 
@@ -62,6 +79,7 @@ type GitHubRelease = {
 async function resolveSatelliteAssetUrl(
   version: string,
   fileName: string,
+  platform: DesktopInstallPlatform,
 ): Promise<string | null> {
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
@@ -71,6 +89,19 @@ async function resolveSatelliteAssetUrl(
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
+
+  const candidates = new Set([
+    fileName,
+    ...satelliteInstallerFileCandidates(version, platform),
+  ]);
+
+  const tryRelease = (release: GitHubRelease): string | null => {
+    for (const name of candidates) {
+      const asset = release.assets?.find((entry) => entry.name === name);
+      if (asset?.browser_download_url) return asset.browser_download_url;
+    }
+    return null;
+  };
 
   const tag = `satellite-v${version}`;
   const tagUrl = `https://api.github.com/repos/loteknowledG/echo-mirage-cyberdeck/releases/tags/${tag}`;
@@ -82,8 +113,8 @@ async function resolveSatelliteAssetUrl(
     });
     if (tagRes.ok) {
       const release = (await tagRes.json()) as GitHubRelease;
-      const asset = release.assets?.find((entry) => entry.name === fileName);
-      if (asset?.browser_download_url) return asset.browser_download_url;
+      const hit = tryRelease(release);
+      if (hit) return hit;
     }
   } catch {
     /* fall through */
@@ -97,8 +128,8 @@ async function resolveSatelliteAssetUrl(
     if (!listRes.ok) return null;
     const releases = (await listRes.json()) as GitHubRelease[];
     for (const release of releases) {
-      const asset = release.assets?.find((entry) => entry.name === fileName);
-      if (asset?.browser_download_url) return asset.browser_download_url;
+      const hit = tryRelease(release);
+      if (hit) return hit;
     }
   } catch {
     return null;
@@ -133,7 +164,7 @@ export async function getSatelliteInstallInfo(
       downloadUrl = `/downloads/${fileName}`;
       installerAvailable = true;
     } else {
-      const publishedUrl = await resolveSatelliteAssetUrl(version, fileName);
+      const publishedUrl = await resolveSatelliteAssetUrl(version, fileName, platform);
       if (publishedUrl) {
         downloadUrl = publishedUrl;
         installerAvailable = true;

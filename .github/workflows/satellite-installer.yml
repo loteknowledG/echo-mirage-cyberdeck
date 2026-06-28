@@ -36,15 +36,17 @@ jobs:
 
       - name: Build Echo Satellite (Windows)
         working-directory: apps/echo-satellite
+        env:
+          CI: true
         run: pnpm tauri:build
 
       - name: Verify Windows installer
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Path apps/echo-satellite/src-tauri/target/release/bundle/nsis -Filter *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          $exe = Get-ChildItem -Path apps/echo-satellite/src-tauri/target/release/bundle -Recurse -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $exe) {
             Get-ChildItem -Recurse apps/echo-satellite/src-tauri/target/release/bundle -ErrorAction SilentlyContinue
-            throw "No Windows satellite installer found"
+            throw "No Windows satellite installer (*-setup.exe) found"
           }
           Write-Host "Installer ready: $($exe.FullName)"
 
@@ -59,7 +61,7 @@ jobs:
           } else {
             $tag = "satellite-v$version"
           }
-          $assets = Get-ChildItem -Path apps/echo-satellite/src-tauri/target/release/bundle -Recurse -Include *.exe,*.exe.sig,*.exe.zip | ForEach-Object { $_.FullName }
+          $assets = Get-ChildItem -Path apps/echo-satellite/src-tauri/target/release/bundle -Recurse -Include *-setup.exe,*.exe.sig | Where-Object { $_.Name -notmatch '\.zip$' } | ForEach-Object { $_.FullName }
           if ($assets.Count -eq 0) { throw "No Windows release assets found" }
           $notesFile = New-TemporaryFile
           node --input-type=module -e "import { satelliteReleaseNotes } from './scripts/satellite-release-notes.mjs'; console.log(satelliteReleaseNotes('$version'))" | Set-Content -Path $notesFile -Encoding utf8
