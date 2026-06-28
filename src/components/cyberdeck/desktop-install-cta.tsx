@@ -61,7 +61,7 @@ export function DesktopInstallCta({ compact = false }: DesktopInstallCtaProps) {
         >
           GitHub Releases
         </a>{" "}
-          and download the {info.platform === "mac" ? "macOS" : "Windows"} setup package.
+        and download the setup package for your platform.
       </p>
     );
   }
