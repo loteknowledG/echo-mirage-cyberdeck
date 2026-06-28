@@ -34,8 +34,25 @@ function formatCheckResult(latestVersion, downloaded) {
   return { status: 'up-to-date', running, latest: running, downloaded: false };
 }
 
+function registerDevAutoUpdateHandlers() {
+  ipcMain.handle('echo:app-update:get-version', async () => app.getVersion());
+
+  ipcMain.handle('echo:app-update:check', async () => ({
+    status: 'local-dev',
+    message: 'Auto-update runs in installed desktop builds. Dev mode uses pnpm electron:dev.',
+  }));
+
+  ipcMain.handle('echo:app-update:quit-and-install', async () => ({
+    ok: false,
+    error: 'No downloaded update is ready to install in dev mode.',
+  }));
+}
+
 function initializeAutoUpdater() {
-  if (!app.isPackaged) return;
+  if (!app.isPackaged) {
+    registerDevAutoUpdateHandlers();
+    return;
+  }
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
