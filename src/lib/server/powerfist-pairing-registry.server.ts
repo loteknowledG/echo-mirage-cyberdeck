@@ -1,6 +1,6 @@
 // SERVER ONLY — QR pairing sessions and single-device remote tokens.
 
-import crypto from "node:crypto";
+import crypto from "crypto";
 import { resolveHttpPort } from "@/lib/server/is-localhost-request.server";
 import {
   readPowerfistPairingState,

@@ -156,6 +156,7 @@ declare global {
       | { status: "up-to-date"; running: string; latest: string }
       | { status: "update-available"; running: string; latest: string; downloaded?: boolean }
       | { status: "unavailable"; message?: string }
+      | { status: "local-dev"; message: string }
     >;
     quitAndInstall(): Promise<{ ok: boolean; error?: string }>;
     subscribe(
