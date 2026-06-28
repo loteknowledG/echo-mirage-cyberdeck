@@ -156,14 +156,14 @@ fn setup_system_tray(app: &AppHandle, state: &AppState) {
         return;
     };
 
-    startup_log::step("boot", 6, 8, "tray menu created, loading icon");
+    startup_log::log("tray: menu items OK, loading icon");
 
     let Some(icon) = app.default_window_icon() else {
         startup_log::log("tray: FAILED no default window icon");
         return;
     };
 
-    startup_log::step("boot", 7, 8, "building tray icon");
+    startup_log::log("tray: building icon");
 
     if TrayIconBuilder::new()
         .icon(icon.clone())
@@ -193,7 +193,7 @@ fn setup_system_tray(app: &AppHandle, state: &AppState) {
         .is_ok()
     {
         state.tray_ready.store(true, Ordering::SeqCst);
-        startup_log::step("boot", 7, 8, "tray icon ready");
+        startup_log::log("tray: ready");
     } else {
         startup_log::log("tray: FAILED build returned error");
     }
