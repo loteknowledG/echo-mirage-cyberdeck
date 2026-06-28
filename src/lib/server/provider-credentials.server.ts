@@ -36,7 +36,7 @@ export type ProviderReceipt = {
 };
 
 const PROVIDER_PRIVATE_ENV: Record<string, string[]> = {
-  opencode: [OPENCODE_ZEN_API_KEY_ENV],
+  opencode: [OPENCODE_ZEN_API_KEY_ENV, "OPENCODE_API_KEY", "ZEN_API_KEY"],
   "opencode-go": [OPENCODE_GO_API_KEY_ENV],
   openai: ["OPENAI_API_KEY"],
   openrouter: ["OPENROUTER_API_KEY"],
