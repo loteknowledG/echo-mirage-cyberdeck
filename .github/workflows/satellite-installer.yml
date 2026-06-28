@@ -38,7 +38,7 @@ jobs:
         working-directory: apps/echo-satellite
         env:
           CI: true
-        run: pnpm tauri:build
+        run: pnpm tauri:build:win
 
       - name: Verify Windows installer
         shell: pwsh
@@ -103,7 +103,34 @@ jobs:
         working-directory: apps/echo-satellite
         env:
           CI: true
-        run: pnpm tauri:build
+        run: pnpm tauri:build:mac
+
+      - name: Smoke test macOS app launch
+        run: |
+          set -euo pipefail
+          APP="$(find apps/echo-satellite/src-tauri/target/release/bundle/macos -name 'Echo-Satellite.app' | head -1)"
+          if [ -z "$APP" ]; then
+            echo "Echo-Satellite.app not found"
+            find apps/echo-satellite/src-tauri/target/release/bundle -maxdepth 4 -type d
+            exit 1
+          fi
+          BIN="$APP/Contents/MacOS/Echo-Satellite"
+          echo "Smoke test: launching $BIN"
+          "$BIN" &
+          PID=$!
+          sleep 4
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "FAIL: Echo Satellite exited within 4s (likely startup crash)"
+            LOG="$HOME/Library/Logs/Echo-Satellite/startup.log"
+            if [ -f "$LOG" ]; then
+              echo "--- startup.log ---"
+              cat "$LOG"
+            fi
+            exit 1
+          fi
+          kill "$PID" 2>/dev/null || true
+          wait "$PID" 2>/dev/null || true
+          echo "PASS: Echo Satellite stayed running for 4s"
 
       - name: Verify macOS DMG
         run: |

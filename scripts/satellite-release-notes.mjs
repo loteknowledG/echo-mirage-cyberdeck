@@ -9,7 +9,9 @@ Minimal capture drone for the **Echo** screenshot machine — tray-only, screens
 
 Grant **Screen Recording** during first launch (Arm phase), then pair with Mirage Echo QR on port **3050**.
 
-If the setup window disappears, Echo Satellite is still running in the **menu bar** (top-right). Click the tray icon → **Show setup**. Use tray → **Quit** to fully exit.
+**macOS 15+:** This build runs as a normal window app (no menu-bar tray) to avoid a known Tauri/tao crash. Use the setup window or Dock icon to reopen. Startup log: \`~/Library/Logs/Echo-Satellite/startup.log\`
+
+If the setup window disappears on older macOS with tray builds, Echo Satellite may be in the **menu bar** (top-right). Click the tray icon → **Show setup**.
 
 \`\`\`bash
 xattr -cr ~/Downloads/Echo-Satellite_${version}_aarch64.dmg

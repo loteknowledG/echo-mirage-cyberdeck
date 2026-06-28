@@ -4,6 +4,7 @@ mod mission;
 mod pair;
 mod pair_server;
 mod permissions;
+mod startup_log;
 mod ws_client;
 
 use config::{
@@ -21,12 +22,14 @@ use pair_server::{spawn_pair_http_server, PairHttpServer};
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tauri::{AppHandle, Manager, RunEvent, State, WindowEvent};
+use ws_client::{spawn_capture_deck_loop, WsController, WsSharedState};
+
+#[cfg(feature = "system-tray")]
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, RunEvent, State, WindowEvent,
 };
-use ws_client::{spawn_capture_deck_loop, WsController, WsSharedState};
 
 struct AppState {
     initialized: AtomicBool,
@@ -128,37 +131,27 @@ fn ensure_pair_server(app: AppHandle, state: Arc<AppState>) {
     *state.pair_server.lock() = Some(server);
 }
 
-fn initialize_after_ready(app: &AppHandle) {
-    let state = app.state::<Arc<AppState>>().inner().clone();
-    if state.initialized.swap(true, Ordering::SeqCst) {
-        return;
-    }
-
-    ensure_pair_server(app.clone(), state.clone());
-
-    if let Some(creds) = load_credentials(app) {
-        let _ = arm_with_credentials(app, &state, creds, false);
-    }
-
+#[cfg(feature = "system-tray")]
+fn setup_system_tray(app: &AppHandle, state: &AppState) {
     let Ok(show_item) = MenuItem::with_id(app, "show", "Show setup", true, None::<&str>) else {
-        show_main_window(app);
+        startup_log::log("tray: failed to create show menu item");
         return;
     };
     let Ok(disarm_item) = MenuItem::with_id(app, "disarm", "Disarm", true, None::<&str>) else {
-        show_main_window(app);
+        startup_log::log("tray: failed to create disarm menu item");
         return;
     };
     let Ok(quit_item) = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>) else {
-        show_main_window(app);
+        startup_log::log("tray: failed to create quit menu item");
         return;
     };
     let Ok(tray_menu) = Menu::with_items(app, &[&show_item, &disarm_item, &quit_item]) else {
-        show_main_window(app);
+        startup_log::log("tray: failed to create menu");
         return;
     };
 
     let Some(icon) = app.default_window_icon() else {
-        show_main_window(app);
+        startup_log::log("tray: no default window icon");
         return;
     };
 
@@ -167,17 +160,13 @@ fn initialize_after_ready(app: &AppHandle) {
         .menu(&tray_menu)
         .tooltip("Echo Satellite")
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "show" => {
-                show_main_window(&app);
-            }
+            "show" => show_main_window(&app),
             "disarm" => {
                 let state = app.state::<Arc<AppState>>();
                 state.disarm(&app);
                 show_main_window(&app);
             }
-            "quit" => {
-                app.exit(0);
-            }
+            "quit" => app.exit(0),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -187,17 +176,46 @@ fn initialize_after_ready(app: &AppHandle) {
                 ..
             } = event
             {
-                let app = tray.app_handle();
-                show_main_window(&app);
+                show_main_window(&tray.app_handle());
             }
         })
         .build(app)
         .is_ok()
     {
         state.tray_ready.store(true, Ordering::SeqCst);
+        startup_log::log("tray: ready");
+    } else {
+        startup_log::log("tray: build failed");
+    }
+}
+
+fn initialize_after_ready(app: &AppHandle) {
+    startup_log::log("init: RunEvent::Ready");
+
+    let state = app.state::<Arc<AppState>>().inner().clone();
+    if state.initialized.swap(true, Ordering::SeqCst) {
+        startup_log::log("init: already initialized");
+        return;
     }
 
+    ensure_pair_server(app.clone(), state.clone());
+    startup_log::log("init: pair HTTP server on port 3050");
+
+    if let Some(creds) = load_credentials(app) {
+        startup_log::log("init: restoring saved credentials");
+        if let Err(reason) = arm_with_credentials(app, &state, creds, false) {
+            startup_log::log(format!("init: restore failed: {reason}"));
+        }
+    }
+
+    #[cfg(feature = "system-tray")]
+    setup_system_tray(app, &state);
+
+    #[cfg(not(feature = "system-tray"))]
+    startup_log::log("init: macOS/window-only mode (no system tray — avoids macOS 15 tao crash)");
+
     show_main_window(app);
+    startup_log::log("init: setup window shown");
 }
 
 #[tauri::command]
@@ -335,11 +353,23 @@ fn open_screen_recording_settings() -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn read_startup_log() -> String {
+    std::fs::read_to_string(startup_log::log_file_path()).unwrap_or_else(|_| {
+        "No startup log yet. Launch Echo Satellite once, then try again.".to_string()
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    startup_log::log("run: entry");
+
     tauri::Builder::default()
         .manage(Arc::new(AppState::new()))
-        .setup(|_app| Ok(()))
+        .setup(|_app| {
+            startup_log::log("setup: ok");
+            Ok(())
+        })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let app = window.app_handle();
@@ -360,6 +390,7 @@ pub fn run() {
             hide_to_tray,
             check_permissions,
             open_screen_recording_settings,
+            read_startup_log,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
