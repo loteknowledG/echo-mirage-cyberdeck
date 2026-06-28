@@ -91,11 +91,30 @@ export function resolveDesktopInstallPlatform(userAgent: string): DesktopInstall
   return "unsupported";
 }
 
+export function parseDesktopInstallPlatformParam(
+  value: string | null | undefined,
+): DesktopInstallPlatform | null {
+  switch (value?.trim().toLowerCase()) {
+    case "win":
+    case "windows":
+      return "win";
+    case "mac":
+    case "macos":
+      return "mac";
+    case "linux":
+      return "linux";
+    default:
+      return null;
+  }
+}
+
 export async function getDesktopInstallInfo(
   userAgent: string,
+  platformOverride?: DesktopInstallPlatform | null,
 ): Promise<DesktopInstallInfo> {
   const version = readPackageVersion();
-  const platform = resolveDesktopInstallPlatform(userAgent);
+  const platform =
+    platformOverride ?? resolveDesktopInstallPlatform(userAgent);
   const supported = platform === "win" || platform === "mac";
   const fileName = desktopInstallerFileName(version, platform);
   const envUrl = process.env.ECHO_MIRAGE_DESKTOP_INSTALLER_URL?.trim();
