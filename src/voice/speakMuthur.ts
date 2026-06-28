@@ -1,27 +1,65 @@
 import { MUTHUR_PRESET } from "@/voice/muthurPreset";
 import { isAudioAllowed } from "@/lib/cyberdeck/audio-gate";
 
+const MUTHUR_VOICE_REJECT = [
+  "david",
+  "mark",
+  "guy",
+  "george",
+  "male",
+  "jenny",
+  "milena",
+  "yuri",
+  "katya",
+  "russian",
+  "ru-ru",
+  "ru_ru",
+];
+
+/** Windows + macOS English female voices for MUTHUR fallback. */
+const MUTHUR_VOICE_PREFER = [
+  "zira",
+  "aria",
+  "hazel",
+  "susan",
+  "samantha",
+  "karen",
+  "moira",
+  "allison",
+  "ava",
+  "victoria",
+  "sonia",
+  "siri female",
+];
+
+function voiceBlob(voice: SpeechSynthesisVoice): string {
+  return `${voice.name} ${voice.lang} ${voice.voiceURI}`.toLowerCase();
+}
+
+function isEnglishVoice(voice: SpeechSynthesisVoice): boolean {
+  return voice.lang.toLowerCase().startsWith("en");
+}
+
 export function selectMuthurFallbackVoice(): SpeechSynthesisVoice | null {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
 
   const voices = window.speechSynthesis.getVoices();
+  const englishVoices = voices.filter(isEnglishVoice);
 
-  const reject = ["david", "mark", "guy", "george", "male", "jenny"];
-  const prefer = ["zira", "aria", "hazel", "susan", "female"];
-
-  const safeVoices = voices.filter((voice) => {
-    const name = `${voice.name} ${voice.lang} ${voice.voiceURI}`.toLowerCase();
-    return !reject.some((bad) => name.includes(bad));
+  const safeVoices = englishVoices.filter((voice) => {
+    const blob = voiceBlob(voice);
+    return !MUTHUR_VOICE_REJECT.some((bad) => blob.includes(bad));
   });
 
-  for (const wanted of prefer) {
-    const match = safeVoices.find((voice) =>
-      `${voice.name} ${voice.lang} ${voice.voiceURI}`.toLowerCase().includes(wanted),
-    );
+  for (const wanted of MUTHUR_VOICE_PREFER) {
+    const match = safeVoices.find((voice) => voiceBlob(voice).includes(wanted));
     if (match) return match;
   }
 
-  return null;
+  const enUs = safeVoices.find((voice) => voice.lang.toLowerCase().startsWith("en-us"));
+  if (enUs) return enUs;
+
+  return safeVoices[0] ?? null;
 }
 
 export type DryFallbackTuning = {
@@ -45,11 +83,12 @@ export function speakDryFallback(text: string, tuning?: DryFallbackTuning): Prom
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.voice = voice;
+      utterance.lang = voice.lang || "en-US";
       utterance.rate = tuning?.rate ?? MUTHUR_PRESET.fallback.rate;
       utterance.pitch = tuning?.pitch ?? MUTHUR_PRESET.fallback.pitch;
       utterance.volume = tuning?.volume ?? MUTHUR_PRESET.fallback.volume;
 
-      console.warn("[muthur] DRY_FALLBACK selected voice:", voice.name);
+      console.warn("[muthur] DRY_FALLBACK selected voice:", voice.name, voice.lang);
 
       utterance.onend = () => resolve();
       utterance.onerror = (event) => reject(event.error || new Error("DRY_FALLBACK speechSynthesis failed"));

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/resizable";
 import type { CyberdeckVoiceTuning } from "@/lib/cyberdeck-voice-tuning";
 import type { Db8DeckSpeakLine } from "@/lib/db8-voice";
+import { selectMuthurFallbackVoice } from "@/voice/speakMuthur";
 import { MUTHUR_PRESET } from "@/voice/muthurPreset";
 import {
   buildMuthurVoiceMasterCopy,
@@ -2176,20 +2177,10 @@ export default function CyberdeckApp() {
       const normalizedProfile = (profile || "").toLowerCase();
       const wantsMuthur = normalizedProfile === "muthur";
       const browserTuning = muthurBrowserSpeechTuning(voiceDialRef.current);
-      const voices = synth.getVoices();
-      const preferred = voices.find((voice) => {
-        const name = voice.name.toLowerCase();
-        if (wantsMuthur) {
-          return (
-            name.includes("zira") ||
-            name.includes("aria") ||
-            name.includes("susan") ||
-            name.includes("sonia") ||
-            name.includes("female")
-          );
-        }
-        return name.includes("jenny");
-      });
+      const voices = synth.getVoices().filter((voice) => voice.lang.toLowerCase().startsWith("en"));
+      const preferred = wantsMuthur
+        ? selectMuthurFallbackVoice()
+        : voices.find((voice) => voice.name.toLowerCase().includes("jenny")) ?? null;
 
       if (wantsMuthur && !preferred) {
         return false;
@@ -2197,8 +2188,10 @@ export default function CyberdeckApp() {
 
       if (preferred) {
         utterance.voice = preferred;
+        utterance.lang = preferred.lang || "en-US";
+      } else {
+        utterance.lang = "en-US";
       }
-      utterance.lang = preferred?.lang || "en-US";
       utterance.rate = wantsMuthur ? browserTuning.rate : 1;
       utterance.pitch = wantsMuthur ? browserTuning.pitch : 1;
       utterance.volume = wantsMuthur ? browserTuning.volume : 1;
