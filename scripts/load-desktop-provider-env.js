@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
+/** Keys injected into packaged desktop Next.js server (see write-desktop-provider-env.mjs). */
 const DESKTOP_PROVIDER_ENV_KEYS = [
   'OPENCODE_ZEN_API_KEY',
   'OPENCODE_API_KEY',
@@ -10,6 +11,11 @@ const DESKTOP_PROVIDER_ENV_KEYS = [
   'OPENAI_API_KEY',
 ];
 
+/**
+ * Parse desktop-provider.env from the standalone bundle (non-dotfile for electron-builder).
+ * @param {string} appDir
+ * @returns {Record<string, string>}
+ */
 function loadDesktopProviderEnv(appDir) {
   const envPath = path.join(appDir, 'desktop-provider.env');
   if (!fs.existsSync(envPath)) return {};

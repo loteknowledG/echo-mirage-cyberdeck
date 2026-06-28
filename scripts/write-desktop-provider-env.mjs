@@ -6,6 +6,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const standaloneElectronDir = path.join(root, '.next', 'standalone-electron');
 const outputPath = path.join(standaloneElectronDir, 'desktop-provider.env');
 
+/** Server-side provider keys bundled into desktop installers (CI secrets only). */
 const DESKTOP_PROVIDER_ENV_KEYS = [
   'OPENCODE_ZEN_API_KEY',
   'OPENCODE_API_KEY',
