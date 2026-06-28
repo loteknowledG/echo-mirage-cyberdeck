@@ -55,7 +55,7 @@ pub fn spawn_capture_deck_loop(
     let stop = Arc::new(AtomicBool::new(false));
     let stop_flag = stop.clone();
 
-    let handle = tokio::spawn(async move {
+    let handle = tauri::async_runtime::spawn(async move {
         while !stop_flag.load(Ordering::SeqCst) {
             shared.set_status(WsRuntimeStatus::Connecting);
             shared.set_error(None);

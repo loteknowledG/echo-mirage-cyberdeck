@@ -89,7 +89,7 @@ pub fn spawn_pair_http_server(
     let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
     let state = PairServerState { app, on_paired };
 
-    let handle = tokio::spawn(async move {
+    let handle = tauri::async_runtime::spawn(async move {
         let router = Router::new()
             .route("/powerfist/capture-pair", get(capture_pair_handler))
             .route("/health", get(health_handler))
