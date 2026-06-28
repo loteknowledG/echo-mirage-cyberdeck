@@ -4,7 +4,7 @@ pub fn capture_primary_monitor_png_base64() -> Result<String, String> {
     let monitors = xcap::Monitor::all().map_err(|e| format!("Monitor enumeration failed: {e}"))?;
     let primary = monitors
         .into_iter()
-        .find(|m| m.is_primary().unwrap_or(false))
+        .find(|m| m.is_primary())
         .ok_or_else(|| "No primary monitor found.".to_string())?;
 
     let image = primary
@@ -30,7 +30,7 @@ pub fn capture_primary_monitor_dimensions() -> Result<(u32, u32), String> {
     let monitors = xcap::Monitor::all().map_err(|e| format!("Monitor enumeration failed: {e}"))?;
     let primary = monitors
         .into_iter()
-        .find(|m| m.is_primary().unwrap_or(false))
+        .find(|m| m.is_primary())
         .ok_or_else(|| "No primary monitor found.".to_string())?;
-    Ok((primary.width().map_err(|e| e.to_string())?, primary.height().map_err(|e| e.to_string())?))
+    Ok((primary.width(), primary.height()))
 }

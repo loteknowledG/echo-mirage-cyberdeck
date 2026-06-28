@@ -127,15 +127,16 @@ async fn pair_from_url(
     app: AppHandle,
     state: State<'_, Arc<AppState>>,
     capture_pair_url: String,
-) -> PairResult {
+) -> Result<PairResult, String> {
+    let state = state.inner().clone();
     let mut params = match parse_capture_pair_url(&capture_pair_url) {
         Ok(params) => params,
         Err(reason) => {
-            return PairResult {
+            return Ok(PairResult {
                 ok: false,
                 credentials: None,
                 reason: Some(reason),
-            };
+            });
         }
     };
 
@@ -146,14 +147,14 @@ async fn pair_from_url(
     let result = complete_capture_pair(params).await;
     if let Some(creds) = result.credentials.clone() {
         if let Err(reason) = arm_with_credentials(&app, &state, creds) {
-            return PairResult {
+            return Ok(PairResult {
                 ok: false,
                 credentials: None,
                 reason: Some(reason),
-            };
+            });
         }
     }
-    result
+    Ok(result)
 }
 
 #[tauri::command]
@@ -164,15 +165,16 @@ async fn pair_manual(
     mirage_http_port: u16,
     pair_id: String,
     pair_secret: String,
-) -> PairResult {
+) -> Result<PairResult, String> {
+    let state = state.inner().clone();
     let node_id = match get_or_create_node_id(&app) {
         Ok(id) => id,
         Err(reason) => {
-            return PairResult {
+            return Ok(PairResult {
                 ok: false,
                 credentials: None,
                 reason: Some(reason),
-            };
+            });
         }
     };
 
@@ -187,14 +189,14 @@ async fn pair_manual(
 
     if let Some(creds) = result.credentials.clone() {
         if let Err(reason) = arm_with_credentials(&app, &state, creds) {
-            return PairResult {
+            return Ok(PairResult {
                 ok: false,
                 credentials: None,
                 reason: Some(reason),
-            };
+            });
         }
     }
-    result
+    Ok(result)
 }
 
 #[tauri::command]
