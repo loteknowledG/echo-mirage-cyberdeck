@@ -45,8 +45,8 @@ export async function fetchEchoSpyCodes(): Promise<
       echoNodeId: string;
       echoHost: string;
       httpPort: number;
-      mirageCode: string | null;
-      powerfistCode: string | null;
+      miragePin: string | null;
+      powerfistPin: string | null;
       mirageExpiresAt: string | null;
       powerfistExpiresAt: string | null;
       pairedMirage: { nodeId: string; pairedAt: string } | null;
@@ -62,8 +62,8 @@ export async function fetchEchoSpyCodes(): Promise<
           echoNodeId: string;
           echoHost: string;
           httpPort: number;
-          mirageCode: string | null;
-          powerfistCode: string | null;
+          miragePin: string | null;
+          powerfistPin: string | null;
           mirageExpiresAt: string | null;
           powerfistExpiresAt: string | null;
           pairedMirage: { nodeId: string; pairedAt: string } | null;
@@ -86,6 +86,60 @@ export async function regenerateEchoSpyCodes(): Promise<
   }
 }
 
+export async function enterSpyPairPin(input: {
+  echoHost: string;
+  echoHttpPort: number;
+  pin: string;
+  role: "mirage" | "powerfist";
+}): Promise<
+  | {
+      ok: true;
+      role: "mirage" | "powerfist";
+      echoNodeId: string;
+      echoHost: string;
+      httpPort: number;
+      token: string;
+      nodeId?: string;
+      deviceId?: string;
+      sessionEpoch: number;
+    }
+  | { ok: false; reason: string }
+> {
+  const nodeId = getOrCreateEspionageNodeId();
+  const deviceId = getOrCreatePowerfistDeviceId();
+
+  try {
+    const res = await fetch("/api/spy/pair/enter", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        echoHost: input.echoHost,
+        echoHttpPort: input.echoHttpPort,
+        pin: input.pin,
+        role: input.role,
+        nodeId,
+        deviceId,
+      }),
+    });
+    return (await res.json()) as
+      | {
+          ok: true;
+          role: "mirage" | "powerfist";
+          echoNodeId: string;
+          echoHost: string;
+          httpPort: number;
+          token: string;
+          nodeId?: string;
+          deviceId?: string;
+          sessionEpoch: number;
+        }
+      | { ok: false; reason: string };
+  } catch {
+    return { ok: false, reason: "Pair request failed." };
+  }
+}
+
+/** @deprecated Legacy long-code pairing — use enterSpyPairPin instead. */
 export async function enterSpyPairCode(code: string): Promise<
   | {
       ok: true;

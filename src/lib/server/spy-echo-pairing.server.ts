@@ -4,6 +4,7 @@ import crypto from "crypto";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
+import { SPY_PAIR_PIN_LENGTH } from "@/lib/cyberdeck/spy-pair-pin";
 import { resolveHttpPort } from "@/lib/server/is-localhost-request.server";
 
 export type SpyPairRole = "mirage" | "powerfist";
@@ -11,6 +12,7 @@ export type SpyPairRole = "mirage" | "powerfist";
 export type SpyPairCodeSession = {
   pairId: string;
   pairSecret: string;
+  pin: string;
   expiresAt: string;
 };
 
@@ -86,6 +88,24 @@ function newPairSecret(): string {
   return crypto.randomBytes(9).toString("base64url");
 }
 
+function newPairPin(taken: Set<string>): string {
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const pin = String(Math.floor(10 ** (SPY_PAIR_PIN_LENGTH - 1) + Math.random() * 9 * 10 ** (SPY_PAIR_PIN_LENGTH - 1)));
+    if (!taken.has(pin)) {
+      taken.add(pin);
+      return pin;
+    }
+  }
+  throw new Error("Failed to allocate unique Spy pairing PIN.");
+}
+
+function normalizeStoredSession(session: SpyPairCodeSession | null | undefined): SpyPairCodeSession | null {
+  if (!session) return null;
+  const pin = session.pin?.trim() || session.pairId?.trim();
+  if (!pin || !/^\d{6}$/.test(pin)) return null;
+  return { ...session, pin };
+}
+
 async function defaultState(): Promise<EchoSpyPairingState> {
   return {
     echoNodeId: crypto.randomUUID(),
@@ -136,10 +156,11 @@ export async function saveEchoSpyPairingState(state: EchoSpyPairingState): Promi
   await fs.writeFile(statePath, JSON.stringify(state, null, 2), "utf8");
 }
 
-function createCodeSession(): SpyPairCodeSession {
+function createCodeSession(takenPins: Set<string>): SpyPairCodeSession {
   return {
     pairId: newPairId(),
     pairSecret: newPairSecret(),
+    pin: newPairPin(takenPins),
     expiresAt: new Date(Date.now() + PAIRING_TTL_MS).toISOString(),
   };
 }
@@ -211,8 +232,9 @@ export async function terminateEchoSpySession(): Promise<{
 export async function refreshEchoSpyPairCodes(): Promise<EchoSpyPairingState> {
   const state = await loadEchoSpyPairingState();
   state.echoSpyActive = true;
-  state.mirageCode = createCodeSession();
-  state.powerfistCode = createCodeSession();
+  const takenPins = new Set<string>();
+  state.mirageCode = createCodeSession(takenPins);
+  state.powerfistCode = createCodeSession(takenPins);
   await saveEchoSpyPairingState(state);
   return state;
 }
@@ -221,8 +243,8 @@ export async function getEchoSpyPairingStatus(): Promise<{
   echoNodeId: string;
   echoHost: string;
   httpPort: number;
-  mirageCode: string | null;
-  powerfistCode: string | null;
+  miragePin: string | null;
+  powerfistPin: string | null;
   mirageExpiresAt: string | null;
   powerfistExpiresAt: string | null;
   pairedMirage: SpyPairedMirageClient | null;
@@ -232,34 +254,35 @@ export async function getEchoSpyPairingStatus(): Promise<{
 }> {
   let state = await loadEchoSpyPairingState();
   state.echoSpyActive = true;
+  const takenPins = new Set<string>();
   if (!state.mirageCode || sessionExpired(state.mirageCode)) {
     if (!state.powerfistCode || sessionExpired(state.powerfistCode)) {
       state = await refreshEchoSpyPairCodes();
     } else {
-      state.mirageCode = createCodeSession();
+      if (state.powerfistCode.pin) takenPins.add(state.powerfistCode.pin);
+      state.mirageCode = createCodeSession(takenPins);
       await saveEchoSpyPairingState(state);
     }
   } else if (!state.powerfistCode || sessionExpired(state.powerfistCode)) {
-    state.powerfistCode = createCodeSession();
+    if (state.mirageCode.pin) takenPins.add(state.mirageCode.pin);
+    state.powerfistCode = createCodeSession(takenPins);
     await saveEchoSpyPairingState(state);
   }
 
   const host = state.lanHosts[0] || "127.0.0.1";
-  const mirageActive = state.mirageCode && !sessionExpired(state.mirageCode);
-  const powerfistActive = state.powerfistCode && !sessionExpired(state.powerfistCode);
+  const mirageSession = normalizeStoredSession(state.mirageCode);
+  const powerfistSession = normalizeStoredSession(state.powerfistCode);
+  const mirageActive = mirageSession && !sessionExpired(mirageSession);
+  const powerfistActive = powerfistSession && !sessionExpired(powerfistSession);
 
   return {
     echoNodeId: state.echoNodeId,
     echoHost: host,
     httpPort: state.httpPort,
-    mirageCode: mirageActive && state.mirageCode
-      ? formatSpyPairCode(host, state.httpPort, state.mirageCode, "mirage")
-      : null,
-    powerfistCode: powerfistActive && state.powerfistCode
-      ? formatSpyPairCode(host, state.httpPort, state.powerfistCode, "powerfist")
-      : null,
-    mirageExpiresAt: mirageActive ? state.mirageCode?.expiresAt ?? null : null,
-    powerfistExpiresAt: powerfistActive ? state.powerfistCode?.expiresAt ?? null : null,
+    miragePin: mirageActive ? mirageSession.pin : null,
+    powerfistPin: powerfistActive ? powerfistSession.pin : null,
+    mirageExpiresAt: mirageActive ? mirageSession.expiresAt : null,
+    powerfistExpiresAt: powerfistActive ? powerfistSession.expiresAt : null,
     pairedMirage: state.pairedMirage,
     pairedPowerfist: state.pairedPowerfist,
     echoSpyActive: state.echoSpyActive,
@@ -320,6 +343,56 @@ export async function checkEchoSpyLinkStatus(input: {
   }
 
   return { ok: true, active: true, sessionEpoch: state.sessionEpoch };
+}
+
+export async function completeSpyPairEnterByPin(input: {
+  pin: string;
+  role: SpyPairRole;
+  nodeId?: string;
+  deviceId?: string;
+}): Promise<
+  | {
+      ok: true;
+      role: SpyPairRole;
+      echoNodeId: string;
+      echoHost: string;
+      httpPort: number;
+      token: string;
+      nodeId?: string;
+      deviceId?: string;
+      sessionEpoch: number;
+    }
+  | { ok: false; reason: string }
+> {
+  const pin = input.pin.trim();
+  if (!new RegExp(`^\\d{${SPY_PAIR_PIN_LENGTH}}$`).test(pin)) {
+    return { ok: false, reason: `Enter the ${SPY_PAIR_PIN_LENGTH}-digit code from Echo.` };
+  }
+
+  const state = await loadEchoSpyPairingState();
+
+  if (!state.echoSpyActive) {
+    return { ok: false, reason: ECHO_SPY_TERMINATED_MESSAGE };
+  }
+
+  const session = input.role === "mirage" ? state.mirageCode : state.powerfistCode;
+  const normalized = normalizeStoredSession(session);
+
+  if (!normalized || sessionExpired(normalized)) {
+    return { ok: false, reason: "Pairing code expired. Generate new codes on Echo." };
+  }
+
+  if (normalized.pin !== pin) {
+    return { ok: false, reason: "Invalid pairing code." };
+  }
+
+  return completeSpyPairEnter({
+    pairId: normalized.pairId,
+    pairSecret: normalized.pairSecret,
+    role: input.role,
+    nodeId: input.nodeId,
+    deviceId: input.deviceId,
+  });
 }
 
 export async function completeSpyPairEnter(input: {

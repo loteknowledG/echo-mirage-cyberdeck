@@ -17,16 +17,16 @@ import {
 } from "@/lib/cyberdeck/spy-pairing-client";
 import { readPowerfistCaptureCredentials } from "@/lib/cyberdeck/powerfist-capture-client";
 
-function PairCodeBlock({
+function PairPinBlock({
   label,
-  code,
+  pin,
   expiresAt,
 }: {
   label: string;
-  code: string | null;
+  pin: string | null;
   expiresAt: string | null;
 }) {
-  if (!code) {
+  if (!pin) {
     return (
       <div className="rounded border border-[#1c1c1c] bg-black/50 p-3">
         <p className="mb-1 text-[9px] tracking-[0.08em] text-[#8a8a8a]">{label}</p>
@@ -40,12 +40,10 @@ function PairCodeBlock({
       <p className="mb-2 text-[9px] tracking-[0.08em] text-[#8a8a8a]">
         {label} · expires in {formatCodeExpiry(expiresAt)}
       </p>
-      <p className="break-all font-mono text-[11px] leading-relaxed tracking-[0.04em] text-cyan-200/90">
-        {code}
-      </p>
+      <p className="font-mono text-2xl tracking-[0.35em] text-cyan-200/90">{pin}</p>
       <p className="mt-2 text-[8px] leading-relaxed text-[#5f5f5f]">
-        Paste this on the {label.includes("MIRAGE") ? ESPIONAGE_MIRAGE_DISPLAY : ESPIONAGE_POWERFIST_LABEL}{" "}
-        device Spy tab.
+        Type this 6-digit code on the {label.includes("MIRAGE") ? ESPIONAGE_MIRAGE_DISPLAY : ESPIONAGE_POWERFIST_LABEL}{" "}
+        device Spy tab, along with the Echo LAN address above.
       </p>
     </div>
   );
@@ -56,8 +54,9 @@ export function SpyEchoPane() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [echoHost, setEchoHost] = useState<string | null>(null);
-  const [mirageCode, setMirageCode] = useState<string | null>(null);
-  const [powerfistCode, setPowerfistCode] = useState<string | null>(null);
+  const [httpPort, setHttpPort] = useState<number | null>(null);
+  const [miragePin, setMiragePin] = useState<string | null>(null);
+  const [powerfistPin, setPowerfistPin] = useState<string | null>(null);
   const [mirageExpiresAt, setMirageExpiresAt] = useState<string | null>(null);
   const [powerfistExpiresAt, setPowerfistExpiresAt] = useState<string | null>(null);
   const [pairedMirage, setPairedMirage] = useState<{ nodeId: string } | null>(null);
@@ -78,8 +77,9 @@ export function SpyEchoPane() {
     }
     setNotEchoMachine(false);
     setEchoHost(status.echoHost);
-    setMirageCode(status.mirageCode);
-    setPowerfistCode(status.powerfistCode);
+    setHttpPort(status.httpPort);
+    setMiragePin(status.miragePin);
+    setPowerfistPin(status.powerfistPin);
     setMirageExpiresAt(status.mirageExpiresAt);
     setPowerfistExpiresAt(status.powerfistExpiresAt);
     setPairedMirage(status.pairedMirage);
@@ -99,8 +99,8 @@ export function SpyEchoPane() {
       setError(status.reason);
       return;
     }
-    setMirageCode(status.mirageCode);
-    setPowerfistCode(status.powerfistCode);
+    setMiragePin(status.miragePin);
+    setPowerfistPin(status.powerfistPin);
     setMirageExpiresAt(status.mirageExpiresAt);
     setPowerfistExpiresAt(status.powerfistExpiresAt);
     setPairedMirage(status.pairedMirage);
@@ -136,7 +136,10 @@ export function SpyEchoPane() {
         <p className="text-cyan-300/90">{ESPIONAGE_MODE_TITLE} // {ESPIONAGE_ECHO_DISPLAY}</p>
         <p className="mt-1 text-[9px] text-[#6a8a8a]">{ESPIONAGE_ECHO_TAGLINE}</p>
         {echoHost ? (
-          <p className="mt-2 text-[9px] text-[#5f5f5f]">Echo on LAN · {echoHost}</p>
+          <p className="mt-2 text-[9px] text-[#5f5f5f]">
+            Echo on LAN · {echoHost}
+            {httpPort ? `:${httpPort}` : null}
+          </p>
         ) : null}
       </div>
 
@@ -144,14 +147,14 @@ export function SpyEchoPane() {
         <p className="text-[#8a8a8a]">Loading pairing codes…</p>
       ) : (
         <>
-          <PairCodeBlock
+          <PairPinBlock
             label={`CODE FOR ${ESPIONAGE_MIRAGE_DISPLAY}`}
-            code={mirageCode}
+            pin={miragePin}
             expiresAt={mirageExpiresAt}
           />
-          <PairCodeBlock
+          <PairPinBlock
             label={`CODE FOR ${ESPIONAGE_POWERFIST_LABEL}`}
-            code={powerfistCode}
+            pin={powerfistPin}
             expiresAt={powerfistExpiresAt}
           />
 
