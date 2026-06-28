@@ -122,7 +122,16 @@ const nextConfig = {
 	outputFileTracingIncludes: {
 		"/api/glyph/*": ["./assets/figlet-fonts/**"],
 		"/api/spy/capture": ["./node_modules/node-screenshots/**", "./node_modules/node-screenshots-*/**/*"],
-		"/*": ["./assets/figlet-fonts/**"],
+		"/*": [
+			"./assets/figlet-fonts/**",
+			// Next standalone trace can omit hoisted/pnpm symlinks — force runtime deps for Electron.
+			"./node_modules/next/**",
+			"./node_modules/@next/env/**",
+			"./node_modules/@swc/helpers/**",
+			"./node_modules/styled-jsx/**",
+			"./node_modules/react/**",
+			"./node_modules/react-dom/**",
+		],
 	},
 	// Treat as external in the Node.js server runtime (native / optional / E2E-only).
 	serverExternalPackages: [
