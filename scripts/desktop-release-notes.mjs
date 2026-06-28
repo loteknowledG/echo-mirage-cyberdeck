@@ -6,15 +6,23 @@ export function desktopReleaseNotes(version) {
 - **Echo-Mirage-Cyberdeck-${version}.dmg**
 
 #### Install (read this if macOS says "damaged")
-Chrome and Safari tag downloaded files with a quarantine flag. On unsigned CI builds, macOS often shows **"Echo Mirage Cyberdeck is damaged and can't be opened"** — the app is not corrupt.
+Chrome tags downloads with a quarantine flag. CI builds are not Apple-notarized, so macOS may show **"Echo Mirage Cyberdeck is damaged and can't be opened"**. The file is not corrupt.
 
-**Terminal (recommended):**
+**Do not double-click the app inside the DMG.** Copy to Applications first, then clear quarantine on the \`.app\` bundle.
+
+**One-liner install script (from repo clone):**
+\`\`\`bash
+bash scripts/mac-install-from-dmg.sh ~/Downloads/Echo-Mirage-Cyberdeck-${version}.dmg
+\`\`\`
+
+**Manual Terminal steps:**
 \`\`\`bash
 xattr -cr ~/Downloads/Echo-Mirage-Cyberdeck-${version}.dmg
-\`\`\`
-Open the DMG, drag **Echo Mirage Cyberdeck** to **Applications**, then:
-\`\`\`bash
+hdiutil attach ~/Downloads/Echo-Mirage-Cyberdeck-${version}.dmg
+cp -R "/Volumes/Echo Mirage Cyberdeck ${version}/Echo Mirage Cyberdeck.app" /Applications/
 xattr -cr "/Applications/Echo Mirage Cyberdeck.app"
+codesign --force --deep --sign - "/Applications/Echo Mirage Cyberdeck.app"
+open "/Applications/Echo Mirage Cyberdeck.app"
 \`\`\`
 
 **First launch:** right-click the app → **Open** (or **System Settings → Privacy & Security → Open Anyway**).
