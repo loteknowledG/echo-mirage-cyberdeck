@@ -123,6 +123,7 @@ async function startPackagedNextServer() {
       NEXT_TELEMETRY_DISABLED: '1',
       ECHO_MIRAGE_POWERFIST_STATE_PATH: powerfistStatePath,
       ECHO_MIRAGE_POWERFIST_WS_HOST: '0.0.0.0',
+      ECHO_MIRAGE_DESKTOP_SHELL: '1',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,

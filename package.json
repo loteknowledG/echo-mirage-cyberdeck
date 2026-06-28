@@ -243,6 +243,14 @@
     "appId": "com.craftwerk.echomirage",
     "productName": "Echo Mirage Cyberdeck",
     "copyright": "Copyright © Craftwerk Corp",
+    "protocols": [
+      {
+        "name": "Echo Mirage Cyberdeck",
+        "schemes": [
+          "echomirage"
+        ]
+      }
+    ],
     "npmRebuild": false,
     "nodeGypRebuild": false,
     "directories": {

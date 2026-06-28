@@ -30,6 +30,79 @@ const { initializeAutoUpdater } = require('./auto-updater');
 
 initializeSilentMode({ app, Tray, Menu, nativeImage });
 
+const DESKTOP_PROTOCOL = 'echomirage';
+/** @type {string | null} */
+let pendingProtocolPath = null;
+
+function registerDesktopProtocolClient() {
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(DESKTOP_PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
+    }
+  } else {
+    app.setAsDefaultProtocolClient(DESKTOP_PROTOCOL);
+  }
+}
+
+function parseProtocolLaunchPath(rawUrl) {
+  if (!rawUrl || !rawUrl.startsWith(`${DESKTOP_PROTOCOL}://`)) return null;
+  try {
+    const parsed = new URL(rawUrl);
+    const deepPath = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname : '/cyberdeck';
+    return `${deepPath}${parsed.search || ''}`;
+  } catch {
+    return '/cyberdeck';
+  }
+}
+
+function findProtocolLaunchArg(argv = process.argv) {
+  return argv.find((arg) => arg.startsWith(`${DESKTOP_PROTOCOL}://`)) ?? null;
+}
+
+async function navigateMainWindowToPath(deepPath) {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (!win || win.isDestroyed()) {
+    pendingProtocolPath = deepPath;
+    return;
+  }
+  try {
+    const origin = await getDevOrigin();
+    await win.loadURL(`${origin}${deepPath}`);
+    showMainWindow();
+  } catch (error) {
+    process.stderr.write(`[echo-mirage] protocol navigation failed: ${error}\n`);
+  }
+}
+
+function handleProtocolLaunch(rawUrl) {
+  const deepPath = parseProtocolLaunchPath(rawUrl);
+  if (!deepPath) return;
+  void navigateMainWindowToPath(deepPath);
+}
+
+registerDesktopProtocolClient();
+
+if (process.platform === 'darwin') {
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    handleProtocolLaunch(url);
+  });
+}
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const protocolArg = findProtocolLaunchArg(argv);
+    if (protocolArg) {
+      handleProtocolLaunch(protocolArg);
+    } else {
+      showMainWindow();
+    }
+  });
+}
+
 if (!app.isPackaged && process.platform === 'win32') {
   // Dev-only: reduce GPU/network subprocess crashes while hot-reloading a heavy page.
   app.commandLine.appendSwitch('disable-gpu-sandbox');
@@ -522,7 +595,13 @@ async function createWindow() {
 
   try {
     const origin = await getDevOrigin();
-    await win.loadURL(`${origin}/cyberdeck`);
+    const protocolArg = findProtocolLaunchArg();
+    if (protocolArg && !pendingProtocolPath) {
+      pendingProtocolPath = parseProtocolLaunchPath(protocolArg);
+    }
+    const launchPath = pendingProtocolPath || '/cyberdeck';
+    pendingProtocolPath = null;
+    await win.loadURL(`${origin}${launchPath}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`[echo-mirage] startup error: ${message}\n`);
