@@ -72,6 +72,9 @@ async function main() {
     throw new Error(`Missing ${packagedServerJs} after materialize.`);
   }
 
+  console.log('[electron:prepare] writing desktop provider env (when CI secrets present)…');
+  await run('node', ['scripts/write-desktop-provider-env.mjs']);
+
   const buildIdPath = path.join(root, '.next', 'BUILD_ID');
   if (await pathExists(buildIdPath)) {
     const buildId = (await fs.readFile(buildIdPath, 'utf8')).trim();

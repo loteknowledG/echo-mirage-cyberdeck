@@ -42,7 +42,29 @@ jobs:
             next-win-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Build Next.js standalone bundle
+        env:
+          OPENCODE_ZEN_API_KEY: ${{ secrets.OPENCODE_ZEN_API_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          ZEN_API_KEY: ${{ secrets.ZEN_API_KEY }}
+          OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: node scripts/prepare-electron-standalone.mjs
+
+      - name: Verify bundled provider env (Windows)
+        shell: pwsh
+        env:
+          OPENCODE_ZEN_API_KEY: ${{ secrets.OPENCODE_ZEN_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if ($env:OPENCODE_ZEN_API_KEY -or $env:OPENROUTER_API_KEY) {
+            if (-not (Test-Path .next/standalone-electron/desktop-provider.env)) {
+              throw "Expected desktop-provider.env after prepare (add OPENCODE_ZEN_API_KEY / OPENROUTER_API_KEY repo secrets)"
+            }
+            Write-Host "desktop-provider.env present for Windows build"
+          } else {
+            Write-Host "No desktop provider secrets configured — installer will prompt for keys"
+          }
 
       - name: Package Windows installer
         run: pnpm exec electron-builder --win --publish never
@@ -116,7 +138,29 @@ jobs:
             next-mac-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Build Next.js standalone bundle
+        env:
+          OPENCODE_ZEN_API_KEY: ${{ secrets.OPENCODE_ZEN_API_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          ZEN_API_KEY: ${{ secrets.ZEN_API_KEY }}
+          OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: node scripts/prepare-electron-standalone.mjs
+
+      - name: Verify bundled provider env (macOS)
+        env:
+          OPENCODE_ZEN_API_KEY: ${{ secrets.OPENCODE_ZEN_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if [ -n "${OPENCODE_ZEN_API_KEY}" ] || [ -n "${OPENROUTER_API_KEY}" ]; then
+            if [ ! -f .next/standalone-electron/desktop-provider.env ]; then
+              echo "Expected desktop-provider.env after prepare (add OPENCODE_ZEN_API_KEY / OPENROUTER_API_KEY repo secrets)"
+              exit 1
+            fi
+            echo "desktop-provider.env present for macOS build"
+          else
+            echo "No desktop provider secrets configured — installer will prompt for keys"
+          fi
 
       - name: Package macOS DMG
         env:
