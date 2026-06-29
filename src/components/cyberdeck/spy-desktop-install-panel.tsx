@@ -150,7 +150,7 @@ export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanel
   const installInfo = echoPane ? satelliteInfo : desktopInfo;
   const installLabel = installInfo?.installerAvailable
     ? echoPane
-      ? "Install Echo Satellite"
+      ? "Install or update Echo Satellite"
       : "Install desktop cyberdeck"
     : echoPane
       ? "Download Echo Satellite"
@@ -176,8 +176,11 @@ export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanel
 
       {echoPane ? (
         <p className="mb-2 text-[8px] leading-relaxed text-[#5a5a5a]">
-          After install: grant Screen Recording (macOS), pair via Mirage Echo QR on port{" "}
-          <strong className="text-[#7a7a7a]">3050</strong>, then hide to tray.
+          {satelliteInfo?.platform === "mac"
+            ? "Double-click the downloaded .pkg — it updates in place over any older Echo Satellite. No uninstall, no Terminal."
+            : "Double-click the downloaded installer — it updates in place over older Echo Satellite builds."}{" "}
+          Then grant Screen Recording (macOS), pair via Mirage Echo QR on port{" "}
+          <strong className="text-[#7a7a7a]">3050</strong>.
         </p>
       ) : null}
 

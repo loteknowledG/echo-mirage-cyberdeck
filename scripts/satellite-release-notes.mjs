@@ -5,29 +5,27 @@ export function satelliteReleaseNotes(version) {
 Minimal capture drone for the **Echo** screenshot machine — tray-only, screenshot on PowerFist signal, relay to Mirage.
 
 ### macOS (Apple Silicon)
-- **Echo-Satellite_${version}_aarch64.dmg** (NOT "Source code zip")
 
-Grant **Screen Recording** during first launch (Arm phase), then pair with Mirage Echo QR on port **3050**.
+1. Download **Echo-Satellite_${version}_aarch64.pkg**
+2. Double-click it and click through the installer
 
-**macOS 15+:** This build runs as a normal window app (no menu-bar tray) to avoid a known Tauri/tao crash. Use the setup window or Dock icon to reopen. Startup log: \`~/Library/Logs/Echo-Satellite/startup.log\`
+**Updates in place** — replaces any older Echo Satellite in Applications. No uninstall, no Terminal.
 
-If the setup window disappears on older macOS with tray builds, Echo Satellite may be in the **menu bar** (top-right). Click the tray icon → **Show setup**.
+If macOS warns about an unidentified developer, right-click the \`.pkg\` → **Open** once (unsigned open-source build).
 
-\`\`\`bash
-xattr -cr ~/Downloads/Echo-Satellite_${version}_aarch64.dmg
-hdiutil attach ~/Downloads/Echo-Satellite_${version}_aarch64.dmg
-cp -R "/Volumes/Echo-Satellite/Echo-Satellite.app" /Applications/
-xattr -cr "/Applications/Echo-Satellite.app"
-codesign --force --deep --sign - "/Applications/Echo-Satellite.app"
-\`\`\`
+Grant **Screen Recording** on first launch, then pair from Mirage Spy → Echo QR on port **3050**.
+
+**macOS 15+:** Window/Dock app (no menu-bar tray). Diagnostics panel shows startup log if anything fails.
 
 ### Windows (x64)
-- **Echo-Satellite_${version}_x64-setup.exe** (NOT "Source code zip")
 
-Requires **Microsoft Edge WebView2 Runtime** (usually preinstalled on Windows 10/11). If the app closes instantly, install WebView2 from Microsoft, then reinstall Echo Satellite.
+Double-click **Echo-Satellite_${version}_x64-setup.exe** (NOT "Source code zip"). Upgrades in place over older installs.
+
+Requires **Microsoft Edge WebView2 Runtime** on some PCs.
 
 ### Pairing
-Mirage Spy → Echo QR → use this machine's LAN IP and port **3050** (\`/powerfist/capture-pair\`).
+
+Mirage Spy → Echo QR → this machine's LAN IP and port **3050** (\`/powerfist/capture-pair\`).
 
 Built from [\`satellite-installer\`](https://github.com/loteknowledG/echo-mirage-cyberdeck/actions/workflows/satellite-installer.yml).
 `;
