@@ -44,7 +44,7 @@ function satelliteInstallerFileName(
     case "win":
       return `Echo-Satellite_${version}_x64-setup.exe`;
     case "mac":
-      return `Echo-Satellite_${version}_aarch64.dmg`;
+      return `Echo-Satellite_${version}_aarch64.pkg`;
     default:
       return null;
   }
@@ -61,7 +61,12 @@ function satelliteInstallerFileCandidates(
     case "win":
       return [primary, `Echo-Satellite-${version}-setup.exe`];
     case "mac":
-      return [primary, `Echo-Satellite-${version}.dmg`, `Echo Satellite_${version}_aarch64.dmg`];
+      return [
+        primary,
+        `Echo-Satellite_${version}_aarch64.dmg`,
+        `Echo-Satellite-${version}.dmg`,
+        `Echo Satellite_${version}_aarch64.dmg`,
+      ];
     default:
       return [primary];
   }

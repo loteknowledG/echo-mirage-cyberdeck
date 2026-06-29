@@ -132,14 +132,18 @@ jobs:
           wait "$PID" 2>/dev/null || true
           echo "PASS: Echo Satellite stayed running for 4s"
 
-      - name: Verify macOS DMG
+      - name: Build macOS PKG installer
+        run: bash scripts/build-satellite-mac-installers.sh
+
+      - name: Verify macOS installers
         run: |
-          dmg="$(find apps/echo-satellite/src-tauri/target/release/bundle -name '*.dmg' | head -1)"
-          if [ -z "$dmg" ]; then
-            find apps/echo-satellite/src-tauri/target/release/bundle -maxdepth 4 -type f || true
-            exit 1
-          fi
-          echo "Installer ready: $dmg"
+          version="$(node -p "require('./apps/echo-satellite/package.json').version")"
+          pkg="apps/echo-satellite/src-tauri/target/release/bundle/macos/Echo-Satellite_${version}_aarch64.pkg"
+          dmg="apps/echo-satellite/src-tauri/target/release/bundle/macos/Echo-Satellite_${version}_aarch64.dmg"
+          test -f "$pkg" || (echo "Missing PKG: $pkg" && exit 1)
+          test -f "$dmg" || (echo "Missing DMG: $dmg" && exit 1)
+          echo "PKG ready: $pkg"
+          echo "DMG ready: $dmg"
 
       - name: Publish GitHub Release (macOS)
         env:
@@ -154,7 +158,7 @@ jobs:
           assets=()
           while IFS= read -r file; do
             assets+=("$file")
-          done < <(find apps/echo-satellite/src-tauri/target/release/bundle -type f \( -name '*.dmg' -o -name '*.dmg.sig' \))
+          done < <(find apps/echo-satellite/src-tauri/target/release/bundle/macos -type f \( -name '*.dmg' -o -name '*.pkg' -o -name '*.dmg.sig' \))
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No macOS satellite assets found"
             exit 1
