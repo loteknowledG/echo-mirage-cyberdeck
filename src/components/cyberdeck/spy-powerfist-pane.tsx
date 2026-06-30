@@ -10,6 +10,7 @@ import {
   ESPIONAGE_POWERFIST_TAGLINE,
 } from "@/lib/cyberdeck/espionage-mode";
 import { useSpyEchoLinkWatch } from "@/lib/cyberdeck/spy-echo-link-watch";
+import { notifySpyTeamStatusChanged } from "@/lib/cyberdeck/spy-team-status";
 import { saveSpyPowerfistPairCredentials } from "@/lib/cyberdeck/spy-pairing-client";
 
 export function SpyPowerfistPane() {
@@ -36,6 +37,7 @@ export function SpyPowerfistPane() {
       };
       saveSpyPowerfistPairCredentials(creds);
       resetLinkWatch();
+      notifySpyTeamStatusChanged();
       setStatus(`Paired with ${ESPIONAGE_ECHO_DISPLAY} at ${result.echoHost}.`);
     },
     [resetLinkWatch],

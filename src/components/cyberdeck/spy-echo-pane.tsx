@@ -123,9 +123,9 @@ export function SpyEchoPane() {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
         <p className="max-w-md text-center leading-relaxed">
-          {ESPIONAGE_ECHO_DISPLAY} pairing codes are shown on the screenshot computer. Install or open
-          the desktop cyberdeck on that machine (see setup bar above), then return to Spy →{" "}
-          {ESPIONAGE_ECHO_DISPLAY}.
+          Pairing codes live on the {ESPIONAGE_ECHO_DISPLAY} screenshot machine (Echo Satellite). Use{" "}
+          <strong className="text-[#9a9a9a]">TEAM LINKS</strong> above to see what is connected from this
+          cyberdeck — after pairing on Mirage or PowerFist tabs.
         </p>
       </div>
     );

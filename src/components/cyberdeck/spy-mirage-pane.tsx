@@ -11,6 +11,7 @@ import {
   ESPIONAGE_MODE_TITLE,
 } from "@/lib/cyberdeck/espionage-mode";
 import { useSpyEchoLinkWatch } from "@/lib/cyberdeck/spy-echo-link-watch";
+import { notifySpyTeamStatusChanged } from "@/lib/cyberdeck/spy-team-status";
 import {
   readSpyMiragePairCredentials,
   saveSpyMiragePairCredentials,
@@ -40,6 +41,7 @@ export function SpyMiragePane() {
       };
       saveSpyMiragePairCredentials(creds);
       resetLinkWatch();
+      notifySpyTeamStatusChanged();
       setStatus(`Paired with ${ESPIONAGE_ECHO_DISPLAY} at ${result.echoHost}.`);
     },
     [resetLinkWatch],

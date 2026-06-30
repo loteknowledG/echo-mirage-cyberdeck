@@ -4,7 +4,6 @@ import { RailAsciiButton } from "@/components/cyberdeck/rail-ascii-button";
 import {
   ESPIONAGE_ECHO_DISPLAY,
   ESPIONAGE_MIRAGE_DISPLAY,
-  ESPIONAGE_POWERFIST_LABEL,
 } from "@/lib/cyberdeck/espionage-mode";
 import type { SpySubPane } from "@/lib/cyberdeck/espionage-mode";
 import {
@@ -15,7 +14,7 @@ import {
 const SUB_PANES: Array<{ id: SpySubPane; glyph: string; label: string }> = [
   { id: "echo", glyph: "e", label: ESPIONAGE_ECHO_DISPLAY },
   { id: "mirage", glyph: "m", label: ESPIONAGE_MIRAGE_DISPLAY },
-  { id: "powerfist", glyph: "p", label: ESPIONAGE_POWERFIST_LABEL },
+  { id: "powerfist", glyph: "p", label: "POWERFIST (phone)" },
 ];
 
 type SpySubRailProps = {
