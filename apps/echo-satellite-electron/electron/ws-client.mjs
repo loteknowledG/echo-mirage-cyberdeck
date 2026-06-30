@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import { capturePrimaryMonitorPngBase64 } from "./capture.mjs";
+import { capturePrimaryMonitorPng } from "./capture.mjs";
 import * as logger from "./logger.mjs";
 
 /**
@@ -76,7 +76,7 @@ export function startWsClient(creds, callbacks) {
 
     lastMissionId = parsed.missionId ?? null;
     try {
-      const pngBase64 = await capturePrimaryMonitorPngBase64();
+      const capture = await capturePrimaryMonitorPng();
       const response = await fetch(parsed.ingestUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,7 +85,7 @@ export function startWsClient(creds, callbacks) {
           kind: parsed.kind,
           missionSecret: parsed.missionSecret,
           prompt: parsed.prompt,
-          pngBase64,
+          pngBase64: capture.pngBase64,
         }),
       });
       const payload = await response.json();

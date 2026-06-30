@@ -152,7 +152,7 @@ export async function getSatelliteInstallInfo(
     platformOverride ?? resolveDesktopInstallPlatform(userAgent);
   const supported = platform === "win" || platform === "mac";
   const fileName = satelliteInstallerFileName(version, platform);
-  const releasePageUrl = `${GITHUB_RELEASES}/tag/satellite-v${version}`;
+  const releasePageUrl = `${GITHUB_RELEASES}/latest`;
 
   let downloadUrl: string | null = null;
   let installerAvailable = false;

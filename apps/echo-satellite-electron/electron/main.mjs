@@ -3,11 +3,12 @@ import { fileURLToPath } from "node:url";
 import {
   app,
   BrowserWindow,
+  desktopCapturer,
   ipcMain,
   Menu,
   nativeImage,
+  screen,
   shell,
-  systemPreferences,
   Tray,
 } from "electron";
 import {
@@ -17,11 +18,14 @@ import {
   loadCredentials,
   saveCredentials,
 } from "./config.mjs";
-import { capturePrimaryMonitorDimensions, capturePrimaryMonitorPngBase64 } from "./capture.mjs";
-import { parseCapturePairUrl, completeCapturePair } from "./pair.mjs";
+import { capturePrimaryMonitorPng, setElectronCaptureBackend } from "./capture.mjs";
+import { createElectronScreenCapture } from "./capture-electron.mjs";
+import { createCapturePreviewBase64 } from "./capture-preview.mjs";
 import { startPairServer } from "./pair-server.mjs";
+import { createSpyPairing } from "./spy-pairing.mjs";
 import { startWsClient } from "./ws-client.mjs";
 import { createTrayManager } from "./tray.mjs";
+import { checkScreenRecordingAccess, warmElectronScreenCapture } from "./screen-permission.mjs";
 import * as logger from "./logger.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -42,6 +46,9 @@ let lastError = null;
 /** @type {string | null} */
 let lastMissionId = null;
 
+/** @type {import('http').Server | null} */
+let pairServer = null;
+
 let trayIcon = null;
 try {
   const iconPath = path.join(__dirname, "..", "public", "icon.ico");
@@ -51,6 +58,13 @@ try {
 }
 
 const trayManager = createTrayManager({ app, Tray, Menu, nativeImage: trayIcon });
+
+/** @type {ReturnType<typeof createSpyPairing> | null} */
+let spyPairing = null;
+
+function notifySpyCodesChanged() {
+  mainWindow?.webContents.send("satellite:spy-codes-changed");
+}
 
 function statusSnapshot() {
   const stats = wsClient?.getStats();
@@ -91,7 +105,7 @@ async function armWithCredentials(creds, hideWindow) {
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 520,
-    height: 640,
+    height: 720,
     title: "Echo Satellite",
     show: false,
     webPreferences: {
@@ -119,10 +133,16 @@ function createMainWindow() {
 async function initializeAfterReady() {
   logger.step(3, 8, "app ready — starting services");
 
+  spyPairing = createSpyPairing(app, () => getOrCreateNodeId(app));
+
   pairServer = startPairServer({
     getNodeId: () => getOrCreateNodeId(app),
     onPaired: (creds) => {
       void armWithCredentials(creds, true);
+    },
+    spyPairing,
+    onSpyPaired: () => {
+      notifySpyCodesChanged();
     },
   });
 
@@ -135,39 +155,45 @@ async function initializeAfterReady() {
   }
 
   trayManager.ensureTray();
+  if (process.platform === "darwin") {
+    void warmElectronScreenCapture();
+  }
   logger.step(7, 8, process.platform === "darwin" ? "window-only mode (macOS)" : "system tray ready");
 }
 
 function registerIpc() {
   ipcMain.handle("satellite:get-status", () => statusSnapshot());
 
-  ipcMain.handle("satellite:pair-from-url", async (_event, capturePairUrl) => {
-    try {
-      const nodeId = await getOrCreateNodeId(app);
-      const params = parseCapturePairUrl(capturePairUrl, nodeId);
-      const result = await completeCapturePair(params);
-      if (!result.ok || !result.credentials) {
-        return { ok: false, reason: result.reason ?? "Pair failed" };
-      }
-      await armWithCredentials(result.credentials, true);
-      return { ok: true };
-    } catch (error) {
-      return {
-        ok: false,
-        reason: error instanceof Error ? error.message : "Pair failed",
-      };
-    }
+  ipcMain.handle("satellite:get-spy-codes", async () => {
+    if (!spyPairing) throw new Error("Spy pairing not ready.");
+    const status = await spyPairing.getEchoSpyPairingStatus();
+    return { ok: true, ...status };
+  });
+
+  ipcMain.handle("satellite:regenerate-spy-codes", async () => {
+    if (!spyPairing) throw new Error("Spy pairing not ready.");
+    await spyPairing.refreshEchoSpyPairCodes();
+    const status = await spyPairing.getEchoSpyPairingStatus();
+    notifySpyCodesChanged();
+    return { ok: true, ...status };
   });
 
   ipcMain.handle("satellite:test-capture", async () => {
     try {
-      const pngBase64 = await capturePrimaryMonitorPngBase64();
-      const dimensions = await capturePrimaryMonitorDimensions();
+      if (process.platform === "darwin") {
+        await warmElectronScreenCapture();
+      }
+
+      const capture = await capturePrimaryMonitorPng();
+      const previewBase64 = createCapturePreviewBase64(capture.pngBuffer);
+
       return {
         ok: true,
-        width: dimensions?.width,
-        height: dimensions?.height,
-        pngBytes: pngBase64.length,
+        width: capture.width,
+        height: capture.height,
+        pngBytes: capture.pngBase64.length,
+        captureSource: capture.captureSource,
+        previewBase64: previewBase64 ?? undefined,
       };
     } catch (error) {
       return {
@@ -189,15 +215,13 @@ function registerIpc() {
     trayManager.hideMainWindow();
   });
 
-  ipcMain.handle("satellite:check-permissions", () => {
+  ipcMain.handle("satellite:check-permissions", async () => {
     if (process.platform === "darwin") {
-      const granted = systemPreferences.getMediaAccessStatus("screen") === "granted";
+      const access = await checkScreenRecordingAccess({ probe: true });
       return {
         platform: "macos",
-        screenRecording: granted,
-        hint: granted
-          ? null
-          : "Grant Screen Recording in System Settings → Privacy & Security.",
+        screenRecording: access.screenRecording,
+        hint: access.hint,
       };
     }
     return { platform: process.platform, screenRecording: true, hint: null };
@@ -219,6 +243,7 @@ function registerIpc() {
 app.whenReady().then(async () => {
   logger.beginSession(app, version);
   logger.step(1, 8, "electron main starting");
+  setElectronCaptureBackend(createElectronScreenCapture({ desktopCapturer, screen }));
   registerIpc();
   createMainWindow();
   logger.step(2, 8, "browser window created");

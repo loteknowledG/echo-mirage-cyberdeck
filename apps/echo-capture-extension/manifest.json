@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Echo Capture",
+  "description": "Browser tab capture drone for Echo Mirage — HackerRank, LeetCode, and coding tests in Chrome.",
+  "version": "0.1.0",
+  "permissions": ["activeTab", "storage", "tabs"],
+  "host_permissions": ["http://*/*", "https://*/*", "ws://*/*", "wss://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Echo Capture",
+    "default_popup": "popup.html"
+  }
+}
