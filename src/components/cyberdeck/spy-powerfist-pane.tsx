@@ -11,6 +11,10 @@ import {
 } from "@/lib/cyberdeck/espionage-mode";
 import { useSpyEchoLinkWatch } from "@/lib/cyberdeck/spy-echo-link-watch";
 import { notifySpyTeamStatusChanged } from "@/lib/cyberdeck/spy-team-status";
+import {
+  formatEspionageEchoPowerfistLinkedLine,
+  notifySpyMuthurArchive,
+} from "@/lib/cyberdeck/espionage-chat";
 import { saveSpyPowerfistPairCredentials } from "@/lib/cyberdeck/spy-pairing-client";
 
 export function SpyPowerfistPane() {
@@ -38,6 +42,7 @@ export function SpyPowerfistPane() {
       saveSpyPowerfistPairCredentials(creds);
       resetLinkWatch();
       notifySpyTeamStatusChanged();
+      notifySpyMuthurArchive(formatEspionageEchoPowerfistLinkedLine(result.echoHost));
       setStatus(`Paired with ${ESPIONAGE_ECHO_DISPLAY} at ${result.echoHost}.`);
     },
     [resetLinkWatch],

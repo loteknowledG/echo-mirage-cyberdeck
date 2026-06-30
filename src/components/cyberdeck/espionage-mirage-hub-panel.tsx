@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import {
@@ -12,6 +12,10 @@ import {
   ESPIONAGE_POWERFIST_TAGLINE,
   getOrCreateEspionageNodeId,
 } from "@/lib/cyberdeck/espionage-mode";
+import {
+  formatEspionageMiragePowerfistLinkedLine,
+  notifySpyMuthurArchive,
+} from "@/lib/cyberdeck/espionage-chat";
 import {
   createPowerfistCaptureQrSession,
   createPowerfistQrSession,

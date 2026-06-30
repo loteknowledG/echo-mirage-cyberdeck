@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { EspionageMirageHubPanel } from "@/components/cyberdeck/espionage-mirage-hub-panel";
+import { EspionageSolutionsPanel } from "@/components/cyberdeck/espionage-solutions-panel";
 import { SpyPairPinForm } from "@/components/cyberdeck/spy-pair-pin-form";
 import {
   ECHO_SPY_TERMINATED_MESSAGE,
@@ -13,13 +14,22 @@ import {
 import { useSpyEchoLinkWatch } from "@/lib/cyberdeck/spy-echo-link-watch";
 import { notifySpyTeamStatusChanged } from "@/lib/cyberdeck/spy-team-status";
 import {
+  formatEspionageEchoMirageLinkedLine,
+  formatEspionageSolutionsReadyLine,
+  notifyEspionageFocusChat,
+  notifySpyMuthurArchive,
+} from "@/lib/cyberdeck/espionage-chat";
+import { useSpyTeamStatus } from "@/lib/cyberdeck/use-spy-team-status";
+import {
   readSpyMiragePairCredentials,
   saveSpyMiragePairCredentials,
 } from "@/lib/cyberdeck/spy-pairing-client";
 
 export function SpyMiragePane() {
   const { paired, terminated, terminatedMessage, resetLinkWatch } = useSpyEchoLinkWatch("mirage");
+  const team = useSpyTeamStatus();
   const [status, setStatus] = useState<string | null>(null);
+  const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
 
   const handlePaired = useCallback(
     (result: {
@@ -42,6 +52,9 @@ export function SpyMiragePane() {
       saveSpyMiragePairCredentials(creds);
       resetLinkWatch();
       notifySpyTeamStatusChanged();
+      notifySpyMuthurArchive(formatEspionageEchoMirageLinkedLine(result.echoHost));
+      notifySpyMuthurArchive(formatEspionageSolutionsReadyLine());
+      notifyEspionageFocusChat();
       setStatus(`Paired with ${ESPIONAGE_ECHO_DISPLAY} at ${result.echoHost}.`);
     },
     [resetLinkWatch],
@@ -89,6 +102,12 @@ export function SpyMiragePane() {
       />
 
       {status ? <p className="text-emerald-300/80">{status}</p> : null}
+
+      {mirageLinked ? (
+        <div className="border-t border-[#1c1c1c] pt-4">
+          <EspionageSolutionsPanel />
+        </div>
+      ) : null}
 
       <div className="border-t border-[#1c1c1c] pt-4">
         <EspionageMirageHubPanel
