@@ -1,18 +1,31 @@
 import { NextResponse } from "next/server";
+import { discoverEchoHosts } from "@/lib/server/spy-echo-discovery.server";
 import {
   completeSpyPairEnter,
   completeSpyPairEnterByPin,
   parseSpyPairCode,
 } from "@/lib/server/spy-echo-pairing.server";
+import { parseEchoEndpointInput } from "@/lib/cyberdeck/spy-pair-pin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const SPY_CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { status: 204, headers: SPY_CORS_HEADERS });
+}
 
 type EnterBody = {
   code?: string;
   pin?: string;
   echoHost?: string;
   echoHttpPort?: number;
+  hintHosts?: string[];
   pairId?: string;
   pairSecret?: string;
   role?: "mirage" | "powerfist";
@@ -20,13 +33,28 @@ type EnterBody = {
   deviceId?: string;
 };
 
+type PairEnterPayload =
+  | {
+      ok: true;
+      role: "mirage" | "powerfist";
+      echoNodeId: string;
+      echoHost: string;
+      httpPort: number;
+      token: string;
+      nodeId?: string;
+      deviceId?: string;
+      sessionEpoch: number;
+    }
+  | { ok: false; reason: string };
+
 function requestHost(request: Request): string {
   return (request.headers.get("host") ?? "").split(":")[0]?.toLowerCase() ?? "";
 }
 
 function shouldHandlePinLocally(echoHost: string | undefined, request: Request): boolean {
   const host = echoHost?.trim().toLowerCase();
-  if (!host || host === "127.0.0.1" || host === "localhost") {
+  if (!host) return false;
+  if (host === "127.0.0.1" || host === "localhost") {
     return true;
   }
   return requestHost(request) === host;
@@ -39,9 +67,10 @@ async function forwardPinToEcho(input: {
   role: "mirage" | "powerfist";
   nodeId?: string;
   deviceId?: string;
-}): Promise<Response> {
+}): Promise<PairEnterPayload> {
+  const endpoint = parseEchoEndpointInput(input.echoHost, input.echoHttpPort);
   try {
-    const forwardUrl = `http://${input.echoHost}:${input.echoHttpPort}/api/spy/pair/enter`;
+    const forwardUrl = `http://${endpoint.host}:${endpoint.port}/api/spy/pair/enter`;
     const forwardRes = await fetch(forwardUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -52,14 +81,77 @@ async function forwardPinToEcho(input: {
         deviceId: input.deviceId,
       }),
     });
-    const payload = (await forwardRes.json()) as { ok?: boolean; reason?: string };
-    return NextResponse.json(payload, { status: forwardRes.status });
+    return (await forwardRes.json()) as PairEnterPayload;
   } catch {
-    return NextResponse.json(
-      { ok: false, reason: `Could not reach Echo at ${input.echoHost}:${input.echoHttpPort}.` },
-      { status: 502 },
-    );
+    return {
+      ok: false,
+      reason: `Could not reach Echo at ${endpoint.host}:${endpoint.port}.`,
+    };
   }
+}
+
+async function pairPinWithDiscovery(input: {
+  echoHttpPort: number;
+  pin: string;
+  role: "mirage" | "powerfist";
+  nodeId?: string;
+  deviceId?: string;
+  hintHosts?: string[];
+}): Promise<PairEnterPayload> {
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+
+  for (const host of input.hintHosts ?? []) {
+    const trimmed = host.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    candidates.push(trimmed);
+  }
+
+  const discovered = await discoverEchoHosts(input.echoHttpPort);
+  for (const host of discovered) {
+    if (seen.has(host)) continue;
+    seen.add(host);
+    candidates.push(host);
+  }
+
+  if (candidates.length === 0) {
+    return {
+      ok: false,
+      reason:
+        "Could not find Echo on your LAN. Open Echo Satellite on the screenshot Mac (same Wi‑Fi), or enter its IP under Advanced.",
+    };
+  }
+
+  let invalidPin = false;
+  let lastReason = "Could not pair with Echo.";
+
+  for (const echoHost of candidates) {
+    const result = await forwardPinToEcho({
+      echoHost,
+      echoHttpPort: input.echoHttpPort,
+      pin: input.pin,
+      role: input.role,
+      nodeId: input.nodeId,
+      deviceId: input.deviceId,
+    });
+
+    if (result.ok) {
+      return result;
+    }
+
+    lastReason = result.reason;
+    if (result.reason.toLowerCase().includes("invalid pairing code")) {
+      invalidPin = true;
+      break;
+    }
+  }
+
+  if (invalidPin) {
+    return { ok: false, reason: "Invalid pairing code." };
+  }
+
+  return { ok: false, reason: lastReason };
 }
 
 /** Mirage or PowerFist — enter the pairing code shown on Echo. */
@@ -74,16 +166,30 @@ export async function POST(request: Request) {
   const pin = body.pin?.trim();
   const role = body.role;
   if (pin && role) {
-    if (!shouldHandlePinLocally(body.echoHost, request)) {
-      const echoHost = body.echoHost?.trim();
-      const echoHttpPort = Number(body.echoHttpPort);
-      if (!echoHost || !Number.isFinite(echoHttpPort) || echoHttpPort <= 0) {
-        return NextResponse.json(
-          { ok: false, reason: "echoHost and echoHttpPort are required to pair with a remote Echo." },
-          { status: 400 },
-        );
-      }
-      return forwardPinToEcho({
+    const echoHttpPortDefault = Number(body.echoHttpPort) || 3050;
+    const parsed = body.echoHost?.trim()
+      ? parseEchoEndpointInput(body.echoHost, echoHttpPortDefault)
+      : { host: "", port: echoHttpPortDefault };
+    const echoHost = parsed.host;
+    const echoHttpPort = parsed.port;
+
+    if (!echoHost) {
+      const result = await pairPinWithDiscovery({
+        echoHttpPort,
+        pin,
+        role,
+        nodeId: body.nodeId,
+        deviceId: body.deviceId,
+        hintHosts: body.hintHosts,
+      });
+      return NextResponse.json(result, {
+        status: result.ok ? 200 : result.reason === "Invalid pairing code." ? 403 : 502,
+        headers: SPY_CORS_HEADERS,
+      });
+    }
+
+    if (!shouldHandlePinLocally(echoHost, request)) {
+      const result = await forwardPinToEcho({
         echoHost,
         echoHttpPort,
         pin,
@@ -91,6 +197,7 @@ export async function POST(request: Request) {
         nodeId: body.nodeId,
         deviceId: body.deviceId,
       });
+      return NextResponse.json(result, { status: result.ok ? 200 : 502, headers: SPY_CORS_HEADERS });
     }
 
     const result = await completeSpyPairEnterByPin({
@@ -99,7 +206,7 @@ export async function POST(request: Request) {
       nodeId: body.nodeId,
       deviceId: body.deviceId,
     });
-    return NextResponse.json(result, { status: result.ok ? 200 : 403 });
+    return NextResponse.json(result, { status: result.ok ? 200 : 403, headers: SPY_CORS_HEADERS });
   }
 
   const code = body.code?.trim();

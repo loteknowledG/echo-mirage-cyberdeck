@@ -27,24 +27,51 @@
         <button id="open-screen-settings" type="button" class="hidden">Open Screen Recording settings</button>
         <p id="permission-result" class="mono muted"></p>
         <p id="capture-result" class="mono muted"></p>
+        <img id="capture-preview" class="capture-preview hidden" alt="Test capture preview" />
       </section>
 
       <section class="card">
-        <h2>2 · Pair with Mirage</h2>
+        <h2>2 · Spy pairing codes</h2>
         <p class="hint">
-          On Mirage Spy → Echo QR, use this machine&apos;s LAN address and port
-          <code id="pair-port">3050</code> with path
-          <code>/powerfist/capture-pair</code>, or paste the full QR URL below.
+          On Mirage or PowerFist, open Spy and enter the 6-digit code below. Echo is found on Wi‑Fi
+          automatically — no IP or URL typing.
         </p>
-        <label class="field">
-          <span>Capture pair URL</span>
-          <textarea
-            id="pair-url"
-            rows="3"
-            placeholder="http://192.168.x.x:3050/powerfist/capture-pair?pairId=..."
-          ></textarea>
-        </label>
-        <button id="pair-url-btn" type="button" class="accent">Pair &amp; arm</button>
+        <p id="echo-lan" class="mono muted"></p>
+        <div class="pin-grid">
+          <div class="pin-block">
+            <p class="pin-label">Code for Mirage</p>
+            <p id="mirage-pin" class="pin-value">———</p>
+            <p id="mirage-pin-expiry" class="pin-meta"></p>
+          </div>
+          <div class="pin-block">
+            <p class="pin-label">Code for PowerFist</p>
+            <p id="powerfist-pin" class="pin-value">———</p>
+            <p id="powerfist-pin-expiry" class="pin-meta"></p>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="regenerate-codes" type="button">New codes</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>3 · Capture relay (silent screenshots)</h2>
+        <p class="hint">
+          After Spy team link, Mirage shows an Echo QR. Scan or open it <strong>on this Mac</strong> —
+          Echo Satellite arms automatically. No URL paste needed.
+        </p>
+        <details class="advanced-pair">
+          <summary>Advanced: paste capture pair URL</summary>
+          <label class="field">
+            <span>Capture pair URL (from Mirage Echo QR)</span>
+            <textarea
+              id="pair-url"
+              rows="3"
+              placeholder="http://192.168.x.x:3050/powerfist/capture-pair?pairId=..."
+            ></textarea>
+          </label>
+          <button id="pair-url-btn" type="button" class="accent">Pair &amp; arm</button>
+        </details>
       </section>
 
       <section class="card">
@@ -52,6 +79,8 @@
         <dl class="status-grid">
           <dt>Armed</dt>
           <dd id="status-armed">—</dd>
+          <dt>Linked Mirages</dt>
+          <dd id="status-mirages" class="mono mirage-list">—</dd>
           <dt>WebSocket</dt>
           <dd id="status-ws">—</dd>
           <dt>Missions</dt>
@@ -60,8 +89,18 @@
           <dd id="status-error" class="mono">—</dd>
         </dl>
         <div class="actions">
+          <button id="refresh-status" type="button">Refresh connections</button>
           <button id="hide-tray" type="button">Hide to tray</button>
           <button id="disarm" type="button">Disarm</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Updates</h2>
+        <p id="update-status" class="hint">Checking for updates…</p>
+        <div class="actions">
+          <button id="check-updates" type="button">Check for updates</button>
+          <button id="install-update" type="button" class="accent hidden">Update now</button>
         </div>
       </section>
 

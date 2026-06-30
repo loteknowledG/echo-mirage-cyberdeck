@@ -350,6 +350,12 @@ import {
   type EspionageMissionSolveDetail,
 } from "@/lib/cyberdeck/powerfist-mission.types";
 import { ESPIONAGE_ECHO_DISPLAY, ESPIONAGE_MIRAGE_DISPLAY } from "@/lib/cyberdeck/espionage-mode";
+import {
+  appendEspionageChatMessage,
+  ESPIONAGE_FOCUS_CHAT_EVENT,
+  SPY_MUTHUR_ARCHIVE_EVENT,
+  notifyEspionageFocusChat,
+} from "@/lib/cyberdeck/espionage-chat";
 import { terminateEchoSpySession } from "@/lib/cyberdeck/spy-pairing-client";
 import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
@@ -4324,6 +4330,28 @@ export default function CyberdeckApp() {
     });
 
   useEffect(() => {
+    const onSpyMuthurArchive = (event: Event) => {
+      const detail = (event as CustomEvent<{ text?: string }>).detail;
+      const text = typeof detail?.text === "string" ? detail.text.trim() : "";
+      if (!text) return;
+      archiveMuthurHistoryLine(text);
+      setMessagesRaw((prev) => [...prev, { role: "assistant", text }]);
+      pinMuthurChatToBottom();
+    };
+    const onEspionageFocusChat = () => {
+      pinMuthurChatToBottom();
+      messageScrollRef.current?.focus({ preventScroll: true });
+    };
+
+    window.addEventListener(SPY_MUTHUR_ARCHIVE_EVENT, onSpyMuthurArchive);
+    window.addEventListener(ESPIONAGE_FOCUS_CHAT_EVENT, onEspionageFocusChat);
+    return () => {
+      window.removeEventListener(SPY_MUTHUR_ARCHIVE_EVENT, onSpyMuthurArchive);
+      window.removeEventListener(ESPIONAGE_FOCUS_CHAT_EVENT, onEspionageFocusChat);
+    };
+  }, [archiveMuthurHistoryLine, pinMuthurChatToBottom]);
+
+  useEffect(() => {
     if (isStreaming && isAudioAllowed()) {
       if (networkFeedbackDelayRef.current == null) {
         networkFeedbackDelayRef.current = window.setTimeout(() => {
@@ -5337,7 +5365,7 @@ export default function CyberdeckApp() {
 
   const handleSend = async (
     messageText?: string,
-    options?: { preserveSelectedSurface?: boolean },
+    options?: { preserveSelectedSurface?: boolean; espionageMission?: boolean },
   ) => {
     const userMessage = (messageText ?? messageInputRef.current?.getValue() ?? "").trim();
     if (!userMessage) return;
@@ -6199,6 +6227,9 @@ ${diff}`;
           ...(toolsTrace ? { toolTrace: toolsTrace } : {}),
         },
       ]);
+      if (options?.espionageMission && cleanedText.trim()) {
+        appendEspionageChatMessage({ role: "assistant", text: cleanedText });
+      }
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
       persistMuthurShipMemoryTurn(userMessage, cleanedText || fullText);
 
@@ -6608,15 +6639,19 @@ ${diff}`;
       });
       setOperatorSurfaceMode("workspace");
       setOperatorDocMode("edit");
+      const missionLine = `ESPIONAGE // ${ESPIONAGE_ECHO_DISPLAY} capture → ${ESPIONAGE_MIRAGE_DISPLAY} // mission ${detail.missionId.slice(0, 8)}…`;
       setMessages((prev) => [
         ...prev,
         {
           role: "system",
-          text: `ESPIONAGE // ${ESPIONAGE_ECHO_DISPLAY} capture → ${ESPIONAGE_MIRAGE_DISPLAY} // mission ${detail.missionId.slice(0, 8)}…`,
+          text: missionLine,
         },
       ]);
+      appendEspionageChatMessage({ role: "system", text: missionLine });
+      appendEspionageChatMessage({ role: "user", text: detail.prompt });
       const prompt = `${detail.prompt}\n\n[System: ${ESPIONAGE_ECHO_DISPLAY} screenshot is in the operator image preview. Use observe_operator_pane (surface operator) to inspect it before answering.]`;
-      void handleSend(prompt, { preserveSelectedSurface: true });
+      notifyEspionageFocusChat();
+      void handleSend(prompt, { preserveSelectedSurface: true, espionageMission: true });
     };
     const handlePowerFistPush = (event: Event) => {
       event.preventDefault();

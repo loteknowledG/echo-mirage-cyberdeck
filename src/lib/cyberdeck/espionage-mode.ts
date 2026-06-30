@@ -17,6 +17,9 @@ export const ESPIONAGE_ROLE_MIRAGE: EspionageNodeRole = "mirage";
 export const ESPIONAGE_ECHO_NODE_LABEL = "echo";
 export const ESPIONAGE_MIRAGE_NODE_LABEL = "mirage";
 export const ESPIONAGE_POWERFIST_LABEL = "powerfist";
+export const ESPIONAGE_POWERFIST_DISPLAY = "POWERFIST";
+/** Shown in team status — role hint, not a rename. */
+export const ESPIONAGE_POWERFIST_HINT = "phone";
 
 export const ESPIONAGE_MODE_TITLE = "ESPIONAGE MODE";
 export const ESPIONAGE_MODE_SHORT = "Espionage";

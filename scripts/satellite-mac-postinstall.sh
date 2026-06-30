@@ -1,14 +1,28 @@
 #!/bin/bash
-# pkg postinstall — clear download quarantine only. Never ad-hoc re-sign a notarized app.
-set -e
-APP="/Applications/Echo Satellite.app"
-if [ ! -d "$APP" ]; then
-  echo "Echo Satellite.app not found at $APP"
-  exit 1
+# pkg postinstall — clear quarantine. Must never fail the installer (exit 0 always).
+
+APP=""
+for candidate in \
+  "/Applications/Echo Satellite.app" \
+  "${HOME}/Applications/Echo Satellite.app" \
+  "${2:-}/Applications/Echo Satellite.app"; do
+  if [ -d "$candidate" ]; then
+    APP="$candidate"
+    break
+  fi
+done
+
+if [ -z "$APP" ]; then
+  echo "Echo Satellite postinstall: app bundle not found at expected paths (install may still be OK)."
+  exit 0
 fi
-xattr -cr "$APP" 2>/dev/null || true
+
+xattr -dr com.apple.quarantine "$APP" 2>/dev/null || xattr -cr "$APP" 2>/dev/null || true
+
 if codesign --verify --deep --strict --verbose=0 "$APP" 2>/dev/null; then
   echo "Echo Satellite installed (signature verified) at $APP"
 else
-  echo "Echo Satellite installed at $APP (unsigned build — right-click → Open once if macOS blocks launch)"
+  echo "Echo Satellite installed at $APP"
 fi
+
+exit 0

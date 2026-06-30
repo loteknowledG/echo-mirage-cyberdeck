@@ -34,6 +34,20 @@ impl Default for WsRuntimeStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CaptureMirageLink {
+    pub host: String,
+    pub port: u16,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SpyMirageLink {
+    pub node_id: String,
+    pub paired_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SatelliteStatus {
     pub armed: bool,
     pub ws_status: WsRuntimeStatus,
@@ -42,6 +56,9 @@ pub struct SatelliteStatus {
     pub last_error: Option<String>,
     pub last_mission_id: Option<String>,
     pub missions_handled: u64,
+    pub spy_mirages: Vec<SpyMirageLink>,
+    pub spy_links_reachable: bool,
+    pub capture_mirage: Option<CaptureMirageLink>,
 }
 
 pub fn config_path(app: &AppHandle) -> Result<PathBuf, String> {

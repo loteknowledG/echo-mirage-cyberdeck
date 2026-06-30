@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import {
@@ -12,6 +12,10 @@ import {
   ESPIONAGE_POWERFIST_TAGLINE,
   getOrCreateEspionageNodeId,
 } from "@/lib/cyberdeck/espionage-mode";
+import {
+  formatEspionageMiragePowerfistLinkedLine,
+  notifySpyMuthurArchive,
+} from "@/lib/cyberdeck/espionage-chat";
 import {
   createPowerfistCaptureQrSession,
   createPowerfistQrSession,
@@ -44,6 +48,13 @@ export function EspionageMirageHubPanel(props: {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const prevPairedDeviceRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!pairedDeviceId || pairedDeviceId === prevPairedDeviceRef.current) return;
+    prevPairedDeviceRef.current = pairedDeviceId;
+    notifySpyMuthurArchive(formatEspionageMiragePowerfistLinkedLine(pairedDeviceId));
+  }, [pairedDeviceId]);
 
   useEffect(() => {
     setNodeId(getOrCreateEspionageNodeId());

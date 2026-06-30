@@ -4,6 +4,18 @@ export function satelliteReleaseNotes(version) {
 
 Minimal capture drone for the **Echo** screenshot machine — tray on Windows, small window on Mac. Screenshots fire only when PowerFist signals Mirage.
 
+### What's new in ${version}
+
+- **Mirage pairing feedback** — Pair with ECHO shows searching, linked, or error; Satellite updates linked Mirages immediately
+- **6-digit Spy pairing codes in the app** — Mirage/PowerFist enter PIN only; no URL paste for team link
+- **Test capture preview** — Test silent capture now shows a thumbnail of what was captured
+- **Test capture no longer hangs** — 20s timeout with a clear error if Screen Recording needs re-grant after upgrade
+- **macOS PKG install fix** — installer no longer fails at Summary when upgrading over a running Echo Satellite
+- **Check for updates** in the app — one-click download and install from GitHub releases
+- Automatic update check on startup when a newer Satellite build exists
+- **Code-only pairing** — Mirage/PowerFist enter the 6-digit PIN; browser finds Echo on Wi‑Fi (no IP typing)
+- **Linked Mirages** on the Status panel — Spy team connections plus capture relay hub
+
 ### macOS (Apple Silicon)
 
 1. Download **Echo-Satellite_${version}_aarch64.pkg**

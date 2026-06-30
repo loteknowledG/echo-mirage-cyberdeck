@@ -2,10 +2,30 @@ import http from "node:http";
 import { URL } from "node:url";
 import { completeCapturePair } from "./pair.mjs";
 import { DEFAULT_PAIR_HTTP_PORT } from "./config.mjs";
+import {
+  completeSpyPairEnterByPin,
+  getEchoSpyPairingStatus,
+  refreshEchoSpyPairCodes,
+} from "./spy-echo-pairing.mjs";
 import * as logger from "./logger.mjs";
 
+function applyCors(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+async function readJsonBody(req) {
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+  if (chunks.length === 0) return {};
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
 /**
- * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void }} options
+ * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void, onSpyPaired?: () => void, getSpyStatus?: () => object }} options
  */
 export function startPairServer(options) {
   const port = options.port ?? DEFAULT_PAIR_HTTP_PORT;
@@ -16,12 +36,59 @@ export function startPairServer(options) {
 
   async function handleRequest(req, res) {
     try {
+      applyCors(res);
+
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
       const host = req.headers.host ?? `127.0.0.1:${port}`;
       const url = new URL(req.url ?? "/", `http://${host}`);
 
       if (url.pathname === "/health") {
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("ok");
+        return;
+      }
+
+      if (url.pathname === "/spy/status" && req.method === "GET") {
+        const status = options.getSpyStatus?.() ?? { ok: false, reason: "status unavailable" };
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(status));
+        return;
+      }
+
+      if (url.pathname === "/api/spy/echo/codes" && req.method === "GET") {
+        const status = await getEchoSpyPairingStatus();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, source: "echo-satellite", ...status }));
+        return;
+      }
+
+      if (url.pathname === "/api/spy/echo/codes" && req.method === "POST") {
+        await refreshEchoSpyPairCodes();
+        const status = await getEchoSpyPairingStatus();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, source: "echo-satellite", ...status }));
+        return;
+      }
+
+      if (url.pathname === "/api/spy/pair/enter" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        logger.log("pair-server: Spy PIN enter");
+        const result = await completeSpyPairEnterByPin({
+          pin: String(body.pin ?? ""),
+          role: body.role === "powerfist" ? "powerfist" : "mirage",
+          nodeId: typeof body.nodeId === "string" ? body.nodeId : undefined,
+          deviceId: typeof body.deviceId === "string" ? body.deviceId : undefined,
+        });
+        if (result.ok) {
+          options.onSpyPaired?.();
+        }
+        res.writeHead(result.ok ? 200 : 403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
         return;
       }
 

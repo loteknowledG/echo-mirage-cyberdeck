@@ -10,6 +10,11 @@ import {
   ESPIONAGE_POWERFIST_TAGLINE,
 } from "@/lib/cyberdeck/espionage-mode";
 import { useSpyEchoLinkWatch } from "@/lib/cyberdeck/spy-echo-link-watch";
+import { notifySpyTeamStatusChanged } from "@/lib/cyberdeck/spy-team-status";
+import {
+  formatEspionageEchoPowerfistLinkedLine,
+  notifySpyMuthurArchive,
+} from "@/lib/cyberdeck/espionage-chat";
 import { saveSpyPowerfistPairCredentials } from "@/lib/cyberdeck/spy-pairing-client";
 
 export function SpyPowerfistPane() {
@@ -36,6 +41,8 @@ export function SpyPowerfistPane() {
       };
       saveSpyPowerfistPairCredentials(creds);
       resetLinkWatch();
+      notifySpyTeamStatusChanged();
+      notifySpyMuthurArchive(formatEspionageEchoPowerfistLinkedLine(result.echoHost));
       setStatus(`Paired with ${ESPIONAGE_ECHO_DISPLAY} at ${result.echoHost}.`);
     },
     [resetLinkWatch],
@@ -60,8 +67,8 @@ export function SpyPowerfistPane() {
       </div>
 
       <p className="text-[9px] leading-relaxed text-[#5f5f5f]">
-        On your phone: enter the Echo LAN address and 6-digit code from {ESPIONAGE_ECHO_DISPLAY} Spy →{" "}
-        {ESPIONAGE_ECHO_DISPLAY} (CODE FOR {ESPIONAGE_POWERFIST_LABEL}).
+        Enter the 6-digit code from {ESPIONAGE_ECHO_DISPLAY} (CODE FOR {ESPIONAGE_POWERFIST_LABEL}). PowerFist
+        finds Echo on your LAN automatically — use Advanced only if auto-detect fails.
       </p>
 
       {paired && !terminated ? (

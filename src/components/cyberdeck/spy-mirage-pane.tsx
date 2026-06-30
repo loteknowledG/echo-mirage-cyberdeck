@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { EspionageMirageHubPanel } from "@/components/cyberdeck/espionage-mirage-hub-panel";
+import { EspionageSolutionsPanel } from "@/components/cyberdeck/espionage-solutions-panel";
 import { SpyPairPinForm } from "@/components/cyberdeck/spy-pair-pin-form";
 import {
   ECHO_SPY_TERMINATED_MESSAGE,
@@ -11,6 +12,14 @@ import {
   ESPIONAGE_MODE_TITLE,
 } from "@/lib/cyberdeck/espionage-mode";
 import { useSpyEchoLinkWatch } from "@/lib/cyberdeck/spy-echo-link-watch";
+import { notifySpyTeamStatusChanged } from "@/lib/cyberdeck/spy-team-status";
+import {
+  formatEspionageEchoMirageLinkedLine,
+  formatEspionageSolutionsReadyLine,
+  notifyEspionageFocusChat,
+  notifySpyMuthurArchive,
+} from "@/lib/cyberdeck/espionage-chat";
+import { useSpyTeamStatus } from "@/lib/cyberdeck/use-spy-team-status";
 import {
   readSpyMiragePairCredentials,
   saveSpyMiragePairCredentials,
@@ -18,7 +27,9 @@ import {
 
 export function SpyMiragePane() {
   const { paired, terminated, terminatedMessage, resetLinkWatch } = useSpyEchoLinkWatch("mirage");
+  const team = useSpyTeamStatus();
   const [status, setStatus] = useState<string | null>(null);
+  const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
 
   const handlePaired = useCallback(
     (result: {
@@ -40,6 +51,10 @@ export function SpyMiragePane() {
       };
       saveSpyMiragePairCredentials(creds);
       resetLinkWatch();
+      notifySpyTeamStatusChanged();
+      notifySpyMuthurArchive(formatEspionageEchoMirageLinkedLine(result.echoHost));
+      notifySpyMuthurArchive(formatEspionageSolutionsReadyLine());
+      notifyEspionageFocusChat();
       setStatus(`Paired with ${ESPIONAGE_ECHO_DISPLAY} at ${result.echoHost}.`);
     },
     [resetLinkWatch],
@@ -64,8 +79,8 @@ export function SpyMiragePane() {
       </div>
 
       <p className="text-[9px] leading-relaxed text-[#5f5f5f]">
-        On the {ESPIONAGE_MIRAGE_DISPLAY} computer: enter the Echo LAN address and 6-digit code from{" "}
-        {ESPIONAGE_ECHO_DISPLAY} Spy → {ESPIONAGE_ECHO_DISPLAY} (CODE FOR {ESPIONAGE_MIRAGE_DISPLAY}).
+        Enter the 6-digit code only — Mirage finds Echo on your Wi‑Fi automatically. No IP needed unless
+        auto-detect fails (use Advanced).
       </p>
 
       {paired && !terminated ? (
@@ -87,6 +102,12 @@ export function SpyMiragePane() {
       />
 
       {status ? <p className="text-emerald-300/80">{status}</p> : null}
+
+      {mirageLinked ? (
+        <div className="border-t border-[#1c1c1c] pt-4">
+          <EspionageSolutionsPanel />
+        </div>
+      ) : null}
 
       <div className="border-t border-[#1c1c1c] pt-4">
         <EspionageMirageHubPanel

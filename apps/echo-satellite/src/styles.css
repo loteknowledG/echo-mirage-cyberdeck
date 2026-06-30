@@ -160,6 +160,16 @@ button:hover {
   color: #c08080;
 }
 
+.mirage-list {
+  white-space: pre-line;
+  line-height: 1.45;
+  color: #9fd89f;
+}
+
+.mirage-list.empty {
+  color: #6a6a6a;
+}
+
 .diagnostics-card .log-tail {
   margin: 0.75rem 0 0;
   padding: 0.65rem;

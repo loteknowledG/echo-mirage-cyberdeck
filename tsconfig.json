@@ -41,6 +41,7 @@
   "exclude": [
     "node_modules",
     "apps/echo-satellite",
+    "apps/echo-satellite-electron",
     ".history",
     ".memory",
     ".atlas",

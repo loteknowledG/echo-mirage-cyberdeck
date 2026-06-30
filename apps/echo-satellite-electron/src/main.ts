@@ -1,5 +1,15 @@
 type WsRuntimeStatus = "disconnected" | "connecting" | "connected" | "error";
 
+type SpyMirageLink = {
+  nodeId: string;
+  pairedAt: string;
+};
+
+type CaptureMirageLink = {
+  host: string;
+  port: number;
+};
+
 type SatelliteStatus = {
   armed: boolean;
   wsStatus: WsRuntimeStatus;
@@ -7,6 +17,9 @@ type SatelliteStatus = {
   lastError?: string | null;
   lastMissionId?: string | null;
   missionsHandled: number;
+  spyMirages: SpyMirageLink[];
+  spyLinksReachable: boolean;
+  captureMirage: CaptureMirageLink | null;
 };
 
 type TestCaptureResult = {
@@ -14,6 +27,7 @@ type TestCaptureResult = {
   width?: number;
   height?: number;
   pngBytes?: number;
+  pngBase64?: string;
   error?: string;
 };
 
@@ -22,7 +36,7 @@ type PairResult = {
   reason?: string;
 };
 
-type PermissionStatus = {
+type SatellitePermissionStatus = {
   platform: string;
   screenRecording: boolean;
   hint?: string | null;
@@ -39,16 +53,49 @@ type DiagnosticsReport = {
   supportHint: string;
 };
 
+type UpdateCheckResult =
+  | {
+      ok: true;
+      currentVersion: string;
+      latestVersion: string;
+      updateAvailable: boolean;
+      releaseUrl: string;
+      downloadUrl: string | null;
+      fileName: string | null;
+      reason?: string | null;
+    }
+  | { ok: false; reason: string };
+
+type SpyCodes = {
+  ok: true;
+  echoHost: string;
+  httpPort: number;
+  miragePin: string | null;
+  powerfistPin: string | null;
+  mirageExpiresAt: string | null;
+  powerfistExpiresAt: string | null;
+  pairedMirages: SpyMirageLink[];
+};
+
 type SatelliteApi = {
   getStatus: () => Promise<SatelliteStatus>;
+  getSpyCodes: () => Promise<SpyCodes | { ok: false; reason: string }>;
+  regenerateSpyCodes: () => Promise<SpyCodes | { ok: false; reason: string }>;
   pairFromUrl: (capturePairUrl: string) => Promise<PairResult>;
   testCapture: () => Promise<TestCaptureResult>;
   disarm: () => Promise<SatelliteStatus>;
   hideToTray: () => Promise<void>;
-  checkPermissions: () => Promise<PermissionStatus>;
+  checkPermissions: () => Promise<SatellitePermissionStatus>;
   openScreenRecordingSettings: () => Promise<void>;
   getDiagnostics: () => Promise<DiagnosticsReport>;
+  checkForUpdates: () => Promise<UpdateCheckResult>;
+  downloadAndInstallUpdate: (input: {
+    downloadUrl: string;
+    fileName: string;
+  }) => Promise<{ ok: true; message: string; quitApp?: boolean } | { ok: false; reason: string }>;
   onDisarm: (handler: () => void) => () => void;
+  onStatusChanged: (handler: () => void) => () => void;
+  onUpdateAvailable: (handler: (result: UpdateCheckResult) => void) => () => void;
 };
 
 declare global {
@@ -59,19 +106,66 @@ declare global {
 
 const api = window.satellite;
 
-const pairPortEl = document.querySelector<HTMLElement>("#pair-port")!;
+const echoLanEl = document.querySelector<HTMLElement>("#echo-lan")!;
+const miragePinEl = document.querySelector<HTMLElement>("#mirage-pin")!;
+const powerfistPinEl = document.querySelector<HTMLElement>("#powerfist-pin")!;
+const miragePinExpiryEl = document.querySelector<HTMLElement>("#mirage-pin-expiry")!;
+const powerfistPinExpiryEl = document.querySelector<HTMLElement>("#powerfist-pin-expiry")!;
+const regenerateCodesBtn = document.querySelector<HTMLButtonElement>("#regenerate-codes")!;
 const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
+const capturePreviewEl = document.querySelector<HTMLImageElement>("#capture-preview")!;
 const permissionResultEl = document.querySelector<HTMLElement>("#permission-result")!;
 const openScreenSettingsBtn = document.querySelector<HTMLButtonElement>("#open-screen-settings")!;
 const statusArmedEl = document.querySelector<HTMLElement>("#status-armed")!;
 const statusWsEl = document.querySelector<HTMLElement>("#status-ws")!;
 const statusMissionsEl = document.querySelector<HTMLElement>("#status-missions")!;
+const statusMiragesEl = document.querySelector<HTMLElement>("#status-mirages")!;
 const statusErrorEl = document.querySelector<HTMLElement>("#status-error")!;
 const diagHintEl = document.querySelector<HTMLElement>("#diag-hint")!;
 const diagVersionEl = document.querySelector<HTMLElement>("#diag-version")!;
 const diagModeEl = document.querySelector<HTMLElement>("#diag-mode")!;
 const diagLogPathEl = document.querySelector<HTMLElement>("#diag-log-path")!;
 const diagLogTailEl = document.querySelector<HTMLElement>("#diag-log-tail")!;
+const updateStatusEl = document.querySelector<HTMLElement>("#update-status")!;
+const checkUpdatesBtn = document.querySelector<HTMLButtonElement>("#check-updates")!;
+const installUpdateBtn = document.querySelector<HTMLButtonElement>("#install-update")!;
+
+let pendingUpdate: Extract<UpdateCheckResult, { ok: true }> | null = null;
+
+function renderUpdateStatus(result: UpdateCheckResult): void {
+  if (!result.ok) {
+    updateStatusEl.textContent = result.reason;
+    installUpdateBtn.classList.add("hidden");
+    pendingUpdate = null;
+    return;
+  }
+
+  pendingUpdate = result.updateAvailable && result.downloadUrl && result.fileName ? result : null;
+
+  if (result.updateAvailable) {
+    updateStatusEl.textContent = result.reason
+      ? `Update ${result.latestVersion} available — ${result.reason}`
+      : `Update available: v${result.latestVersion} (you have v${result.currentVersion}).`;
+    if (pendingUpdate) {
+      installUpdateBtn.classList.remove("hidden");
+    } else {
+      installUpdateBtn.classList.add("hidden");
+    }
+    return;
+  }
+
+  updateStatusEl.textContent = `Up to date — v${result.currentVersion}.`;
+  installUpdateBtn.classList.add("hidden");
+  pendingUpdate = null;
+}
+
+async function refreshUpdateCheck(): Promise<void> {
+  checkUpdatesBtn.disabled = true;
+  updateStatusEl.textContent = "Checking for updates…";
+  const result = await api.checkForUpdates();
+  renderUpdateStatus(result);
+  checkUpdatesBtn.disabled = false;
+}
 
 function formatDiagnostics(report: DiagnosticsReport): string {
   return [
@@ -97,6 +191,33 @@ async function refreshDiagnostics(): Promise<DiagnosticsReport> {
   return report;
 }
 
+function formatCodeExpiry(expiresAt: string | null): string {
+  if (!expiresAt) return "—";
+  const ms = Date.parse(expiresAt) - Date.now();
+  if (ms <= 0) return "expired";
+  const minutes = Math.ceil(ms / 60_000);
+  return `${minutes}m`;
+}
+
+function renderSpyCodes(codes: SpyCodes): void {
+  echoLanEl.textContent = `Echo on LAN · ${codes.echoHost}:${codes.httpPort}`;
+  miragePinEl.textContent = codes.miragePin ?? "———";
+  powerfistPinEl.textContent = codes.powerfistPin ?? "———";
+  miragePinExpiryEl.textContent = codes.miragePin
+    ? `expires in ${formatCodeExpiry(codes.mirageExpiresAt)}`
+    : "No active code — tap New codes";
+  powerfistPinExpiryEl.textContent = codes.powerfistPin
+    ? `expires in ${formatCodeExpiry(codes.powerfistExpiresAt)}`
+    : "No active code — tap New codes";
+}
+
+async function refreshSpyCodes(): Promise<void> {
+  const codes = await api.getSpyCodes();
+  if (codes.ok) {
+    renderSpyCodes(codes);
+  }
+}
+
 async function refreshPermissions(): Promise<void> {
   const perm = await api.checkPermissions();
   if (perm.screenRecording) {
@@ -111,24 +232,56 @@ async function refreshPermissions(): Promise<void> {
   }
 }
 
+function formatLinkedMirages(status: SatelliteStatus): string {
+  const lines: string[] = [];
+  for (const mirage of status.spyMirages) {
+    lines.push(`${mirage.nodeId.slice(0, 8)}… (Spy team)`);
+  }
+  if (status.captureMirage) {
+    const armedSuffix = status.armed ? " · armed" : "";
+    lines.push(`${status.captureMirage.host}:${status.captureMirage.port} (Capture relay${armedSuffix})`);
+  }
+  if (lines.length === 0) {
+    return "No Mirage linked yet — enter a Spy code on Mirage";
+  }
+  return lines.join("\n");
+}
+
 async function refreshStatus(): Promise<void> {
   const status = await api.getStatus();
-  pairPortEl.textContent = String(status.pairHttpPort);
+  const mirageSummary = formatLinkedMirages(status);
   statusArmedEl.textContent = status.armed ? "ARMED" : "DISARMED";
+  statusMiragesEl.textContent = mirageSummary;
+  statusMiragesEl.classList.toggle("empty", mirageSummary.includes("No Mirage linked"));
   statusWsEl.textContent = status.wsStatus.toUpperCase();
   statusMissionsEl.textContent = String(status.missionsHandled);
   statusErrorEl.textContent = status.lastError?.trim() || "—";
 }
 
 document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("click", async () => {
+  const testCaptureBtn = document.querySelector<HTMLButtonElement>("#test-capture")!;
+  testCaptureBtn.disabled = true;
   captureResultEl.textContent = "Capturing…";
-  const result = await api.testCapture();
-  if (result.ok) {
-    captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"} · ~${result.pngBytes ?? 0} b64 chars`;
-  } else {
-    captureResultEl.textContent = result.error ?? "Capture failed";
+  capturePreviewEl.classList.add("hidden");
+  capturePreviewEl.removeAttribute("src");
+  try {
+    const result = await api.testCapture();
+    if (result.ok) {
+      captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"} · ~${result.pngBytes ?? 0} b64 chars`;
+      if (result.pngBase64) {
+        capturePreviewEl.src = `data:image/png;base64,${result.pngBase64}`;
+        capturePreviewEl.classList.remove("hidden");
+      }
+    } else {
+      captureResultEl.textContent = result.error ?? "Capture failed";
+    }
+  } catch (error) {
+    captureResultEl.textContent =
+      error instanceof Error ? error.message : "Capture failed — quit and reopen Echo Satellite.";
+  } finally {
+    testCaptureBtn.disabled = false;
+    await refreshPermissions();
   }
-  await refreshPermissions();
 });
 
 openScreenSettingsBtn.addEventListener("click", async () => {
@@ -138,17 +291,53 @@ openScreenSettingsBtn.addEventListener("click", async () => {
 document.querySelector<HTMLButtonElement>("#pair-url-btn")!.addEventListener("click", async () => {
   const url = document.querySelector<HTMLTextAreaElement>("#pair-url")!.value.trim();
   if (!url) {
-    captureResultEl.textContent = "Paste the Mirage Echo QR URL first.";
+    captureResultEl.textContent = "Paste the Mirage Echo QR URL in Advanced first.";
     return;
   }
-  captureResultEl.textContent = "Pairing…";
+  captureResultEl.textContent = "Pairing capture relay…";
   const result = await api.pairFromUrl(url);
   if (result.ok) {
-    captureResultEl.textContent = "Paired and armed — hide to tray when ready.";
+    captureResultEl.textContent = "Capture relay armed — hide to tray when ready.";
     await refreshStatus();
   } else {
     captureResultEl.textContent = result.reason ?? "Pair failed";
   }
+});
+
+regenerateCodesBtn.addEventListener("click", async () => {
+  regenerateCodesBtn.disabled = true;
+  const codes = await api.regenerateSpyCodes();
+  if (codes.ok) {
+    renderSpyCodes(codes);
+  }
+  regenerateCodesBtn.disabled = false;
+  await refreshStatus();
+});
+
+document.querySelector<HTMLButtonElement>("#refresh-status")!.addEventListener("click", async () => {
+  await refreshStatus();
+});
+
+checkUpdatesBtn.addEventListener("click", async () => {
+  await refreshUpdateCheck();
+});
+
+installUpdateBtn.addEventListener("click", async () => {
+  if (!pendingUpdate?.downloadUrl || !pendingUpdate.fileName) return;
+  installUpdateBtn.disabled = true;
+  checkUpdatesBtn.disabled = true;
+  updateStatusEl.textContent = "Downloading update…";
+  const result = await api.downloadAndInstallUpdate({
+    downloadUrl: pendingUpdate.downloadUrl,
+    fileName: pendingUpdate.fileName,
+  });
+  if (!result.ok) {
+    updateStatusEl.textContent = result.reason;
+    installUpdateBtn.disabled = false;
+    checkUpdatesBtn.disabled = false;
+    return;
+  }
+  updateStatusEl.textContent = result.message;
 });
 
 document.querySelector<HTMLButtonElement>("#hide-tray")!.addEventListener("click", async () => {
@@ -179,9 +368,21 @@ api.onDisarm(() => {
   void refreshStatus();
 });
 
+api.onStatusChanged(() => {
+  void refreshStatus();
+  void refreshSpyCodes();
+});
+
+api.onUpdateAvailable((result) => {
+  renderUpdateStatus(result);
+});
+
 void refreshPermissions();
+void refreshSpyCodes();
 void refreshStatus();
 void refreshDiagnostics();
+void refreshUpdateCheck();
 window.setInterval(() => {
   void refreshStatus();
+  void refreshSpyCodes();
 }, 5000);
