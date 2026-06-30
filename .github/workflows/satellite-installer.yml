@@ -135,26 +135,30 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: pnpm build:mac
 
+      - name: Smoke test screen capture
+        working-directory: apps/echo-satellite-electron
+        run: node ../../scripts/smoke-test-satellite-capture.mjs
+
       - name: Smoke test macOS app launch
         run: |
           set -euo pipefail
-          APP="$(find apps/echo-satellite-electron/release -name 'Echo Satellite.app' | head -1)"
+          APP="$(find apps/echo-satellite-electron/release -name 'Echo-Satellite.app' | head -1)"
           if [ -z "$APP" ]; then
-            echo "Echo Satellite.app not found"
+            echo "Echo-Satellite.app not found"
             find apps/echo-satellite-electron/release -maxdepth 4 -type d
             exit 1
           fi
-          BIN="$APP/Contents/MacOS/Echo Satellite"
+          BIN="$APP/Contents/MacOS/Echo-Satellite"
           echo "Smoke test: launching $BIN"
           "$BIN" --disable-gpu &
           sleep 4
-          if pgrep -f "Echo Satellite" >/dev/null 2>&1; then
+          if pgrep -f "Echo-Satellite" >/dev/null 2>&1; then
             echo "PASS: Echo Satellite stayed running for 4s"
           else
             echo "FAIL: Echo Satellite exited within 4s"
             exit 1
           fi
-          pkill -f "Echo Satellite" 2>/dev/null || true
+          pkill -f "Echo-Satellite" 2>/dev/null || true
 
       - name: Build macOS PKG installer
         env:
