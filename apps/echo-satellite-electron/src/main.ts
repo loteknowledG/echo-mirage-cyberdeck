@@ -27,6 +27,7 @@ type TestCaptureResult = {
   width?: number;
   height?: number;
   pngBytes?: number;
+  previewDataUrl?: string;
   error?: string;
 };
 
@@ -77,6 +78,8 @@ const mirageExpiryEl = document.querySelector<HTMLElement>("#mirage-expiry")!;
 const powerfistExpiryEl = document.querySelector<HTMLElement>("#powerfist-expiry")!;
 const pairStatusEl = document.querySelector<HTMLElement>("#pair-status")!;
 const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
+const capturePreviewEl = document.querySelector<HTMLImageElement>("#capture-preview")!;
+const testCaptureBtn = document.querySelector<HTMLButtonElement>("#test-capture")!;
 const permissionResultEl = document.querySelector<HTMLElement>("#permission-result")!;
 const openScreenSettingsBtn = document.querySelector<HTMLButtonElement>("#open-screen-settings")!;
 const statusArmedEl = document.querySelector<HTMLElement>("#status-armed")!;
@@ -167,14 +170,28 @@ async function refreshStatus(): Promise<void> {
 }
 
 document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("click", async () => {
+  testCaptureBtn.disabled = true;
   captureResultEl.textContent = "Capturing…";
-  const result = await api.testCapture();
-  if (result.ok) {
-    captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"} · ~${result.pngBytes ?? 0} b64 chars`;
-  } else {
-    captureResultEl.textContent = result.error ?? "Capture failed";
+  capturePreviewEl.classList.add("hidden");
+  capturePreviewEl.removeAttribute("src");
+
+  try {
+    const result = await api.testCapture();
+    if (result.ok) {
+      captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"} — preview below`;
+      if (result.previewDataUrl) {
+        capturePreviewEl.src = result.previewDataUrl;
+        capturePreviewEl.classList.remove("hidden");
+      }
+    } else {
+      captureResultEl.textContent = result.error ?? "Capture failed";
+    }
+  } catch (error) {
+    captureResultEl.textContent = error instanceof Error ? error.message : "Capture failed";
+  } finally {
+    testCaptureBtn.disabled = false;
+    await refreshPermissions();
   }
-  await refreshPermissions();
 });
 
 openScreenSettingsBtn.addEventListener("click", async () => {

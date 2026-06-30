@@ -173,13 +173,31 @@ function registerIpc() {
 
   ipcMain.handle("satellite:test-capture", async () => {
     try {
+      if (process.platform === "darwin") {
+        const access = systemPreferences.getMediaAccessStatus("screen");
+        if (access !== "granted") {
+          return {
+            ok: false,
+            error:
+              access === "denied" || access === "restricted"
+                ? "Screen Recording denied. System Settings → Privacy & Security → Screen Recording → enable Echo Satellite, then quit and reopen the app."
+                : "Screen Recording not granted yet. Enable Echo Satellite in Screen Recording settings, then quit and reopen the app.",
+          };
+        }
+      }
+
       const pngBase64 = await capturePrimaryMonitorPngBase64();
       const dimensions = await capturePrimaryMonitorDimensions();
+      const pngBuffer = Buffer.from(pngBase64, "base64");
+      const preview = nativeImage.createFromBuffer(pngBuffer).resize({ width: 480 });
+      const previewBase64 = preview.toPNG().toString("base64");
+
       return {
         ok: true,
         width: dimensions?.width,
         height: dimensions?.height,
         pngBytes: pngBase64.length,
+        previewDataUrl: `data:image/png;base64,${previewBase64}`,
       };
     } catch (error) {
       return {

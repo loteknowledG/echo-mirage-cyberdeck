@@ -137,6 +137,17 @@ button:hover {
   color: #6a6a6a;
 }
 
+.capture-preview {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  margin-top: 0.65rem;
+  border: 1px solid #1c1c1c;
+  border-radius: 4px;
+  background: #000;
+}
+
 .hidden {
   display: none;
 }
