@@ -1,5 +1,6 @@
 #!/bin/bash
 # pkg postinstall — must NEVER exit non-zero or macOS marks the whole install failed.
+# Do NOT re-sign the app here: ad-hoc re-signing invalidates Screen Recording TCC entries.
 APP="/Applications/Echo-Satellite.app"
 LEGACY="/Applications/Echo Satellite.app"
 
@@ -8,12 +9,7 @@ for target in "$APP" "$LEGACY"; do
     continue
   fi
   xattr -cr "$target" 2>/dev/null || true
-  if codesign --verify --deep --strict "$target" 2>/dev/null; then
-    echo "Echo Satellite installed (signed) at $target"
-  else
-    codesign --force --deep --sign - "$target" 2>/dev/null || true
-    echo "Echo Satellite installed (ad-hoc signed) at $target"
-  fi
+  echo "Echo Satellite installed at $target (quarantine cleared; signature unchanged for TCC)"
   exit 0
 done
 

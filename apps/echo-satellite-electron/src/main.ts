@@ -30,12 +30,16 @@ type TestCaptureResult = {
   previewBase64?: string;
   captureSource?: string;
   captureNote?: string;
+  stale?: boolean;
   error?: string;
 };
 
 type PermissionStatus = {
   platform: string;
   screenRecording: boolean;
+  stale?: boolean;
+  electronStatus?: string;
+  preflight?: boolean;
   hint?: string | null;
 };
 
@@ -59,6 +63,7 @@ type SatelliteApi = {
   disarm: () => Promise<SatelliteStatus>;
   hideToTray: () => Promise<void>;
   checkPermissions: () => Promise<PermissionStatus>;
+  requestScreenPermission: () => Promise<PermissionStatus>;
   openScreenRecordingSettings: () => Promise<void>;
   getDiagnostics: () => Promise<DiagnosticsReport>;
   onDisarm: (handler: () => void) => () => void;
@@ -84,6 +89,7 @@ const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
 const capturePreviewEl = document.querySelector<HTMLImageElement>("#capture-preview")!;
 const testCaptureBtn = document.querySelector<HTMLButtonElement>("#test-capture")!;
 const permissionResultEl = document.querySelector<HTMLElement>("#permission-result")!;
+const fixPermissionBtn = document.querySelector<HTMLButtonElement>("#fix-permission")!;
 const openScreenSettingsBtn = document.querySelector<HTMLButtonElement>("#open-screen-settings")!;
 const statusArmedEl = document.querySelector<HTMLElement>("#status-armed")!;
 const statusWsEl = document.querySelector<HTMLElement>("#status-ws")!;
@@ -155,15 +161,28 @@ async function refreshDiagnostics(): Promise<DiagnosticsReport> {
 
 async function refreshPermissions(): Promise<void> {
   permissionResultEl.textContent = "Checking Screen Recording…";
+  permissionResultEl.classList.remove("warn");
   const perm = await api.checkPermissions();
+  fixPermissionBtn.classList.remove("show");
+  openScreenSettingsBtn.classList.remove("show");
+
   if (perm.screenRecording) {
-    permissionResultEl.textContent = "Screen Recording: granted";
-    openScreenSettingsBtn.classList.remove("show");
-  } else {
-    permissionResultEl.textContent = perm.hint ?? "Screen Recording not granted — required before missions.";
-    if (perm.platform === "macos") {
-      openScreenSettingsBtn.classList.add("show");
-    }
+    permissionResultEl.textContent = "Screen Recording: working (full desktop capture OK)";
+    return;
+  }
+
+  permissionResultEl.classList.add("warn");
+  if (perm.stale) {
+    permissionResultEl.textContent = `Re-enable required: ${perm.hint ?? "Toggle Echo-Satellite OFF then ON in System Settings."}`;
+    fixPermissionBtn.classList.add("show");
+    openScreenSettingsBtn.classList.add("show");
+    return;
+  }
+
+  permissionResultEl.textContent = perm.hint ?? "Screen Recording not granted — required before missions.";
+  if (perm.platform === "macos") {
+    fixPermissionBtn.classList.add("show");
+    openScreenSettingsBtn.classList.add("show");
   }
 }
 
@@ -178,6 +197,7 @@ async function refreshStatus(): Promise<void> {
 document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("click", async () => {
   testCaptureBtn.disabled = true;
   captureResultEl.textContent = "Capturing…";
+  captureResultEl.classList.remove("warn");
   capturePreviewEl.classList.add("hidden");
   capturePreviewEl.removeAttribute("src");
 
@@ -199,6 +219,11 @@ document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("cl
       }
     } else {
       captureResultEl.textContent = result.error ?? "Capture failed";
+      captureResultEl.classList.add("warn");
+      if (result.stale) {
+        fixPermissionBtn.classList.add("show");
+        openScreenSettingsBtn.classList.add("show");
+      }
     }
   } catch (error) {
     captureResultEl.textContent = error instanceof Error ? error.message : "Capture failed";
@@ -210,6 +235,13 @@ document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("cl
 
 openScreenSettingsBtn.addEventListener("click", async () => {
   await api.openScreenRecordingSettings();
+});
+
+fixPermissionBtn.addEventListener("click", async () => {
+  permissionResultEl.textContent = "Opening permission prompt… toggle OFF then ON if needed.";
+  await api.openScreenRecordingSettings();
+  await api.requestScreenPermission();
+  await refreshPermissions();
 });
 
 document.querySelector<HTMLButtonElement>("#new-codes-btn")!.addEventListener("click", async () => {

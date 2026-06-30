@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("satellite", {
   disarm: () => ipcRenderer.invoke("satellite:disarm"),
   hideToTray: () => ipcRenderer.invoke("satellite:hide-to-tray"),
   checkPermissions: () => ipcRenderer.invoke("satellite:check-permissions"),
+  requestScreenPermission: () => ipcRenderer.invoke("satellite:request-screen-permission"),
   openScreenRecordingSettings: () => ipcRenderer.invoke("satellite:open-screen-settings"),
   getDiagnostics: () => ipcRenderer.invoke("satellite:get-diagnostics"),
   onDisarm: (handler) => {

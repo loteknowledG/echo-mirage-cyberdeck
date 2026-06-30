@@ -29,7 +29,7 @@ import { startPairServer } from "./pair-server.mjs";
 import { createSpyPairing } from "./spy-pairing.mjs";
 import { startWsClient } from "./ws-client.mjs";
 import { createTrayManager } from "./tray.mjs";
-import { checkScreenRecordingAccess, warmElectronScreenCapture } from "./screen-permission.mjs";
+import { checkScreenRecordingAccess, requestScreenRecordingAccess, warmElectronScreenCapture } from "./screen-permission.mjs";
 import * as logger from "./logger.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -197,6 +197,14 @@ function registerIpc() {
     try {
       if (process.platform === "darwin") {
         await warmElectronScreenCapture();
+        const access = await checkScreenRecordingAccess({ probe: true });
+        if (!access.screenRecording) {
+          return {
+            ok: false,
+            error: access.hint ?? "Screen Recording not working.",
+            stale: access.stale,
+          };
+        }
       }
 
       const capture = await capturePrimaryMonitorPng();
@@ -204,6 +212,19 @@ function registerIpc() {
       const captureNote = getLastCaptureNote();
       if (captureNote) {
         logger.log(`capture: ${captureNote}`);
+      }
+
+      if (process.platform === "darwin" && capture.captureSource === "node-screenshots") {
+        const access = await checkScreenRecordingAccess({ probe: true });
+        return {
+          ok: false,
+          error:
+            access.hint ??
+            "Full desktop capture failed — only partial preview available. Re-enable Screen Recording.",
+          stale: access.stale,
+          captureSource: capture.captureSource,
+          captureNote: captureNote ?? undefined,
+        };
       }
 
       return {
@@ -241,10 +262,25 @@ function registerIpc() {
       return {
         platform: "macos",
         screenRecording: access.screenRecording,
+        stale: access.stale,
+        electronStatus: access.electronStatus,
+        preflight: access.preflight,
         hint: access.hint,
       };
     }
-    return { platform: process.platform, screenRecording: true, hint: null };
+    return { platform: process.platform, screenRecording: true, stale: false, hint: null };
+  });
+
+  ipcMain.handle("satellite:request-screen-permission", async () => {
+    if (process.platform !== "darwin") {
+      return { screenRecording: true, stale: false, hint: null };
+    }
+    const access = await requestScreenRecordingAccess();
+    return {
+      screenRecording: access.screenRecording,
+      stale: access.stale,
+      hint: access.hint,
+    };
   });
 
   ipcMain.handle("satellite:open-screen-settings", async () => {

@@ -1,7 +1,11 @@
 import { desktopCapturer, systemPreferences } from "electron";
-import { capturePrimaryMonitorPngBase64, withCaptureTimeout } from "./capture.mjs";
-
-const PROBE_TIMEOUT_MS = 8_000;
+import { probeMacFullDesktopCapture } from "./capture-screencapture.mjs";
+import {
+  cgPreflightScreenCaptureAccess,
+  cgRequestScreenCaptureAccess,
+  SCREEN_RECORDING_HINT,
+  STALE_SCREEN_RECORDING_HINT,
+} from "./screen-permission-mac.mjs";
 
 /** @returns {"not-determined"|"granted"|"denied"|"restricted"|"unknown"|"unsupported"} */
 export function getElectronScreenAccessStatus() {
@@ -20,70 +24,98 @@ export async function warmElectronScreenCapture() {
     await desktopCapturer.getSources({
       types: ["screen"],
       thumbnailSize: { width: 1, height: 1 },
+      fetchWindowIcons: false,
     });
   } catch {
     /* optional warm-up */
   }
 }
 
-/** True when node-screenshots can grab a non-empty frame (authoritative on Mac). */
-export async function probeNativeScreenCapture() {
-  const pngBase64 = await withCaptureTimeout(
-    capturePrimaryMonitorPngBase64(),
-    PROBE_TIMEOUT_MS,
-    "Screen capture timed out. Toggle Echo-Satellite OFF then ON in Screen Recording, quit the app (Cmd+Q), and reopen.",
-  );
-  return pngBase64.length > 0;
-}
-
 /**
- * @returns {Promise<{ screenRecording: boolean, electronStatus: string, hint: string | null }>}
+ * @returns {Promise<{
+ *   screenRecording: boolean,
+ *   electronStatus: string,
+ *   preflight: boolean,
+ *   stale: boolean,
+ *   hint: string | null
+ * }>}
  */
 export async function checkScreenRecordingAccess(options = {}) {
   const { probe = true } = options;
 
   if (process.platform !== "darwin") {
-    return { screenRecording: true, electronStatus: "unsupported", hint: null };
-  }
-
-  const electronStatus = getElectronScreenAccessStatus();
-  if (electronStatus === "granted") {
-    return { screenRecording: true, electronStatus, hint: null };
-  }
-
-  if (!probe) {
     return {
-      screenRecording: false,
-      electronStatus,
-      hint: macScreenRecordingHint(electronStatus),
+      screenRecording: true,
+      electronStatus: "unsupported",
+      preflight: true,
+      stale: false,
+      hint: null,
     };
   }
 
-  try {
-    await warmElectronScreenCapture();
-    const works = await probeNativeScreenCapture();
-    if (works) {
-      return { screenRecording: true, electronStatus, hint: null };
-    }
-  } catch (error) {
+  const electronStatus = getElectronScreenAccessStatus();
+  const preflight = await cgPreflightScreenCaptureAccess();
+
+  if (!probe) {
+    const looksGranted = electronStatus === "granted" || preflight;
+    return {
+      screenRecording: looksGranted,
+      electronStatus,
+      preflight,
+      stale: false,
+      hint: looksGranted ? null : macScreenRecordingHint(electronStatus),
+    };
+  }
+
+  await warmElectronScreenCapture();
+  const fullProbe = await probeMacFullDesktopCapture();
+  if (fullProbe.ok) {
+    return {
+      screenRecording: true,
+      electronStatus,
+      preflight,
+      stale: false,
+      hint: null,
+    };
+  }
+
+  const looksGranted = electronStatus === "granted" || preflight;
+  if (looksGranted) {
     return {
       screenRecording: false,
       electronStatus,
-      hint: error instanceof Error ? error.message : macScreenRecordingHint(electronStatus),
+      preflight,
+      stale: true,
+      hint: STALE_SCREEN_RECORDING_HINT,
     };
   }
 
   return {
     screenRecording: false,
     electronStatus,
-    hint: macScreenRecordingHint(electronStatus),
+    preflight,
+    stale: false,
+    hint: fullProbe.error ?? macScreenRecordingHint(electronStatus),
   };
+}
+
+/** Prompt macOS screen-recording dialog and re-probe. */
+export async function requestScreenRecordingAccess() {
+  if (process.platform !== "darwin") {
+    return checkScreenRecordingAccess({ probe: true });
+  }
+  await cgRequestScreenCaptureAccess();
+  await warmElectronScreenCapture();
+  return checkScreenRecordingAccess({ probe: true });
 }
 
 /** @param {string} electronStatus */
 function macScreenRecordingHint(electronStatus) {
   if (electronStatus === "denied" || electronStatus === "restricted") {
-    return "Screen Recording blocked. System Settings → Privacy & Security → Screen Recording → Echo-Satellite ON, then quit (Cmd+Q) and reopen.";
+    return (
+      "Screen Recording blocked. System Settings → Privacy & Security → " +
+      "Screen & System Audio Recording → Echo-Satellite ON, then quit (Cmd+Q) and reopen."
+    );
   }
-  return "Enable Echo-Satellite in Screen Recording, then quit (Cmd+Q) and reopen — closing the window is not enough.";
+  return SCREEN_RECORDING_HINT;
 }

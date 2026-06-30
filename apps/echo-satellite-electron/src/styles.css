@@ -156,6 +156,10 @@ button:hover {
   display: inline-block;
 }
 
+.mono.warn {
+  color: #f0a0a0;
+}
+
 .crash-banner {
   border: 1px solid #5a2a2a;
   background: #1a0a0a;
