@@ -1,0 +1,89 @@
+{
+  "name": "echo-satellite",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Echo Mirage capture satellite — Electron tray agent",
+  "main": "electron/main.mjs",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:1420 && electron .\"",
+    "build:ui": "vite build",
+    "build:mac": "pnpm build:ui && electron-builder --mac --arm64",
+    "build:win": "pnpm build:ui && electron-builder --win --x64",
+    "build": "pnpm build:ui && electron-builder --mac --arm64 --win --x64"
+  },
+  "dependencies": {
+    "node-screenshots": "^0.2.8",
+    "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "electron": "^35.0.3",
+    "electron-builder": "^25.1.8",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3",
+    "wait-on": "^8.0.3"
+  },
+  "build": {
+    "appId": "com.craftwerk.echo-satellite",
+    "productName": "Echo Satellite",
+    "copyright": "Copyright © Craftwerk Corp",
+    "npmRebuild": true,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "public/icon.icns",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        }
+      ],
+      "artifactName": "Echo-Satellite_${version}_aarch64.${ext}",
+      "extendInfo": {
+        "LSMinimumSystemVersion": "12.0"
+      }
+    },
+    "dmg": {
+      "title": "Echo Satellite ${version}"
+    },
+    "win": {
+      "icon": "public/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "Echo-Satellite_${version}_x64-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/icon.ico",
+      "uninstallerIcon": "public/icon.ico",
+      "installerHooks": "build/hooks.nsh"
+    }
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "node-screenshots"
+    ]
+  }
+}

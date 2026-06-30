@@ -26,26 +26,24 @@ jobs:
         with:
           node-version: "20"
           cache: pnpm
-          cache-dependency-path: apps/echo-satellite/pnpm-lock.yaml
+          cache-dependency-path: apps/echo-satellite-electron/pnpm-lock.yaml
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Install satellite frontend dependencies
-        working-directory: apps/echo-satellite
+      - name: Install Echo Satellite (Electron) dependencies
+        working-directory: apps/echo-satellite-electron
         run: pnpm install --frozen-lockfile
 
       - name: Build Echo Satellite (Windows)
-        working-directory: apps/echo-satellite
+        working-directory: apps/echo-satellite-electron
         env:
           CI: true
-        run: pnpm tauri:build:win
+        run: pnpm build:win
 
       - name: Verify Windows installer
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Path apps/echo-satellite/src-tauri/target/release/bundle -Recurse -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $exe = Get-ChildItem -Path apps/echo-satellite-electron/release -Recurse -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $exe) {
-            Get-ChildItem -Recurse apps/echo-satellite/src-tauri/target/release/bundle -ErrorAction SilentlyContinue
+            Get-ChildItem -Recurse apps/echo-satellite-electron/release -ErrorAction SilentlyContinue
             throw "No Windows satellite installer (*-setup.exe) found"
           }
           Write-Host "Installer ready: $($exe.FullName)"
@@ -55,13 +53,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $version = node -p "require('./apps/echo-satellite/package.json').version"
+          $version = node -p "require('./apps/echo-satellite-electron/package.json').version"
           if ("${{ github.ref }}" -like "refs/tags/*") {
             $tag = "${{ github.ref }}".Replace("refs/tags/", "")
           } else {
             $tag = "satellite-v$version"
           }
-          $assets = Get-ChildItem -Path apps/echo-satellite/src-tauri/target/release/bundle -Recurse -Include *-setup.exe,*.exe.sig | Where-Object { $_.Name -notmatch '\.zip$' } | ForEach-Object { $_.FullName }
+          $assets = Get-ChildItem -Path apps/echo-satellite-electron/release -Recurse -Include *-setup.exe | ForEach-Object { $_.FullName }
           if ($assets.Count -eq 0) { throw "No Windows release assets found" }
           $notesFile = New-TemporaryFile
           node --input-type=module -e "import { satelliteReleaseNotes } from './scripts/satellite-release-notes.mjs'; console.log(satelliteReleaseNotes('$version'))" | Set-Content -Path $notesFile -Encoding utf8
@@ -91,9 +89,7 @@ jobs:
         with:
           node-version: "20"
           cache: pnpm
-          cache-dependency-path: apps/echo-satellite/pnpm-lock.yaml
-
-      - uses: dtolnay/rust-toolchain@stable
+          cache-dependency-path: apps/echo-satellite-electron/pnpm-lock.yaml
 
       - name: Import Apple Developer certificate
         env:
@@ -121,12 +117,12 @@ jobs:
           echo "path=$key_path" >> "$GITHUB_OUTPUT"
           echo "configured=true" >> "$GITHUB_OUTPUT"
 
-      - name: Install satellite frontend dependencies
-        working-directory: apps/echo-satellite
+      - name: Install Echo Satellite (Electron) dependencies
+        working-directory: apps/echo-satellite-electron
         run: pnpm install --frozen-lockfile
 
       - name: Build Echo Satellite (macOS)
-        working-directory: apps/echo-satellite
+        working-directory: apps/echo-satellite-electron
         env:
           CI: true
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -137,29 +133,24 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_PATH: ${{ steps.apple_api_key.outputs.path }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: pnpm tauri:build:mac
+        run: pnpm build:mac
 
       - name: Smoke test macOS app launch
         run: |
           set -euo pipefail
-          APP="$(find apps/echo-satellite/src-tauri/target/release/bundle/macos -name 'Echo-Satellite.app' | head -1)"
+          APP="$(find apps/echo-satellite-electron/release -name 'Echo Satellite.app' | head -1)"
           if [ -z "$APP" ]; then
-            echo "Echo-Satellite.app not found"
-            find apps/echo-satellite/src-tauri/target/release/bundle -maxdepth 4 -type d
+            echo "Echo Satellite.app not found"
+            find apps/echo-satellite-electron/release -maxdepth 4 -type d
             exit 1
           fi
-          BIN="$APP/Contents/MacOS/Echo-Satellite"
+          BIN="$APP/Contents/MacOS/Echo Satellite"
           echo "Smoke test: launching $BIN"
           "$BIN" &
           PID=$!
           sleep 4
           if ! kill -0 "$PID" 2>/dev/null; then
             echo "FAIL: Echo Satellite exited within 4s (likely startup crash)"
-            LOG="$HOME/Library/Logs/Echo-Satellite/startup.log"
-            if [ -f "$LOG" ]; then
-              echo "--- startup.log ---"
-              cat "$LOG"
-            fi
             exit 1
           fi
           kill "$PID" 2>/dev/null || true
@@ -180,15 +171,15 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_PATH: ${{ steps.apple_api_key.outputs.path }}
         run: |
-          version="$(node -p "require('./apps/echo-satellite/package.json').version")"
-          dmg="apps/echo-satellite/src-tauri/target/release/bundle/dmg/Echo-Satellite_${version}_aarch64.dmg"
+          version="$(node -p "require('./apps/echo-satellite-electron/package.json').version")"
+          dmg="$(find apps/echo-satellite-electron/release -maxdepth 1 -name "Echo-Satellite_${version}_aarch64.dmg" | head -1)"
           bash scripts/notarize-mac-artifact.sh "$dmg"
 
       - name: Verify macOS installers
         run: |
-          version="$(node -p "require('./apps/echo-satellite/package.json').version")"
-          pkg="apps/echo-satellite/src-tauri/target/release/bundle/macos/Echo-Satellite_${version}_aarch64.pkg"
-          dmg="apps/echo-satellite/src-tauri/target/release/bundle/dmg/Echo-Satellite_${version}_aarch64.dmg"
+          version="$(node -p "require('./apps/echo-satellite-electron/package.json').version")"
+          pkg="apps/echo-satellite-electron/release/mac-pkg/Echo-Satellite_${version}_aarch64.pkg"
+          dmg="$(find apps/echo-satellite-electron/release -maxdepth 1 -name "Echo-Satellite_${version}_aarch64.dmg" | head -1)"
           test -f "$pkg" || (echo "Missing PKG: $pkg" && exit 1)
           test -f "$dmg" || (echo "Missing DMG: $dmg" && exit 1)
           echo "PKG ready: $pkg"
@@ -198,7 +189,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="$(node -p "require('./apps/echo-satellite/package.json').version")"
+          version="$(node -p "require('./apps/echo-satellite-electron/package.json').version")"
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             tag="${GITHUB_REF#refs/tags/}"
           else
@@ -207,7 +198,7 @@ jobs:
           assets=()
           while IFS= read -r file; do
             assets+=("$file")
-          done < <(find apps/echo-satellite/src-tauri/target/release/bundle/macos apps/echo-satellite/src-tauri/target/release/bundle/dmg -type f \( -name '*.dmg' -o -name '*.pkg' -o -name '*.dmg.sig' \))
+          done < <(find apps/echo-satellite-electron/release -type f \( -name '*.dmg' -o -name '*.pkg' \))
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No macOS satellite assets found"
             exit 1
