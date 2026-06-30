@@ -9,17 +9,25 @@ type SatelliteStatus = {
   missionsHandled: number;
 };
 
+type SpyCodesStatus = {
+  ok: true;
+  echoNodeId: string;
+  echoHost: string;
+  httpPort: number;
+  miragePin: string | null;
+  powerfistPin: string | null;
+  mirageExpiresAt: string | null;
+  powerfistExpiresAt: string | null;
+  pairedMirage: { nodeId: string; pairedAt: string } | null;
+  pairedPowerfist: { deviceId: string; pairedAt: string } | null;
+};
+
 type TestCaptureResult = {
   ok: boolean;
   width?: number;
   height?: number;
   pngBytes?: number;
   error?: string;
-};
-
-type PairResult = {
-  ok: boolean;
-  reason?: string;
 };
 
 type PermissionStatus = {
@@ -41,7 +49,8 @@ type DiagnosticsReport = {
 
 type SatelliteApi = {
   getStatus: () => Promise<SatelliteStatus>;
-  pairFromUrl: (capturePairUrl: string) => Promise<PairResult>;
+  getSpyCodes: () => Promise<SpyCodesStatus>;
+  regenerateSpyCodes: () => Promise<SpyCodesStatus>;
   testCapture: () => Promise<TestCaptureResult>;
   disarm: () => Promise<SatelliteStatus>;
   hideToTray: () => Promise<void>;
@@ -49,6 +58,7 @@ type SatelliteApi = {
   openScreenRecordingSettings: () => Promise<void>;
   getDiagnostics: () => Promise<DiagnosticsReport>;
   onDisarm: (handler: () => void) => () => void;
+  onSpyCodesChanged: (handler: () => void) => () => void;
 };
 
 declare global {
@@ -60,6 +70,12 @@ declare global {
 const api = window.satellite;
 
 const pairPortEl = document.querySelector<HTMLElement>("#pair-port")!;
+const echoLanEl = document.querySelector<HTMLElement>("#echo-lan")!;
+const miragePinEl = document.querySelector<HTMLElement>("#mirage-pin")!;
+const powerfistPinEl = document.querySelector<HTMLElement>("#powerfist-pin")!;
+const mirageExpiryEl = document.querySelector<HTMLElement>("#mirage-expiry")!;
+const powerfistExpiryEl = document.querySelector<HTMLElement>("#powerfist-expiry")!;
+const pairStatusEl = document.querySelector<HTMLElement>("#pair-status")!;
 const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
 const permissionResultEl = document.querySelector<HTMLElement>("#permission-result")!;
 const openScreenSettingsBtn = document.querySelector<HTMLButtonElement>("#open-screen-settings")!;
@@ -73,6 +89,18 @@ const diagModeEl = document.querySelector<HTMLElement>("#diag-mode")!;
 const diagLogPathEl = document.querySelector<HTMLElement>("#diag-log-path")!;
 const diagLogTailEl = document.querySelector<HTMLElement>("#diag-log-tail")!;
 
+function formatCodeExpiry(expiresAt: string | null): string {
+  if (!expiresAt) return "";
+  const ms = Date.parse(expiresAt) - Date.now();
+  if (ms <= 0) return "Expired — tap New codes";
+  const minutes = Math.ceil(ms / 60_000);
+  return `Expires in ${minutes} min`;
+}
+
+function formatPin(pin: string | null): string {
+  return pin ?? "——";
+}
+
 function formatDiagnostics(report: DiagnosticsReport): string {
   return [
     "Echo Satellite diagnostics (Electron)",
@@ -85,6 +113,25 @@ function formatDiagnostics(report: DiagnosticsReport): string {
     "--- startup.log (tail) ---",
     report.logTail,
   ].join("\n");
+}
+
+async function refreshSpyCodes(): Promise<void> {
+  const codes = await api.getSpyCodes();
+  pairPortEl.textContent = String(codes.httpPort);
+  echoLanEl.textContent = `Echo on LAN · ${codes.echoHost}:${codes.httpPort}`;
+  miragePinEl.textContent = formatPin(codes.miragePin);
+  powerfistPinEl.textContent = formatPin(codes.powerfistPin);
+  mirageExpiryEl.textContent = formatCodeExpiry(codes.mirageExpiresAt);
+  powerfistExpiryEl.textContent = formatCodeExpiry(codes.powerfistExpiresAt);
+
+  const parts: string[] = [];
+  if (codes.pairedMirage) {
+    parts.push(`PAIRED // MIRAGE ${codes.pairedMirage.nodeId.slice(0, 8)}…`);
+  }
+  if (codes.pairedPowerfist) {
+    parts.push(`PAIRED // PowerFist ${codes.pairedPowerfist.deviceId.slice(0, 8)}…`);
+  }
+  pairStatusEl.textContent = parts.length > 0 ? parts.join(" · ") : "Waiting for Mirage / PowerFist to enter codes.";
 }
 
 async function refreshDiagnostics(): Promise<DiagnosticsReport> {
@@ -113,7 +160,6 @@ async function refreshPermissions(): Promise<void> {
 
 async function refreshStatus(): Promise<void> {
   const status = await api.getStatus();
-  pairPortEl.textContent = String(status.pairHttpPort);
   statusArmedEl.textContent = status.armed ? "ARMED" : "DISARMED";
   statusWsEl.textContent = status.wsStatus.toUpperCase();
   statusMissionsEl.textContent = String(status.missionsHandled);
@@ -135,20 +181,9 @@ openScreenSettingsBtn.addEventListener("click", async () => {
   await api.openScreenRecordingSettings();
 });
 
-document.querySelector<HTMLButtonElement>("#pair-url-btn")!.addEventListener("click", async () => {
-  const url = document.querySelector<HTMLTextAreaElement>("#pair-url")!.value.trim();
-  if (!url) {
-    captureResultEl.textContent = "Paste the Mirage Echo QR URL first.";
-    return;
-  }
-  captureResultEl.textContent = "Pairing…";
-  const result = await api.pairFromUrl(url);
-  if (result.ok) {
-    captureResultEl.textContent = "Paired and armed — hide to tray when ready.";
-    await refreshStatus();
-  } else {
-    captureResultEl.textContent = result.reason ?? "Pair failed";
-  }
+document.querySelector<HTMLButtonElement>("#new-codes-btn")!.addEventListener("click", async () => {
+  await api.regenerateSpyCodes();
+  await refreshSpyCodes();
 });
 
 document.querySelector<HTMLButtonElement>("#hide-tray")!.addEventListener("click", async () => {
@@ -179,9 +214,15 @@ api.onDisarm(() => {
   void refreshStatus();
 });
 
+api.onSpyCodesChanged(() => {
+  void refreshSpyCodes();
+});
+
 void refreshPermissions();
 void refreshStatus();
+void refreshSpyCodes();
 void refreshDiagnostics();
 window.setInterval(() => {
   void refreshStatus();
+  void refreshSpyCodes();
 }, 5000);
