@@ -4,6 +4,7 @@ import {
   SPY_ECHO_LINK_CHANNEL,
 } from "@/lib/cyberdeck/espionage-mode";
 import { discoverEchoEndpointsOnLan } from "@/lib/cyberdeck/spy-echo-discovery.client";
+import { parseEchoEndpointInput } from "@/lib/cyberdeck/spy-pair-pin";
 
 const SPY_MIRAGE_PAIR_STORAGE_KEY = "echo-mirage-spy-mirage-pair";
 const SPY_POWERFIST_PAIR_STORAGE_KEY = "echo-mirage-spy-powerfist-pair";
@@ -187,6 +188,9 @@ export async function enterSpyPairPin(input: {
 > {
   const nodeId = getOrCreateEspionageNodeId();
   const deviceId = getOrCreatePowerfistDeviceId();
+  const resolvedEndpoint = input.echoHost
+    ? parseEchoEndpointInput(input.echoHost, input.echoHttpPort)
+    : { host: "", port: input.echoHttpPort };
   const body = {
     pin: input.pin,
     role: input.role,
@@ -197,6 +201,9 @@ export async function enterSpyPairPin(input: {
   type PairSuccess = Extract<Awaited<ReturnType<typeof enterSpyPairPin>>, { ok: true }>;
 
   async function postDirect(host: string, port: number): Promise<PairSuccess | { ok: false; reason: string }> {
+    if (!host.trim()) {
+      return { ok: false, reason: "Enter Echo IP address under Advanced." };
+    }
     try {
       const res = await fetch(`http://${host}:${port}/api/spy/pair/enter`, {
         method: "POST",
@@ -204,9 +211,18 @@ export async function enterSpyPairPin(input: {
         body: JSON.stringify(body),
         cache: "no-store",
         mode: "cors",
-        signal: AbortSignal.timeout(4000),
+        signal: AbortSignal.timeout(8_000),
       });
-      const payload = (await res.json()) as PairSuccess | { ok: false; reason: string };
+      const text = await res.text();
+      let payload: PairSuccess | { ok: false; reason: string };
+      try {
+        payload = JSON.parse(text) as PairSuccess | { ok: false; reason: string };
+      } catch {
+        return {
+          ok: false,
+          reason: `Echo at ${host}:${port} returned an unexpected response (HTTP ${res.status}).`,
+        };
+      }
       if (payload.ok) {
         return {
           ...payload,
@@ -215,14 +231,21 @@ export async function enterSpyPairPin(input: {
         };
       }
       return payload;
-    } catch {
-      return { ok: false, reason: `Could not reach Echo at ${host}:${port}.` };
+    } catch (error) {
+      const detail =
+        error instanceof Error && error.name === "TimeoutError"
+          ? "Timed out — check Echo Satellite is running and Screen Recording is granted."
+          : "";
+      return {
+        ok: false,
+        reason: [`Could not reach Echo at ${host}:${port}.`, detail].filter(Boolean).join(" "),
+      };
     }
   }
 
   if (typeof window !== "undefined") {
-    if (input.echoHost) {
-      return postDirect(input.echoHost, input.echoHttpPort);
+    if (resolvedEndpoint.host) {
+      return postDirect(resolvedEndpoint.host, resolvedEndpoint.port);
     }
 
     try {

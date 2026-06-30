@@ -5,6 +5,7 @@ import {
   completeSpyPairEnterByPin,
   parseSpyPairCode,
 } from "@/lib/server/spy-echo-pairing.server";
+import { parseEchoEndpointInput } from "@/lib/cyberdeck/spy-pair-pin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,8 +68,9 @@ async function forwardPinToEcho(input: {
   nodeId?: string;
   deviceId?: string;
 }): Promise<PairEnterPayload> {
+  const endpoint = parseEchoEndpointInput(input.echoHost, input.echoHttpPort);
   try {
-    const forwardUrl = `http://${input.echoHost}:${input.echoHttpPort}/api/spy/pair/enter`;
+    const forwardUrl = `http://${endpoint.host}:${endpoint.port}/api/spy/pair/enter`;
     const forwardRes = await fetch(forwardUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -83,7 +85,7 @@ async function forwardPinToEcho(input: {
   } catch {
     return {
       ok: false,
-      reason: `Could not reach Echo at ${input.echoHost}:${input.echoHttpPort}.`,
+      reason: `Could not reach Echo at ${endpoint.host}:${endpoint.port}.`,
     };
   }
 }
@@ -164,8 +166,12 @@ export async function POST(request: Request) {
   const pin = body.pin?.trim();
   const role = body.role;
   if (pin && role) {
-    const echoHttpPort = Number(body.echoHttpPort) || 3050;
-    const echoHost = body.echoHost?.trim();
+    const echoHttpPortDefault = Number(body.echoHttpPort) || 3050;
+    const parsed = body.echoHost?.trim()
+      ? parseEchoEndpointInput(body.echoHost, echoHttpPortDefault)
+      : { host: "", port: echoHttpPortDefault };
+    const echoHost = parsed.host;
+    const echoHttpPort = parsed.port;
 
     if (!echoHost) {
       const result = await pairPinWithDiscovery({

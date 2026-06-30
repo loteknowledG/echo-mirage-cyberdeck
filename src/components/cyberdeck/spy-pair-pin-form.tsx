@@ -6,7 +6,7 @@ import { SpyPairOtpInput } from "@/components/cyberdeck/spy-pair-otp-input";
 import {
   ESPIONAGE_ECHO_DISPLAY,
 } from "@/lib/cyberdeck/espionage-mode";
-import { isValidSpyPairPin, normalizeSpyPairPin } from "@/lib/cyberdeck/spy-pair-pin";
+import { isValidSpyPairPin, normalizeSpyPairPin, parseEchoEndpointInput } from "@/lib/cyberdeck/spy-pair-pin";
 import {
   enterSpyPairPin,
   readSpyMiragePairCredentials,
@@ -14,6 +14,12 @@ import {
 } from "@/lib/cyberdeck/spy-pairing-client";
 
 const DEFAULT_ECHO_HTTP_PORT = 3050;
+
+function resolveEchoEndpoint(hostInput: string, portInput: string) {
+  const fallbackPort = Number(portInput.trim() || DEFAULT_ECHO_HTTP_PORT);
+  const parsed = parseEchoEndpointInput(hostInput, fallbackPort);
+  return parsed;
+}
 
 type SpyPairPinFormProps = {
   role: "mirage" | "powerfist";
@@ -58,8 +64,7 @@ export function SpyPairPinForm({
   }, []);
 
   const handlePair = useCallback(async () => {
-    const host = echoHost.trim();
-    const port = Number(echoHttpPort.trim() || DEFAULT_ECHO_HTTP_PORT);
+    const { host, port } = resolveEchoEndpoint(echoHost, echoHttpPort);
 
     if (!Number.isFinite(port) || port <= 0) {
       setError("Enter a valid Echo port.");
@@ -72,7 +77,7 @@ export function SpyPairPinForm({
 
     setBusy(true);
     setError(null);
-    setStatus(host ? `Pairing with ${host}…` : "Searching for Echo on your LAN…");
+    setStatus(host ? `Pairing with ${host}:${port}…` : "Searching for Echo on your LAN…");
 
     const hintHosts = [host, readLastEchoHost(role)].filter(Boolean);
     const result = await enterSpyPairPin({
@@ -136,9 +141,12 @@ export function SpyPairPinForm({
               spellCheck={false}
               autoCapitalize="off"
               autoComplete="off"
-              placeholder="192.168.12.39 (optional — auto-detected on LAN)"
+              placeholder="192.168.12.39 or 192.168.12.39:3050"
               className="border border-[#2d2d2d] bg-black px-2 py-2 font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none focus:border-[#3d3d3d]"
             />
+            <span className="text-[8px] leading-relaxed text-[#5f5f5f]">
+              IP only, or include :3050 once — do not put the port in both fields.
+            </span>
           </label>
 
           <label className="flex flex-col gap-2">
