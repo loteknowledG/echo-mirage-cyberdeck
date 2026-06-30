@@ -72,7 +72,7 @@ export function SpyPairPinForm({
 
     setBusy(true);
     setError(null);
-    setStatus(host ? "Pairing…" : "Searching for Echo on your LAN…");
+    setStatus(host ? `Pairing with ${host}…` : "Searching for Echo on your LAN…");
 
     const hintHosts = [host, readLastEchoHost(role)].filter(Boolean);
     const result = await enterSpyPairPin({
@@ -83,20 +83,23 @@ export function SpyPairPinForm({
       hintHosts,
     });
     setBusy(false);
-    setStatus(null);
 
     if (!result.ok) {
+      setStatus(null);
       setError(result.reason);
       return;
     }
 
     if (result.role !== role) {
+      setStatus(null);
       setError(`That code is for ${result.role === "mirage" ? "Mirage" : "PowerFist"}, not ${roleLabel}.`);
       return;
     }
 
     onPaired(result);
     setPin("");
+    setError(null);
+    setStatus(`Linked with ${ESPIONAGE_ECHO_DISPLAY} at ${result.echoHost}.`);
   }, [echoHost, echoHttpPort, pin, role, roleLabel, onPaired]);
 
   return (
@@ -153,6 +156,7 @@ export function SpyPairPinForm({
         </>
       ) : null}
 
+      {status && !error ? <p className="text-emerald-300/80">{status}</p> : null}
       {error ? <p className="text-red-300/90">{error}</p> : null}
     </div>
   );

@@ -191,6 +191,9 @@ async function initializeAfterReady() {
     onPaired: (creds) => {
       void armWithCredentials(creds, true);
     },
+    onSpyPaired: () => {
+      void refreshSpyLinks();
+    },
     getSpyStatus: () => buildSpyStatusPayload(),
   });
 

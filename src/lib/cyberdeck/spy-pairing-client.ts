@@ -221,28 +221,33 @@ export async function enterSpyPairPin(input: {
   }
 
   if (typeof window !== "undefined") {
-    const host = window.location.hostname;
-    if (!input.echoHost && (host === "localhost" || host === "127.0.0.1")) {
-      try {
-        const res = await fetch("/api/spy/pair/enter", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...body,
-            echoHttpPort: input.echoHttpPort,
-            hintHosts: input.hintHosts,
-          }),
-        });
-        const local = (await res.json()) as PairSuccess | { ok: false; reason: string };
-        if (local.ok) return local;
-      } catch {
-        /* fall through to LAN discovery */
-      }
+    if (input.echoHost) {
+      return postDirect(input.echoHost, input.echoHttpPort);
     }
 
-    const endpoints = input.echoHost
-      ? [{ host: input.echoHost, port: input.echoHttpPort }]
-      : await discoverEchoEndpointsOnLan(input.hintHosts ?? []);
+    try {
+      const res = await fetch("/api/spy/pair/enter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...body,
+          echoHttpPort: input.echoHttpPort,
+          hintHosts: input.hintHosts,
+        }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(35_000),
+      });
+      const serverResult = (await res.json()) as PairSuccess | { ok: false; reason: string };
+      if (serverResult.ok) return serverResult;
+      const reason = serverResult.reason?.toLowerCase() ?? "";
+      if (reason.includes("invalid pairing code") || reason.includes("expired")) {
+        return serverResult;
+      }
+    } catch {
+      /* hosted PWA or server unreachable — try browser LAN discovery */
+    }
+
+    const endpoints = await discoverEchoEndpointsOnLan(input.hintHosts ?? []);
 
     if (endpoints.length === 0) {
       return {
@@ -251,7 +256,6 @@ export async function enterSpyPairPin(input: {
           "Could not find Echo on your LAN. Open Echo Satellite on the screenshot Mac (same Wi‑Fi), or enter its IP under Advanced.",
       };
     }
-
     let invalidPin = false;
     let lastReason = "Could not pair with Echo.";
 

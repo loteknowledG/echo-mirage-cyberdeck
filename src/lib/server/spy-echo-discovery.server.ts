@@ -3,7 +3,7 @@ import os from "node:os";
 
 const DEFAULT_ECHO_HTTP_PORT = 3050;
 const PROBE_TIMEOUT_MS = 650;
-const MAX_HOSTS_PER_SUBNET = 254;
+const MAX_HOSTS_PER_SUBNET = 64;
 const PROBE_BATCH_SIZE = 24;
 
 function ipv4ToInt(ip: string): number | null {
@@ -52,15 +52,33 @@ function subnetHosts(prefix: string): string[] {
 async function probeEchoHost(host: string, port: number): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  const paths =
+    port === DEFAULT_ECHO_HTTP_PORT
+      ? ["/api/spy/echo/codes", "/spy/status", "/health"]
+      : ["/api/spy/echo/codes"];
+
   try {
-    const res = await fetch(`http://${host}:${port}/api/spy/echo/codes`, {
-      signal: controller.signal,
-      cache: "no-store",
-    });
-    if (!res.ok) return false;
-    const payload = (await res.json()) as { ok?: boolean; echoNodeId?: string };
-    return payload.ok === true && typeof payload.echoNodeId === "string" && payload.echoNodeId.length > 0;
-  } catch {
+    for (const path of paths) {
+      try {
+        const res = await fetch(`http://${host}:${port}${path}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!res.ok) continue;
+        if (path === "/health") return true;
+        const payload = (await res.json()) as {
+          ok?: boolean;
+          echoNodeId?: string;
+          source?: string;
+        };
+        if (payload.ok === true && typeof payload.echoNodeId === "string" && payload.echoNodeId.length > 0) {
+          return true;
+        }
+        if (payload.source === "echo-satellite") return true;
+      } catch {
+        /* try next path */
+      }
+    }
     return false;
   } finally {
     clearTimeout(timer);

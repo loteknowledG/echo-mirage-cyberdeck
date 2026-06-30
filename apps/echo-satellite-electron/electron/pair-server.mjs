@@ -25,7 +25,7 @@ async function readJsonBody(req) {
 }
 
 /**
- * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void, getSpyStatus?: () => object }} options
+ * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void, onSpyPaired?: () => void, getSpyStatus?: () => object }} options
  */
 export function startPairServer(options) {
   const port = options.port ?? DEFAULT_PAIR_HTTP_PORT;
@@ -84,6 +84,9 @@ export function startPairServer(options) {
           nodeId: typeof body.nodeId === "string" ? body.nodeId : undefined,
           deviceId: typeof body.deviceId === "string" ? body.deviceId : undefined,
         });
+        if (result.ok) {
+          options.onSpyPaired?.();
+        }
         res.writeHead(result.ok ? 200 : 403, { "Content-Type": "application/json" });
         res.end(JSON.stringify(result));
         return;

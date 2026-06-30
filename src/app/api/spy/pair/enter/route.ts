@@ -52,7 +52,8 @@ function requestHost(request: Request): string {
 
 function shouldHandlePinLocally(echoHost: string | undefined, request: Request): boolean {
   const host = echoHost?.trim().toLowerCase();
-  if (!host || host === "127.0.0.1" || host === "localhost") {
+  if (!host) return false;
+  if (host === "127.0.0.1" || host === "localhost") {
     return true;
   }
   return requestHost(request) === host;
@@ -167,16 +168,6 @@ export async function POST(request: Request) {
     const echoHost = body.echoHost?.trim();
 
     if (!echoHost) {
-      if (shouldHandlePinLocally(undefined, request)) {
-        const result = await completeSpyPairEnterByPin({
-          pin,
-          role,
-          nodeId: body.nodeId,
-          deviceId: body.deviceId,
-        });
-        return NextResponse.json(result, { status: result.ok ? 200 : 403, headers: SPY_CORS_HEADERS });
-      }
-
       const result = await pairPinWithDiscovery({
         echoHttpPort,
         pin,

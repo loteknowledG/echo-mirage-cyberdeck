@@ -8,7 +8,8 @@ export type EchoEndpoint = {
 const PROBE_PORTS = [3050, 3000, 3001] as const;
 const PROBE_TIMEOUT_MS = 900;
 const PROBE_BATCH_SIZE = 24;
-const MAX_HOSTS_PER_SUBNET = 254;
+const MAX_HOSTS_PER_SUBNET = 64;
+const PAIR_DISCOVERY_TIMEOUT_MS = 28_000;
 
 function ipv4ToInt(ip: string): number | null {
   const parts = ip.split(".").map((part) => Number(part));
@@ -131,6 +132,17 @@ async function probeEchoEndpoint(host: string, port: number): Promise<boolean> {
 
 /** Scan the local /24 for Echo Satellite (3050) or cyberdeck (3000) from the browser. */
 export async function discoverEchoEndpointsOnLan(hintHosts: string[] = []): Promise<EchoEndpoint[]> {
+  if (typeof window === "undefined") return [];
+
+  return Promise.race([
+    discoverEchoEndpointsOnLanInner(hintHosts),
+    new Promise<EchoEndpoint[]>((resolve) => {
+      window.setTimeout(() => resolve([]), PAIR_DISCOVERY_TIMEOUT_MS);
+    }),
+  ]);
+}
+
+async function discoverEchoEndpointsOnLanInner(hintHosts: string[] = []): Promise<EchoEndpoint[]> {
   if (typeof window === "undefined") return [];
 
   const candidates = new Set<string>(["127.0.0.1", ...hintHosts.filter(Boolean)]);
