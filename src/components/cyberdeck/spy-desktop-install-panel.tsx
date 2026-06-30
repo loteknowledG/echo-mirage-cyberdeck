@@ -178,7 +178,9 @@ export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanel
         <p className="mb-2 text-[8px] leading-relaxed text-[#5a5a5a]">
           {satelliteInfo?.platform === "mac"
             ? "Double-click the downloaded .pkg — it updates in place over any older Echo Satellite. No uninstall, no Terminal."
-            : "Double-click the downloaded installer — it updates in place over older Echo Satellite builds."}{" "}
+            : satelliteInfo?.platform === "win"
+              ? "Double-click the downloaded .exe — it updates in place and closes any running Echo Satellite automatically."
+              : "Double-click the downloaded installer — it updates in place over older Echo Satellite builds."}{" "}
           Then grant Screen Recording (macOS), pair via Mirage Echo QR on port{" "}
           <strong className="text-[#7a7a7a]">3050</strong>.
         </p>
