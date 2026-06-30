@@ -27,7 +27,7 @@ type TestCaptureResult = {
   width?: number;
   height?: number;
   pngBytes?: number;
-  previewDataUrl?: string;
+  previewUrl?: string;
   error?: string;
 };
 
@@ -179,8 +179,8 @@ document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("cl
     const result = await api.testCapture();
     if (result.ok) {
       captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"} — preview below`;
-      if (result.previewDataUrl) {
-        capturePreviewEl.src = result.previewDataUrl;
+      if (result.previewUrl) {
+        capturePreviewEl.src = result.previewUrl;
         capturePreviewEl.classList.remove("hidden");
       }
     } else {

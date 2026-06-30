@@ -17,6 +17,7 @@ import {
   saveCredentials,
 } from "./config.mjs";
 import { capturePrimaryMonitorDimensions, capturePrimaryMonitorPngBase64 } from "./capture.mjs";
+import { registerCapturePreviewProtocol, writeCapturePreviewUrl } from "./capture-preview.mjs";
 import { startPairServer } from "./pair-server.mjs";
 import { createSpyPairing } from "./spy-pairing.mjs";
 import { startWsClient } from "./ws-client.mjs";
@@ -183,15 +184,14 @@ function registerIpc() {
       const pngBase64 = await capturePrimaryMonitorPngBase64();
       const dimensions = await capturePrimaryMonitorDimensions();
       const pngBuffer = Buffer.from(pngBase64, "base64");
-      const preview = nativeImage.createFromBuffer(pngBuffer).resize({ width: 480 });
-      const previewBase64 = preview.toPNG().toString("base64");
+      const previewUrl = await writeCapturePreviewUrl(pngBuffer);
 
       return {
         ok: true,
-        width: dimensions?.width,
-        height: dimensions?.height,
+        width: Number(dimensions?.width) || 0,
+        height: Number(dimensions?.height) || 0,
         pngBytes: pngBase64.length,
-        previewDataUrl: `data:image/png;base64,${previewBase64}`,
+        previewUrl: previewUrl ?? undefined,
       };
     } catch (error) {
       return {
@@ -241,6 +241,7 @@ function registerIpc() {
 app.whenReady().then(async () => {
   logger.beginSession(app, version);
   logger.step(1, 8, "electron main starting");
+  registerCapturePreviewProtocol();
   registerIpc();
   createMainWindow();
   logger.step(2, 8, "browser window created");
