@@ -27,7 +27,7 @@ type TestCaptureResult = {
   width?: number;
   height?: number;
   pngBytes?: number;
-  previewUrl?: string;
+  previewBase64?: string;
   error?: string;
 };
 
@@ -179,9 +179,11 @@ document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("cl
     const result = await api.testCapture();
     if (result.ok) {
       captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"} — preview below`;
-      if (result.previewUrl) {
-        capturePreviewEl.src = result.previewUrl;
+      if (result.previewBase64) {
+        capturePreviewEl.src = `data:image/jpeg;base64,${result.previewBase64}`;
         capturePreviewEl.classList.remove("hidden");
+      } else {
+        captureResultEl.textContent += " (no preview thumbnail)";
       }
     } else {
       captureResultEl.textContent = result.error ?? "Capture failed";

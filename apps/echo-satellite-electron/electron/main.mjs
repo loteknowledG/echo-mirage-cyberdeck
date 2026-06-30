@@ -16,8 +16,8 @@ import {
   loadCredentials,
   saveCredentials,
 } from "./config.mjs";
-import { capturePrimaryMonitorDimensions, capturePrimaryMonitorPngBase64 } from "./capture.mjs";
-import { registerCapturePreviewProtocol, writeCapturePreviewUrl } from "./capture-preview.mjs";
+import { capturePrimaryMonitorPng } from "./capture.mjs";
+import { createCapturePreviewBase64 } from "./capture-preview.mjs";
 import { startPairServer } from "./pair-server.mjs";
 import { createSpyPairing } from "./spy-pairing.mjs";
 import { startWsClient } from "./ws-client.mjs";
@@ -181,17 +181,15 @@ function registerIpc() {
         await warmElectronScreenCapture();
       }
 
-      const pngBase64 = await capturePrimaryMonitorPngBase64();
-      const dimensions = await capturePrimaryMonitorDimensions();
-      const pngBuffer = Buffer.from(pngBase64, "base64");
-      const previewUrl = await writeCapturePreviewUrl(pngBuffer);
+      const capture = await capturePrimaryMonitorPng();
+      const previewBase64 = createCapturePreviewBase64(capture.pngBuffer);
 
       return {
         ok: true,
-        width: Number(dimensions?.width) || 0,
-        height: Number(dimensions?.height) || 0,
-        pngBytes: pngBase64.length,
-        previewUrl: previewUrl ?? undefined,
+        width: capture.width,
+        height: capture.height,
+        pngBytes: capture.pngBase64.length,
+        previewBase64: previewBase64 ?? undefined,
       };
     } catch (error) {
       return {
@@ -241,7 +239,6 @@ function registerIpc() {
 app.whenReady().then(async () => {
   logger.beginSession(app, version);
   logger.step(1, 8, "electron main starting");
-  registerCapturePreviewProtocol();
   registerIpc();
   createMainWindow();
   logger.step(2, 8, "browser window created");
