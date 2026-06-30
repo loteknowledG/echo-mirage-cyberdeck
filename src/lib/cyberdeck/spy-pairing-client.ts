@@ -32,6 +32,7 @@ export function normalizePairedMirages(status: {
 
 const LOCAL_CYBERDECK_ORIGINS = ["http://127.0.0.1:3000", "http://localhost:3000"];
 const SATELLITE_STATUS_URL = "http://127.0.0.1:3050/spy/status";
+const SATELLITE_CODES_URL = "http://127.0.0.1:3050/api/spy/echo/codes";
 
 export type EchoSpyStatusSource = "cyberdeck" | "local-cyberdeck" | "satellite";
 
@@ -78,6 +79,23 @@ async function readEchoSpyPayload(url: string): Promise<EchoSpyStatus | { ok: fa
   } catch {
     return { ok: false, reason: "Could not reach Echo status endpoint." };
   }
+}
+
+/** Load Echo Spy status from a known Echo Satellite on the LAN (browser → Echo direct). */
+export async function fetchEchoRemoteStatusClient(
+  echoHost: string,
+  echoHttpPort: number,
+): Promise<EchoSpyStatus | { ok: false; reason: string }> {
+  const endpoint = parseEchoEndpointInput(echoHost, echoHttpPort);
+  if (!endpoint.host) {
+    return { ok: false, reason: "echoHost is required." };
+  }
+
+  const status = await readEchoSpyPayload(`http://${endpoint.host}:${endpoint.port}/spy/status`);
+  if (!status.ok) {
+    return status;
+  }
+  return { ...status, source: "satellite" };
 }
 
 /** Load Echo Spy status from cyberdeck, local dev server, or Echo Satellite tray agent. */
@@ -149,6 +167,14 @@ export async function fetchEchoSpyCodes(): Promise<
 > {
   try {
     const res = await fetch("/api/spy/echo/codes", { cache: "no-store" });
+    const payload = (await res.json()) as Awaited<ReturnType<typeof fetchEchoSpyCodes>>;
+    if (payload.ok) return payload;
+  } catch {
+    /* try Echo Satellite tray agent */
+  }
+
+  try {
+    const res = await fetch(SATELLITE_CODES_URL, { cache: "no-store", signal: AbortSignal.timeout(2500) });
     return (await res.json()) as Awaited<ReturnType<typeof fetchEchoSpyCodes>>;
   } catch {
     return { ok: false, reason: "Could not load Echo pairing codes." };
@@ -160,6 +186,17 @@ export async function regenerateEchoSpyCodes(): Promise<
 > {
   try {
     const res = await fetch("/api/spy/echo/codes", { method: "POST" });
+    const payload = (await res.json()) as Awaited<ReturnType<typeof fetchEchoSpyCodes>>;
+    if (payload.ok) return payload;
+  } catch {
+    /* try Echo Satellite tray agent */
+  }
+
+  try {
+    const res = await fetch(SATELLITE_CODES_URL, {
+      method: "POST",
+      signal: AbortSignal.timeout(5000),
+    });
     return (await res.json()) as Awaited<ReturnType<typeof fetchEchoSpyCodes>>;
   } catch {
     return { ok: false, reason: "Could not regenerate Echo pairing codes." };

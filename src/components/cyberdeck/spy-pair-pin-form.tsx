@@ -221,8 +221,16 @@ export function SpyPairPinForm({
         </>
       ) : null}
 
-      {status && !error ? <p className="text-emerald-300/80">{status}</p> : null}
-      {error ? <p className="text-red-300/90">{error}</p> : null}
+      {status && !error ? (
+        <p className="rounded border border-emerald-950/40 bg-emerald-950/10 px-3 py-2 text-[9px] text-emerald-300/90">
+          {status}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="rounded border border-red-950/40 bg-red-950/10 px-3 py-2 text-[9px] text-red-300/90">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
