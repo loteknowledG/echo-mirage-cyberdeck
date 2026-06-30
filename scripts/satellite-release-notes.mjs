@@ -19,7 +19,9 @@ Grant **Screen Recording** on first launch, then pair from Mirage Spy → Echo Q
 
 ### Windows (x64)
 
-Double-click **Echo-Satellite_${version}_x64-setup.exe** (NOT "Source code zip"). Upgrades in place over older installs.
+Double-click **Echo-Satellite_${version}_x64-setup.exe** (NOT "Source code zip"). Upgrades in place — the installer closes any running Echo Satellite automatically. No uninstall needed.
+
+If you still see a "app is running" prompt, choose **OK** to let the installer close it and continue (Cancel aborts the whole install).
 
 Requires **Microsoft Edge WebView2 Runtime** on some PCs.
 
