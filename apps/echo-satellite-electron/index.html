@@ -30,25 +30,38 @@
       </section>
 
       <section class="card">
-        <h2>2 · Pair with Mirage</h2>
+        <h2>2 · Pairing codes</h2>
         <p class="hint">
-          On Mirage Spy → Echo QR, use this machine&apos;s LAN address and port
-          <code id="pair-port">3050</code> with path
-          <code>/powerfist/capture-pair</code>, or paste the full QR URL below.
+          On Mirage or PowerFist, open Spy and enter this machine&apos;s LAN address, port
+          <code id="pair-port">3050</code>, and the matching 6-digit code below.
         </p>
-        <label class="field">
-          <span>Capture pair URL</span>
-          <textarea
-            id="pair-url"
-            rows="3"
-            placeholder="http://192.168.x.x:3050/powerfist/capture-pair?pairId=..."
-          ></textarea>
-        </label>
-        <button id="pair-url-btn" type="button" class="accent">Pair &amp; arm</button>
+        <p id="echo-lan" class="echo-lan mono">Loading…</p>
+
+        <div class="pair-codes">
+          <div class="pair-code-block">
+            <p class="pair-code-label">Code for MIRAGE</p>
+            <p id="mirage-pin" class="pair-code-pin">——</p>
+            <p id="mirage-expiry" class="pair-code-expiry muted"></p>
+          </div>
+          <div class="pair-code-block">
+            <p class="pair-code-label">Code for PowerFist</p>
+            <p id="powerfist-pin" class="pair-code-pin">——</p>
+            <p id="powerfist-expiry" class="pair-code-expiry muted"></p>
+          </div>
+        </div>
+
+        <p id="pair-status" class="mono muted"></p>
+        <div class="actions">
+          <button id="new-codes-btn" type="button">New codes</button>
+        </div>
       </section>
 
       <section class="card">
-        <h2>Status</h2>
+        <h2>3 · Capture relay</h2>
+        <p class="hint">
+          After Mirage pairs, open Mirage hub → <strong>Echo QR</strong> and open the link on this Mac
+          (Safari is fine). That arms silent capture — no paste step.
+        </p>
         <dl class="status-grid">
           <dt>Armed</dt>
           <dd id="status-armed">—</dd>
