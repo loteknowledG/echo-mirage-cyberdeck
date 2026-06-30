@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Echo Satellite</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <header>
+        <p class="eyebrow">ECHO MIRAGE // SATELLITE DRONE</p>
+        <h1>Echo Satellite</h1>
+        <p class="lede">
+          Minimal Electron tray agent. Arm once — screenshots fire only when PowerFist signals Mirage.
+          On Mac, reopen from the <strong>Dock</strong>. On Windows, use the system tray.
+        </p>
+      </header>
+
+      <section class="card">
+        <h2>1 · Permissions (before missions)</h2>
+        <p class="hint">
+          macOS: grant <strong>Screen Recording</strong> in System Settings when prompted.
+          Windows: no extra prompt usually required.
+        </p>
+        <button id="test-capture" type="button">Test silent capture</button>
+        <button id="open-screen-settings" type="button" class="hidden">Open Screen Recording settings</button>
+        <p id="permission-result" class="mono muted"></p>
+        <p id="capture-result" class="mono muted"></p>
+      </section>
+
+      <section class="card">
+        <h2>2 · Pair with Mirage</h2>
+        <p class="hint">
+          On Mirage Spy → Echo QR, use this machine&apos;s LAN address and port
+          <code id="pair-port">3050</code> with path
+          <code>/powerfist/capture-pair</code>, or paste the full QR URL below.
+        </p>
+        <label class="field">
+          <span>Capture pair URL</span>
+          <textarea
+            id="pair-url"
+            rows="3"
+            placeholder="http://192.168.x.x:3050/powerfist/capture-pair?pairId=..."
+          ></textarea>
+        </label>
+        <button id="pair-url-btn" type="button" class="accent">Pair &amp; arm</button>
+      </section>
+
+      <section class="card">
+        <h2>Status</h2>
+        <dl class="status-grid">
+          <dt>Armed</dt>
+          <dd id="status-armed">—</dd>
+          <dt>WebSocket</dt>
+          <dd id="status-ws">—</dd>
+          <dt>Missions</dt>
+          <dd id="status-missions">—</dd>
+          <dt>Last error</dt>
+          <dd id="status-error" class="mono">—</dd>
+        </dl>
+        <div class="actions">
+          <button id="hide-tray" type="button">Hide to tray</button>
+          <button id="disarm" type="button">Disarm</button>
+        </div>
+      </section>
+
+      <section class="card diagnostics-card">
+        <h2>Diagnostics</h2>
+        <p id="diag-hint" class="hint">Startup log from Electron main process.</p>
+        <dl class="status-grid">
+          <dt>Version</dt>
+          <dd id="diag-version">—</dd>
+          <dt>Mode</dt>
+          <dd id="diag-mode">—</dd>
+          <dt>Log file</dt>
+          <dd id="diag-log-path" class="mono">—</dd>
+        </dl>
+        <div class="actions">
+          <button id="copy-diagnostics" type="button">Copy diagnostics</button>
+          <button id="refresh-diagnostics" type="button">Refresh</button>
+        </div>
+        <pre id="diag-log-tail" class="log-tail mono muted">Loading…</pre>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

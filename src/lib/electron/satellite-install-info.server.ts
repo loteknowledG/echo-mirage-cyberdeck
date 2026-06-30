@@ -26,7 +26,7 @@ const GITHUB_RELEASES =
 function readSatelliteVersion(): string {
   try {
     const raw = readFileSync(
-      path.join(process.cwd(), "apps/echo-satellite/package.json"),
+      path.join(process.cwd(), "apps/echo-satellite-electron/package.json"),
       "utf8",
     );
     const parsed = JSON.parse(raw) as { version?: string };

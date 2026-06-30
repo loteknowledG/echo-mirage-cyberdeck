@@ -1,9 +1,9 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # pkg postinstall — clear download quarantine only. Never ad-hoc re-sign a notarized app.
 set -e
-APP="/Applications/Echo-Satellite.app"
+APP="/Applications/Echo Satellite.app"
 if [ ! -d "$APP" ]; then
-  echo "Echo-Satellite.app not found at $APP"
+  echo "Echo Satellite.app not found at $APP"
   exit 1
 fi
 xattr -cr "$APP" 2>/dev/null || true
