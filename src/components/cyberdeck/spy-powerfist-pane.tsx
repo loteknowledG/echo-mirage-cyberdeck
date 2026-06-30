@@ -60,8 +60,8 @@ export function SpyPowerfistPane() {
       </div>
 
       <p className="text-[9px] leading-relaxed text-[#5f5f5f]">
-        On your phone: enter the Echo LAN address and 6-digit code from {ESPIONAGE_ECHO_DISPLAY} Spy →{" "}
-        {ESPIONAGE_ECHO_DISPLAY} (CODE FOR {ESPIONAGE_POWERFIST_LABEL}).
+        Enter the 6-digit code from {ESPIONAGE_ECHO_DISPLAY} (CODE FOR {ESPIONAGE_POWERFIST_LABEL}). PowerFist
+        finds Echo on your LAN automatically — use Advanced only if auto-detect fails.
       </p>
 
       {paired && !terminated ? (

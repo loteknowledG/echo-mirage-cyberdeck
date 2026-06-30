@@ -87,10 +87,11 @@ export async function regenerateEchoSpyCodes(): Promise<
 }
 
 export async function enterSpyPairPin(input: {
-  echoHost: string;
+  echoHost?: string;
   echoHttpPort: number;
   pin: string;
   role: "mirage" | "powerfist";
+  hintHosts?: string[];
 }): Promise<
   | {
       ok: true;
@@ -115,6 +116,7 @@ export async function enterSpyPairPin(input: {
       body: JSON.stringify({
         echoHost: input.echoHost,
         echoHttpPort: input.echoHttpPort,
+        hintHosts: input.hintHosts,
         pin: input.pin,
         role: input.role,
         nodeId,

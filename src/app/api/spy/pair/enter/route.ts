@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { discoverEchoHosts } from "@/lib/server/spy-echo-discovery.server";
 import {
   completeSpyPairEnter,
   completeSpyPairEnterByPin,
@@ -13,12 +14,27 @@ type EnterBody = {
   pin?: string;
   echoHost?: string;
   echoHttpPort?: number;
+  hintHosts?: string[];
   pairId?: string;
   pairSecret?: string;
   role?: "mirage" | "powerfist";
   nodeId?: string;
   deviceId?: string;
 };
+
+type PairEnterPayload =
+  | {
+      ok: true;
+      role: "mirage" | "powerfist";
+      echoNodeId: string;
+      echoHost: string;
+      httpPort: number;
+      token: string;
+      nodeId?: string;
+      deviceId?: string;
+      sessionEpoch: number;
+    }
+  | { ok: false; reason: string };
 
 function requestHost(request: Request): string {
   return (request.headers.get("host") ?? "").split(":")[0]?.toLowerCase() ?? "";
@@ -39,7 +55,7 @@ async function forwardPinToEcho(input: {
   role: "mirage" | "powerfist";
   nodeId?: string;
   deviceId?: string;
-}): Promise<Response> {
+}): Promise<PairEnterPayload> {
   try {
     const forwardUrl = `http://${input.echoHost}:${input.echoHttpPort}/api/spy/pair/enter`;
     const forwardRes = await fetch(forwardUrl, {
@@ -52,14 +68,77 @@ async function forwardPinToEcho(input: {
         deviceId: input.deviceId,
       }),
     });
-    const payload = (await forwardRes.json()) as { ok?: boolean; reason?: string };
-    return NextResponse.json(payload, { status: forwardRes.status });
+    return (await forwardRes.json()) as PairEnterPayload;
   } catch {
-    return NextResponse.json(
-      { ok: false, reason: `Could not reach Echo at ${input.echoHost}:${input.echoHttpPort}.` },
-      { status: 502 },
-    );
+    return {
+      ok: false,
+      reason: `Could not reach Echo at ${input.echoHost}:${input.echoHttpPort}.`,
+    };
   }
+}
+
+async function pairPinWithDiscovery(input: {
+  echoHttpPort: number;
+  pin: string;
+  role: "mirage" | "powerfist";
+  nodeId?: string;
+  deviceId?: string;
+  hintHosts?: string[];
+}): Promise<PairEnterPayload> {
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+
+  for (const host of input.hintHosts ?? []) {
+    const trimmed = host.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    candidates.push(trimmed);
+  }
+
+  const discovered = await discoverEchoHosts(input.echoHttpPort);
+  for (const host of discovered) {
+    if (seen.has(host)) continue;
+    seen.add(host);
+    candidates.push(host);
+  }
+
+  if (candidates.length === 0) {
+    return {
+      ok: false,
+      reason:
+        "Could not find Echo on your LAN. Open Echo Satellite on the screenshot Mac (same Wi‑Fi), or enter its IP under Advanced.",
+    };
+  }
+
+  let invalidPin = false;
+  let lastReason = "Could not pair with Echo.";
+
+  for (const echoHost of candidates) {
+    const result = await forwardPinToEcho({
+      echoHost,
+      echoHttpPort: input.echoHttpPort,
+      pin: input.pin,
+      role: input.role,
+      nodeId: input.nodeId,
+      deviceId: input.deviceId,
+    });
+
+    if (result.ok) {
+      return result;
+    }
+
+    lastReason = result.reason;
+    if (result.reason.toLowerCase().includes("invalid pairing code")) {
+      invalidPin = true;
+      break;
+    }
+  }
+
+  if (invalidPin) {
+    return { ok: false, reason: "Invalid pairing code." };
+  }
+
+  return { ok: false, reason: lastReason };
 }
 
 /** Mirage or PowerFist — enter the pairing code shown on Echo. */
@@ -74,16 +153,33 @@ export async function POST(request: Request) {
   const pin = body.pin?.trim();
   const role = body.role;
   if (pin && role) {
-    if (!shouldHandlePinLocally(body.echoHost, request)) {
-      const echoHost = body.echoHost?.trim();
-      const echoHttpPort = Number(body.echoHttpPort);
-      if (!echoHost || !Number.isFinite(echoHttpPort) || echoHttpPort <= 0) {
-        return NextResponse.json(
-          { ok: false, reason: "echoHost and echoHttpPort are required to pair with a remote Echo." },
-          { status: 400 },
-        );
+    const echoHttpPort = Number(body.echoHttpPort) || 3050;
+    const echoHost = body.echoHost?.trim();
+
+    if (!echoHost) {
+      if (shouldHandlePinLocally(undefined, request)) {
+        const result = await completeSpyPairEnterByPin({
+          pin,
+          role,
+          nodeId: body.nodeId,
+          deviceId: body.deviceId,
+        });
+        return NextResponse.json(result, { status: result.ok ? 200 : 403 });
       }
-      return forwardPinToEcho({
+
+      const result = await pairPinWithDiscovery({
+        echoHttpPort,
+        pin,
+        role,
+        nodeId: body.nodeId,
+        deviceId: body.deviceId,
+        hintHosts: body.hintHosts,
+      });
+      return NextResponse.json(result, { status: result.ok ? 200 : result.reason === "Invalid pairing code." ? 403 : 502 });
+    }
+
+    if (!shouldHandlePinLocally(echoHost, request)) {
+      const result = await forwardPinToEcho({
         echoHost,
         echoHttpPort,
         pin,
@@ -91,6 +187,7 @@ export async function POST(request: Request) {
         nodeId: body.nodeId,
         deviceId: body.deviceId,
       });
+      return NextResponse.json(result, { status: result.ok ? 200 : 502 });
     }
 
     const result = await completeSpyPairEnterByPin({
