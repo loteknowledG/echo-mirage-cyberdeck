@@ -1,25 +1,20 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { SpyPairOtpInput } from "@/components/cyberdeck/spy-pair-otp-input";
+import { ESPIONAGE_ECHO_DISPLAY } from "@/lib/cyberdeck/espionage-mode";
 import {
-  ESPIONAGE_ECHO_DISPLAY,
-} from "@/lib/cyberdeck/espionage-mode";
-import { isValidSpyPairPin, normalizeSpyPairPin, parseEchoEndpointInput } from "@/lib/cyberdeck/spy-pair-pin";
+  DEFAULT_ECHO_HTTP_PORT,
+  formatEchoEndpointFields,
+  isValidSpyPairPin,
+  normalizeSpyPairPin,
+} from "@/lib/cyberdeck/spy-pair-pin";
 import {
   enterSpyPairPin,
   readSpyMiragePairCredentials,
   readSpyPowerfistPairCredentials,
 } from "@/lib/cyberdeck/spy-pairing-client";
-
-const DEFAULT_ECHO_HTTP_PORT = 3050;
-
-function resolveEchoEndpoint(hostInput: string, portInput: string) {
-  const fallbackPort = Number(portInput.trim() || DEFAULT_ECHO_HTTP_PORT);
-  const parsed = parseEchoEndpointInput(hostInput, fallbackPort);
-  return parsed;
-}
 
 type SpyPairPinFormProps = {
   role: "mirage" | "powerfist";
@@ -44,6 +39,17 @@ function readLastEchoHost(role: "mirage" | "powerfist"): string {
   return readSpyPowerfistPairCredentials()?.echoHost ?? "";
 }
 
+function readLastEchoPort(role: "mirage" | "powerfist"): string {
+  const creds =
+    role === "mirage" ? readSpyMiragePairCredentials() : readSpyPowerfistPairCredentials();
+  return creds?.httpPort ? String(creds.httpPort) : String(DEFAULT_ECHO_HTTP_PORT);
+}
+
+function shouldNormalizeAddressInput(value: string): boolean {
+  const trimmed = value.trim();
+  return /^https?:\/\//i.test(trimmed) || /:\d{1,5}$/.test(trimmed);
+}
+
 export function SpyPairPinForm({
   role,
   roleLabel,
@@ -51,7 +57,7 @@ export function SpyPairPinForm({
   buttonLabel,
   onPaired,
 }: SpyPairPinFormProps) {
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(() => Boolean(readLastEchoHost(role)));
   const [echoHost, setEchoHost] = useState("");
   const [echoHttpPort, setEchoHttpPort] = useState(String(DEFAULT_ECHO_HTTP_PORT));
   const [pin, setPin] = useState("");
@@ -59,12 +65,45 @@ export function SpyPairPinForm({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
+  useEffect(() => {
+    const lastHost = readLastEchoHost(role);
+    if (!lastHost) return;
+    const formatted = formatEchoEndpointFields(lastHost, readLastEchoPort(role));
+    setEchoHost(formatted.host);
+    setEchoHttpPort(formatted.port);
+  }, [role]);
+
+  const syncEndpointFields = useCallback(
+    (hostInput: string, portInput: string) => {
+      const formatted = formatEchoEndpointFields(hostInput, portInput);
+      setEchoHost(formatted.host);
+      setEchoHttpPort(formatted.port);
+      return formatted;
+    },
+    [],
+  );
+
   const handlePinChange = useCallback((next: string) => {
     setPin(normalizeSpyPairPin(next));
   }, []);
 
+  const handleAddressChange = useCallback(
+    (value: string) => {
+      setEchoHost(value);
+      if (shouldNormalizeAddressInput(value)) {
+        syncEndpointFields(value, echoHttpPort);
+      }
+    },
+    [echoHttpPort, syncEndpointFields],
+  );
+
+  const handleAddressBlur = useCallback(() => {
+    syncEndpointFields(echoHost, echoHttpPort);
+  }, [echoHost, echoHttpPort, syncEndpointFields]);
+
   const handlePair = useCallback(async () => {
-    const { host, port } = resolveEchoEndpoint(echoHost, echoHttpPort);
+    const { host, port: portText } = syncEndpointFields(echoHost, echoHttpPort);
+    const port = Number(portText);
 
     if (!Number.isFinite(port) || port <= 0) {
       setError("Enter a valid Echo port.");
@@ -104,8 +143,14 @@ export function SpyPairPinForm({
     onPaired(result);
     setPin("");
     setError(null);
-    setStatus(`Linked with ${ESPIONAGE_ECHO_DISPLAY} at ${result.echoHost}.`);
-  }, [echoHost, echoHttpPort, pin, role, roleLabel, onPaired]);
+    setStatus(`Linked with ${ESPIONAGE_ECHO_DISPLAY} at ${result.echoHost}:${result.httpPort}.`);
+    syncEndpointFields(result.echoHost, String(result.httpPort));
+  }, [echoHost, echoHttpPort, pin, role, roleLabel, onPaired, syncEndpointFields]);
+
+  const resolvedPreview =
+    echoHost.trim().length > 0
+      ? formatEchoEndpointFields(echoHost, echoHttpPort)
+      : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -137,15 +182,17 @@ export function SpyPairPinForm({
             <span className="text-[9px] tracking-[0.08em] text-[#8a8a8a]">{ESPIONAGE_ECHO_DISPLAY} address</span>
             <input
               value={echoHost}
-              onChange={(event) => setEchoHost(event.target.value)}
+              onChange={(event) => handleAddressChange(event.target.value)}
+              onBlur={handleAddressBlur}
               spellCheck={false}
               autoCapitalize="off"
               autoComplete="off"
-              placeholder="192.168.12.39 or 192.168.12.39:3050"
+              placeholder="192.168.12.39"
               className="border border-[#2d2d2d] bg-black px-2 py-2 font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none focus:border-[#3d3d3d]"
             />
             <span className="text-[8px] leading-relaxed text-[#5f5f5f]">
-              IP only, or include :3050 once — do not put the port in both fields.
+              IP or paste <code className="text-[#8a8a8a]">192.168.12.39:3050</code> — port moves to the field
+              below automatically.
             </span>
           </label>
 
@@ -154,6 +201,7 @@ export function SpyPairPinForm({
             <input
               value={echoHttpPort}
               onChange={(event) => setEchoHttpPort(event.target.value.replace(/\D/g, "").slice(0, 5))}
+              onBlur={handleAddressBlur}
               inputMode="numeric"
               spellCheck={false}
               autoComplete="off"
@@ -161,6 +209,15 @@ export function SpyPairPinForm({
               className="w-24 border border-[#2d2d2d] bg-black px-2 py-2 font-mono text-[10px] tracking-[0.04em] text-[#cfcfcf] outline-none focus:border-[#3d3d3d]"
             />
           </label>
+
+          {resolvedPreview?.host ? (
+            <p className="text-[8px] text-[#6a8a8a]">
+              Will connect to{" "}
+              <code className="text-[#9fd8ff]">
+                {resolvedPreview.host}:{resolvedPreview.port}
+              </code>
+            </p>
+          ) : null}
         </>
       ) : null}
 

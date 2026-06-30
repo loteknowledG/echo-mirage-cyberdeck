@@ -42,3 +42,13 @@ export function parseEchoEndpointInput(
 
   return { host: raw, port: fallbackPort };
 }
+
+/** Split host:port / URL input into separate fields for the pairing form. */
+export function formatEchoEndpointFields(
+  hostInput: string,
+  portInput: string,
+  fallbackPort = DEFAULT_ECHO_HTTP_PORT,
+): { host: string; port: string } {
+  const parsed = parseEchoEndpointInput(hostInput, Number(portInput) || fallbackPort);
+  return { host: parsed.host, port: String(parsed.port) };
+}
