@@ -1,8 +1,9 @@
 {
   "name": "echo-satellite",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Echo Mirage capture satellite — Electron tray agent",
+  "author": "Craftwerk Corp",
   "main": "electron/main.mjs",
   "type": "module",
   "scripts": {
@@ -28,6 +29,7 @@
     "appId": "com.craftwerk.echo-satellite",
     "productName": "Echo Satellite",
     "copyright": "Copyright © Craftwerk Corp",
+    "publish": null,
     "npmRebuild": true,
     "directories": {
       "output": "release",
@@ -77,7 +79,8 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "public/icon.ico",
       "uninstallerIcon": "public/icon.ico",
-      "installerHooks": "build/hooks.nsh"
+      "runAfterFinish": false,
+      "include": "build/installer.nsh"
     }
   },
   "pnpm": {
