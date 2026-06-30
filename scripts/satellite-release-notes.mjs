@@ -6,6 +6,7 @@ Minimal capture drone for the **Echo** screenshot machine — tray on Windows, s
 
 ### What's new in ${version}
 
+- **macOS PKG install fix** — installer no longer fails at Summary when upgrading over a running Echo Satellite
 - **Check for updates** in the app — one-click download and install from GitHub releases
 - Automatic update check on startup when a newer Satellite build exists
 - **Code-only pairing** — Mirage/PowerFist enter the 6-digit PIN; browser finds Echo on Wi‑Fi (no IP typing)
