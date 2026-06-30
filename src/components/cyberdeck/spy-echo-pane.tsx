@@ -13,6 +13,7 @@ import { startStealthCaptureDeck } from "@/lib/cyberdeck/espionage-stealth-captu
 import {
   fetchEchoSpyCodes,
   formatCodeExpiry,
+  normalizePairedMirages,
   regenerateEchoSpyCodes,
 } from "@/lib/cyberdeck/spy-pairing-client";
 import { readPowerfistCaptureCredentials } from "@/lib/cyberdeck/powerfist-capture-client";
@@ -59,7 +60,7 @@ export function SpyEchoPane() {
   const [powerfistPin, setPowerfistPin] = useState<string | null>(null);
   const [mirageExpiresAt, setMirageExpiresAt] = useState<string | null>(null);
   const [powerfistExpiresAt, setPowerfistExpiresAt] = useState<string | null>(null);
-  const [pairedMirage, setPairedMirage] = useState<{ nodeId: string } | null>(null);
+  const [pairedMirages, setPairedMirages] = useState<{ nodeId: string }[]>([]);
   const [pairedPowerfist, setPairedPowerfist] = useState<{ deviceId: string } | null>(null);
   const [notEchoMachine, setNotEchoMachine] = useState(false);
   const [captureRelayActive, setCaptureRelayActive] = useState(() => Boolean(readPowerfistCaptureCredentials()));
@@ -82,7 +83,7 @@ export function SpyEchoPane() {
     setPowerfistPin(status.powerfistPin);
     setMirageExpiresAt(status.mirageExpiresAt);
     setPowerfistExpiresAt(status.powerfistExpiresAt);
-    setPairedMirage(status.pairedMirage);
+    setPairedMirages(normalizePairedMirages(status));
     setPairedPowerfist(status.pairedPowerfist);
   }, []);
 
@@ -103,7 +104,7 @@ export function SpyEchoPane() {
     setPowerfistPin(status.powerfistPin);
     setMirageExpiresAt(status.mirageExpiresAt);
     setPowerfistExpiresAt(status.powerfistExpiresAt);
-    setPairedMirage(status.pairedMirage);
+    setPairedMirages(normalizePairedMirages(status));
     setPairedPowerfist(status.pairedPowerfist);
   }, []);
 
@@ -159,10 +160,14 @@ export function SpyEchoPane() {
             expiresAt={powerfistExpiresAt}
           />
 
-          {pairedMirage ? (
-            <p className="text-emerald-300/80">
-              PAIRED // {ESPIONAGE_MIRAGE_DISPLAY} {pairedMirage.nodeId.slice(0, 8)}…
-            </p>
+          {pairedMirages.length > 0 ? (
+            <ul className="space-y-1">
+              {pairedMirages.map((mirage) => (
+                <li key={mirage.nodeId} className="text-emerald-300/80">
+                  LINKED // {ESPIONAGE_MIRAGE_DISPLAY} {mirage.nodeId.slice(0, 8)}…
+                </li>
+              ))}
+            </ul>
           ) : null}
           {pairedPowerfist ? (
             <p className="text-emerald-300/80">

@@ -2,6 +2,16 @@ import { invoke } from "@tauri-apps/api/core";
 
 type WsRuntimeStatus = "disconnected" | "connecting" | "connected" | "error";
 
+type SpyMirageLink = {
+  nodeId: string;
+  pairedAt: string;
+};
+
+type CaptureMirageLink = {
+  host: string;
+  port: number;
+};
+
 type SatelliteStatus = {
   armed: boolean;
   wsStatus: WsRuntimeStatus;
@@ -9,6 +19,9 @@ type SatelliteStatus = {
   lastError?: string | null;
   lastMissionId?: string | null;
   missionsHandled: number;
+  spyMirages: SpyMirageLink[];
+  spyLinksReachable: boolean;
+  captureMirage: CaptureMirageLink | null;
 };
 
 type TestCaptureResult = {
@@ -59,6 +72,7 @@ const openScreenSettingsBtn = document.querySelector<HTMLButtonElement>("#open-s
 const statusArmedEl = document.querySelector<HTMLElement>("#status-armed")!;
 const statusWsEl = document.querySelector<HTMLElement>("#status-ws")!;
 const statusMissionsEl = document.querySelector<HTMLElement>("#status-missions")!;
+const statusMiragesEl = document.querySelector<HTMLElement>("#status-mirages")!;
 const statusErrorEl = document.querySelector<HTMLElement>("#status-error")!;
 const crashBannerEl = document.querySelector<HTMLElement>("#crash-banner")!;
 const crashBannerDetailEl = document.querySelector<HTMLElement>("#crash-banner-detail")!;
@@ -123,10 +137,33 @@ async function refreshPermissions(): Promise<void> {
   }
 }
 
+function formatLinkedMirages(status: SatelliteStatus): string {
+  const lines: string[] = [];
+  for (const mirage of status.spyMirages) {
+    lines.push(`${mirage.nodeId.slice(0, 8)}… (Spy team)`);
+  }
+  if (status.captureMirage) {
+    const armedSuffix = status.armed ? " · armed" : "";
+    lines.push(`${status.captureMirage.host}:${status.captureMirage.port} (Capture relay${armedSuffix})`);
+  }
+  if (lines.length === 0) {
+    return status.spyLinksReachable
+      ? "No Mirage linked yet"
+      : "Open cyberdeck Spy tab on this machine for Spy team links";
+  }
+  return lines.join("\n");
+}
+
 async function refreshStatus(): Promise<void> {
   const status = await invoke<SatelliteStatus>("get_status");
+  const mirageSummary = formatLinkedMirages(status);
   pairPortEl.textContent = String(status.pairHttpPort);
   statusArmedEl.textContent = status.armed ? "ARMED" : "DISARMED";
+  statusMiragesEl.textContent = mirageSummary;
+  statusMiragesEl.classList.toggle(
+    "empty",
+    mirageSummary.includes("No Mirage") || mirageSummary.includes("Open cyberdeck"),
+  );
   statusWsEl.textContent = status.wsStatus.toUpperCase();
   statusMissionsEl.textContent = String(status.missionsHandled);
   statusErrorEl.textContent = status.lastError?.trim() || "—";

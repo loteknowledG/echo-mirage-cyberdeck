@@ -38,8 +38,10 @@ export type EchoSpyPairingState = {
   sessionEpoch: number;
   mirageCode: SpyPairCodeSession | null;
   powerfistCode: SpyPairCodeSession | null;
-  pairedMirage: SpyPairedMirageClient | null;
+  pairedMirages: SpyPairedMirageClient[];
   pairedPowerfist: SpyPairedPowerfistClient | null;
+  /** @deprecated Migrated to pairedMirages on load */
+  pairedMirage?: SpyPairedMirageClient | null;
 };
 
 export const ECHO_SPY_TERMINATED_MESSAGE = "ECHO TERMINATED";
@@ -116,16 +118,30 @@ async function defaultState(): Promise<EchoSpyPairingState> {
     sessionEpoch: 1,
     mirageCode: null,
     powerfistCode: null,
-    pairedMirage: null,
+    pairedMirages: [],
     pairedPowerfist: null,
   };
 }
 
+export function normalizePairedMirages(
+  state: Pick<EchoSpyPairingState, "pairedMirages"> & { pairedMirage?: SpyPairedMirageClient | null },
+): SpyPairedMirageClient[] {
+  if (Array.isArray(state.pairedMirages) && state.pairedMirages.length > 0) {
+    return state.pairedMirages;
+  }
+  if (state.pairedMirage) {
+    return [state.pairedMirage];
+  }
+  return [];
+}
+
 function normalizeEchoSpyState(state: EchoSpyPairingState): EchoSpyPairingState {
+  const pairedMirages = normalizePairedMirages(state);
   return {
     ...state,
     echoSpyActive: state.echoSpyActive ?? false,
     sessionEpoch: state.sessionEpoch ?? 1,
+    pairedMirages,
   };
 }
 
@@ -219,7 +235,7 @@ export async function terminateEchoSpySession(): Promise<{
   state.sessionEpoch += 1;
   state.mirageCode = null;
   state.powerfistCode = null;
-  state.pairedMirage = null;
+  state.pairedMirages = [];
   state.pairedPowerfist = null;
   await saveEchoSpyPairingState(state);
   return {
@@ -247,6 +263,8 @@ export async function getEchoSpyPairingStatus(): Promise<{
   powerfistPin: string | null;
   mirageExpiresAt: string | null;
   powerfistExpiresAt: string | null;
+  pairedMirages: SpyPairedMirageClient[];
+  /** First linked Mirage — legacy alias for single-client consumers */
   pairedMirage: SpyPairedMirageClient | null;
   pairedPowerfist: SpyPairedPowerfistClient | null;
   echoSpyActive: boolean;
@@ -275,6 +293,8 @@ export async function getEchoSpyPairingStatus(): Promise<{
   const mirageActive = mirageSession && !sessionExpired(mirageSession);
   const powerfistActive = powerfistSession && !sessionExpired(powerfistSession);
 
+  const pairedMirages = normalizePairedMirages(state);
+
   return {
     echoNodeId: state.echoNodeId,
     echoHost: host,
@@ -283,7 +303,8 @@ export async function getEchoSpyPairingStatus(): Promise<{
     powerfistPin: powerfistActive ? powerfistSession.pin : null,
     mirageExpiresAt: mirageActive ? mirageSession.expiresAt : null,
     powerfistExpiresAt: powerfistActive ? powerfistSession.expiresAt : null,
-    pairedMirage: state.pairedMirage,
+    pairedMirages,
+    pairedMirage: pairedMirages[0] ?? null,
     pairedPowerfist: state.pairedPowerfist,
     echoSpyActive: state.echoSpyActive,
     sessionEpoch: state.sessionEpoch,
@@ -322,7 +343,8 @@ export async function checkEchoSpyLinkStatus(input: {
 
   if (input.role === "mirage") {
     const nodeId = input.nodeId?.trim();
-    if (!nodeId || !state.pairedMirage || state.pairedMirage.nodeId !== nodeId) {
+    const linked = normalizePairedMirages(state).some((mirage) => mirage.nodeId === nodeId);
+    if (!nodeId || !linked) {
       return {
         ok: true,
         active: false,
@@ -439,13 +461,22 @@ export async function completeSpyPairEnter(input: {
       return { ok: false, reason: "nodeId is required for Mirage pairing." };
     }
 
+    const pairedMirages = normalizePairedMirages(state);
+    const existingIdx = pairedMirages.findIndex((mirage) => mirage.nodeId === nodeId);
     const mirageToken =
-      state.pairedMirage?.mirageToken ?? crypto.randomBytes(24).toString("hex");
-    state.pairedMirage = {
+      (existingIdx >= 0 ? pairedMirages[existingIdx]?.mirageToken : null) ??
+      crypto.randomBytes(24).toString("hex");
+    const entry: SpyPairedMirageClient = {
       nodeId,
       mirageToken,
       pairedAt: new Date().toISOString(),
     };
+    if (existingIdx >= 0) {
+      pairedMirages[existingIdx] = entry;
+    } else {
+      pairedMirages.push(entry);
+    }
+    state.pairedMirages = pairedMirages;
     state.mirageCode = null;
     await saveEchoSpyPairingState(state);
 

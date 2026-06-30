@@ -14,4 +14,9 @@ contextBridge.exposeInMainWorld("satellite", {
     ipcRenderer.on("satellite:disarm", listener);
     return () => ipcRenderer.removeListener("satellite:disarm", listener);
   },
+  onStatusChanged: (handler) => {
+    const listener = () => handler();
+    ipcRenderer.on("satellite:status-changed", listener);
+    return () => ipcRenderer.removeListener("satellite:status-changed", listener);
+  },
 });

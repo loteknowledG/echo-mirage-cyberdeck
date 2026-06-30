@@ -11,6 +11,7 @@ import {
 import {
   fetchEchoSpyCodes,
   fetchEchoSpyLinkStatus,
+  normalizePairedMirages,
   readSpyMiragePairCredentials,
   readSpyPowerfistPairCredentials,
 } from "@/lib/cyberdeck/spy-pairing-client";
@@ -21,10 +22,17 @@ type RemoteEchoStatus =
   | {
       ok: true;
       echoHost: string;
+      pairedMirages?: { nodeId: string; pairedAt: string }[];
       pairedMirage: { nodeId: string; pairedAt: string } | null;
       pairedPowerfist: { deviceId: string; pairedAt: string } | null;
     }
   | { ok: false; reason?: string };
+
+function formatMirageLinkDetail(mirages: { nodeId: string }[]): string {
+  if (mirages.length === 0) return "Waiting for Mirage code.";
+  if (mirages.length === 1) return `node ${mirages[0].nodeId.slice(0, 8)}…`;
+  return `${mirages.length} linked · ${mirages.map((mirage) => mirage.nodeId.slice(0, 8)).join(", ")}…`;
+}
 
 async function fetchEchoRemoteStatus(echoHost: string, echoHttpPort: number): Promise<RemoteEchoStatus> {
   try {
@@ -67,8 +75,9 @@ export function useSpyTeamStatus(): SpyTeamStatus {
     let remote: RemoteEchoStatus | null = null;
 
     if (echoLocal.ok) {
-      echoMirage = echoLocal.pairedMirage
-        ? linkFromBool(true, `node ${echoLocal.pairedMirage.nodeId.slice(0, 8)}…`)
+      const localMirages = normalizePairedMirages(echoLocal);
+      echoMirage = localMirages.length
+        ? linkFromBool(true, formatMirageLinkDetail(localMirages))
         : linkFromBool(false, "Waiting for Mirage code.");
       echoPowerfist = echoLocal.pairedPowerfist
         ? linkFromBool(true, `device ${echoLocal.pairedPowerfist.deviceId.slice(0, 8)}…`)
@@ -76,8 +85,9 @@ export function useSpyTeamStatus(): SpyTeamStatus {
     } else if (echoHost) {
       remote = await fetchEchoRemoteStatus(echoHost, echoHttpPort);
       if (remote.ok) {
-        echoMirage = remote.pairedMirage
-          ? linkFromBool(true, `node ${remote.pairedMirage.nodeId.slice(0, 8)}…`)
+        const remoteMirages = normalizePairedMirages(remote);
+        echoMirage = remoteMirages.length
+          ? linkFromBool(true, formatMirageLinkDetail(remoteMirages))
           : linkFromBool(false, "Echo has no Mirage pairing yet.");
         echoPowerfist = remote.pairedPowerfist
           ? linkFromBool(true, `device ${remote.pairedPowerfist.deviceId.slice(0, 8)}…`)
@@ -86,8 +96,8 @@ export function useSpyTeamStatus(): SpyTeamStatus {
     }
 
     if (mirageCreds) {
-      const remoteMatches =
-        remote?.ok && remote.pairedMirage?.nodeId === mirageCreds.nodeId;
+      const remoteMirages = remote?.ok ? normalizePairedMirages(remote) : [];
+      const remoteMatches = remoteMirages.some((mirage) => mirage.nodeId === mirageCreds.nodeId);
       const localActive = echoLocal.ok ? await isLocalSpyLinkActive("mirage", mirageCreds) : false;
 
       if (remoteMatches || localActive || (!remote && !echoLocal.ok)) {
@@ -95,7 +105,7 @@ export function useSpyTeamStatus(): SpyTeamStatus {
           true,
           `${mirageCreds.echoHost} · node ${mirageCreds.nodeId.slice(0, 8)}…`,
         );
-      } else if (remote?.ok && !remote.pairedMirage) {
+      } else if (remote?.ok && remoteMirages.length === 0) {
         echoMirage = linkFromBool(false, "Re-enter Mirage code — Echo session may have reset.");
       }
     }

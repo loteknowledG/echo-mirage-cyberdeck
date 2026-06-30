@@ -23,6 +23,7 @@ import { startPairServer } from "./pair-server.mjs";
 import { startWsClient } from "./ws-client.mjs";
 import { createTrayManager } from "./tray.mjs";
 import * as logger from "./logger.mjs";
+import { fetchSpyMirageLinks } from "./spy-links.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -33,6 +34,9 @@ let mainWindow = null;
 /** @type {ReturnType<typeof startWsClient> | null} */
 let wsClient = null;
 
+/** @type {ReturnType<typeof startPairServer> | null} */
+let pairServer = null;
+
 let armed = false;
 /** @type {"disconnected"|"connecting"|"connected"|"error"} */
 let wsStatus = "disconnected";
@@ -41,6 +45,10 @@ let missionsHandled = 0;
 let lastError = null;
 /** @type {string | null} */
 let lastMissionId = null;
+/** @type {import('./config.mjs').SatelliteCredentials | null} */
+let cachedCredentials = null;
+/** @type {{ reachable: boolean, mirages: Array<{ nodeId: string, pairedAt: string }> }} */
+let cachedSpyLinks = { reachable: false, mirages: [] };
 
 let trayIcon = null;
 try {
@@ -61,6 +69,14 @@ function statusSnapshot() {
     lastError: stats?.lastError ?? lastError,
     lastMissionId: stats?.lastMissionId ?? lastMissionId,
     missionsHandled: stats?.missionsHandled ?? missionsHandled,
+    spyMirages: cachedSpyLinks.mirages,
+    spyLinksReachable: cachedSpyLinks.reachable,
+    captureMirage: cachedCredentials
+      ? {
+          host: cachedCredentials.mirageHost,
+          port: cachedCredentials.mirageHttpPort,
+        }
+      : null,
   };
 }
 
@@ -72,6 +88,7 @@ function stopWs() {
 
 async function armWithCredentials(creds, hideWindow) {
   await saveCredentials(app, creds);
+  cachedCredentials = creds;
   stopWs();
   wsClient = startWsClient(creds, {
     onStatus: (status) => {
@@ -116,6 +133,11 @@ function createMainWindow() {
   });
 }
 
+async function refreshSpyLinks() {
+  cachedSpyLinks = await fetchSpyMirageLinks();
+  mainWindow?.webContents.send("satellite:status-changed", statusSnapshot());
+}
+
 async function initializeAfterReady() {
   logger.step(3, 8, "app ready — starting services");
 
@@ -127,12 +149,18 @@ async function initializeAfterReady() {
   });
 
   const saved = await loadCredentials(app);
+  cachedCredentials = saved;
   if (saved) {
     logger.step(6, 8, "restoring saved credentials");
     await armWithCredentials(saved, false);
   } else {
     logger.step(6, 8, "no saved credentials — fresh setup");
   }
+
+  void refreshSpyLinks();
+  setInterval(() => {
+    void refreshSpyLinks();
+  }, 5000);
 
   trayManager.ensureTray();
   logger.step(7, 8, process.platform === "darwin" ? "window-only mode (macOS)" : "system tray ready");
@@ -180,6 +208,7 @@ function registerIpc() {
   ipcMain.handle("satellite:disarm", async () => {
     armed = false;
     stopWs();
+    cachedCredentials = null;
     await clearCredentials(app);
     trayManager.showMainWindow();
     return statusSnapshot();

@@ -10,6 +10,24 @@ const POWERFIST_DEVICE_ID_KEY = "echo-mirage-powerfist-device-id";
 
 export { ECHO_SPY_TERMINATED_MESSAGE };
 
+export type SpyPairedMirage = {
+  nodeId: string;
+  pairedAt: string;
+};
+
+export function normalizePairedMirages(status: {
+  pairedMirages?: SpyPairedMirage[];
+  pairedMirage?: SpyPairedMirage | null;
+}): SpyPairedMirage[] {
+  if (status.pairedMirages?.length) {
+    return status.pairedMirages;
+  }
+  if (status.pairedMirage) {
+    return [status.pairedMirage];
+  }
+  return [];
+}
+
 export type SpyMiragePairCredentials = {
   echoHost: string;
   httpPort: number;
@@ -49,27 +67,15 @@ export async function fetchEchoSpyCodes(): Promise<
       powerfistPin: string | null;
       mirageExpiresAt: string | null;
       powerfistExpiresAt: string | null;
-      pairedMirage: { nodeId: string; pairedAt: string } | null;
+      pairedMirages: SpyPairedMirage[];
+      pairedMirage: SpyPairedMirage | null;
       pairedPowerfist: { deviceId: string; pairedAt: string } | null;
     }
   | { ok: false; reason: string }
 > {
   try {
     const res = await fetch("/api/spy/echo/codes", { cache: "no-store" });
-    return (await res.json()) as
-      | {
-          ok: true;
-          echoNodeId: string;
-          echoHost: string;
-          httpPort: number;
-          miragePin: string | null;
-          powerfistPin: string | null;
-          mirageExpiresAt: string | null;
-          powerfistExpiresAt: string | null;
-          pairedMirage: { nodeId: string; pairedAt: string } | null;
-          pairedPowerfist: { deviceId: string; pairedAt: string } | null;
-        }
-      | { ok: false; reason: string };
+    return (await res.json()) as Awaited<ReturnType<typeof fetchEchoSpyCodes>>;
   } catch {
     return { ok: false, reason: "Could not load Echo pairing codes." };
   }
