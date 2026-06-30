@@ -5,7 +5,13 @@ import { DEFAULT_PAIR_HTTP_PORT } from "./config.mjs";
 import * as logger from "./logger.mjs";
 
 /**
- * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void }} options
+ * @param {{
+ *   port?: number,
+ *   getNodeId: () => Promise<string>,
+ *   onPaired: (creds: object) => void,
+ *   spyPairing: ReturnType<import('./spy-pairing.mjs').createSpyPairing>,
+ *   onSpyPaired?: () => void,
+ * }} options
  */
 export function startPairServer(options) {
   const port = options.port ?? DEFAULT_PAIR_HTTP_PORT;
@@ -14,18 +20,104 @@ export function startPairServer(options) {
     void handleRequest(req, res);
   });
 
+  async function readJsonBody(req) {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const raw = Buffer.concat(chunks).toString("utf8").trim();
+    if (!raw) return {};
+    return JSON.parse(raw);
+  }
+
+  function sendJson(res, status, payload) {
+    res.writeHead(status, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(payload));
+  }
+
   async function handleRequest(req, res) {
     try {
       const host = req.headers.host ?? `127.0.0.1:${port}`;
       const url = new URL(req.url ?? "/", `http://${host}`);
+      const pathname = url.pathname;
 
-      if (url.pathname === "/health") {
+      if (pathname === "/health") {
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("ok");
         return;
       }
 
-      if (url.pathname === "/powerfist/capture-pair" && req.method === "GET") {
+      if (pathname === "/api/spy/echo/codes" && req.method === "GET") {
+        const status = await options.spyPairing.getEchoSpyPairingStatus();
+        sendJson(res, 200, { ok: true, ...status });
+        return;
+      }
+
+      if (pathname === "/api/spy/echo/codes" && req.method === "POST") {
+        await options.spyPairing.refreshEchoSpyPairCodes();
+        const status = await options.spyPairing.getEchoSpyPairingStatus();
+        sendJson(res, 200, { ok: true, ...status });
+        return;
+      }
+
+      if (pathname === "/api/spy/pair/enter" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const pin = typeof body.pin === "string" ? body.pin.trim() : "";
+        const role = body.role;
+        if (pin && (role === "mirage" || role === "powerfist")) {
+          const result = await options.spyPairing.completeSpyPairEnterByPin({
+            pin,
+            role,
+            nodeId: typeof body.nodeId === "string" ? body.nodeId : undefined,
+            deviceId: typeof body.deviceId === "string" ? body.deviceId : undefined,
+          });
+          if (result.ok) options.onSpyPaired?.();
+          sendJson(res, result.ok ? 200 : 403, result);
+          return;
+        }
+
+        const pairId = typeof body.pairId === "string" ? body.pairId.trim() : "";
+        const pairSecret = typeof body.pairSecret === "string" ? body.pairSecret.trim() : "";
+        if (role === "mirage" || role === "powerfist") {
+          if (!pairId || !pairSecret) {
+            sendJson(res, 400, { ok: false, reason: "pin/role or pairId/pairSecret/role required." });
+            return;
+          }
+          const result = await options.spyPairing.completeSpyPairEnter({
+            pairId,
+            pairSecret,
+            role,
+            nodeId: typeof body.nodeId === "string" ? body.nodeId : undefined,
+            deviceId: typeof body.deviceId === "string" ? body.deviceId : undefined,
+          });
+          if (result.ok) options.onSpyPaired?.();
+          sendJson(res, result.ok ? 200 : 403, result);
+          return;
+        }
+
+        sendJson(res, 400, { ok: false, reason: "pin/role or pairId/pairSecret/role required." });
+        return;
+      }
+
+      if (pathname === "/api/spy/pair/link-status" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const role = body.role;
+        if (role !== "mirage" && role !== "powerfist") {
+          sendJson(res, 400, { ok: false, reason: "role required." });
+          return;
+        }
+        const result = await options.spyPairing.checkEchoSpyLinkStatus({
+          echoNodeId: typeof body.echoNodeId === "string" ? body.echoNodeId : "",
+          role,
+          sessionEpoch: Number(body.sessionEpoch),
+          nodeId: typeof body.nodeId === "string" ? body.nodeId : undefined,
+          deviceId: typeof body.deviceId === "string" ? body.deviceId : undefined,
+        });
+        sendJson(res, 200, result);
+        return;
+      }
+
+      if (pathname === "/powerfist/capture-pair" && req.method === "GET") {
         const pairId = url.searchParams.get("pairId")?.trim();
         const pairSecret = url.searchParams.get("pairSecret")?.trim();
         const mirageHost = url.searchParams.get("mirageHost")?.trim();
@@ -38,7 +130,7 @@ export function startPairServer(options) {
           return;
         }
 
-        logger.log("pair-server: QR hit — completing pair with Mirage");
+        logger.log("pair-server: capture QR hit — arming relay with Mirage");
         const result = await completeCapturePair({
           pairId,
           pairSecret,
@@ -50,14 +142,16 @@ export function startPairServer(options) {
         if (!result.ok || !result.credentials) {
           res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
           res.end(
-            `<body style="background:#000;color:#888;font-family:monospace">${result.reason ?? "pair failed"}</body>`,
+            `<body style="background:#000;color:#888;font-family:monospace;padding:1rem">${result.reason ?? "pair failed"}</body>`,
           );
           return;
         }
 
         options.onPaired(result.credentials);
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end('<body style="background:#000"></body>');
+        res.end(
+          '<body style="background:#050505;color:#8fd88f;font-family:monospace;padding:1rem">Echo Satellite armed — you can close this tab.</body>',
+        );
         return;
       }
 

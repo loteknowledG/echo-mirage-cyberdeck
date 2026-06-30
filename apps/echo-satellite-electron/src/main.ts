@@ -9,22 +9,37 @@ type SatelliteStatus = {
   missionsHandled: number;
 };
 
+type SpyCodesStatus = {
+  ok: true;
+  echoNodeId: string;
+  echoHost: string;
+  httpPort: number;
+  miragePin: string | null;
+  powerfistPin: string | null;
+  mirageExpiresAt: string | null;
+  powerfistExpiresAt: string | null;
+  pairedMirage: { nodeId: string; pairedAt: string } | null;
+  pairedPowerfist: { deviceId: string; pairedAt: string } | null;
+};
+
 type TestCaptureResult = {
   ok: boolean;
   width?: number;
   height?: number;
   pngBytes?: number;
+  previewBase64?: string;
+  captureSource?: string;
+  captureNote?: string;
+  stale?: boolean;
   error?: string;
-};
-
-type PairResult = {
-  ok: boolean;
-  reason?: string;
 };
 
 type PermissionStatus = {
   platform: string;
   screenRecording: boolean;
+  stale?: boolean;
+  electronStatus?: string;
+  preflight?: boolean;
   hint?: string | null;
 };
 
@@ -35,20 +50,24 @@ type DiagnosticsReport = {
   logPath: string;
   sessionId: string;
   previousSessionCrashed: boolean;
+  captureNote?: string | null;
   logTail: string;
   supportHint: string;
 };
 
 type SatelliteApi = {
   getStatus: () => Promise<SatelliteStatus>;
-  pairFromUrl: (capturePairUrl: string) => Promise<PairResult>;
+  getSpyCodes: () => Promise<SpyCodesStatus>;
+  regenerateSpyCodes: () => Promise<SpyCodesStatus>;
   testCapture: () => Promise<TestCaptureResult>;
   disarm: () => Promise<SatelliteStatus>;
   hideToTray: () => Promise<void>;
   checkPermissions: () => Promise<PermissionStatus>;
+  requestScreenPermission: () => Promise<PermissionStatus>;
   openScreenRecordingSettings: () => Promise<void>;
   getDiagnostics: () => Promise<DiagnosticsReport>;
   onDisarm: (handler: () => void) => () => void;
+  onSpyCodesChanged: (handler: () => void) => () => void;
 };
 
 declare global {
@@ -60,8 +79,17 @@ declare global {
 const api = window.satellite;
 
 const pairPortEl = document.querySelector<HTMLElement>("#pair-port")!;
+const echoLanEl = document.querySelector<HTMLElement>("#echo-lan")!;
+const miragePinEl = document.querySelector<HTMLElement>("#mirage-pin")!;
+const powerfistPinEl = document.querySelector<HTMLElement>("#powerfist-pin")!;
+const mirageExpiryEl = document.querySelector<HTMLElement>("#mirage-expiry")!;
+const powerfistExpiryEl = document.querySelector<HTMLElement>("#powerfist-expiry")!;
+const pairStatusEl = document.querySelector<HTMLElement>("#pair-status")!;
 const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
+const capturePreviewEl = document.querySelector<HTMLImageElement>("#capture-preview")!;
+const testCaptureBtn = document.querySelector<HTMLButtonElement>("#test-capture")!;
 const permissionResultEl = document.querySelector<HTMLElement>("#permission-result")!;
+const fixPermissionBtn = document.querySelector<HTMLButtonElement>("#fix-permission")!;
 const openScreenSettingsBtn = document.querySelector<HTMLButtonElement>("#open-screen-settings")!;
 const statusArmedEl = document.querySelector<HTMLElement>("#status-armed")!;
 const statusWsEl = document.querySelector<HTMLElement>("#status-ws")!;
@@ -73,6 +101,18 @@ const diagModeEl = document.querySelector<HTMLElement>("#diag-mode")!;
 const diagLogPathEl = document.querySelector<HTMLElement>("#diag-log-path")!;
 const diagLogTailEl = document.querySelector<HTMLElement>("#diag-log-tail")!;
 
+function formatCodeExpiry(expiresAt: string | null): string {
+  if (!expiresAt) return "";
+  const ms = Date.parse(expiresAt) - Date.now();
+  if (ms <= 0) return "Expired — tap New codes";
+  const minutes = Math.ceil(ms / 60_000);
+  return `Expires in ${minutes} min`;
+}
+
+function formatPin(pin: string | null): string {
+  return pin ?? "——";
+}
+
 function formatDiagnostics(report: DiagnosticsReport): string {
   return [
     "Echo Satellite diagnostics (Electron)",
@@ -81,10 +121,32 @@ function formatDiagnostics(report: DiagnosticsReport): string {
     `trayMode: ${report.trayMode}`,
     `sessionId: ${report.sessionId}`,
     `logPath: ${report.logPath}`,
+    report.captureNote ? `captureNote: ${report.captureNote}` : null,
     "",
     "--- startup.log (tail) ---",
     report.logTail,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+async function refreshSpyCodes(): Promise<void> {
+  const codes = await api.getSpyCodes();
+  pairPortEl.textContent = String(codes.httpPort);
+  echoLanEl.textContent = `Echo on LAN · ${codes.echoHost}:${codes.httpPort}`;
+  miragePinEl.textContent = formatPin(codes.miragePin);
+  powerfistPinEl.textContent = formatPin(codes.powerfistPin);
+  mirageExpiryEl.textContent = formatCodeExpiry(codes.mirageExpiresAt);
+  powerfistExpiryEl.textContent = formatCodeExpiry(codes.powerfistExpiresAt);
+
+  const parts: string[] = [];
+  if (codes.pairedMirage) {
+    parts.push(`PAIRED // MIRAGE ${codes.pairedMirage.nodeId.slice(0, 8)}…`);
+  }
+  if (codes.pairedPowerfist) {
+    parts.push(`PAIRED // PowerFist ${codes.pairedPowerfist.deviceId.slice(0, 8)}…`);
+  }
+  pairStatusEl.textContent = parts.length > 0 ? parts.join(" · ") : "Waiting for Mirage / PowerFist to enter codes.";
 }
 
 async function refreshDiagnostics(): Promise<DiagnosticsReport> {
@@ -98,22 +160,34 @@ async function refreshDiagnostics(): Promise<DiagnosticsReport> {
 }
 
 async function refreshPermissions(): Promise<void> {
+  permissionResultEl.textContent = "Checking Screen Recording…";
+  permissionResultEl.classList.remove("warn");
   const perm = await api.checkPermissions();
+  fixPermissionBtn.classList.remove("show");
+  openScreenSettingsBtn.classList.remove("show");
+
   if (perm.screenRecording) {
-    permissionResultEl.textContent = "Screen Recording: granted";
-    openScreenSettingsBtn.classList.remove("show");
-  } else {
-    permissionResultEl.textContent =
-      perm.hint ?? "Screen Recording not granted — required before missions.";
-    if (perm.platform === "macos") {
-      openScreenSettingsBtn.classList.add("show");
-    }
+    permissionResultEl.textContent = "Screen Recording: working (full desktop capture OK)";
+    return;
+  }
+
+  permissionResultEl.classList.add("warn");
+  if (perm.stale) {
+    permissionResultEl.textContent = `Re-enable required: ${perm.hint ?? "Toggle Echo-Satellite OFF then ON in System Settings."}`;
+    fixPermissionBtn.classList.add("show");
+    openScreenSettingsBtn.classList.add("show");
+    return;
+  }
+
+  permissionResultEl.textContent = perm.hint ?? "Screen Recording not granted — required before missions.";
+  if (perm.platform === "macos") {
+    fixPermissionBtn.classList.add("show");
+    openScreenSettingsBtn.classList.add("show");
   }
 }
 
 async function refreshStatus(): Promise<void> {
   const status = await api.getStatus();
-  pairPortEl.textContent = String(status.pairHttpPort);
   statusArmedEl.textContent = status.armed ? "ARMED" : "DISARMED";
   statusWsEl.textContent = status.wsStatus.toUpperCase();
   statusMissionsEl.textContent = String(status.missionsHandled);
@@ -121,34 +195,58 @@ async function refreshStatus(): Promise<void> {
 }
 
 document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("click", async () => {
+  testCaptureBtn.disabled = true;
   captureResultEl.textContent = "Capturing…";
-  const result = await api.testCapture();
-  if (result.ok) {
-    captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"} · ~${result.pngBytes ?? 0} b64 chars`;
-  } else {
-    captureResultEl.textContent = result.error ?? "Capture failed";
+  captureResultEl.classList.remove("warn");
+  capturePreviewEl.classList.add("hidden");
+  capturePreviewEl.removeAttribute("src");
+
+  try {
+    const result = await api.testCapture();
+    if (result.ok) {
+      const source = result.captureSource ? ` · ${result.captureSource}` : "";
+      const note =
+        result.captureNote ??
+        (result.captureSource === "node-screenshots"
+          ? "Warning: node-screenshots may miss other apps — check preview."
+          : "");
+      captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"}${source}${note ? ` — ${note}` : ""} — preview below`;
+      if (result.previewBase64) {
+        capturePreviewEl.src = `data:image/jpeg;base64,${result.previewBase64}`;
+        capturePreviewEl.classList.remove("hidden");
+      } else {
+        captureResultEl.textContent += " (no preview thumbnail)";
+      }
+    } else {
+      captureResultEl.textContent = result.error ?? "Capture failed";
+      captureResultEl.classList.add("warn");
+      if (result.stale) {
+        fixPermissionBtn.classList.add("show");
+        openScreenSettingsBtn.classList.add("show");
+      }
+    }
+  } catch (error) {
+    captureResultEl.textContent = error instanceof Error ? error.message : "Capture failed";
+  } finally {
+    testCaptureBtn.disabled = false;
+    await refreshPermissions();
   }
-  await refreshPermissions();
 });
 
 openScreenSettingsBtn.addEventListener("click", async () => {
   await api.openScreenRecordingSettings();
 });
 
-document.querySelector<HTMLButtonElement>("#pair-url-btn")!.addEventListener("click", async () => {
-  const url = document.querySelector<HTMLTextAreaElement>("#pair-url")!.value.trim();
-  if (!url) {
-    captureResultEl.textContent = "Paste the Mirage Echo QR URL first.";
-    return;
-  }
-  captureResultEl.textContent = "Pairing…";
-  const result = await api.pairFromUrl(url);
-  if (result.ok) {
-    captureResultEl.textContent = "Paired and armed — hide to tray when ready.";
-    await refreshStatus();
-  } else {
-    captureResultEl.textContent = result.reason ?? "Pair failed";
-  }
+fixPermissionBtn.addEventListener("click", async () => {
+  permissionResultEl.textContent = "Opening permission prompt… toggle OFF then ON if needed.";
+  await api.openScreenRecordingSettings();
+  await api.requestScreenPermission();
+  await refreshPermissions();
+});
+
+document.querySelector<HTMLButtonElement>("#new-codes-btn")!.addEventListener("click", async () => {
+  await api.regenerateSpyCodes();
+  await refreshSpyCodes();
 });
 
 document.querySelector<HTMLButtonElement>("#hide-tray")!.addEventListener("click", async () => {
@@ -179,9 +277,15 @@ api.onDisarm(() => {
   void refreshStatus();
 });
 
+api.onSpyCodesChanged(() => {
+  void refreshSpyCodes();
+});
+
 void refreshPermissions();
 void refreshStatus();
+void refreshSpyCodes();
 void refreshDiagnostics();
 window.setInterval(() => {
   void refreshStatus();
+  void refreshSpyCodes();
 }, 5000);

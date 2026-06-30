@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Echo Capture</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">ECHO MIRAGE // BROWSER DRONE</p>
+      <h1>Echo Capture</h1>
+      <p class="lede">
+        Chrome tab capture for HackerRank, LeetCode, and coding tests. Pair once from Mirage hub →
+        Echo QR, then keep this extension armed.
+      </p>
+
+      <section>
+        <h2>Arm with Mirage Echo QR</h2>
+        <p class="hint">Mirage Spy → hub → Echo QR → copy link, paste below.</p>
+        <textarea id="pair-url" rows="3" placeholder="http://192.168.x.x:3050/powerfist/capture-pair?..."></textarea>
+        <button id="pair-btn" type="button" class="accent">Pair &amp; arm</button>
+      </section>
+
+      <section>
+        <h2>Status</h2>
+        <p id="status-armed" class="mono">—</p>
+        <p id="status-ws" class="mono">—</p>
+        <button id="test-capture" type="button">Test tab capture</button>
+        <p id="capture-result" class="mono muted"></p>
+        <img id="capture-preview" class="preview hidden" alt="Tab capture preview" />
+        <button id="disarm" type="button">Disarm</button>
+      </section>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
