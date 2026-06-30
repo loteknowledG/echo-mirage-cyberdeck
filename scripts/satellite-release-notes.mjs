@@ -8,7 +8,8 @@ Minimal capture drone for the **Echo** screenshot machine — tray on Windows, s
 
 - **Linked Mirages** on the Status panel — Spy team connections plus capture relay hub
 - **Refresh connections** button — poll Mirage links without restarting
-- **Port 3050 status API** — cyberdeck PWA on the Echo Mac can read Satellite link state
+- **Code-only pairing** — Mirage/PowerFist enter the 6-digit PIN; browser finds Echo on Wi‑Fi (no IP typing)
+- Satellite proxies PIN entry to the local cyberdeck on port 3050
 
 ### macOS (Apple Silicon)
 

@@ -9,6 +9,16 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const SPY_CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { status: 204, headers: SPY_CORS_HEADERS });
+}
+
 type EnterBody = {
   code?: string;
   pin?: string;
@@ -164,7 +174,7 @@ export async function POST(request: Request) {
           nodeId: body.nodeId,
           deviceId: body.deviceId,
         });
-        return NextResponse.json(result, { status: result.ok ? 200 : 403 });
+        return NextResponse.json(result, { status: result.ok ? 200 : 403, headers: SPY_CORS_HEADERS });
       }
 
       const result = await pairPinWithDiscovery({
@@ -175,7 +185,10 @@ export async function POST(request: Request) {
         deviceId: body.deviceId,
         hintHosts: body.hintHosts,
       });
-      return NextResponse.json(result, { status: result.ok ? 200 : result.reason === "Invalid pairing code." ? 403 : 502 });
+      return NextResponse.json(result, {
+        status: result.ok ? 200 : result.reason === "Invalid pairing code." ? 403 : 502,
+        headers: SPY_CORS_HEADERS,
+      });
     }
 
     if (!shouldHandlePinLocally(echoHost, request)) {
@@ -187,7 +200,7 @@ export async function POST(request: Request) {
         nodeId: body.nodeId,
         deviceId: body.deviceId,
       });
-      return NextResponse.json(result, { status: result.ok ? 200 : 502 });
+      return NextResponse.json(result, { status: result.ok ? 200 : 502, headers: SPY_CORS_HEADERS });
     }
 
     const result = await completeSpyPairEnterByPin({
@@ -196,7 +209,7 @@ export async function POST(request: Request) {
       nodeId: body.nodeId,
       deviceId: body.deviceId,
     });
-    return NextResponse.json(result, { status: result.ok ? 200 : 403 });
+    return NextResponse.json(result, { status: result.ok ? 200 : 403, headers: SPY_CORS_HEADERS });
   }
 
   const code = body.code?.trim();

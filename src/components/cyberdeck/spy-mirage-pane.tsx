@@ -79,8 +79,8 @@ export function SpyMiragePane() {
       </div>
 
       <p className="text-[9px] leading-relaxed text-[#5f5f5f]">
-        Enter the 6-digit code from {ESPIONAGE_ECHO_DISPLAY} (CODE FOR {ESPIONAGE_MIRAGE_DISPLAY}). Mirage
-        finds Echo on your LAN automatically — no IP typing needed unless auto-detect fails.
+        Enter the 6-digit code only — Mirage finds Echo on your Wi‑Fi automatically. No IP needed unless
+        auto-detect fails (use Advanced).
       </p>
 
       {paired && !terminated ? (

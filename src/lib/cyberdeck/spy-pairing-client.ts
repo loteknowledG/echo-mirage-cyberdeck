@@ -3,6 +3,7 @@ import {
   getOrCreateEspionageNodeId,
   SPY_ECHO_LINK_CHANNEL,
 } from "@/lib/cyberdeck/espionage-mode";
+import { discoverEchoEndpointsOnLan } from "@/lib/cyberdeck/spy-echo-discovery.client";
 
 const SPY_MIRAGE_PAIR_STORAGE_KEY = "echo-mirage-spy-mirage-pair";
 const SPY_POWERFIST_PAIR_STORAGE_KEY = "echo-mirage-spy-powerfist-pair";
@@ -186,6 +187,86 @@ export async function enterSpyPairPin(input: {
 > {
   const nodeId = getOrCreateEspionageNodeId();
   const deviceId = getOrCreatePowerfistDeviceId();
+  const body = {
+    pin: input.pin,
+    role: input.role,
+    nodeId,
+    deviceId,
+  };
+
+  type PairSuccess = Extract<Awaited<ReturnType<typeof enterSpyPairPin>>, { ok: true }>;
+
+  async function postDirect(host: string, port: number): Promise<PairSuccess | { ok: false; reason: string }> {
+    try {
+      const res = await fetch(`http://${host}:${port}/api/spy/pair/enter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        cache: "no-store",
+        mode: "cors",
+        signal: AbortSignal.timeout(4000),
+      });
+      const payload = (await res.json()) as PairSuccess | { ok: false; reason: string };
+      if (payload.ok) {
+        return {
+          ...payload,
+          echoHost: payload.echoHost || host,
+          httpPort: payload.httpPort || port,
+        };
+      }
+      return payload;
+    } catch {
+      return { ok: false, reason: `Could not reach Echo at ${host}:${port}.` };
+    }
+  }
+
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (!input.echoHost && (host === "localhost" || host === "127.0.0.1")) {
+      try {
+        const res = await fetch("/api/spy/pair/enter", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...body,
+            echoHttpPort: input.echoHttpPort,
+            hintHosts: input.hintHosts,
+          }),
+        });
+        const local = (await res.json()) as PairSuccess | { ok: false; reason: string };
+        if (local.ok) return local;
+      } catch {
+        /* fall through to LAN discovery */
+      }
+    }
+
+    const endpoints = input.echoHost
+      ? [{ host: input.echoHost, port: input.echoHttpPort }]
+      : await discoverEchoEndpointsOnLan(input.hintHosts ?? []);
+
+    if (endpoints.length === 0) {
+      return {
+        ok: false,
+        reason:
+          "Could not find Echo on your LAN. Open Echo Satellite on the screenshot Mac (same Wi‑Fi), or enter its IP under Advanced.",
+      };
+    }
+
+    let invalidPin = false;
+    let lastReason = "Could not pair with Echo.";
+
+    for (const endpoint of endpoints) {
+      const result = await postDirect(endpoint.host, endpoint.port);
+      if (result.ok) return result;
+      lastReason = result.reason;
+      if (result.reason.toLowerCase().includes("invalid pairing code")) {
+        invalidPin = true;
+        break;
+      }
+    }
+
+    return { ok: false, reason: invalidPin ? "Invalid pairing code." : lastReason };
+  }
 
   try {
     const res = await fetch("/api/spy/pair/enter", {
@@ -201,19 +282,7 @@ export async function enterSpyPairPin(input: {
         deviceId,
       }),
     });
-    return (await res.json()) as
-      | {
-          ok: true;
-          role: "mirage" | "powerfist";
-          echoNodeId: string;
-          echoHost: string;
-          httpPort: number;
-          token: string;
-          nodeId?: string;
-          deviceId?: string;
-          sessionEpoch: number;
-        }
-      | { ok: false; reason: string };
+    return (await res.json()) as PairSuccess | { ok: false; reason: string };
   } catch {
     return { ok: false, reason: "Pair request failed." };
   }

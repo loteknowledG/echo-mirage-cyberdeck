@@ -2,7 +2,23 @@ import http from "node:http";
 import { URL } from "node:url";
 import { completeCapturePair } from "./pair.mjs";
 import { DEFAULT_PAIR_HTTP_PORT } from "./config.mjs";
+import { proxySpyPairEnter } from "./spy-pair-proxy.mjs";
 import * as logger from "./logger.mjs";
+
+function applyCors(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+async function readJsonBody(req) {
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+  if (chunks.length === 0) return {};
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
 
 /**
  * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void, getSpyStatus?: () => object }} options
@@ -16,6 +32,14 @@ export function startPairServer(options) {
 
   async function handleRequest(req, res) {
     try {
+      applyCors(res);
+
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
       const host = req.headers.host ?? `127.0.0.1:${port}`;
       const url = new URL(req.url ?? "/", `http://${host}`);
 
@@ -36,6 +60,15 @@ export function startPairServer(options) {
         const status = options.getSpyStatus?.() ?? { ok: false, reason: "Echo codes unavailable." };
         res.writeHead(status.ok ? 200 : 503, { "Content-Type": "application/json" });
         res.end(JSON.stringify(status));
+        return;
+      }
+
+      if (url.pathname === "/api/spy/pair/enter" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        logger.log("pair-server: Spy PIN enter — proxying to local cyberdeck");
+        const result = await proxySpyPairEnter(body);
+        res.writeHead(result.ok ? 200 : 403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
         return;
       }
 
