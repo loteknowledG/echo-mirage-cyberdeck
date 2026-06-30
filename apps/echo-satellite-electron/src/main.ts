@@ -22,7 +22,7 @@ type PairResult = {
   reason?: string;
 };
 
-type PermissionStatus = {
+type SatellitePermissionStatus = {
   platform: string;
   screenRecording: boolean;
   hint?: string | null;
@@ -45,7 +45,7 @@ type SatelliteApi = {
   testCapture: () => Promise<TestCaptureResult>;
   disarm: () => Promise<SatelliteStatus>;
   hideToTray: () => Promise<void>;
-  checkPermissions: () => Promise<PermissionStatus>;
+  checkPermissions: () => Promise<SatellitePermissionStatus>;
   openScreenRecordingSettings: () => Promise<void>;
   getDiagnostics: () => Promise<DiagnosticsReport>;
   onDisarm: (handler: () => void) => () => void;

@@ -48,6 +48,13 @@ export function EspionageMirageHubPanel(props: {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const prevPairedDeviceRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!pairedDeviceId || pairedDeviceId === prevPairedDeviceRef.current) return;
+    prevPairedDeviceRef.current = pairedDeviceId;
+    notifySpyMuthurArchive(formatEspionageMiragePowerfistLinkedLine(pairedDeviceId));
+  }, [pairedDeviceId]);
 
   useEffect(() => {
     setNodeId(getOrCreateEspionageNodeId());
