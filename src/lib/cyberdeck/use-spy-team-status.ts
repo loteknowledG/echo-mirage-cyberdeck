@@ -9,7 +9,7 @@ import {
   type SpyTeamStatus,
 } from "@/lib/cyberdeck/spy-team-status";
 import {
-  fetchEchoSpyCodes,
+  fetchEchoSpyStatus,
   fetchEchoSpyLinkStatus,
   normalizePairedMirages,
   readSpyMiragePairCredentials,
@@ -71,7 +71,7 @@ export function useSpyTeamStatus(): SpyTeamStatus & { refresh: () => Promise<voi
     let echoPowerfist = linkFromBool(false, "Enter PowerFist code on the phone.");
     let miragePowerfist = linkFromBool(false, "Scan Mirage hub phone QR on PowerFist.");
 
-    const echoLocal = await fetchEchoSpyCodes();
+    const echoLocal = await fetchEchoSpyStatus();
     let remote: RemoteEchoStatus | null = null;
 
     if (echoLocal.ok) {

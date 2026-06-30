@@ -16,12 +16,12 @@ export function CyberdeckSpyPaneBody() {
     <div className="cyberdeck-spy-pane flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-black">
       <SpySubRail active={activeSubPane} onSelect={setActiveSubPane} />
       <SpyTeamStatusPanel />
-      <SpyDesktopInstallPanel activeSubPane={activeSubPane} />
       <div className="min-h-0 flex-1 overflow-hidden">
         {activeSubPane === "echo" ? <SpyEchoPane /> : null}
         {activeSubPane === "mirage" ? <SpyMiragePane /> : null}
         {activeSubPane === "powerfist" ? <SpyPowerfistPane /> : null}
       </div>
+      <SpyDesktopInstallPanel activeSubPane={activeSubPane} />
     </div>
   );
 }

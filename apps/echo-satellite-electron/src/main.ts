@@ -189,8 +189,8 @@ document.querySelector<HTMLButtonElement>("#pair-url-btn")!.addEventListener("cl
   }
 });
 
-document.querySelector<HTMLButtonElement>("#hide-tray")!.addEventListener("click", async () => {
-  await api.hideToTray();
+document.querySelector<HTMLButtonElement>("#refresh-status")!.addEventListener("click", async () => {
+  await refreshStatus();
 });
 
 document.querySelector<HTMLButtonElement>("#disarm")!.addEventListener("click", async () => {

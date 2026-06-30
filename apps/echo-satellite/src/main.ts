@@ -200,6 +200,10 @@ document.querySelector<HTMLButtonElement>("#pair-url-btn")!.addEventListener("cl
   }
 });
 
+document.querySelector<HTMLButtonElement>("#refresh-status")!.addEventListener("click", async () => {
+  await refreshStatus();
+});
+
 document.querySelector<HTMLButtonElement>("#hide-tray")!.addEventListener("click", async () => {
   await invoke("hide_to_tray");
 });

@@ -4,6 +4,12 @@ export function satelliteReleaseNotes(version) {
 
 Minimal capture drone for the **Echo** screenshot machine — tray on Windows, small window on Mac. Screenshots fire only when PowerFist signals Mirage.
 
+### What's new in ${version}
+
+- **Linked Mirages** on the Status panel — Spy team connections plus capture relay hub
+- **Refresh connections** button — poll Mirage links without restarting
+- **Port 3050 status API** — cyberdeck PWA on the Echo Mac can read Satellite link state
+
 ### macOS (Apple Silicon)
 
 1. Download **Echo-Satellite_${version}_aarch64.pkg**
