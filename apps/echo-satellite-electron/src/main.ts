@@ -148,13 +148,13 @@ async function refreshDiagnostics(): Promise<DiagnosticsReport> {
 }
 
 async function refreshPermissions(): Promise<void> {
+  permissionResultEl.textContent = "Checking Screen Recording…";
   const perm = await api.checkPermissions();
   if (perm.screenRecording) {
     permissionResultEl.textContent = "Screen Recording: granted";
     openScreenSettingsBtn.classList.remove("show");
   } else {
-    permissionResultEl.textContent =
-      perm.hint ?? "Screen Recording not granted — required before missions.";
+    permissionResultEl.textContent = perm.hint ?? "Screen Recording not granted — required before missions.";
     if (perm.platform === "macos") {
       openScreenSettingsBtn.classList.add("show");
     }
