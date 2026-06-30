@@ -226,6 +226,7 @@ function registerIpc() {
         width: capture.width,
         height: capture.height,
         pngBytes: capture.pngBase64.length,
+        pngBase64: capture.pngBase64,
       };
     } catch (error) {
       return {

@@ -27,6 +27,7 @@ type TestCaptureResult = {
   width?: number;
   height?: number;
   pngBytes?: number;
+  pngBase64?: string;
   error?: string;
 };
 
@@ -94,6 +95,7 @@ const api = window.satellite;
 
 const pairPortEl = document.querySelector<HTMLElement>("#pair-port")!;
 const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
+const capturePreviewEl = document.querySelector<HTMLImageElement>("#capture-preview")!;
 const permissionResultEl = document.querySelector<HTMLElement>("#permission-result")!;
 const openScreenSettingsBtn = document.querySelector<HTMLButtonElement>("#open-screen-settings")!;
 const statusArmedEl = document.querySelector<HTMLElement>("#status-armed")!;
@@ -221,10 +223,16 @@ document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("cl
   const testCaptureBtn = document.querySelector<HTMLButtonElement>("#test-capture")!;
   testCaptureBtn.disabled = true;
   captureResultEl.textContent = "Capturing…";
+  capturePreviewEl.classList.add("hidden");
+  capturePreviewEl.removeAttribute("src");
   try {
     const result = await api.testCapture();
     if (result.ok) {
       captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"} · ~${result.pngBytes ?? 0} b64 chars`;
+      if (result.pngBase64) {
+        capturePreviewEl.src = `data:image/png;base64,${result.pngBase64}`;
+        capturePreviewEl.classList.remove("hidden");
+      }
     } else {
       captureResultEl.textContent = result.error ?? "Capture failed";
     }
