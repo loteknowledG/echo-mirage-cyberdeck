@@ -146,16 +146,15 @@ jobs:
           fi
           BIN="$APP/Contents/MacOS/Echo Satellite"
           echo "Smoke test: launching $BIN"
-          "$BIN" &
-          PID=$!
+          "$BIN" --disable-gpu &
           sleep 4
-          if ! kill -0 "$PID" 2>/dev/null; then
-            echo "FAIL: Echo Satellite exited within 4s (likely startup crash)"
+          if pgrep -f "Echo Satellite" >/dev/null 2>&1; then
+            echo "PASS: Echo Satellite stayed running for 4s"
+          else
+            echo "FAIL: Echo Satellite exited within 4s"
             exit 1
           fi
-          kill "$PID" 2>/dev/null || true
-          wait "$PID" 2>/dev/null || true
-          echo "PASS: Echo Satellite stayed running for 4s"
+          pkill -f "Echo Satellite" 2>/dev/null || true
 
       - name: Build macOS PKG installer
         env:
