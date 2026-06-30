@@ -4,12 +4,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="$(node -p "require('$ROOT/apps/echo-satellite-electron/package.json').version")"
+APP_NAME="Echo-Satellite.app"
 
 APP=""
 for candidate in \
+  "$ROOT/apps/echo-satellite-electron/release/mac-arm64/$APP_NAME" \
+  "$ROOT/apps/echo-satellite-electron/release/mac/$APP_NAME" \
   "$ROOT/apps/echo-satellite-electron/release/mac-arm64/Echo Satellite.app" \
-  "$ROOT/apps/echo-satellite-electron/release/mac/Echo Satellite.app" \
-  "$ROOT/apps/echo-satellite/src-tauri/target/release/bundle/macos/Echo-Satellite.app"; do
+  "$ROOT/apps/echo-satellite-electron/release/mac/Echo Satellite.app"; do
   if [ -d "$candidate" ]; then
     APP="$candidate"
     break
@@ -17,11 +19,11 @@ for candidate in \
 done
 
 if [ -z "$APP" ]; then
-  APP="$(find "$ROOT/apps/echo-satellite-electron/release" -maxdepth 3 -name 'Echo Satellite.app' 2>/dev/null | head -1)"
+  APP="$(find "$ROOT/apps/echo-satellite-electron/release" -maxdepth 3 \( -name 'Echo-Satellite.app' -o -name 'Echo Satellite.app' \) 2>/dev/null | head -1)"
 fi
 
 if [ -z "$APP" ] || [ ! -d "$APP" ]; then
-  echo "Echo Satellite.app not found under apps/echo-satellite-electron/release"
+  echo "Echo-Satellite.app not found under apps/echo-satellite-electron/release"
   find "$ROOT/apps/echo-satellite-electron/release" -maxdepth 4 -type d 2>/dev/null || true
   exit 1
 fi
@@ -45,7 +47,7 @@ cp "$ROOT/scripts/satellite-mac-postinstall.sh" "$PKG_SCRIPTS/postinstall"
 chmod +x "$PKG_SCRIPTS/preinstall" "$PKG_SCRIPTS/postinstall"
 
 mkdir -p "$STAGING/payload"
-ditto "$APP" "$STAGING/payload/Echo Satellite.app"
+ditto "$APP" "$STAGING/payload/$APP_NAME"
 
 pkgbuild \
   --root "$STAGING/payload" \
