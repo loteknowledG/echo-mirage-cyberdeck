@@ -3,6 +3,16 @@ import { Monitor } from "node-screenshots";
 const CAPTURE_TIMEOUT_MS = 20_000;
 
 /**
+ * Monitor uses width()/height(); Image uses .width/.height properties.
+ * @param {{ width?: number | (() => number), height?: number | (() => number) }} source
+ */
+export function readPixelSize(source) {
+  const width = typeof source.width === "function" ? source.width() : Number(source.width);
+  const height = typeof source.height === "function" ? source.height() : Number(source.height);
+  return { width, height };
+}
+
+/**
  * @template T
  * @param {Promise<T>} promise
  * @param {number} ms
@@ -38,8 +48,7 @@ export async function capturePrimaryMonitorPng() {
     throw new Error("Capture returned an empty image.");
   }
 
-  const width = image.width();
-  const height = image.height();
+  const { width, height } = readPixelSize(image);
   if (!width || !height) {
     throw new Error("Capture returned zero-size image — check Screen Recording permission.");
   }
@@ -64,5 +73,5 @@ export async function capturePrimaryMonitorDimensions() {
   const monitors = Monitor.all();
   const primary = monitors.find((monitor) => monitor.isPrimary()) ?? monitors[0];
   if (!primary) return null;
-  return { width: primary.width(), height: primary.height() };
+  return readPixelSize(primary);
 }

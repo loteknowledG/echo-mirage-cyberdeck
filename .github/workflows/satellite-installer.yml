@@ -135,6 +135,10 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: pnpm build:mac
 
+      - name: Smoke test screen capture
+        working-directory: apps/echo-satellite-electron
+        run: node ../../scripts/smoke-test-satellite-capture.mjs
+
       - name: Smoke test macOS app launch
         run: |
           set -euo pipefail
