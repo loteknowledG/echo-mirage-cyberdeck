@@ -17,7 +17,7 @@ import {
   loadCredentials,
   saveCredentials,
 } from "./config.mjs";
-import { capturePrimaryMonitorDimensions, capturePrimaryMonitorPngBase64 } from "./capture.mjs";
+import { capturePrimaryMonitorPng } from "./capture.mjs";
 import { parseCapturePairUrl, completeCapturePair } from "./pair.mjs";
 import { startPairServer } from "./pair-server.mjs";
 import { startWsClient } from "./ws-client.mjs";
@@ -220,13 +220,12 @@ function registerIpc() {
 
   ipcMain.handle("satellite:test-capture", async () => {
     try {
-      const pngBase64 = await capturePrimaryMonitorPngBase64();
-      const dimensions = await capturePrimaryMonitorDimensions();
+      const capture = await capturePrimaryMonitorPng();
       return {
         ok: true,
-        width: dimensions?.width,
-        height: dimensions?.height,
-        pngBytes: pngBase64.length,
+        width: capture.width,
+        height: capture.height,
+        pngBytes: capture.pngBase64.length,
       };
     } catch (error) {
       return {

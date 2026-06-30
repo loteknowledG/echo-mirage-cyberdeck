@@ -218,14 +218,23 @@ async function refreshStatus(): Promise<void> {
 }
 
 document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("click", async () => {
+  const testCaptureBtn = document.querySelector<HTMLButtonElement>("#test-capture")!;
+  testCaptureBtn.disabled = true;
   captureResultEl.textContent = "Capturing…";
-  const result = await api.testCapture();
-  if (result.ok) {
-    captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"} · ~${result.pngBytes ?? 0} b64 chars`;
-  } else {
-    captureResultEl.textContent = result.error ?? "Capture failed";
+  try {
+    const result = await api.testCapture();
+    if (result.ok) {
+      captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"} · ~${result.pngBytes ?? 0} b64 chars`;
+    } else {
+      captureResultEl.textContent = result.error ?? "Capture failed";
+    }
+  } catch (error) {
+    captureResultEl.textContent =
+      error instanceof Error ? error.message : "Capture failed — quit and reopen Echo Satellite.";
+  } finally {
+    testCaptureBtn.disabled = false;
+    await refreshPermissions();
   }
-  await refreshPermissions();
 });
 
 openScreenSettingsBtn.addEventListener("click", async () => {
