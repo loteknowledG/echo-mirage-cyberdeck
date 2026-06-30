@@ -3,9 +3,11 @@ import { fileURLToPath } from "node:url";
 import {
   app,
   BrowserWindow,
+  desktopCapturer,
   ipcMain,
   Menu,
   nativeImage,
+  screen,
   shell,
   Tray,
 } from "electron";
@@ -16,7 +18,8 @@ import {
   loadCredentials,
   saveCredentials,
 } from "./config.mjs";
-import { capturePrimaryMonitorPng } from "./capture.mjs";
+import { capturePrimaryMonitorPng, setElectronCaptureBackend } from "./capture.mjs";
+import { createElectronScreenCapture } from "./capture-electron.mjs";
 import { createCapturePreviewBase64 } from "./capture-preview.mjs";
 import { startPairServer } from "./pair-server.mjs";
 import { createSpyPairing } from "./spy-pairing.mjs";
@@ -189,6 +192,7 @@ function registerIpc() {
         width: capture.width,
         height: capture.height,
         pngBytes: capture.pngBase64.length,
+        captureSource: capture.captureSource,
         previewBase64: previewBase64 ?? undefined,
       };
     } catch (error) {
@@ -239,6 +243,7 @@ function registerIpc() {
 app.whenReady().then(async () => {
   logger.beginSession(app, version);
   logger.step(1, 8, "electron main starting");
+  setElectronCaptureBackend(createElectronScreenCapture({ desktopCapturer, screen }));
   registerIpc();
   createMainWindow();
   logger.step(2, 8, "browser window created");

@@ -182,7 +182,9 @@ export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanel
               ? "Double-click the downloaded .exe — it updates in place and closes any running Echo Satellite automatically."
               : "Double-click the downloaded installer — it updates in place over older Echo Satellite builds."}{" "}
           Then grant Screen Recording (macOS). Echo Satellite shows 6-digit codes — enter them on Mirage / PowerFist Spy along with this machine&apos;s LAN address (port{" "}
-          <strong className="text-[#7a7a7a]">3050</strong>).
+          <strong className="text-[#7a7a7a]">3050</strong>). For browser-only coding tests (HackerRank/LeetCode), load the{" "}
+          <strong className="text-[#7a7a7a]">Echo Capture</strong> Chrome extension from{" "}
+          <code className="text-[#6a6a6a]">apps/echo-capture-extension</code> instead.
         </p>
       ) : null}
 

@@ -2,6 +2,14 @@ import { Monitor } from "node-screenshots";
 
 const CAPTURE_TIMEOUT_MS = 20_000;
 
+/** @type {{ captureScreen: () => Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer, captureSource?: string }> } | null} */
+let electronBackend = null;
+
+/** @param {{ captureScreen: () => Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer, captureSource?: string }> }} backend */
+export function setElectronCaptureBackend(backend) {
+  electronBackend = backend;
+}
+
 /**
  * Monitor uses width()/height(); Image uses .width/.height properties.
  * @param {{ width?: number | (() => number), height?: number | (() => number) }} source
@@ -28,9 +36,9 @@ export function withCaptureTimeout(promise, ms, message) {
 }
 
 /**
- * @returns {Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer }>}
+ * @returns {Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer, captureSource: string }>}
  */
-export async function capturePrimaryMonitorPng() {
+export async function captureViaNodeScreenshots() {
   const monitors = Monitor.all();
   const primary = monitors.find((monitor) => monitor.isPrimary()) ?? monitors[0];
   if (!primary) {
@@ -59,7 +67,23 @@ export async function capturePrimaryMonitorPng() {
     width,
     height,
     pngBuffer,
+    captureSource: "node-screenshots",
   };
+}
+
+/**
+ * @returns {Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer, captureSource: string }>}
+ */
+export async function capturePrimaryMonitorPng() {
+  if (process.platform === "darwin" && electronBackend) {
+    try {
+      const captured = await electronBackend.captureScreen();
+      return { ...captured, captureSource: captured.captureSource ?? "desktopCapturer" };
+    } catch {
+      /* fall back to native capture */
+    }
+  }
+  return captureViaNodeScreenshots();
 }
 
 /** @deprecated Use capturePrimaryMonitorPng(). */

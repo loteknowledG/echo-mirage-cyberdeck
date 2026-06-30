@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /** CI smoke test — primary monitor capture must return non-zero dimensions. */
-import { capturePrimaryMonitorPng } from "../apps/echo-satellite-electron/electron/capture.mjs";
+import { captureViaNodeScreenshots } from "../apps/echo-satellite-electron/electron/capture.mjs";
 
 try {
-  const capture = await capturePrimaryMonitorPng();
+  const capture = await captureViaNodeScreenshots();
   if (!capture.width || !capture.height) {
     throw new Error(`Capture size is ${capture.width}x${capture.height}`);
   }
