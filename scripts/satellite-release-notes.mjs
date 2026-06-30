@@ -6,10 +6,10 @@ Minimal capture drone for the **Echo** screenshot machine — tray on Windows, s
 
 ### What's new in ${version}
 
-- **Linked Mirages** on the Status panel — Spy team connections plus capture relay hub
-- **Refresh connections** button — poll Mirage links without restarting
+- **Check for updates** in the app — one-click download and install from GitHub releases
+- Automatic update check on startup when a newer Satellite build exists
 - **Code-only pairing** — Mirage/PowerFist enter the 6-digit PIN; browser finds Echo on Wi‑Fi (no IP typing)
-- Satellite proxies PIN entry to the local cyberdeck on port 3050
+- **Linked Mirages** on the Status panel — Spy team connections plus capture relay hub
 
 ### macOS (Apple Silicon)
 

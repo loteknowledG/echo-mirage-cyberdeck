@@ -24,6 +24,7 @@ import { startWsClient } from "./ws-client.mjs";
 import { createTrayManager } from "./tray.mjs";
 import * as logger from "./logger.mjs";
 import { fetchSpyMirageLinks } from "./spy-links.mjs";
+import { checkForSatelliteUpdate, downloadAndInstallSatelliteUpdate } from "./updater.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -184,6 +185,14 @@ async function initializeAfterReady() {
     void refreshSpyLinks();
   }, 5000);
 
+  setTimeout(() => {
+    void checkForSatelliteUpdate(version).then((result) => {
+      if (result.ok && result.updateAvailable) {
+        mainWindow?.webContents.send("satellite:update-available", result);
+      }
+    });
+  }, 8000);
+
   trayManager.ensureTray();
   logger.step(7, 8, process.platform === "darwin" ? "window-only mode (macOS)" : "system tray ready");
 }
@@ -265,6 +274,28 @@ function registerIpc() {
   ipcMain.handle("satellite:get-diagnostics", () =>
     logger.getDiagnostics(version, process.platform, trayManager.isTrayReady() ? "tray" : "window"),
   );
+
+  ipcMain.handle("satellite:check-for-updates", async () => checkForSatelliteUpdate(version));
+
+  ipcMain.handle("satellite:download-and-install-update", async (_event, input) => {
+    try {
+      if (!input?.downloadUrl || !input?.fileName) {
+        return { ok: false, reason: "Update download info missing." };
+      }
+      const result = await downloadAndInstallSatelliteUpdate(input);
+      if (result.quitApp) {
+        setTimeout(() => {
+          app.quit();
+        }, 600);
+      }
+      return result;
+    } catch (error) {
+      return {
+        ok: false,
+        reason: error instanceof Error ? error.message : "Update install failed.",
+      };
+    }
+  });
 }
 
 app.whenReady().then(async () => {

@@ -52,6 +52,19 @@ type DiagnosticsReport = {
   supportHint: string;
 };
 
+type UpdateCheckResult =
+  | {
+      ok: true;
+      currentVersion: string;
+      latestVersion: string;
+      updateAvailable: boolean;
+      releaseUrl: string;
+      downloadUrl: string | null;
+      fileName: string | null;
+      reason?: string | null;
+    }
+  | { ok: false; reason: string };
+
 type SatelliteApi = {
   getStatus: () => Promise<SatelliteStatus>;
   pairFromUrl: (capturePairUrl: string) => Promise<PairResult>;
@@ -61,8 +74,14 @@ type SatelliteApi = {
   checkPermissions: () => Promise<SatellitePermissionStatus>;
   openScreenRecordingSettings: () => Promise<void>;
   getDiagnostics: () => Promise<DiagnosticsReport>;
+  checkForUpdates: () => Promise<UpdateCheckResult>;
+  downloadAndInstallUpdate: (input: {
+    downloadUrl: string;
+    fileName: string;
+  }) => Promise<{ ok: true; message: string; quitApp?: boolean } | { ok: false; reason: string }>;
   onDisarm: (handler: () => void) => () => void;
   onStatusChanged: (handler: () => void) => () => void;
+  onUpdateAvailable: (handler: (result: UpdateCheckResult) => void) => () => void;
 };
 
 declare global {
@@ -87,6 +106,46 @@ const diagVersionEl = document.querySelector<HTMLElement>("#diag-version")!;
 const diagModeEl = document.querySelector<HTMLElement>("#diag-mode")!;
 const diagLogPathEl = document.querySelector<HTMLElement>("#diag-log-path")!;
 const diagLogTailEl = document.querySelector<HTMLElement>("#diag-log-tail")!;
+const updateStatusEl = document.querySelector<HTMLElement>("#update-status")!;
+const checkUpdatesBtn = document.querySelector<HTMLButtonElement>("#check-updates")!;
+const installUpdateBtn = document.querySelector<HTMLButtonElement>("#install-update")!;
+
+let pendingUpdate: Extract<UpdateCheckResult, { ok: true }> | null = null;
+
+function renderUpdateStatus(result: UpdateCheckResult): void {
+  if (!result.ok) {
+    updateStatusEl.textContent = result.reason;
+    installUpdateBtn.classList.add("hidden");
+    pendingUpdate = null;
+    return;
+  }
+
+  pendingUpdate = result.updateAvailable && result.downloadUrl && result.fileName ? result : null;
+
+  if (result.updateAvailable) {
+    updateStatusEl.textContent = result.reason
+      ? `Update ${result.latestVersion} available — ${result.reason}`
+      : `Update available: v${result.latestVersion} (you have v${result.currentVersion}).`;
+    if (pendingUpdate) {
+      installUpdateBtn.classList.remove("hidden");
+    } else {
+      installUpdateBtn.classList.add("hidden");
+    }
+    return;
+  }
+
+  updateStatusEl.textContent = `Up to date — v${result.currentVersion}.`;
+  installUpdateBtn.classList.add("hidden");
+  pendingUpdate = null;
+}
+
+async function refreshUpdateCheck(): Promise<void> {
+  checkUpdatesBtn.disabled = true;
+  updateStatusEl.textContent = "Checking for updates…";
+  const result = await api.checkForUpdates();
+  renderUpdateStatus(result);
+  checkUpdatesBtn.disabled = false;
+}
 
 function formatDiagnostics(report: DiagnosticsReport): string {
   return [
@@ -193,6 +252,32 @@ document.querySelector<HTMLButtonElement>("#refresh-status")!.addEventListener("
   await refreshStatus();
 });
 
+checkUpdatesBtn.addEventListener("click", async () => {
+  await refreshUpdateCheck();
+});
+
+installUpdateBtn.addEventListener("click", async () => {
+  if (!pendingUpdate?.downloadUrl || !pendingUpdate.fileName) return;
+  installUpdateBtn.disabled = true;
+  checkUpdatesBtn.disabled = true;
+  updateStatusEl.textContent = "Downloading update…";
+  const result = await api.downloadAndInstallUpdate({
+    downloadUrl: pendingUpdate.downloadUrl,
+    fileName: pendingUpdate.fileName,
+  });
+  if (!result.ok) {
+    updateStatusEl.textContent = result.reason;
+    installUpdateBtn.disabled = false;
+    checkUpdatesBtn.disabled = false;
+    return;
+  }
+  updateStatusEl.textContent = result.message;
+});
+
+document.querySelector<HTMLButtonElement>("#hide-tray")!.addEventListener("click", async () => {
+  await api.hideToTray();
+});
+
 document.querySelector<HTMLButtonElement>("#disarm")!.addEventListener("click", async () => {
   await api.disarm();
   await refreshStatus();
@@ -221,9 +306,14 @@ api.onStatusChanged(() => {
   void refreshStatus();
 });
 
+api.onUpdateAvailable((result) => {
+  renderUpdateStatus(result);
+});
+
 void refreshPermissions();
 void refreshStatus();
 void refreshDiagnostics();
+void refreshUpdateCheck();
 window.setInterval(() => {
   void refreshStatus();
 }, 5000);

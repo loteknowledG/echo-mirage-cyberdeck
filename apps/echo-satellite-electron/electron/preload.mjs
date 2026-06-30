@@ -19,4 +19,12 @@ contextBridge.exposeInMainWorld("satellite", {
     ipcRenderer.on("satellite:status-changed", listener);
     return () => ipcRenderer.removeListener("satellite:status-changed", listener);
   },
+  checkForUpdates: () => ipcRenderer.invoke("satellite:check-for-updates"),
+  downloadAndInstallUpdate: (input) =>
+    ipcRenderer.invoke("satellite:download-and-install-update", input),
+  onUpdateAvailable: (handler) => {
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on("satellite:update-available", listener);
+    return () => ipcRenderer.removeListener("satellite:update-available", listener);
+  },
 });
