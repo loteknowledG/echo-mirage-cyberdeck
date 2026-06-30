@@ -28,6 +28,78 @@ export function normalizePairedMirages(status: {
   return [];
 }
 
+const LOCAL_CYBERDECK_ORIGINS = ["http://127.0.0.1:3000", "http://localhost:3000"];
+const SATELLITE_STATUS_URL = "http://127.0.0.1:3050/spy/status";
+
+export type EchoSpyStatusSource = "cyberdeck" | "local-cyberdeck" | "satellite";
+
+export type EchoSpyStatus = {
+  ok: true;
+  source: EchoSpyStatusSource;
+  echoNodeId?: string;
+  echoHost: string;
+  httpPort: number;
+  miragePin: string | null;
+  powerfistPin: string | null;
+  mirageExpiresAt: string | null;
+  powerfistExpiresAt: string | null;
+  pairedMirages: SpyPairedMirage[];
+  pairedMirage: SpyPairedMirage | null;
+  pairedPowerfist: { deviceId: string; pairedAt: string } | null;
+  armed?: boolean;
+  wsStatus?: string;
+  captureMirage?: { host: string; port: number } | null;
+  spyLinksReachable?: boolean;
+};
+
+async function readEchoSpyPayload(url: string): Promise<EchoSpyStatus | { ok: false; reason: string }> {
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(2500) });
+    if (!res.ok) {
+      return { ok: false, reason: `Request failed (${res.status}).` };
+    }
+    const payload = (await res.json()) as EchoSpyStatus | { ok: false; reason?: string };
+    if (!payload.ok) {
+      return { ok: false, reason: payload.reason ?? "Could not load Echo Spy status." };
+    }
+    const pairedMirages = normalizePairedMirages(payload);
+    return {
+      ...payload,
+      pairedMirages,
+      pairedMirage: pairedMirages[0] ?? null,
+      miragePin: payload.miragePin ?? null,
+      powerfistPin: payload.powerfistPin ?? null,
+      mirageExpiresAt: payload.mirageExpiresAt ?? null,
+      powerfistExpiresAt: payload.powerfistExpiresAt ?? null,
+      pairedPowerfist: payload.pairedPowerfist ?? null,
+    };
+  } catch {
+    return { ok: false, reason: "Could not reach Echo status endpoint." };
+  }
+}
+
+/** Load Echo Spy status from cyberdeck, local dev server, or Echo Satellite tray agent. */
+export async function fetchEchoSpyStatus(): Promise<EchoSpyStatus | { ok: false; reason: string }> {
+  const direct = await readEchoSpyPayload("/api/spy/echo/codes");
+  if (direct.ok) {
+    return { ...direct, source: "cyberdeck" };
+  }
+
+  for (const origin of LOCAL_CYBERDECK_ORIGINS) {
+    const local = await readEchoSpyPayload(`${origin}/api/spy/echo/codes`);
+    if (local.ok) {
+      return { ...local, source: "local-cyberdeck" };
+    }
+  }
+
+  const satellite = await readEchoSpyPayload(SATELLITE_STATUS_URL);
+  if (satellite.ok) {
+    return { ...satellite, source: "satellite" };
+  }
+
+  return direct;
+}
+
 export type SpyMiragePairCredentials = {
   echoHost: string;
   httpPort: number;

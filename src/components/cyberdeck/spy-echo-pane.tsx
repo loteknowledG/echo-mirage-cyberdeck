@@ -12,6 +12,7 @@ import {
 import { startStealthCaptureDeck } from "@/lib/cyberdeck/espionage-stealth-capture-deck";
 import {
   fetchEchoSpyCodes,
+  fetchEchoSpyStatus,
   formatCodeExpiry,
   normalizePairedMirages,
   regenerateEchoSpyCodes,
@@ -62,6 +63,10 @@ export function SpyEchoPane() {
   const [powerfistExpiresAt, setPowerfistExpiresAt] = useState<string | null>(null);
   const [pairedMirages, setPairedMirages] = useState<{ nodeId: string }[]>([]);
   const [pairedPowerfist, setPairedPowerfist] = useState<{ deviceId: string } | null>(null);
+  const [statusSource, setStatusSource] = useState<"cyberdeck" | "local-cyberdeck" | "satellite" | null>(null);
+  const [satelliteArmed, setSatelliteArmed] = useState<boolean | null>(null);
+  const [satelliteWsStatus, setSatelliteWsStatus] = useState<string | null>(null);
+  const [captureMirage, setCaptureMirage] = useState<{ host: string; port: number } | null>(null);
   const [notEchoMachine, setNotEchoMachine] = useState(false);
   const [captureRelayActive, setCaptureRelayActive] = useState(() => Boolean(readPowerfistCaptureCredentials()));
   const [relayBusy, setRelayBusy] = useState(false);
@@ -69,14 +74,16 @@ export function SpyEchoPane() {
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const status = await fetchEchoSpyCodes();
+    const status = await fetchEchoSpyStatus();
     setLoading(false);
     if (!status.ok) {
       setNotEchoMachine(true);
+      setStatusSource(null);
       setError(status.reason);
       return;
     }
     setNotEchoMachine(false);
+    setStatusSource(status.source);
     setEchoHost(status.echoHost);
     setHttpPort(status.httpPort);
     setMiragePin(status.miragePin);
@@ -85,10 +92,21 @@ export function SpyEchoPane() {
     setPowerfistExpiresAt(status.powerfistExpiresAt);
     setPairedMirages(normalizePairedMirages(status));
     setPairedPowerfist(status.pairedPowerfist);
+    setSatelliteArmed(status.armed ?? null);
+    setSatelliteWsStatus(status.wsStatus ?? null);
+    setCaptureMirage(status.captureMirage ?? null);
   }, []);
 
   useEffect(() => {
     void refresh();
+    const interval = window.setInterval(() => void refresh(), 5000);
+    return () => window.clearInterval(interval);
+  }, [refresh]);
+
+  const handleRefreshStatus = useCallback(async () => {
+    setBusy(true);
+    await refresh();
+    setBusy(false);
   }, [refresh]);
 
   const handleRegenerate = useCallback(async () => {
@@ -122,12 +140,19 @@ export function SpyEchoPane() {
 
   if (notEchoMachine) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-        <p className="max-w-md text-center leading-relaxed">
-          Pairing codes live on the {ESPIONAGE_ECHO_DISPLAY} screenshot machine (Echo Satellite). Use{" "}
-          <strong className="text-[#9a9a9a]">TEAM LINKS</strong> above to see what is connected from this
-          cyberdeck — after pairing on Mirage or PowerFist tabs.
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
+        <p className="max-w-md leading-relaxed">
+          This browser tab is the <strong className="text-[#9a9a9a]">hosted cyberdeck</strong>, not the Echo
+          screenshot machine. Pairing codes and linked Mirages for {ESPIONAGE_ECHO_DISPLAY} live on the Mac
+          running Echo Satellite.
         </p>
+        <p className="max-w-md leading-relaxed">
+          On the Echo Mac: open Echo Satellite from the Dock (Status → Linked Mirages), or open the{" "}
+          <strong className="text-[#9a9a9a]">local cyberdeck</strong> at{" "}
+          <code className="text-[#bdbdbd]">http://127.0.0.1:3000</code>. Use{" "}
+          <strong className="text-[#9a9a9a]">TEAM LINKS</strong> above after Mirage/PowerFist pair.
+        </p>
+        {error ? <p className="text-red-300/90">{error}</p> : null}
       </div>
     );
   }
@@ -141,24 +166,36 @@ export function SpyEchoPane() {
           <p className="mt-2 text-[9px] text-[#5f5f5f]">
             Echo on LAN · {echoHost}
             {httpPort ? `:${httpPort}` : null}
+            {statusSource === "satellite" ? " · via Echo Satellite" : null}
           </p>
         ) : null}
       </div>
+
+      {statusSource === "satellite" ? (
+        <p className="rounded border border-cyan-950/40 bg-cyan-950/10 px-3 py-2 text-[8px] leading-relaxed text-[#7a9a9a]">
+          Reading from Echo Satellite on this Mac. For fresh 6-digit PIN codes, also open the local cyberdeck at{" "}
+          <code className="text-[#bdbdbd]">http://127.0.0.1:3000</code> (Spy → Echo).
+        </p>
+      ) : null}
 
       {loading ? (
         <p className="text-[#8a8a8a]">Loading pairing codes…</p>
       ) : (
         <>
-          <PairPinBlock
-            label={`CODE FOR ${ESPIONAGE_MIRAGE_DISPLAY}`}
-            pin={miragePin}
-            expiresAt={mirageExpiresAt}
-          />
-          <PairPinBlock
-            label={`CODE FOR ${ESPIONAGE_POWERFIST_LABEL}`}
-            pin={powerfistPin}
-            expiresAt={powerfistExpiresAt}
-          />
+          {statusSource !== "satellite" || miragePin || powerfistPin ? (
+            <>
+              <PairPinBlock
+                label={`CODE FOR ${ESPIONAGE_MIRAGE_DISPLAY}`}
+                pin={miragePin}
+                expiresAt={mirageExpiresAt}
+              />
+              <PairPinBlock
+                label={`CODE FOR ${ESPIONAGE_POWERFIST_LABEL}`}
+                pin={powerfistPin}
+                expiresAt={powerfistExpiresAt}
+              />
+            </>
+          ) : null}
 
           {pairedMirages.length > 0 ? (
             <ul className="space-y-1">
@@ -168,6 +205,15 @@ export function SpyEchoPane() {
                 </li>
               ))}
             </ul>
+          ) : (
+            <p className="text-[#8a8a8a]">No Mirage linked yet.</p>
+          )}
+          {captureMirage ? (
+            <p className="text-emerald-300/80">
+              CAPTURE RELAY // {captureMirage.host}:{captureMirage.port}
+              {satelliteArmed ? " · ARMED" : " · disarmed"}
+              {satelliteWsStatus ? ` · WS ${satelliteWsStatus.toUpperCase()}` : null}
+            </p>
           ) : null}
           {pairedPowerfist ? (
             <p className="text-emerald-300/80">
@@ -175,9 +221,14 @@ export function SpyEchoPane() {
             </p>
           ) : null}
 
-          <CyberdeckActionButton disabled={busy} onClick={() => void handleRegenerate()}>
-            New codes
-          </CyberdeckActionButton>
+          <div className="flex flex-wrap gap-2">
+            <CyberdeckActionButton disabled={busy} onClick={() => void handleRefreshStatus()}>
+              Refresh status
+            </CyberdeckActionButton>
+            <CyberdeckActionButton disabled={busy} onClick={() => void handleRegenerate()}>
+              New codes
+            </CyberdeckActionButton>
+          </div>
 
           <div className="rounded border border-[#1c1c1c] bg-black/50 p-3">
             <p className="mb-2 text-[9px] tracking-[0.08em] text-[#8a8a8a]">Silent capture relay</p>

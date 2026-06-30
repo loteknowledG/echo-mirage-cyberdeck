@@ -5,7 +5,7 @@ import { DEFAULT_PAIR_HTTP_PORT } from "./config.mjs";
 import * as logger from "./logger.mjs";
 
 /**
- * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void }} options
+ * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void, getSpyStatus?: () => object }} options
  */
 export function startPairServer(options) {
   const port = options.port ?? DEFAULT_PAIR_HTTP_PORT;
@@ -22,6 +22,20 @@ export function startPairServer(options) {
       if (url.pathname === "/health") {
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("ok");
+        return;
+      }
+
+      if (url.pathname === "/spy/status" && req.method === "GET") {
+        const status = options.getSpyStatus?.() ?? { ok: false, reason: "status unavailable" };
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(status));
+        return;
+      }
+
+      if (url.pathname === "/api/spy/echo/codes" && req.method === "GET") {
+        const status = options.getSpyStatus?.() ?? { ok: false, reason: "Echo codes unavailable." };
+        res.writeHead(status.ok ? 200 : 503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(status));
         return;
       }
 

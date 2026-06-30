@@ -58,7 +58,7 @@ async function isLocalSpyLinkActive(
   return status.ok && status.active;
 }
 
-export function useSpyTeamStatus(): SpyTeamStatus {
+export function useSpyTeamStatus(): SpyTeamStatus & { refresh: () => Promise<void> } {
   const [status, setStatus] = useState<SpyTeamStatus>(EMPTY_SPY_TEAM_STATUS);
 
   const refresh = useCallback(async () => {
@@ -155,5 +155,5 @@ export function useSpyTeamStatus(): SpyTeamStatus {
     };
   }, [refresh]);
 
-  return status;
+  return { ...status, refresh };
 }

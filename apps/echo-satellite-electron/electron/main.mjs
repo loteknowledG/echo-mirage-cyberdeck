@@ -133,6 +133,27 @@ function createMainWindow() {
   });
 }
 
+function buildSpyStatusPayload() {
+  const snapshot = statusSnapshot();
+  return {
+    ok: true,
+    source: "echo-satellite",
+    echoHost: "127.0.0.1",
+    httpPort: DEFAULT_PAIR_HTTP_PORT,
+    miragePin: null,
+    powerfistPin: null,
+    mirageExpiresAt: null,
+    powerfistExpiresAt: null,
+    pairedMirages: snapshot.spyMirages,
+    pairedMirage: snapshot.spyMirages[0] ?? null,
+    pairedPowerfist: null,
+    armed: snapshot.armed,
+    wsStatus: snapshot.wsStatus,
+    captureMirage: snapshot.captureMirage,
+    spyLinksReachable: snapshot.spyLinksReachable,
+  };
+}
+
 async function refreshSpyLinks() {
   cachedSpyLinks = await fetchSpyMirageLinks();
   mainWindow?.webContents.send("satellite:status-changed", statusSnapshot());
@@ -146,6 +167,7 @@ async function initializeAfterReady() {
     onPaired: (creds) => {
       void armWithCredentials(creds, true);
     },
+    getSpyStatus: () => buildSpyStatusPayload(),
   });
 
   const saved = await loadCredentials(app);
