@@ -2,7 +2,11 @@ import http from "node:http";
 import { URL } from "node:url";
 import { completeCapturePair } from "./pair.mjs";
 import { DEFAULT_PAIR_HTTP_PORT } from "./config.mjs";
-import { proxySpyPairEnter } from "./spy-pair-proxy.mjs";
+import {
+  completeSpyPairEnterByPin,
+  getEchoSpyPairingStatus,
+  refreshEchoSpyPairCodes,
+} from "./spy-echo-pairing.mjs";
 import * as logger from "./logger.mjs";
 
 function applyCors(res) {
@@ -57,16 +61,29 @@ export function startPairServer(options) {
       }
 
       if (url.pathname === "/api/spy/echo/codes" && req.method === "GET") {
-        const status = options.getSpyStatus?.() ?? { ok: false, reason: "Echo codes unavailable." };
-        res.writeHead(status.ok ? 200 : 503, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(status));
+        const status = await getEchoSpyPairingStatus();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, source: "echo-satellite", ...status }));
+        return;
+      }
+
+      if (url.pathname === "/api/spy/echo/codes" && req.method === "POST") {
+        await refreshEchoSpyPairCodes();
+        const status = await getEchoSpyPairingStatus();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, source: "echo-satellite", ...status }));
         return;
       }
 
       if (url.pathname === "/api/spy/pair/enter" && req.method === "POST") {
         const body = await readJsonBody(req);
-        logger.log("pair-server: Spy PIN enter — proxying to local cyberdeck");
-        const result = await proxySpyPairEnter(body);
+        logger.log("pair-server: Spy PIN enter");
+        const result = await completeSpyPairEnterByPin({
+          pin: String(body.pin ?? ""),
+          role: body.role === "powerfist" ? "powerfist" : "mirage",
+          nodeId: typeof body.nodeId === "string" ? body.nodeId : undefined,
+          deviceId: typeof body.deviceId === "string" ? body.deviceId : undefined,
+        });
         res.writeHead(result.ok ? 200 : 403, { "Content-Type": "application/json" });
         res.end(JSON.stringify(result));
         return;

@@ -181,6 +181,55 @@ button:hover {
   background: #000;
 }
 
+.pin-grid {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.pin-block {
+  border: 1px solid #1c1c1c;
+  border-radius: 4px;
+  background: #000;
+  padding: 0.65rem;
+}
+
+.pin-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: #8a8a8a;
+}
+
+.pin-value {
+  margin: 0;
+  font-size: 1.45rem;
+  letter-spacing: 0.35em;
+  color: #9fd8ff;
+}
+
+.pin-meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.68rem;
+  color: #5f5f5f;
+}
+
+.advanced-pair {
+  margin-top: 0.5rem;
+  font-size: 0.72rem;
+  color: #666;
+}
+
+.advanced-pair summary {
+  cursor: pointer;
+  color: #8a8a8a;
+  margin-bottom: 0.5rem;
+}
+
+.advanced-pair[open] summary {
+  margin-bottom: 0.65rem;
+}
+
 .log-tail {
   margin: 0.75rem 0 0;
   padding: 0.65rem;

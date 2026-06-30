@@ -23,7 +23,11 @@ import { startPairServer } from "./pair-server.mjs";
 import { startWsClient } from "./ws-client.mjs";
 import { createTrayManager } from "./tray.mjs";
 import * as logger from "./logger.mjs";
-import { fetchSpyMirageLinks } from "./spy-links.mjs";
+import {
+  getEchoSpyPairingStatus,
+  initSpyEchoPairing,
+  refreshEchoSpyPairCodes,
+} from "./spy-echo-pairing.mjs";
 import { checkForSatelliteUpdate, downloadAndInstallSatelliteUpdate } from "./updater.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -50,6 +54,8 @@ let lastMissionId = null;
 let cachedCredentials = null;
 /** @type {{ reachable: boolean, mirages: Array<{ nodeId: string, pairedAt: string }> }} */
 let cachedSpyLinks = { reachable: false, mirages: [] };
+/** @type {Awaited<ReturnType<typeof getEchoSpyPairingStatus>> | null} */
+let cachedSpyStatus = null;
 
 let trayIcon = null;
 try {
@@ -136,18 +142,19 @@ function createMainWindow() {
 
 function buildSpyStatusPayload() {
   const snapshot = statusSnapshot();
+  const spy = cachedSpyStatus;
   return {
     ok: true,
     source: "echo-satellite",
-    echoHost: "127.0.0.1",
-    httpPort: DEFAULT_PAIR_HTTP_PORT,
-    miragePin: null,
-    powerfistPin: null,
-    mirageExpiresAt: null,
-    powerfistExpiresAt: null,
+    echoHost: spy?.echoHost ?? "127.0.0.1",
+    httpPort: spy?.httpPort ?? DEFAULT_PAIR_HTTP_PORT,
+    miragePin: spy?.miragePin ?? null,
+    powerfistPin: spy?.powerfistPin ?? null,
+    mirageExpiresAt: spy?.mirageExpiresAt ?? null,
+    powerfistExpiresAt: spy?.powerfistExpiresAt ?? null,
     pairedMirages: snapshot.spyMirages,
     pairedMirage: snapshot.spyMirages[0] ?? null,
-    pairedPowerfist: null,
+    pairedPowerfist: spy?.pairedPowerfist ?? null,
     armed: snapshot.armed,
     wsStatus: snapshot.wsStatus,
     captureMirage: snapshot.captureMirage,
@@ -156,12 +163,28 @@ function buildSpyStatusPayload() {
 }
 
 async function refreshSpyLinks() {
-  cachedSpyLinks = await fetchSpyMirageLinks();
+  try {
+    cachedSpyStatus = await getEchoSpyPairingStatus();
+    cachedSpyLinks = {
+      reachable: true,
+      mirages: cachedSpyStatus.pairedMirages.map((mirage) => ({
+        nodeId: mirage.nodeId,
+        pairedAt: mirage.pairedAt,
+      })),
+    };
+  } catch (error) {
+    cachedSpyStatus = null;
+    cachedSpyLinks = { reachable: false, mirages: [] };
+    logger.log(
+      `spy codes refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   mainWindow?.webContents.send("satellite:status-changed", statusSnapshot());
 }
 
 async function initializeAfterReady() {
   logger.step(3, 8, "app ready — starting services");
+  initSpyEchoPairing(app);
 
   pairServer = startPairServer({
     getNodeId: () => getOrCreateNodeId(app),
@@ -199,6 +222,34 @@ async function initializeAfterReady() {
 
 function registerIpc() {
   ipcMain.handle("satellite:get-status", () => statusSnapshot());
+
+  ipcMain.handle("satellite:get-spy-codes", async () => {
+    const status = await getEchoSpyPairingStatus();
+    cachedSpyStatus = status;
+    cachedSpyLinks = {
+      reachable: true,
+      mirages: status.pairedMirages.map((mirage) => ({
+        nodeId: mirage.nodeId,
+        pairedAt: mirage.pairedAt,
+      })),
+    };
+    return { ok: true, ...status };
+  });
+
+  ipcMain.handle("satellite:regenerate-spy-codes", async () => {
+    await refreshEchoSpyPairCodes();
+    const status = await getEchoSpyPairingStatus();
+    cachedSpyStatus = status;
+    cachedSpyLinks = {
+      reachable: true,
+      mirages: status.pairedMirages.map((mirage) => ({
+        nodeId: mirage.nodeId,
+        pairedAt: mirage.pairedAt,
+      })),
+    };
+    mainWindow?.webContents.send("satellite:status-changed", statusSnapshot());
+    return { ok: true, ...status };
+  });
 
   ipcMain.handle("satellite:pair-from-url", async (_event, capturePairUrl) => {
     try {

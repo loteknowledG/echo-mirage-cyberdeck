@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("satellite", {
   getStatus: () => ipcRenderer.invoke("satellite:get-status"),
+  getSpyCodes: () => ipcRenderer.invoke("satellite:get-spy-codes"),
+  regenerateSpyCodes: () => ipcRenderer.invoke("satellite:regenerate-spy-codes"),
   pairFromUrl: (capturePairUrl) => ipcRenderer.invoke("satellite:pair-from-url", capturePairUrl),
   testCapture: () => ipcRenderer.invoke("satellite:test-capture"),
   disarm: () => ipcRenderer.invoke("satellite:disarm"),
