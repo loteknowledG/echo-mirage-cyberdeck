@@ -9,39 +9,21 @@ import {
   type SpyTeamStatus,
 } from "@/lib/cyberdeck/spy-team-status";
 import {
+  fetchEchoRemoteStatusClient,
   fetchEchoSpyStatus,
   fetchEchoSpyLinkStatus,
   normalizePairedMirages,
   readSpyMiragePairCredentials,
   readSpyPowerfistPairCredentials,
+  type EchoSpyStatus,
 } from "@/lib/cyberdeck/spy-pairing-client";
 
 const REFRESH_MS = 3000;
-
-type RemoteEchoStatus =
-  | {
-      ok: true;
-      echoHost: string;
-      pairedMirages?: { nodeId: string; pairedAt: string }[];
-      pairedMirage: { nodeId: string; pairedAt: string } | null;
-      pairedPowerfist: { deviceId: string; pairedAt: string } | null;
-    }
-  | { ok: false; reason?: string };
 
 function formatMirageLinkDetail(mirages: { nodeId: string }[]): string {
   if (mirages.length === 0) return "Waiting for Mirage code.";
   if (mirages.length === 1) return `node ${mirages[0].nodeId.slice(0, 8)}…`;
   return `${mirages.length} linked · ${mirages.map((mirage) => mirage.nodeId.slice(0, 8)).join(", ")}…`;
-}
-
-async function fetchEchoRemoteStatus(echoHost: string, echoHttpPort: number): Promise<RemoteEchoStatus> {
-  try {
-    const params = new URLSearchParams({ echoHost, echoHttpPort: String(echoHttpPort) });
-    const res = await fetch(`/api/spy/echo/remote-status?${params.toString()}`, { cache: "no-store" });
-    return (await res.json()) as RemoteEchoStatus;
-  } catch {
-    return { ok: false, reason: "Could not reach Echo." };
-  }
 }
 
 async function isLocalSpyLinkActive(
@@ -72,7 +54,7 @@ export function useSpyTeamStatus(): SpyTeamStatus & { refresh: () => Promise<voi
     let miragePowerfist = linkFromBool(false, "Scan Mirage hub phone QR on PowerFist.");
 
     const echoLocal = await fetchEchoSpyStatus();
-    let remote: RemoteEchoStatus | null = null;
+    let remote: EchoSpyStatus | { ok: false; reason?: string } | null = null;
 
     if (echoLocal.ok) {
       const localMirages = normalizePairedMirages(echoLocal);
@@ -83,7 +65,7 @@ export function useSpyTeamStatus(): SpyTeamStatus & { refresh: () => Promise<voi
         ? linkFromBool(true, `device ${echoLocal.pairedPowerfist.deviceId.slice(0, 8)}…`)
         : linkFromBool(false, "Waiting for PowerFist code.");
     } else if (echoHost) {
-      remote = await fetchEchoRemoteStatus(echoHost, echoHttpPort);
+      remote = await fetchEchoRemoteStatusClient(echoHost, echoHttpPort);
       if (remote.ok) {
         const remoteMirages = normalizePairedMirages(remote);
         echoMirage = remoteMirages.length
@@ -100,7 +82,7 @@ export function useSpyTeamStatus(): SpyTeamStatus & { refresh: () => Promise<voi
       const remoteMatches = remoteMirages.some((mirage) => mirage.nodeId === mirageCreds.nodeId);
       const localActive = echoLocal.ok ? await isLocalSpyLinkActive("mirage", mirageCreds) : false;
 
-      if (remoteMatches || localActive || (!remote && !echoLocal.ok)) {
+      if (remoteMatches || localActive || (mirageCreds && !echoLocal.ok && !remote?.ok)) {
         echoMirage = linkFromBool(
           true,
           `${mirageCreds.echoHost} · node ${mirageCreds.nodeId.slice(0, 8)}…`,
@@ -117,7 +99,7 @@ export function useSpyTeamStatus(): SpyTeamStatus & { refresh: () => Promise<voi
         ? await isLocalSpyLinkActive("powerfist", powerfistSpyCreds)
         : false;
 
-      if (remoteMatches || localActive || (!remote && !echoLocal.ok)) {
+      if (remoteMatches || localActive || (powerfistSpyCreds && !echoLocal.ok && !remote?.ok)) {
         echoPowerfist = linkFromBool(
           true,
           `${powerfistSpyCreds.echoHost} · device ${powerfistSpyCreds.deviceId.slice(0, 8)}…`,

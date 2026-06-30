@@ -79,8 +79,9 @@ export function SpyMiragePane() {
       </div>
 
       <p className="text-[9px] leading-relaxed text-[#5f5f5f]">
-        Enter the 6-digit code only — Mirage finds Echo on your Wi‑Fi automatically. No IP needed unless
-        auto-detect fails (use Advanced).
+        Enter the 6-digit Mirage code from Echo Satellite (or this pane on the Echo Mac). Mirage finds Echo
+        on your Wi‑Fi automatically — paste <code className="text-[#8a8a8a]">192.168.x.x:3050</code> under
+        Advanced only if auto-detect fails.
       </p>
 
       {paired && !terminated ? (

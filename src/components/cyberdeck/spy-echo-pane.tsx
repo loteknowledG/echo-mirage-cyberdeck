@@ -46,7 +46,7 @@ function PairPinBlock({
       <p className="font-mono text-2xl tracking-[0.35em] text-cyan-200/90">{pin}</p>
       <p className="mt-2 text-[8px] leading-relaxed text-[#5f5f5f]">
         Type this 6-digit code on the {label.includes("MIRAGE") ? ESPIONAGE_MIRAGE_DISPLAY : ESPIONAGE_POWERFIST_LABEL}{" "}
-        device Spy tab, along with the Echo LAN address above.
+        device Spy tab. Mirage finds Echo on Wi‑Fi automatically — no IP needed.
       </p>
     </div>
   );
@@ -183,8 +183,8 @@ export function SpyEchoPane() {
 
       {statusSource === "satellite" ? (
         <p className="rounded border border-cyan-950/40 bg-cyan-950/10 px-3 py-2 text-[8px] leading-relaxed text-[#7a9a9a]">
-          Reading from Echo Satellite on this Mac. For fresh 6-digit PIN codes, also open the local cyberdeck at{" "}
-          <code className="text-[#bdbdbd]">http://127.0.0.1:3000</code> (Spy → Echo).
+          Reading from Echo Satellite on this Mac. PIN codes also appear in the Satellite window under{" "}
+          <strong className="text-[#9a9a9a]">Spy pairing codes</strong>.
         </p>
       ) : null}
 
@@ -192,7 +192,7 @@ export function SpyEchoPane() {
         <p className="text-[#8a8a8a]">Loading pairing codes…</p>
       ) : (
         <>
-          {statusSource !== "satellite" || miragePin || powerfistPin ? (
+          {miragePin || powerfistPin ? (
             <>
               <PairPinBlock
                 label={`CODE FOR ${ESPIONAGE_MIRAGE_DISPLAY}`}
@@ -205,6 +205,10 @@ export function SpyEchoPane() {
                 expiresAt={powerfistExpiresAt}
               />
             </>
+          ) : statusSource === "satellite" ? (
+            <p className="text-[9px] text-[#8a8a8a]">
+              No active PIN codes — open Echo Satellite or tap New codes below.
+            </p>
           ) : null}
 
           {pairedMirages.length > 0 ? (
