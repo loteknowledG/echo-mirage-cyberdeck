@@ -28,7 +28,7 @@ export function step(step, total, detail) {
   log(`[boot ${step}/${total}] ${detail}`);
 }
 
-export function getDiagnostics(version, platform, trayMode) {
+export function getDiagnostics(version, platform, trayMode, captureNote = null) {
   return {
     version,
     platform,
@@ -37,6 +37,7 @@ export function getDiagnostics(version, platform, trayMode) {
     sessionId: logs[0] ?? "unknown",
     previousSessionCrashed: false,
     previousSession: null,
+    captureNote,
     logTail: logs.slice(-80).join("\n"),
     supportHint:
       "Startup is logged to startup.log. If capture fails on macOS, grant Screen Recording in System Settings.",

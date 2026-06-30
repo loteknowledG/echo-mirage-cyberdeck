@@ -18,7 +18,11 @@ import {
   loadCredentials,
   saveCredentials,
 } from "./config.mjs";
-import { capturePrimaryMonitorPng, setElectronCaptureBackend } from "./capture.mjs";
+import {
+  capturePrimaryMonitorPng,
+  getLastCaptureNote,
+  setElectronCaptureBackend,
+} from "./capture.mjs";
 import { createElectronScreenCapture } from "./capture-electron.mjs";
 import { createCapturePreviewBase64 } from "./capture-preview.mjs";
 import { startPairServer } from "./pair-server.mjs";
@@ -31,6 +35,17 @@ import * as logger from "./logger.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
 const version = app.getVersion();
+
+if (process.platform === "darwin") {
+  app.commandLine.appendSwitch(
+    "disable-features",
+    [
+      "ThumbnailCapturerMac:capture_mode/sc_screenshot_manager",
+      "ScreenCaptureKitPickerScreen",
+      "ScreenCaptureKitStreamPickerSonoma",
+    ].join(","),
+  );
+}
 
 /** @type {import('electron').BrowserWindow | null} */
 let mainWindow = null;
@@ -186,6 +201,10 @@ function registerIpc() {
 
       const capture = await capturePrimaryMonitorPng();
       const previewBase64 = createCapturePreviewBase64(capture.pngBuffer);
+      const captureNote = getLastCaptureNote();
+      if (captureNote) {
+        logger.log(`capture: ${captureNote}`);
+      }
 
       return {
         ok: true,
@@ -193,6 +212,7 @@ function registerIpc() {
         height: capture.height,
         pngBytes: capture.pngBase64.length,
         captureSource: capture.captureSource,
+        captureNote: captureNote ?? undefined,
         previewBase64: previewBase64 ?? undefined,
       };
     } catch (error) {
@@ -236,7 +256,12 @@ function registerIpc() {
   });
 
   ipcMain.handle("satellite:get-diagnostics", () =>
-    logger.getDiagnostics(version, process.platform, trayManager.isTrayReady() ? "tray" : "window"),
+    logger.getDiagnostics(
+      version,
+      process.platform,
+      trayManager.isTrayReady() ? "tray" : "window",
+      getLastCaptureNote(),
+    ),
   );
 }
 

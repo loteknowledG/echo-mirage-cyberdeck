@@ -1,13 +1,21 @@
 import { Monitor } from "node-screenshots";
+import { captureViaMacScreencapture } from "./capture-screencapture.mjs";
 
 const CAPTURE_TIMEOUT_MS = 20_000;
 
 /** @type {{ captureScreen: () => Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer, captureSource?: string }> } | null} */
 let electronBackend = null;
 
+/** @type {string | null} */
+let lastCaptureNote = null;
+
 /** @param {{ captureScreen: () => Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer, captureSource?: string }> }} backend */
 export function setElectronCaptureBackend(backend) {
   electronBackend = backend;
+}
+
+export function getLastCaptureNote() {
+  return lastCaptureNote;
 }
 
 /**
@@ -75,15 +83,40 @@ export async function captureViaNodeScreenshots() {
  * @returns {Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer, captureSource: string }>}
  */
 export async function capturePrimaryMonitorPng() {
-  if (process.platform === "darwin" && electronBackend) {
+  lastCaptureNote = null;
+
+  if (process.platform === "darwin") {
+    if (electronBackend) {
+      try {
+        const captured = await electronBackend.captureScreen();
+        return { ...captured, captureSource: captured.captureSource ?? "desktopCapturer" };
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        lastCaptureNote = `desktopCapturer failed (${reason}); trying screencapture…`;
+      }
+    }
+
     try {
-      const captured = await electronBackend.captureScreen();
-      return { ...captured, captureSource: captured.captureSource ?? "desktopCapturer" };
-    } catch {
-      /* fall back to native capture */
+      const captured = await captureViaMacScreencapture();
+      if (lastCaptureNote) {
+        lastCaptureNote = `${lastCaptureNote} using screencapture fallback.`;
+      }
+      return captured;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      lastCaptureNote = lastCaptureNote
+        ? `${lastCaptureNote} screencapture failed (${reason}); trying node-screenshots…`
+        : `screencapture failed (${reason}); trying node-screenshots…`;
     }
   }
-  return captureViaNodeScreenshots();
+
+  const captured = await captureViaNodeScreenshots();
+  if (process.platform === "darwin" && captured.captureSource === "node-screenshots") {
+    lastCaptureNote =
+      (lastCaptureNote ? `${lastCaptureNote} ` : "") +
+      "node-screenshots may only show wallpaper + Echo Satellite — not other apps.";
+  }
+  return captured;
 }
 
 /** @deprecated Use capturePrimaryMonitorPng(). */

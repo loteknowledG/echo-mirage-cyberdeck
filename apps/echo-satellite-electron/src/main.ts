@@ -29,6 +29,7 @@ type TestCaptureResult = {
   pngBytes?: number;
   previewBase64?: string;
   captureSource?: string;
+  captureNote?: string;
   error?: string;
 };
 
@@ -45,6 +46,7 @@ type DiagnosticsReport = {
   logPath: string;
   sessionId: string;
   previousSessionCrashed: boolean;
+  captureNote?: string | null;
   logTail: string;
   supportHint: string;
 };
@@ -113,10 +115,13 @@ function formatDiagnostics(report: DiagnosticsReport): string {
     `trayMode: ${report.trayMode}`,
     `sessionId: ${report.sessionId}`,
     `logPath: ${report.logPath}`,
+    report.captureNote ? `captureNote: ${report.captureNote}` : null,
     "",
     "--- startup.log (tail) ---",
     report.logTail,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 async function refreshSpyCodes(): Promise<void> {
@@ -180,7 +185,12 @@ document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("cl
     const result = await api.testCapture();
     if (result.ok) {
       const source = result.captureSource ? ` · ${result.captureSource}` : "";
-      captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"}${source} — preview below`;
+      const note =
+        result.captureNote ??
+        (result.captureSource === "node-screenshots"
+          ? "Warning: node-screenshots may miss other apps — check preview."
+          : "");
+      captureResultEl.textContent = `OK ${result.width ?? "?"}×${result.height ?? "?"}${source}${note ? ` — ${note}` : ""} — preview below`;
       if (result.previewBase64) {
         capturePreviewEl.src = `data:image/jpeg;base64,${result.previewBase64}`;
         capturePreviewEl.classList.remove("hidden");

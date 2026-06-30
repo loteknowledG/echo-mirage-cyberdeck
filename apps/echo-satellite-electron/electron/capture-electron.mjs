@@ -13,36 +13,47 @@ export function createElectronScreenCapture(electron) {
       const sources = await electron.desktopCapturer.getSources({
         types: ["screen"],
         thumbnailSize: { width, height },
+        fetchWindowIcons: false,
       });
 
+      if (!sources.length) {
+        throw new Error("desktopCapturer returned no screen sources.");
+      }
+
       const displayId = String(display.id);
-      let source =
-        sources.find((entry) => entry.display_id === displayId) ??
-        sources.find((entry) => entry.id.startsWith("screen")) ??
-        sources[0];
+      const candidates = [
+        sources.find((entry) => entry.display_id === displayId),
+        sources.find((entry) => String(entry.display_id) === displayId),
+        sources.find((entry) => entry.name.toLowerCase().includes("entire screen")),
+        sources.find((entry) => entry.name.toLowerCase().includes("screen 1")),
+        ...sources.filter((entry) => entry.id.startsWith("screen:")),
+        ...sources,
+      ];
 
-      if (!source) {
-        throw new Error("No screen source from desktopCapturer.");
+      const seen = new Set();
+      for (const source of candidates) {
+        if (!source || seen.has(source.id)) continue;
+        seen.add(source.id);
+
+        const thumbnail = source.thumbnail;
+        if (thumbnail.isEmpty()) continue;
+
+        const size = thumbnail.getSize();
+        const pngBuffer = thumbnail.toPNG();
+        if (!pngBuffer.length || !size.width || !size.height) continue;
+
+        return {
+          pngBase64: pngBuffer.toString("base64"),
+          width: size.width,
+          height: size.height,
+          pngBuffer,
+          captureSource: "desktopCapturer",
+        };
       }
 
-      const thumbnail = source.thumbnail;
-      if (thumbnail.isEmpty()) {
-        throw new Error("desktopCapturer returned an empty thumbnail.");
-      }
-
-      const size = thumbnail.getSize();
-      const pngBuffer = thumbnail.toPNG();
-      if (!pngBuffer.length) {
-        throw new Error("desktopCapturer PNG encode failed.");
-      }
-
-      return {
-        pngBase64: pngBuffer.toString("base64"),
-        width: size.width,
-        height: size.height,
-        pngBuffer,
-        captureSource: "desktopCapturer",
-      };
+      throw new Error(
+        `desktopCapturer returned empty thumbnails for ${sources.length} screen source(s).`,
+      );
     },
   };
 }
