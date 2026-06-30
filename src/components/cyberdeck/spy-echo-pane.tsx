@@ -17,6 +17,7 @@ import {
   normalizePairedMirages,
   regenerateEchoSpyCodes,
 } from "@/lib/cyberdeck/spy-pairing-client";
+import { SATELLITE_GITHUB_RELEASES_URL } from "@/lib/electron/desktop-install.client";
 import { readPowerfistCaptureCredentials } from "@/lib/cyberdeck/powerfist-capture-client";
 
 function PairPinBlock({
@@ -147,7 +148,16 @@ export function SpyEchoPane() {
           running Echo Satellite.
         </p>
         <p className="max-w-md leading-relaxed">
-          On the Echo Mac: open Echo Satellite from the Dock (Status → Linked Mirages), or open the{" "}
+          On the Echo Mac: install or update{" "}
+          <a
+            href={SATELLITE_GITHUB_RELEASES_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cyan-300/90 underline-offset-2 hover:underline"
+          >
+            Echo Satellite
+          </a>{" "}
+          from GitHub, open it from the Dock (Status → Linked Mirages), or open the{" "}
           <strong className="text-[#9a9a9a]">local cyberdeck</strong> at{" "}
           <code className="text-[#bdbdbd]">http://127.0.0.1:3000</code>. Use{" "}
           <strong className="text-[#9a9a9a]">TEAM LINKS</strong> above after Mirage/PowerFist pair.

@@ -20,8 +20,23 @@ export type SatelliteInstallInfo = {
   features: string[];
 };
 
-const GITHUB_RELEASES =
-  "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases";
+const GITHUB_REPO = "loteknowledG/echo-mirage-cyberdeck";
+const GITHUB_RELEASES = `https://github.com/${GITHUB_REPO}/releases`;
+const SATELLITE_TAG_PREFIX = "satellite-v";
+
+/** Filtered GitHub releases index — not the cyberdeck desktop `releases/latest` page. */
+export const SATELLITE_GITHUB_RELEASES_URL = `${GITHUB_RELEASES}?q=${SATELLITE_TAG_PREFIX}`;
+
+type GitHubReleaseAsset = {
+  name: string;
+  browser_download_url: string;
+};
+
+type GitHubRelease = {
+  tag_name?: string;
+  html_url?: string;
+  assets?: GitHubReleaseAsset[];
+};
 
 function readSatelliteVersion(): string {
   try {
@@ -34,6 +49,12 @@ function readSatelliteVersion(): string {
   } catch {
     return "0.1.0";
   }
+}
+
+function parseSatelliteVersionFromTag(tag: string | undefined): string | null {
+  if (!tag?.startsWith(SATELLITE_TAG_PREFIX)) return null;
+  const version = tag.slice(SATELLITE_TAG_PREFIX.length).trim();
+  return version || null;
 }
 
 function satelliteInstallerFileName(
@@ -72,20 +93,7 @@ function satelliteInstallerFileCandidates(
   }
 }
 
-type GitHubReleaseAsset = {
-  name: string;
-  browser_download_url: string;
-};
-
-type GitHubRelease = {
-  assets?: GitHubReleaseAsset[];
-};
-
-async function resolveSatelliteAssetUrl(
-  version: string,
-  fileName: string,
-  platform: DesktopInstallPlatform,
-): Promise<string | null> {
+function githubRequestHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "User-Agent": "echo-mirage-cyberdeck",
@@ -94,31 +102,67 @@ async function resolveSatelliteAssetUrl(
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
+  return headers;
+}
 
-  const candidates = new Set([
-    fileName,
-    ...satelliteInstallerFileCandidates(version, platform),
-  ]);
+async function fetchGitHubReleases(): Promise<GitHubRelease[]> {
+  const listRes = await fetch(
+    `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=40`,
+    { headers: githubRequestHeaders(), signal: AbortSignal.timeout(10_000) },
+  );
+  if (!listRes.ok) {
+    return [];
+  }
+  return (await listRes.json()) as GitHubRelease[];
+}
 
-  const tryRelease = (release: GitHubRelease): string | null => {
-    for (const name of candidates) {
-      const asset = release.assets?.find((entry) => entry.name === name);
-      if (asset?.browser_download_url) return asset.browser_download_url;
-    }
-    return null;
-  };
-
-  const tag = `satellite-v${version}`;
-  const tagUrl = `https://api.github.com/repos/loteknowledG/echo-mirage-cyberdeck/releases/tags/${tag}`;
-
+async function fetchLatestSatelliteRelease(): Promise<GitHubRelease | null> {
   try {
-    const tagRes = await fetch(tagUrl, {
-      headers,
-      signal: AbortSignal.timeout(10_000),
-    });
+    const releases = await fetchGitHubReleases();
+    return releases.find((release) => release.tag_name?.startsWith(SATELLITE_TAG_PREFIX)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveAssetFromRelease(
+  release: GitHubRelease,
+  version: string,
+  platform: DesktopInstallPlatform,
+): string | null {
+  const candidates = new Set(satelliteInstallerFileCandidates(version, platform));
+  for (const name of candidates) {
+    const asset = release.assets?.find((entry) => entry.name === name);
+    if (asset?.browser_download_url) return asset.browser_download_url;
+  }
+  return null;
+}
+
+async function resolveSatelliteAssetUrl(
+  version: string,
+  platform: DesktopInstallPlatform,
+  latestRelease: GitHubRelease | null,
+): Promise<string | null> {
+  const fileName = satelliteInstallerFileName(version, platform);
+  if (!fileName) return null;
+
+  if (latestRelease) {
+    const latestVersion = parseSatelliteVersionFromTag(latestRelease.tag_name);
+    if (latestVersion === version) {
+      const hit = resolveAssetFromRelease(latestRelease, version, platform);
+      if (hit) return hit;
+    }
+  }
+
+  const tag = `${SATELLITE_TAG_PREFIX}${version}`;
+  try {
+    const tagRes = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${tag}`,
+      { headers: githubRequestHeaders(), signal: AbortSignal.timeout(10_000) },
+    );
     if (tagRes.ok) {
       const release = (await tagRes.json()) as GitHubRelease;
-      const hit = tryRelease(release);
+      const hit = resolveAssetFromRelease(release, version, platform);
       if (hit) return hit;
     }
   } catch {
@@ -126,14 +170,10 @@ async function resolveSatelliteAssetUrl(
   }
 
   try {
-    const listRes = await fetch(
-      "https://api.github.com/repos/loteknowledG/echo-mirage-cyberdeck/releases?per_page=30",
-      { headers, signal: AbortSignal.timeout(10_000) },
-    );
-    if (!listRes.ok) return null;
-    const releases = (await listRes.json()) as GitHubRelease[];
+    const releases = await fetchGitHubReleases();
     for (const release of releases) {
-      const hit = tryRelease(release);
+      if (!release.tag_name?.startsWith(SATELLITE_TAG_PREFIX)) continue;
+      const hit = resolveAssetFromRelease(release, version, platform);
       if (hit) return hit;
     }
   } catch {
@@ -147,12 +187,17 @@ export async function getSatelliteInstallInfo(
   userAgent: string,
   platformOverride?: DesktopInstallPlatform | null,
 ): Promise<SatelliteInstallInfo> {
-  const version = readSatelliteVersion();
+  const repoVersion = readSatelliteVersion();
+  const latestRelease = await fetchLatestSatelliteRelease();
+  const version =
+    parseSatelliteVersionFromTag(latestRelease?.tag_name) ?? repoVersion;
   const platform =
     platformOverride ?? resolveDesktopInstallPlatform(userAgent);
   const supported = platform === "win" || platform === "mac";
   const fileName = satelliteInstallerFileName(version, platform);
-  const releasePageUrl = `${GITHUB_RELEASES}/tag/satellite-v${version}`;
+  const releasePageUrl =
+    latestRelease?.html_url ??
+    `${GITHUB_RELEASES}/tag/${SATELLITE_TAG_PREFIX}${version}`;
 
   let downloadUrl: string | null = null;
   let installerAvailable = false;
@@ -169,7 +214,11 @@ export async function getSatelliteInstallInfo(
       downloadUrl = `/downloads/${fileName}`;
       installerAvailable = true;
     } else {
-      const publishedUrl = await resolveSatelliteAssetUrl(version, fileName, platform);
+      const publishedUrl = await resolveSatelliteAssetUrl(
+        version,
+        platform,
+        latestRelease,
+      );
       if (publishedUrl) {
         downloadUrl = publishedUrl;
         installerAvailable = true;

@@ -20,6 +20,7 @@ import {
   openDesktopInstaller,
   openSatelliteInstaller,
   probeLocalDesktopShell,
+  SATELLITE_GITHUB_RELEASES_URL,
   promptPwaInstall,
   subscribePwaInstallPrompt,
   type BeforeInstallPromptEvent,
@@ -90,11 +91,7 @@ export function SpyDesktopInstallPanel({ activeSubPane }: SpyDesktopInstallPanel
 
   const handleInstallSatellite = useCallback(() => {
     if (!satelliteInfo) {
-      window.open(
-        "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases",
-        "_blank",
-        "noopener,noreferrer",
-      );
+      window.open(SATELLITE_GITHUB_RELEASES_URL, "_blank", "noopener,noreferrer");
       return;
     }
     openSatelliteInstaller(satelliteInfo);

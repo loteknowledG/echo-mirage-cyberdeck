@@ -9,6 +9,9 @@ import type { SatelliteInstallInfo } from "@/lib/electron/satellite-install-info
 export const DESKTOP_INSTALL_DISMISS_KEY = "echo-mirage-desktop-install-dismissed-v1";
 export const DESKTOP_CYBERDECK_PROTOCOL = "echomirage";
 export const DEFAULT_LOCAL_CYBERDECK_ORIGIN = "http://127.0.0.1:3050";
+/** Echo Satellite releases only — not cyberdeck desktop `releases/latest`. */
+export const SATELLITE_GITHUB_RELEASES_URL =
+  "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases?q=satellite-v";
 
 export type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
