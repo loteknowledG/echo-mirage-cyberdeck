@@ -18,8 +18,8 @@ import {
   saveCredentials,
 } from "./config.mjs";
 import { capturePrimaryMonitorDimensions, capturePrimaryMonitorPngBase64 } from "./capture.mjs";
-import { parseCapturePairUrl, completeCapturePair } from "./pair.mjs";
 import { startPairServer } from "./pair-server.mjs";
+import { createSpyPairing } from "./spy-pairing.mjs";
 import { startWsClient } from "./ws-client.mjs";
 import { createTrayManager } from "./tray.mjs";
 import * as logger from "./logger.mjs";
@@ -42,6 +42,9 @@ let lastError = null;
 /** @type {string | null} */
 let lastMissionId = null;
 
+/** @type {import('http').Server | null} */
+let pairServer = null;
+
 let trayIcon = null;
 try {
   const iconPath = path.join(__dirname, "..", "public", "icon.ico");
@@ -51,6 +54,13 @@ try {
 }
 
 const trayManager = createTrayManager({ app, Tray, Menu, nativeImage: trayIcon });
+
+/** @type {ReturnType<typeof createSpyPairing> | null} */
+let spyPairing = null;
+
+function notifySpyCodesChanged() {
+  mainWindow?.webContents.send("satellite:spy-codes-changed");
+}
 
 function statusSnapshot() {
   const stats = wsClient?.getStats();
@@ -91,7 +101,7 @@ async function armWithCredentials(creds, hideWindow) {
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 520,
-    height: 640,
+    height: 720,
     title: "Echo Satellite",
     show: false,
     webPreferences: {
@@ -119,10 +129,16 @@ function createMainWindow() {
 async function initializeAfterReady() {
   logger.step(3, 8, "app ready — starting services");
 
+  spyPairing = createSpyPairing(app, () => getOrCreateNodeId(app));
+
   pairServer = startPairServer({
     getNodeId: () => getOrCreateNodeId(app),
     onPaired: (creds) => {
       void armWithCredentials(creds, true);
+    },
+    spyPairing,
+    onSpyPaired: () => {
+      notifySpyCodesChanged();
     },
   });
 
@@ -141,33 +157,47 @@ async function initializeAfterReady() {
 function registerIpc() {
   ipcMain.handle("satellite:get-status", () => statusSnapshot());
 
-  ipcMain.handle("satellite:pair-from-url", async (_event, capturePairUrl) => {
-    try {
-      const nodeId = await getOrCreateNodeId(app);
-      const params = parseCapturePairUrl(capturePairUrl, nodeId);
-      const result = await completeCapturePair(params);
-      if (!result.ok || !result.credentials) {
-        return { ok: false, reason: result.reason ?? "Pair failed" };
-      }
-      await armWithCredentials(result.credentials, true);
-      return { ok: true };
-    } catch (error) {
-      return {
-        ok: false,
-        reason: error instanceof Error ? error.message : "Pair failed",
-      };
-    }
+  ipcMain.handle("satellite:get-spy-codes", async () => {
+    if (!spyPairing) throw new Error("Spy pairing not ready.");
+    const status = await spyPairing.getEchoSpyPairingStatus();
+    return { ok: true, ...status };
+  });
+
+  ipcMain.handle("satellite:regenerate-spy-codes", async () => {
+    if (!spyPairing) throw new Error("Spy pairing not ready.");
+    await spyPairing.refreshEchoSpyPairCodes();
+    const status = await spyPairing.getEchoSpyPairingStatus();
+    notifySpyCodesChanged();
+    return { ok: true, ...status };
   });
 
   ipcMain.handle("satellite:test-capture", async () => {
     try {
+      if (process.platform === "darwin") {
+        const access = systemPreferences.getMediaAccessStatus("screen");
+        if (access !== "granted") {
+          return {
+            ok: false,
+            error:
+              access === "denied" || access === "restricted"
+                ? "Screen Recording denied. System Settings → Privacy & Security → Screen Recording → enable Echo Satellite, then quit and reopen the app."
+                : "Screen Recording not granted yet. Enable Echo Satellite in Screen Recording settings, then quit and reopen the app.",
+          };
+        }
+      }
+
       const pngBase64 = await capturePrimaryMonitorPngBase64();
       const dimensions = await capturePrimaryMonitorDimensions();
+      const pngBuffer = Buffer.from(pngBase64, "base64");
+      const preview = nativeImage.createFromBuffer(pngBuffer).resize({ width: 480 });
+      const previewBase64 = preview.toPNG().toString("base64");
+
       return {
         ok: true,
         width: dimensions?.width,
         height: dimensions?.height,
         pngBytes: pngBase64.length,
+        previewDataUrl: `data:image/png;base64,${previewBase64}`,
       };
     } catch (error) {
       return {
