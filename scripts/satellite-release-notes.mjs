@@ -11,7 +11,7 @@ Minimal capture drone for the **Echo** screenshot machine — tray-only, screens
 
 **Updates in place** — replaces any older Echo Satellite in Applications. No uninstall, no Terminal.
 
-If macOS warns about an unidentified developer, right-click the \`.pkg\` → **Open** once (unsigned open-source build).
+If macOS still warns about an unidentified developer, the release was built without Apple signing secrets — see [\`MACOS_SIGNING.md\`](https://github.com/loteknowledG/echo-mirage-cyberdeck/blob/main/apps/echo-satellite/MACOS_SIGNING.md) to enable notarized builds (removes this dialog entirely).
 
 Grant **Screen Recording** on first launch, then pair from Mirage Spy → Echo QR on port **3050**.
 

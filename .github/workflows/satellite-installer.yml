@@ -95,6 +95,32 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Import Apple Developer certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: bash scripts/import-apple-signing-cert.sh
+
+      - name: Write App Store Connect API key
+        id: apple_api_key
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPLE_API_KEY:-}" ] || [ -z "${APPLE_API_KEY_BASE64:-}" ]; then
+            echo "App Store Connect API key not configured — notarization will be skipped."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          key_dir="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$key_dir"
+          key_path="$key_dir/AuthKey_${APPLE_API_KEY}.p8"
+          echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$key_path"
+          echo "path=$key_path" >> "$GITHUB_OUTPUT"
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
       - name: Install satellite frontend dependencies
         working-directory: apps/echo-satellite
         run: pnpm install --frozen-lockfile
@@ -103,6 +129,14 @@ jobs:
         working-directory: apps/echo-satellite
         env:
           CI: true
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_PATH: ${{ steps.apple_api_key.outputs.path }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: pnpm tauri:build:mac
 
       - name: Smoke test macOS app launch
@@ -133,7 +167,22 @@ jobs:
           echo "PASS: Echo Satellite stayed running for 4s"
 
       - name: Build macOS PKG installer
+        env:
+          APPLE_INSTALLER_SIGNING_IDENTITY: ${{ secrets.APPLE_INSTALLER_SIGNING_IDENTITY }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_PATH: ${{ steps.apple_api_key.outputs.path }}
         run: bash scripts/build-satellite-mac-installers.sh
+
+      - name: Notarize macOS DMG
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_PATH: ${{ steps.apple_api_key.outputs.path }}
+        run: |
+          version="$(node -p "require('./apps/echo-satellite/package.json').version")"
+          dmg="apps/echo-satellite/src-tauri/target/release/bundle/dmg/Echo-Satellite_${version}_aarch64.dmg"
+          bash scripts/notarize-mac-artifact.sh "$dmg"
 
       - name: Verify macOS installers
         run: |

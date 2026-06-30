@@ -42,4 +42,15 @@ pkgbuild \
   --version "$VERSION" \
   "$PKG"
 
+if [ -n "${APPLE_INSTALLER_SIGNING_IDENTITY:-}" ]; then
+  SIGNED_PKG="${PKG%.pkg}-signed.pkg"
+  echo "Signing PKG with ${APPLE_INSTALLER_SIGNING_IDENTITY}"
+  productsign --sign "$APPLE_INSTALLER_SIGNING_IDENTITY" "$PKG" "$SIGNED_PKG"
+  mv "$SIGNED_PKG" "$PKG"
+else
+  echo "APPLE_INSTALLER_SIGNING_IDENTITY not set — PKG is unsigned."
+fi
+
+bash "$ROOT/scripts/notarize-mac-artifact.sh" "$PKG"
+
 echo "Created PKG: $PKG"

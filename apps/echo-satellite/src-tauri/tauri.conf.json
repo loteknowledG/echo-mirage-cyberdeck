@@ -38,8 +38,8 @@
     "shortDescription": "Echo capture drone for Mirage espionage",
     "longDescription": "Minimal tray agent: screenshot on PowerFist signal, relay PNG to Mirage. No cyberdeck UI.",
     "macOS": {
-      "signingIdentity": "-",
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
+      "entitlements": "./Entitlements.plist",
       "minimumSystemVersion": "12.0"
     },
     "windows": {
