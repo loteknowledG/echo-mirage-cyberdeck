@@ -5,6 +5,7 @@ import { SurveySubRail } from "@/components/cyberdeck/survey-sub-rail";
 import { SurveyDesktopInstallPanel } from "@/components/cyberdeck/survey-desktop-install-panel";
 import { SurveyEchoPane } from "@/components/cyberdeck/survey-echo-pane";
 import { SurveyMiragePane } from "@/components/cyberdeck/survey-mirage-pane";
+import { SurveyMiragePairingDock } from "@/components/cyberdeck/survey-mirage-pairing-dock";
 import { SurveyPowerfistPane } from "@/components/cyberdeck/survey-powerfist-pane";
 import { SurveyTeamStatusPanel } from "@/components/cyberdeck/survey-team-status-panel";
 import type { SurveySubPane } from "@/lib/cyberdeck/survey-mode";
@@ -15,6 +16,7 @@ export function CyberdeckSurveyPaneBody() {
   return (
     <div className="cyberdeck-spy-pane flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-black">
       <SurveySubRail active={activeSubPane} onSelect={setActiveSubPane} />
+      {activeSubPane === "mirage" ? <SurveyMiragePairingDock /> : null}
       <SurveyTeamStatusPanel />
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         {activeSubPane === "echo" ? <SurveyEchoPane /> : null}
