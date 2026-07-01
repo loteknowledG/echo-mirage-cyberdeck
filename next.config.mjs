@@ -121,7 +121,7 @@ const nextConfig = {
 	},
 	outputFileTracingIncludes: {
 		"/api/glyph/*": ["./assets/figlet-fonts/**"],
-		"/api/spy/capture": ["./node_modules/node-screenshots/**", "./node_modules/node-screenshots-*/**/*"],
+		"/api/survey/capture": ["./node_modules/node-screenshots/**", "./node_modules/node-screenshots-*/**/*"],
 		"/*": [
 			"./assets/figlet-fonts/**",
 			// Next standalone trace can omit hoisted/pnpm symlinks — force runtime deps for Electron.

@@ -319,6 +319,21 @@ export function parseBrowserCommand(input: string): BrowserCommand | null {
   const body = (commandMatch?.[1] || commandText).trim();
   const lower = body.toLowerCase();
 
+  const operatorBrowserSearch = body.match(
+    /^(?:use\s+)?operator_browser\s+(?:to\s+)?search\s+for:?\s*(.+)$/i,
+  );
+  if (operatorBrowserSearch?.[1]?.trim()) {
+    return {
+      kind: "goto",
+      url: deriveOperatorBrowserUrl(operatorBrowserSearch[1].trim()),
+    };
+  }
+
+  const lookUpMatch = body.match(/^look\s+(?:it\s+)?up:?\s+(.+)$/i);
+  if (lookUpMatch?.[1]?.trim()) {
+    return { kind: "goto", url: deriveOperatorBrowserUrl(lookUpMatch[1].trim()) };
+  }
+
   if (/^(?:back|go back)$/i.test(lower)) return { kind: "back" };
   if (/^(?:forward|go forward)$/i.test(lower)) return { kind: "forward" };
   if (/^(?:reload|refresh)$/i.test(lower)) return { kind: "reload" };

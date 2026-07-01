@@ -18,7 +18,7 @@ type SatelliteStatus = {
   lastMissionId?: string | null;
   missionsHandled: number;
   spyMirages: SpyMirageLink[];
-  spyLinksReachable: boolean;
+  surveyLinksReachable: boolean;
   captureMirage: CaptureMirageLink | null;
 };
 

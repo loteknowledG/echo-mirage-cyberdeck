@@ -515,8 +515,8 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   place-items: start;
 }
 
-/* Spy tab — horizontal E/M/P sub-rail reuses server-rail ASCII button styling */
-.spy-sub-rail.cyberdeck-server-rail {
+/* Survey tab — horizontal E/M/P sub-rail reuses server-rail ASCII button styling */
+.survey-sub-rail.cyberdeck-server-rail {
   flex-direction: row;
   align-items: flex-end;
   width: 100%;
@@ -524,7 +524,7 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   overflow-x: auto;
 }
 
-.spy-sub-rail.cyberdeck-server-rail .cyberdeck-rail-tab {
+.survey-sub-rail.cyberdeck-server-rail .cyberdeck-rail-tab {
   flex-shrink: 0;
 }
 

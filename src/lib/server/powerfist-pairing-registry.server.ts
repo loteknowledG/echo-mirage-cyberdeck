@@ -11,8 +11,8 @@ import {
   type PowerfistPairedMirage,
 } from "@/lib/server/powerfist-pairing-state.server";
 import type { PowerfistMissionEnvelope } from "@/lib/cyberdeck/powerfist-mission.types";
-import { ESPIONAGE_SILENT_CAPTURE_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
-import { ESPIONAGE_ECHO_NODE_LABEL } from "@/lib/cyberdeck/espionage-mode";
+import { SURVEY_SILENT_CAPTURE_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
+import { SURVEY_ECHO_NODE_LABEL } from "@/lib/cyberdeck/survey-mode";
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 
@@ -351,7 +351,7 @@ export async function completePowerfistCapturePair(input: {
     nodeId: input.nodeId,
     captureToken,
     pairedAt: new Date().toISOString(),
-    label: input.label?.trim() || ESPIONAGE_ECHO_NODE_LABEL,
+    label: input.label?.trim() || SURVEY_ECHO_NODE_LABEL,
   };
   state.mirageNode = ensureMirageNode(state);
   state.capturePairingSession = null;
@@ -410,7 +410,7 @@ export async function buildSilentCaptureMissionEnvelope(): Promise<
       kind: "silent-capture-solve",
       ingestUrl: buildMissionIngestUrl(state),
       missionSecret,
-      prompt: ESPIONAGE_SILENT_CAPTURE_PROMPT,
+      prompt: SURVEY_SILENT_CAPTURE_PROMPT,
     },
   };
 }

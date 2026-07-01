@@ -5,32 +5,32 @@ import path from "node:path";
 
 import { DEFAULT_PAIR_HTTP_PORT } from "./config.mjs";
 
-const SPY_PAIR_PIN_LENGTH = 6;
+const SURVEY_PAIR_PIN_LENGTH = 6;
 const PAIRING_TTL_MS = 15 * 60 * 1000;
-export const ECHO_SPY_TERMINATED_MESSAGE = "ECHO TERMINATED";
+export const ECHO_SURVEY_TERMINATED_MESSAGE = "ECHO TERMINATED";
 
 /** @type {import("electron").App | null} */
 let electronApp = null;
 
-/** @type {EchoSpyPairingState | null} */
+/** @type {EchoSurveyPairingState | null} */
 let cachedState = null;
 
 /**
  * @typedef {{ pairId: string, pairSecret: string, pin: string, expiresAt: string }} SpyPairCodeSession
- * @typedef {{ nodeId: string, mirageToken: string, pairedAt: string }} SpyPairedMirageClient
+ * @typedef {{ nodeId: string, mirageToken: string, pairedAt: string }} SurveyPairedMirageClient
  * @typedef {{ deviceId: string, remoteToken: string, pairedAt: string }} SpyPairedPowerfistClient
  * @typedef {{
  *   echoNodeId: string,
  *   httpPort: number,
  *   lanHosts: string[],
  *   updatedAt: string,
- *   echoSpyActive: boolean,
+ *   echoSurveyActive: boolean,
  *   sessionEpoch: number,
  *   mirageCode: SpyPairCodeSession | null,
  *   powerfistCode: SpyPairCodeSession | null,
- *   pairedMirages: SpyPairedMirageClient[],
+ *   pairedMirages: SurveyPairedMirageClient[],
  *   pairedPowerfist: SpyPairedPowerfistClient | null,
- * }} EchoSpyPairingState
+ * }} EchoSurveyPairingState
  */
 
 /** @param {import("electron").App} app */
@@ -77,7 +77,7 @@ function newPairSecret() {
 function newPairPin(taken) {
   for (let attempt = 0; attempt < 32; attempt += 1) {
     const pin = String(
-      Math.floor(10 ** (SPY_PAIR_PIN_LENGTH - 1) + Math.random() * 9 * 10 ** (SPY_PAIR_PIN_LENGTH - 1)),
+      Math.floor(10 ** (SURVEY_PAIR_PIN_LENGTH - 1) + Math.random() * 9 * 10 ** (SURVEY_PAIR_PIN_LENGTH - 1)),
     );
     if (!taken.has(pin)) {
       taken.add(pin);
@@ -95,7 +95,7 @@ function normalizeStoredSession(session) {
   return { ...session, pin };
 }
 
-/** @param {EchoSpyPairingState} state */
+/** @param {EchoSurveyPairingState} state */
 function normalizePairedMirages(state) {
   if (Array.isArray(state.pairedMirages) && state.pairedMirages.length > 0) {
     return state.pairedMirages;
@@ -109,7 +109,7 @@ async function defaultState() {
     httpPort: DEFAULT_PAIR_HTTP_PORT,
     lanHosts: getLanHosts(),
     updatedAt: new Date().toISOString(),
-    echoSpyActive: false,
+    echoSurveyActive: false,
     sessionEpoch: 1,
     mirageCode: null,
     powerfistCode: null,
@@ -118,14 +118,14 @@ async function defaultState() {
   };
 }
 
-export async function loadEchoSpyPairingState() {
+export async function loadEchoSurveyPairingState() {
   if (cachedState) return cachedState;
   try {
     const raw = JSON.parse(await fs.readFile(pairingStatePath(), "utf8"));
     cachedState = {
       ...raw,
       pairedMirages: normalizePairedMirages(raw),
-      echoSpyActive: raw.echoSpyActive ?? false,
+      echoSurveyActive: raw.echoSurveyActive ?? false,
       sessionEpoch: raw.sessionEpoch ?? 1,
     };
     return cachedState;
@@ -135,8 +135,8 @@ export async function loadEchoSpyPairingState() {
   }
 }
 
-/** @param {EchoSpyPairingState} state */
-async function saveEchoSpyPairingState(state) {
+/** @param {EchoSurveyPairingState} state */
+async function saveEchoSurveyPairingState(state) {
   state.updatedAt = new Date().toISOString();
   state.lanHosts = getLanHosts();
   state.httpPort = DEFAULT_PAIR_HTTP_PORT;
@@ -156,33 +156,33 @@ function createCodeSession(takenPins) {
   };
 }
 
-export async function refreshEchoSpyPairCodes() {
-  const state = await loadEchoSpyPairingState();
-  state.echoSpyActive = true;
+export async function refreshEchoSurveyPairCodes() {
+  const state = await loadEchoSurveyPairingState();
+  state.echoSurveyActive = true;
   const takenPins = new Set();
   state.mirageCode = createCodeSession(takenPins);
   state.powerfistCode = createCodeSession(takenPins);
-  await saveEchoSpyPairingState(state);
+  await saveEchoSurveyPairingState(state);
   return state;
 }
 
-export async function getEchoSpyPairingStatus() {
-  let state = await loadEchoSpyPairingState();
-  state.echoSpyActive = true;
+export async function getEchoSurveyPairingStatus() {
+  let state = await loadEchoSurveyPairingState();
+  state.echoSurveyActive = true;
   const takenPins = new Set();
 
   if (!state.mirageCode || sessionExpired(state.mirageCode)) {
     if (!state.powerfistCode || sessionExpired(state.powerfistCode)) {
-      state = await refreshEchoSpyPairCodes();
+      state = await refreshEchoSurveyPairCodes();
     } else {
       if (state.powerfistCode.pin) takenPins.add(state.powerfistCode.pin);
       state.mirageCode = createCodeSession(takenPins);
-      await saveEchoSpyPairingState(state);
+      await saveEchoSurveyPairingState(state);
     }
   } else if (!state.powerfistCode || sessionExpired(state.powerfistCode)) {
     if (state.mirageCode.pin) takenPins.add(state.mirageCode.pin);
     state.powerfistCode = createCodeSession(takenPins);
-    await saveEchoSpyPairingState(state);
+    await saveEchoSurveyPairingState(state);
   }
 
   const host = state.lanHosts[0] || "127.0.0.1";
@@ -203,7 +203,7 @@ export async function getEchoSpyPairingStatus() {
     pairedMirages,
     pairedMirage: pairedMirages[0] ?? null,
     pairedPowerfist: state.pairedPowerfist,
-    echoSpyActive: state.echoSpyActive,
+    echoSurveyActive: state.echoSurveyActive,
     sessionEpoch: state.sessionEpoch,
   };
 }
@@ -211,15 +211,15 @@ export async function getEchoSpyPairingStatus() {
 /**
  * @param {{ pin: string, role: "mirage" | "powerfist", nodeId?: string, deviceId?: string }} input
  */
-export async function completeSpyPairEnterByPin(input) {
+export async function completeSurveyPairEnterByPin(input) {
   const pin = input.pin.trim();
-  if (!new RegExp(`^\\d{${SPY_PAIR_PIN_LENGTH}}$`).test(pin)) {
-    return { ok: false, reason: `Enter the ${SPY_PAIR_PIN_LENGTH}-digit code from Echo.` };
+  if (!new RegExp(`^\\d{${SURVEY_PAIR_PIN_LENGTH}}$`).test(pin)) {
+    return { ok: false, reason: `Enter the ${SURVEY_PAIR_PIN_LENGTH}-digit code from Echo.` };
   }
 
-  const state = await loadEchoSpyPairingState();
-  if (!state.echoSpyActive) {
-    return { ok: false, reason: ECHO_SPY_TERMINATED_MESSAGE };
+  const state = await loadEchoSurveyPairingState();
+  if (!state.echoSurveyActive) {
+    return { ok: false, reason: ECHO_SURVEY_TERMINATED_MESSAGE };
   }
 
   const session = input.role === "mirage" ? state.mirageCode : state.powerfistCode;
@@ -233,7 +233,7 @@ export async function completeSpyPairEnterByPin(input) {
     return { ok: false, reason: "Invalid pairing code." };
   }
 
-  return completeSpyPairEnter({
+  return completeSurveyPairEnter({
     pairId: normalized.pairId,
     pairSecret: normalized.pairSecret,
     role: input.role,
@@ -245,10 +245,10 @@ export async function completeSpyPairEnterByPin(input) {
 /**
  * @param {{ pairId: string, pairSecret: string, role: "mirage" | "powerfist", nodeId?: string, deviceId?: string }} input
  */
-async function completeSpyPairEnter(input) {
-  const state = await loadEchoSpyPairingState();
-  if (!state.echoSpyActive) {
-    return { ok: false, reason: ECHO_SPY_TERMINATED_MESSAGE };
+async function completeSurveyPairEnter(input) {
+  const state = await loadEchoSurveyPairingState();
+  if (!state.echoSurveyActive) {
+    return { ok: false, reason: ECHO_SURVEY_TERMINATED_MESSAGE };
   }
 
   const session = input.role === "mirage" ? state.mirageCode : state.powerfistCode;
@@ -285,7 +285,7 @@ async function completeSpyPairEnter(input) {
     }
     state.pairedMirages = pairedMirages;
     state.mirageCode = null;
-    await saveEchoSpyPairingState(state);
+    await saveEchoSurveyPairingState(state);
 
     return {
       ok: true,
@@ -311,7 +311,7 @@ async function completeSpyPairEnter(input) {
     pairedAt: new Date().toISOString(),
   };
   state.powerfistCode = null;
-  await saveEchoSpyPairingState(state);
+  await saveEchoSurveyPairingState(state);
 
   return {
     ok: true,
@@ -327,6 +327,6 @@ async function completeSpyPairEnter(input) {
 
 /** @returns {Promise<Array<{ nodeId: string, pairedAt: string }>>} */
 export async function getLinkedSpyMirages() {
-  const state = await loadEchoSpyPairingState();
+  const state = await loadEchoSurveyPairingState();
   return normalizePairedMirages(state);
 }

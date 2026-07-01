@@ -72,8 +72,8 @@ export const PREVIEW_DECKS: PreviewDeck[] = [
     cards: [
       {
         type: "capture",
-        title: "Espionage Capture",
-        purpose: "Echo silent screenshot → Mirage MUTHUR solve (3-device Espionage Mode).",
+        title: "Survey Capture",
+        purpose: "Echo silent screenshot → Mirage MUTHUR solve (3-device Survey Mode).",
         risk: "restricted",
       },
       {

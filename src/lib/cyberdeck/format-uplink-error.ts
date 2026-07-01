@@ -11,6 +11,17 @@ export function formatUplinkErrorDetail(status: number, raw: string): string {
     return `HTTP ${status}`;
   }
 
+  const lowerTrimmed = trimmed.toLowerCase();
+  if (lowerTrimmed.includes("idle timeout")) {
+    return (
+      "Provider idle timeout during tool planning. Try OpenRouter or a faster model, " +
+      "or phrase searches as: Use operator_browser to search for: <topic> (local fast path)."
+    );
+  }
+  if (lowerTrimmed === "provider returned error" || lowerTrimmed.includes("provider returned error")) {
+    return "Provider returned an error — check API key, model id, and provider status in Settings.";
+  }
+
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     try {
       const payload = JSON.parse(trimmed) as {

@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import {
-  ESPIONAGE_MODE_TITLE,
-  espionageRoleLabel,
-  espionageTeamSummary,
-  readEspionageNodeRole,
-  writeEspionageNodeRole,
-  type EspionageNodeRole,
-} from "@/lib/cyberdeck/espionage-mode";
+  SURVEY_MODE_TITLE,
+  surveyRoleLabel,
+  surveyTeamSummary,
+  readSurveyNodeRole,
+  writeSurveyNodeRole,
+  type SurveyNodeRole,
+} from "@/lib/cyberdeck/survey-mode";
 
-function RoleBadge({ role }: { role: EspionageNodeRole }) {
+function RoleBadge({ role }: { role: SurveyNodeRole }) {
   const tone =
     role === "echo"
       ? "text-cyan-300/90"
@@ -20,30 +20,30 @@ function RoleBadge({ role }: { role: EspionageNodeRole }) {
         : "text-[#8a8a8a]";
   return (
     <span className={`font-mono text-[11px] tracking-[0.12em] ${tone}`}>
-      {ESPIONAGE_MODE_TITLE} // {espionageRoleLabel(role)}
+      {SURVEY_MODE_TITLE} // {surveyRoleLabel(role)}
     </span>
   );
 }
 
-/** Settings shortcut — full Espionage UI lives in the Spy tab. */
+/** Settings shortcut — full Survey UI lives in the Survey tab. */
 export function SettingsPowerfistPairingSection() {
-  const [role, setRole] = useState<EspionageNodeRole>("off");
+  const [role, setRole] = useState<SurveyNodeRole>("off");
 
   useEffect(() => {
-    setRole(readEspionageNodeRole());
+    setRole(readSurveyNodeRole());
   }, []);
 
-  const handleRoleChange = useCallback((next: EspionageNodeRole) => {
-    writeEspionageNodeRole(next);
+  const handleRoleChange = useCallback((next: SurveyNodeRole) => {
+    writeSurveyNodeRole(next);
     setRole(next);
   }, []);
 
   return (
-    <section className="flex flex-col gap-2" data-testid="settings-espionage-mode">
+    <section className="flex flex-col gap-2" data-testid="settings-survey-mode">
       <RoleBadge role={role} />
       <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">
         <p className="mb-3 text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
-          {espionageTeamSummary(role)}
+          {surveyTeamSummary(role)}
         </p>
         <p className="mb-4 text-[9px] text-[#6a6a8a]">
           Open the <strong className="font-normal text-[#9a9a9a]">Spy</strong> rail tab for Echo /
@@ -53,7 +53,7 @@ export function SettingsPowerfistPairingSection() {
           <CyberdeckActionButton onClick={() => handleRoleChange("mirage")}>This machine is Mirage</CyberdeckActionButton>
           <CyberdeckActionButton onClick={() => handleRoleChange("echo")}>This machine is Echo</CyberdeckActionButton>
           {role !== "off" ? (
-            <CyberdeckActionButton onClick={() => handleRoleChange("off")}>Espionage off</CyberdeckActionButton>
+            <CyberdeckActionButton onClick={() => handleRoleChange("off")}>Survey off</CyberdeckActionButton>
           ) : null}
         </div>
       </div>

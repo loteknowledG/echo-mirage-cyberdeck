@@ -38,6 +38,7 @@ import {
   looksLikeCaptchaBlock,
   messageReferencesLocalPath,
   normalizeOperatorBrowserUrl,
+  parseBrowserCommand,
 } from "@/lib/browser-intents";
 import { useBrowserController } from "@/lib/use-browser-controller";
 import { CyberdeckCustomTabBrowserSync } from "@/components/cyberdeck/cyberdeck-custom-tab-browser-sync";
@@ -346,17 +347,17 @@ import {
 } from "@/lib/cyberdeck/powerfist-events";
 import { connectPowerfistDeckSocket, fetchPowerfistDeckConnect } from "@/lib/cyberdeck/powerfist-remote-socket";
 import {
-  ESPIONAGE_MISSION_SOLVE_EVENT,
-  type EspionageMissionSolveDetail,
+  SURVEY_MISSION_SOLVE_EVENT,
+  type SurveyMissionSolveDetail,
 } from "@/lib/cyberdeck/powerfist-mission.types";
-import { ESPIONAGE_ECHO_DISPLAY, ESPIONAGE_MIRAGE_DISPLAY } from "@/lib/cyberdeck/espionage-mode";
+import { SURVEY_ECHO_DISPLAY, SURVEY_MIRAGE_DISPLAY } from "@/lib/cyberdeck/survey-mode";
 import {
-  appendEspionageChatMessage,
-  ESPIONAGE_FOCUS_CHAT_EVENT,
-  SPY_MUTHUR_ARCHIVE_EVENT,
-  notifyEspionageFocusChat,
-} from "@/lib/cyberdeck/espionage-chat";
-import { terminateEchoSpySession } from "@/lib/cyberdeck/spy-pairing-client";
+  appendSurveyChatMessage,
+  SURVEY_FOCUS_CHAT_EVENT,
+  SURVEY_MUTHUR_ARCHIVE_EVENT,
+  notifySurveyFocusChat,
+} from "@/lib/cyberdeck/survey-chat";
+import { terminateEchoSurveySession } from "@/lib/cyberdeck/survey-pairing-client";
 import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
@@ -519,7 +520,7 @@ const CUSTOM_TAB_KINDS = [
   "db8",
   "cadre",
   "install",
-  "spy",
+  "survey",
   "catelog",
 ] as const;
 type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -624,7 +625,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Drop Bay", kind: "drop-bay", action: "convert" },
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Kit", action: "kit-pane" },
-  { label: "Spy", kind: "spy", action: "convert" },
+  { label: "Spy", kind: "survey", action: "convert" },
   { label: "Powerfist", kind: "rola-dex", action: "convert" },
   { label: "Tunes", kind: "tunes", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
@@ -669,7 +670,7 @@ function sanitizeCustomTabs(value: unknown): CustomTab[] {
     const migratedKind = migrateLegacyTestPaneKind(kindRaw);
     const kind = isCustomTabKind(migratedKind) ? migratedKind : "blank";
     const rawGlyph = typeof tab.glyph === "string" && tab.glyph.trim() ? tab.glyph.trim() : "□";
-    const glyph = kind === "rola-dex" ? defaultCustomTabGlyphForKind("rola-dex") : kind === "spy" ? defaultCustomTabGlyphForKind("spy") : rawGlyph;
+    const glyph = kind === "rola-dex" ? defaultCustomTabGlyphForKind("rola-dex") : kind === "survey" ? defaultCustomTabGlyphForKind("survey") : rawGlyph;
     const browserUrl = typeof tab.browserUrl === "string" && tab.browserUrl.trim() ? tab.browserUrl.trim() : undefined;
     const asset = tab.asset && typeof tab.asset === "object" ? (tab.asset as DroppedOperatorAsset) : null;
 
@@ -975,8 +976,8 @@ function normalizeCustomTabKind(kind: string) {
   ) {
     return "rola-dex" as CustomTabKind;
   }
-  if (nextKind === "spy" || nextKind === "espionage") {
-    return "spy" as CustomTabKind;
+  if (nextKind === "survey" || nextKind === "espionage") {
+    return "survey" as CustomTabKind;
   }
   if (
     nextKind === "sound-profile" ||
@@ -1050,7 +1051,7 @@ function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "drop-bay") return "⬇";
   if (kind === "glyph-channel") return "⟁";
   if (kind === "rola-dex") return "#";
-  if (kind === "spy") return "◉";
+  if (kind === "survey") return "◉";
   if (kind === "tunes") return "♫";
   if (kind === "call-center") return "CC";
   if (kind === "photoshop") return "Ps";
@@ -1068,7 +1069,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "drop-bay") return "DROP BAY";
   if (kind === "glyph-channel") return "⟁ GLYPH";
   if (kind === "rola-dex") return "Rola Dex";
-  if (kind === "spy") return "Spy";
+  if (kind === "survey") return "Spy";
   if (kind === "tunes") return "Tunes";
   if (kind === "call-center") return "CALL CENTER";
   if (kind === "photoshop") return "PHOTOSHOP";
@@ -4108,14 +4109,14 @@ export default function CyberdeckApp() {
     const closingTab = useCyberdeckTabStore
       .getState()
       .customTabs.find((tab) => tab.id === activeCustomTabId);
-    const isSpyTab = closingTab?.kind === "spy";
+    const isSurveyTab = closingTab?.kind === "survey";
     useCyberdeckTabStore.getState().setCustomTabs((prev) => prev.filter((tab) => tab.id !== activeCustomTabId));
     useCyberdeckTabStore.setState((state) => ({
       mountedCustomTabIds: state.mountedCustomTabIds.filter((id) => id !== activeCustomTabId),
     }));
     useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-    if (isSpyTab) {
-      void terminateEchoSpySession();
+    if (isSurveyTab) {
+      void terminateEchoSurveySession();
     }
     playDeckSystemSound("click", 0.02);
   }, [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
@@ -4123,12 +4124,12 @@ export default function CyberdeckApp() {
   const clearSavedCustomTabState = useCallback(() => {
     const tabs = useCyberdeckTabStore.getState().customTabs;
     const removedCount = tabs.length;
-    const hasSpyTab = tabs.some((tab) => tab.kind === "spy");
+    const hasSurveyTab = tabs.some((tab) => tab.kind === "survey");
     useCyberdeckTabStore.getState().setCustomTabs([]);
     useCyberdeckTabStore.setState({ mountedCustomTabIds: [] });
     useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-    if (hasSpyTab) {
-      void terminateEchoSpySession();
+    if (hasSurveyTab) {
+      void terminateEchoSurveySession();
     }
 
     try {
@@ -4338,16 +4339,16 @@ export default function CyberdeckApp() {
       setMessagesRaw((prev) => [...prev, { role: "assistant", text }]);
       pinMuthurChatToBottom();
     };
-    const onEspionageFocusChat = () => {
+    const onSurveyFocusChat = () => {
       pinMuthurChatToBottom();
       messageScrollRef.current?.focus({ preventScroll: true });
     };
 
-    window.addEventListener(SPY_MUTHUR_ARCHIVE_EVENT, onSpyMuthurArchive);
-    window.addEventListener(ESPIONAGE_FOCUS_CHAT_EVENT, onEspionageFocusChat);
+    window.addEventListener(SURVEY_MUTHUR_ARCHIVE_EVENT, onSpyMuthurArchive);
+    window.addEventListener(SURVEY_FOCUS_CHAT_EVENT, onSurveyFocusChat);
     return () => {
-      window.removeEventListener(SPY_MUTHUR_ARCHIVE_EVENT, onSpyMuthurArchive);
-      window.removeEventListener(ESPIONAGE_FOCUS_CHAT_EVENT, onEspionageFocusChat);
+      window.removeEventListener(SURVEY_MUTHUR_ARCHIVE_EVENT, onSpyMuthurArchive);
+      window.removeEventListener(SURVEY_FOCUS_CHAT_EVENT, onSurveyFocusChat);
     };
   }, [archiveMuthurHistoryLine, pinMuthurChatToBottom]);
 
@@ -5365,7 +5366,7 @@ export default function CyberdeckApp() {
 
   const handleSend = async (
     messageText?: string,
-    options?: { preserveSelectedSurface?: boolean; espionageMission?: boolean },
+    options?: { preserveSelectedSurface?: boolean; surveyMission?: boolean },
   ) => {
     const userMessage = (messageText ?? messageInputRef.current?.getValue() ?? "").trim();
     if (!userMessage) return;
@@ -6003,6 +6004,42 @@ ${diff}`;
       return;
     }
 
+    const directBrowserCommand = parseBrowserCommand(userMessage);
+    if (directBrowserCommand) {
+      setIsStreaming(true);
+      composeStartedAtRef.current = Date.now();
+      setStreamText("⏳ MUTHUR // operator browser (local)…\n");
+      try {
+        const actionResult = await performBrowserCommand(directBrowserCommand);
+        const searchLabel =
+          directBrowserCommand.kind === "goto" ? directBrowserCommand.url : directBrowserCommand.kind;
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            text: `Opened operator web browser.\n\n${searchLabel}`,
+            toolTrace: "operator_browser",
+          },
+          {
+            role: "system",
+            text: `BROWSER_ACTION // ${directBrowserCommand.kind.toUpperCase()} // ${actionResult}`,
+          },
+        ]);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setMessages((prev) => [
+          ...prev,
+          { role: "error", text: `BROWSER_ACTION // FAILED // ${msg.slice(0, 200)}` },
+        ]);
+      } finally {
+        setStreamText("");
+        setIsStreaming(false);
+        composeStartedAtRef.current = null;
+        setMuthurStall(null);
+      }
+      return;
+    }
+
     let browserContextForRequest =
       operatorSurfaceMode === "browser" ? operatorBrowserSnapshot || `URL: ${operatorBrowserUrl}` : "";
 
@@ -6227,8 +6264,8 @@ ${diff}`;
           ...(toolsTrace ? { toolTrace: toolsTrace } : {}),
         },
       ]);
-      if (options?.espionageMission && cleanedText.trim()) {
-        appendEspionageChatMessage({ role: "assistant", text: cleanedText });
+      if (options?.surveyMission && cleanedText.trim()) {
+        appendSurveyChatMessage({ role: "assistant", text: cleanedText });
       }
       setMuthurMemory((current) => recordMuthurMemoryTurn(current, userMessage, fullText));
       persistMuthurShipMemoryTurn(userMessage, cleanedText || fullText);
@@ -6626,7 +6663,7 @@ ${diff}`;
       if (!message) return;
       void handleSend(message, { preserveSelectedSurface: true });
     };
-    const handleEspionageMissionSolve = (detail: EspionageMissionSolveDetail) => {
+    const handleSurveyMissionSolve = (detail: SurveyMissionSolveDetail) => {
       revokeOperatorBlobUrl(operatorPreviewBlobUrlRef.current);
       operatorPreviewBlobUrlRef.current = null;
       setOperatorDroppedAsset({
@@ -6639,7 +6676,7 @@ ${diff}`;
       });
       setOperatorSurfaceMode("workspace");
       setOperatorDocMode("edit");
-      const missionLine = `ESPIONAGE // ${ESPIONAGE_ECHO_DISPLAY} capture → ${ESPIONAGE_MIRAGE_DISPLAY} // mission ${detail.missionId.slice(0, 8)}…`;
+      const missionLine = `SURVEY // ${SURVEY_ECHO_DISPLAY} capture → ${SURVEY_MIRAGE_DISPLAY} // mission ${detail.missionId.slice(0, 8)}…`;
       setMessages((prev) => [
         ...prev,
         {
@@ -6647,11 +6684,11 @@ ${diff}`;
           text: missionLine,
         },
       ]);
-      appendEspionageChatMessage({ role: "system", text: missionLine });
-      appendEspionageChatMessage({ role: "user", text: detail.prompt });
-      const prompt = `${detail.prompt}\n\n[System: ${ESPIONAGE_ECHO_DISPLAY} screenshot is in the operator image preview. Use observe_operator_pane (surface operator) to inspect it before answering.]`;
-      notifyEspionageFocusChat();
-      void handleSend(prompt, { preserveSelectedSurface: true, espionageMission: true });
+      appendSurveyChatMessage({ role: "system", text: missionLine });
+      appendSurveyChatMessage({ role: "user", text: detail.prompt });
+      const prompt = `${detail.prompt}\n\n[System: ${SURVEY_ECHO_DISPLAY} screenshot is in the operator image preview. Use observe_operator_pane (surface operator) to inspect it before answering.]`;
+      notifySurveyFocusChat();
+      void handleSend(prompt, { preserveSelectedSurface: true, surveyMission: true });
     };
     const handlePowerFistPush = (event: Event) => {
       event.preventDefault();
@@ -6676,20 +6713,20 @@ ${diff}`;
         onStackPush: (command) => {
           void pushToChat(command);
         },
-        onMissionSolve: handleEspionageMissionSolve,
+        onMissionSolve: handleSurveyMissionSolve,
       });
     })();
-    const handleEspionageMissionEvent = (event: Event) => {
-      handleEspionageMissionSolve(
-        (event as CustomEvent<EspionageMissionSolveDetail>).detail,
+    const handleSurveyMissionEvent = (event: Event) => {
+      handleSurveyMissionSolve(
+        (event as CustomEvent<SurveyMissionSolveDetail>).detail,
       );
     };
     window.addEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
-    window.addEventListener(ESPIONAGE_MISSION_SOLVE_EVENT, handleEspionageMissionEvent);
+    window.addEventListener(SURVEY_MISSION_SOLVE_EVENT, handleSurveyMissionEvent);
     return () => {
       cancelled = true;
       window.removeEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
-      window.removeEventListener(ESPIONAGE_MISSION_SOLVE_EVENT, handleEspionageMissionEvent);
+      window.removeEventListener(SURVEY_MISSION_SOLVE_EVENT, handleSurveyMissionEvent);
       channel?.close();
       deckSocket?.close();
     };
@@ -7672,13 +7709,13 @@ ${diff}`;
         );
       }
 
-      if (tab.kind === "spy") {
+      if (tab.kind === "survey") {
         return (
           <div
             className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
-            data-pointer-target="spy"
+            data-pointer-target="survey"
           >
-            <ActivatedCyberdeckPane kind="spy" />
+            <ActivatedCyberdeckPane kind="survey" />
           </div>
         );
       }
