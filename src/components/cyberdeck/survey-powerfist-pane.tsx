@@ -67,8 +67,7 @@ export function SurveyPowerfistPane() {
       </div>
 
       <p className="text-[9px] leading-relaxed text-[#5f5f5f]">
-        Enter the 6-digit code from {SURVEY_ECHO_DISPLAY} (CODE FOR {SURVEY_POWERFIST_LABEL}). PowerFist
-        finds Echo on your LAN automatically — use Advanced only if auto-detect fails.
+        Enter Echo Satellite IP and port, then the 6-digit PowerFist code shown on Echo.
       </p>
 
       {paired && !terminated ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { SurveyMirageHubPanel } from "@/components/cyberdeck/survey-mirage-hub-panel";
 import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-panel";
 import { SurveyPairPinForm } from "@/components/cyberdeck/survey-pair-pin-form";
@@ -24,12 +24,28 @@ import {
   readSurveyMiragePairCredentials,
   saveSurveyMiragePairCredentials,
 } from "@/lib/cyberdeck/survey-pairing-client";
+import {
+  emitSurveyPairingDiagnostics,
+  initSurveyPairingDebug,
+  notifySurveyPairingDebug,
+} from "@/lib/cyberdeck/survey-pairing-debug";
 
 export function SurveyMiragePane() {
   const { paired, terminated, terminatedMessage, resetLinkWatch } = useSurveyEchoLinkWatch("mirage");
   const team = useSurveyTeamStatus();
   const [status, setStatus] = useState<string | null>(null);
   const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
+
+  useEffect(() => {
+    initSurveyPairingDebug();
+    void emitSurveyPairingDiagnostics("Mirage pane opened");
+  }, []);
+
+  useEffect(() => {
+    if (!terminated) return;
+    notifySurveyPairingDebug(`session terminated — ${terminatedMessage ?? ECHO_SURVEY_TERMINATED_MESSAGE}`);
+    void emitSurveyPairingDiagnostics("link terminated");
+  }, [terminated, terminatedMessage]);
 
   const handlePaired = useCallback(
     (result: {
@@ -55,6 +71,10 @@ export function SurveyMiragePane() {
       notifySpyMuthurArchive(formatSurveyEchoMirageLinkedLine(result.echoHost));
       notifySpyMuthurArchive(formatSurveySolutionsReadyLine());
       notifySurveyFocusChat();
+      notifySurveyPairingDebug(
+        `pair saved · ${result.echoHost}:${result.httpPort} · node ${creds.nodeId.slice(0, 8)}… · epoch ${result.sessionEpoch}`,
+      );
+      void emitSurveyPairingDiagnostics("after pair success");
       setStatus(`Paired with ${SURVEY_ECHO_DISPLAY} at ${result.echoHost}.`);
     },
     [resetLinkWatch],
@@ -77,12 +97,6 @@ export function SurveyMiragePane() {
         <p className="text-fuchsia-300/90">{SURVEY_MODE_TITLE} // {SURVEY_MIRAGE_DISPLAY}</p>
         <p className="mt-1 text-[9px] text-[#6a6a8a]">{SURVEY_MIRAGE_TAGLINE}</p>
       </div>
-
-      <p className="text-[9px] leading-relaxed text-[#5f5f5f]">
-        Enter the 6-digit Mirage code from Echo Satellite (or this pane on the Echo Mac). Mirage finds Echo
-        on your Wi‑Fi automatically — paste <code className="text-[#8a8a8a]">192.168.x.x:3050</code> under
-        Advanced only if auto-detect fails.
-      </p>
 
       {paired && !terminated ? (
         <p className="text-emerald-300/80">

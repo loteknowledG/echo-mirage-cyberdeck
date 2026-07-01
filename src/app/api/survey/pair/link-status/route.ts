@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isLocalhostRequest } from "@/lib/server/is-localhost-request.server";
 import { checkEchoSurveyLinkStatus } from "@/lib/server/survey-echo-pairing.server";
 
 export const runtime = "nodejs";
@@ -19,6 +20,13 @@ export async function POST(request: Request) {
     body = (await request.json()) as LinkStatusBody;
   } catch {
     return NextResponse.json({ ok: false, reason: "Invalid JSON." }, { status: 400 });
+  }
+
+  if (!isLocalhostRequest(request)) {
+    return NextResponse.json(
+      { ok: false, reason: "Link status is localhost-only — poll Echo Satellite from the client." },
+      { status: 403 },
+    );
   }
 
   const echoNodeId = body.echoNodeId?.trim();

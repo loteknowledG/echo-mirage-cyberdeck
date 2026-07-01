@@ -9,6 +9,7 @@ import {
 } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import type { SpyTeamLink } from "@/lib/cyberdeck/survey-team-status";
+import { emitSurveyPairingDiagnostics } from "@/lib/cyberdeck/survey-pairing-debug";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 
 function linkLabel(link: SpyTeamLink): string {
@@ -68,6 +69,7 @@ export function SurveyTeamStatusPanel() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await refresh();
+    await emitSurveyPairingDiagnostics("TEAM LINKS refresh");
     setRefreshing(false);
   }, [refresh]);
 

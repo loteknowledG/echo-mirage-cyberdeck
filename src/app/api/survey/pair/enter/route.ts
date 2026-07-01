@@ -119,7 +119,7 @@ async function pairPinWithDiscovery(input: {
     return {
       ok: false,
       reason:
-        "Could not find Echo on your LAN. Open Echo Satellite on the screenshot Mac (same Wi‑Fi), or enter its IP under Advanced.",
+        "Could not reach Echo. Open Echo Satellite on the screenshot Mac and enter its IP and port.",
     };
   }
 

@@ -625,7 +625,7 @@ const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Drop Bay", kind: "drop-bay", action: "convert" },
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Kit", action: "kit-pane" },
-  { label: "Spy", kind: "survey", action: "convert" },
+  { label: "Survey", kind: "survey", action: "convert" },
   { label: "Powerfist", kind: "rola-dex", action: "convert" },
   { label: "Tunes", kind: "tunes", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
@@ -1069,7 +1069,7 @@ function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "drop-bay") return "DROP BAY";
   if (kind === "glyph-channel") return "⟁ GLYPH";
   if (kind === "rola-dex") return "Rola Dex";
-  if (kind === "survey") return "Spy";
+  if (kind === "survey") return "Survey";
   if (kind === "tunes") return "Tunes";
   if (kind === "call-center") return "CALL CENTER";
   if (kind === "photoshop") return "PHOTOSHOP";

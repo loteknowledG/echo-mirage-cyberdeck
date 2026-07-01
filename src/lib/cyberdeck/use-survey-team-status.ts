@@ -26,18 +26,28 @@ function formatMirageLinkDetail(mirages: { nodeId: string }[]): string {
   return `${mirages.length} linked · ${mirages.map((mirage) => mirage.nodeId.slice(0, 8)).join(", ")}…`;
 }
 
-async function isLocalSpyLinkActive(
+async function isSpyLinkActive(
   role: "mirage" | "powerfist",
-  creds: { echoNodeId: string; sessionEpoch: number; nodeId?: string; deviceId?: string },
-): Promise<boolean> {
+  creds: {
+    echoHost: string;
+    httpPort: number;
+    echoNodeId: string;
+    sessionEpoch: number;
+    nodeId?: string;
+    deviceId?: string;
+  },
+): Promise<boolean | null> {
   const status = await fetchEchoSurveyLinkStatus({
     echoNodeId: creds.echoNodeId,
     role,
     sessionEpoch: creds.sessionEpoch ?? 0,
     nodeId: role === "mirage" ? creds.nodeId : undefined,
     deviceId: role === "powerfist" ? creds.deviceId : undefined,
+    echoHost: creds.echoHost,
+    httpPort: creds.httpPort,
   });
-  return status.ok && status.active;
+  if (!status.ok) return null;
+  return status.active;
 }
 
 export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promise<void> } {
@@ -78,35 +88,23 @@ export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promi
     }
 
     if (mirageCreds) {
-      const remoteMirages = remote?.ok ? normalizePairedMirages(remote) : [];
-      const remoteMatches = remoteMirages.some((mirage) => mirage.nodeId === mirageCreds.nodeId);
-      const localActive = echoLocal.ok ? await isLocalSpyLinkActive("mirage", mirageCreds) : false;
-
-      if (remoteMatches || localActive || (mirageCreds && !echoLocal.ok && !remote?.ok)) {
-        echoMirage = linkFromBool(
-          true,
-          `${mirageCreds.echoHost} · node ${mirageCreds.nodeId.slice(0, 8)}…`,
-        );
-      } else if (remote?.ok && remoteMirages.length === 0) {
-        echoMirage = linkFromBool(false, "Re-enter Mirage code — Echo session may have reset.");
-      }
+      const linkActive = await isSpyLinkActive("mirage", mirageCreds);
+      echoMirage = linkFromBool(
+        linkActive !== false,
+        linkActive === false
+          ? "Re-enter Mirage code — Echo session may have reset."
+          : `${mirageCreds.echoHost} · node ${mirageCreds.nodeId.slice(0, 8)}…`,
+      );
     }
 
     if (powerfistSpyCreds) {
-      const remoteMatches =
-        remote?.ok && remote.pairedPowerfist?.deviceId === powerfistSpyCreds.deviceId;
-      const localActive = echoLocal.ok
-        ? await isLocalSpyLinkActive("powerfist", powerfistSpyCreds)
-        : false;
-
-      if (remoteMatches || localActive || (powerfistSpyCreds && !echoLocal.ok && !remote?.ok)) {
-        echoPowerfist = linkFromBool(
-          true,
-          `${powerfistSpyCreds.echoHost} · device ${powerfistSpyCreds.deviceId.slice(0, 8)}…`,
-        );
-      } else if (remote?.ok && !remote.pairedPowerfist) {
-        echoPowerfist = linkFromBool(false, "Re-enter PowerFist code on the phone.");
-      }
+      const linkActive = await isSpyLinkActive("powerfist", powerfistSpyCreds);
+      echoPowerfist = linkFromBool(
+        linkActive !== false,
+        linkActive === false
+          ? "Re-enter PowerFist code on the phone."
+          : `${powerfistSpyCreds.echoHost} · device ${powerfistSpyCreds.deviceId.slice(0, 8)}…`,
+      );
     }
 
     const pfSession = await fetchPowerfistQrSession();

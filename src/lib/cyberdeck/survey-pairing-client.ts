@@ -5,6 +5,7 @@ import {
 } from "@/lib/cyberdeck/survey-mode";
 import { discoverEchoEndpointsOnLan } from "@/lib/cyberdeck/survey-echo-discovery.client";
 import { parseEchoEndpointInput } from "@/lib/cyberdeck/survey-pair-pin";
+import { traceSurveyPairing } from "@/lib/cyberdeck/survey-pairing-trace";
 
 const SURVEY_MIRAGE_PAIR_STORAGE_KEY = "echo-mirage-survey-mirage-pair";
 const SURVEY_POWERFIST_PAIR_STORAGE_KEY = "echo-mirage-survey-powerfist-pair";
@@ -53,6 +54,8 @@ export type EchoSurveyStatus = {
   wsStatus?: string;
   captureMirage?: { host: string; port: number } | null;
   surveyLinksReachable?: boolean;
+  echoSurveyActive?: boolean;
+  sessionEpoch?: number;
 };
 
 async function readEchoSurveyPayload(url: string): Promise<EchoSurveyStatus | { ok: false; reason: string }> {
@@ -81,8 +84,30 @@ async function readEchoSurveyPayload(url: string): Promise<EchoSurveyStatus | { 
   }
 }
 
-/** Load Echo Spy status from a known Echo Satellite on the LAN (browser → Echo direct). */
+/** Load Echo Survey status from a known Echo Satellite on the LAN (browser → Echo direct). */
 export async function fetchEchoRemoteSurveyStatusClient(
+  echoHost: string,
+  echoHttpPort: number,
+): Promise<EchoSurveyStatus | { ok: false; reason: string }> {
+  const codes = await fetchEchoRemoteSurveyCodesClient(echoHost, echoHttpPort);
+  if (codes.ok) {
+    return codes;
+  }
+
+  const endpoint = parseEchoEndpointInput(echoHost, echoHttpPort);
+  if (!endpoint.host) {
+    return { ok: false, reason: "echoHost is required." };
+  }
+
+  const status = await readEchoSurveyPayload(`http://${endpoint.host}:${endpoint.port}/spy/status`);
+  if (!status.ok) {
+    return status;
+  }
+  return { ...status, source: "satellite" };
+}
+
+/** Load full Echo Survey pairing state from Echo Satellite (preferred for remote link checks). */
+export async function fetchEchoRemoteSurveyCodesClient(
   echoHost: string,
   echoHttpPort: number,
 ): Promise<EchoSurveyStatus | { ok: false; reason: string }> {
@@ -91,7 +116,9 @@ export async function fetchEchoRemoteSurveyStatusClient(
     return { ok: false, reason: "echoHost is required." };
   }
 
-  const status = await readEchoSurveyPayload(`http://${endpoint.host}:${endpoint.port}/spy/status`);
+  const status = await readEchoSurveyPayload(
+    `http://${endpoint.host}:${endpoint.port}/api/survey/echo/codes`,
+  );
   if (!status.ok) {
     return status;
   }
@@ -239,8 +266,9 @@ export async function enterSurveyPairPin(input: {
 
   async function postDirect(host: string, port: number): Promise<PairSuccess | { ok: false; reason: string }> {
     if (!host.trim()) {
-      return { ok: false, reason: "Enter Echo IP address under Advanced." };
+      return { ok: false, reason: "Enter Echo Satellite IP address." };
     }
+    traceSurveyPairing(`pair POST http://${host}:${port}/api/survey/pair/enter role=${input.role}`);
     try {
       const res = await fetch(`http://${host}:${port}/api/survey/pair/enter`, {
         method: "POST",
@@ -261,12 +289,16 @@ export async function enterSurveyPairPin(input: {
         };
       }
       if (payload.ok) {
+        traceSurveyPairing(
+          `pair OK via ${host}:${port} · echoNode ${payload.echoNodeId.slice(0, 8)}… · epoch ${payload.sessionEpoch}`,
+        );
         return {
           ...payload,
           echoHost: payload.echoHost || host,
           httpPort: payload.httpPort || port,
         };
       }
+      traceSurveyPairing(`pair rejected ${host}:${port} — ${payload.reason}`);
       return payload;
     } catch (error) {
       const detail =
@@ -280,11 +312,17 @@ export async function enterSurveyPairPin(input: {
     }
   }
 
+  traceSurveyPairing(
+    `pair start role=${input.role} node=${nodeId.slice(0, 8)}… host=${resolvedEndpoint.host || "LAN discovery"} port=${resolvedEndpoint.port}`,
+  );
+
   if (typeof window !== "undefined") {
     if (resolvedEndpoint.host) {
+      traceSurveyPairing(`pair route: direct to ${resolvedEndpoint.host}:${resolvedEndpoint.port}`);
       return postDirect(resolvedEndpoint.host, resolvedEndpoint.port);
     }
 
+    traceSurveyPairing("pair route: try cyberdeck /api/survey/pair/enter proxy");
     try {
       const res = await fetch("/api/survey/pair/enter", {
         method: "POST",
@@ -298,22 +336,28 @@ export async function enterSurveyPairPin(input: {
         signal: AbortSignal.timeout(35_000),
       });
       const serverResult = (await res.json()) as PairSuccess | { ok: false; reason: string };
-      if (serverResult.ok) return serverResult;
+      if (serverResult.ok) {
+        traceSurveyPairing(`pair OK via cyberdeck proxy · ${serverResult.echoHost}:${serverResult.httpPort}`);
+        return serverResult;
+      }
+      traceSurveyPairing(`pair proxy fail — ${serverResult.reason}`);
       const reason = serverResult.reason?.toLowerCase() ?? "";
       if (reason.includes("invalid pairing code") || reason.includes("expired")) {
         return serverResult;
       }
     } catch {
-      /* hosted PWA or server unreachable — try browser LAN discovery */
+      traceSurveyPairing("pair proxy unreachable — falling back to browser LAN discovery");
     }
 
+    traceSurveyPairing("pair route: browser LAN discovery");
     const endpoints = await discoverEchoEndpointsOnLan(input.hintHosts ?? []);
+    traceSurveyPairing(`LAN discovery found ${endpoints.length} Echo endpoint(s)`);
 
     if (endpoints.length === 0) {
       return {
         ok: false,
         reason:
-          "Could not find Echo on your LAN. Open Echo Satellite on the screenshot Mac (same Wi‑Fi), or enter its IP under Advanced.",
+          "Could not reach Echo. Open Echo Satellite on the screenshot Mac and enter its IP and port.",
       };
     }
     let invalidPin = false;
@@ -465,27 +509,123 @@ export async function terminateEchoSurveySession(): Promise<
   }
 }
 
+function evaluateRemoteEchoSurveyLinkStatus(
+  status: EchoSurveyStatus,
+  input: {
+    echoNodeId: string;
+    role: "mirage" | "powerfist";
+    sessionEpoch: number;
+    nodeId?: string;
+    deviceId?: string;
+  },
+):
+  | { ok: true; active: true; sessionEpoch: number }
+  | { ok: true; active: false; sessionEpoch: number; message: string } {
+  const sessionEpoch = status.sessionEpoch ?? input.sessionEpoch;
+
+  if (status.echoSurveyActive === false) {
+    return {
+      ok: true,
+      active: false,
+      sessionEpoch,
+      message: ECHO_SURVEY_TERMINATED_MESSAGE,
+    };
+  }
+
+  if (status.echoNodeId && status.echoNodeId !== input.echoNodeId) {
+    return {
+      ok: true,
+      active: false,
+      sessionEpoch,
+      message: ECHO_SURVEY_TERMINATED_MESSAGE,
+    };
+  }
+
+  if (input.sessionEpoch !== sessionEpoch) {
+    return {
+      ok: true,
+      active: false,
+      sessionEpoch,
+      message: ECHO_SURVEY_TERMINATED_MESSAGE,
+    };
+  }
+
+  if (input.role === "mirage") {
+    const nodeId = input.nodeId?.trim();
+    const linked = normalizePairedMirages(status).some((mirage) => mirage.nodeId === nodeId);
+    if (!nodeId || !linked) {
+      return {
+        ok: true,
+        active: false,
+        sessionEpoch,
+        message: ECHO_SURVEY_TERMINATED_MESSAGE,
+      };
+    }
+  } else {
+    const deviceId = input.deviceId?.trim();
+    if (!deviceId || status.pairedPowerfist?.deviceId !== deviceId) {
+      return {
+        ok: true,
+        active: false,
+        sessionEpoch,
+        message: ECHO_SURVEY_TERMINATED_MESSAGE,
+      };
+    }
+  }
+
+  return { ok: true, active: true, sessionEpoch };
+}
+
 export async function fetchEchoSurveyLinkStatus(input: {
   echoNodeId: string;
   role: "mirage" | "powerfist";
   sessionEpoch: number;
   nodeId?: string;
   deviceId?: string;
+  echoHost?: string;
+  httpPort?: number;
 }): Promise<
   | { ok: true; active: true; sessionEpoch: number }
   | { ok: true; active: false; sessionEpoch: number; message: string }
   | { ok: false; reason: string }
 > {
+  const echoHost = input.echoHost?.trim();
+  const httpPort = input.httpPort ?? 3050;
+
+  if (echoHost && typeof window !== "undefined") {
+    const remote = await fetchEchoRemoteSurveyCodesClient(echoHost, httpPort);
+    if (remote.ok) {
+      const result = evaluateRemoteEchoSurveyLinkStatus(remote, input);
+      if (!result.active) {
+        traceSurveyPairing(`link inactive @ ${echoHost}:${httpPort} — ${result.message}`);
+      }
+      return result;
+    }
+    traceSurveyPairing(`link remote codes fail @ ${echoHost}:${httpPort} — ${remote.reason}`);
+  }
+
   try {
     const res = await fetch("/api/survey/pair/link-status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        echoNodeId: input.echoNodeId,
+        role: input.role,
+        sessionEpoch: input.sessionEpoch,
+        nodeId: input.nodeId,
+        deviceId: input.deviceId,
+      }),
     });
-    return (await res.json()) as
+    const payload = (await res.json()) as
       | { ok: true; active: true; sessionEpoch: number }
       | { ok: true; active: false; sessionEpoch: number; message: string }
       | { ok: false; reason: string };
+
+    if (!payload.ok && res.status === 403) {
+      traceSurveyPairing(`link localhost API blocked (403) — use Echo IP in saved creds`);
+      return { ok: false, reason: payload.reason };
+    }
+    return payload;
   } catch {
     return { ok: false, reason: "Link status check failed." };
   }

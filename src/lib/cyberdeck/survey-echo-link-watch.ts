@@ -12,6 +12,7 @@ import {
   type SpyMiragePairCredentials,
   type SpyPowerfistPairCredentials,
 } from "@/lib/cyberdeck/survey-pairing-client";
+import { traceSurveyPairing } from "@/lib/cyberdeck/survey-pairing-trace";
 
 const LINK_POLL_MS = 2500;
 
@@ -53,6 +54,7 @@ export function useSurveyEchoLinkWatch(role: SpyEchoLinkRole): {
 
   const handleTerminated = useCallback(
     (message: string) => {
+      traceSurveyPairing(`clearing saved creds — ${message}`);
       clearCredentials(role);
       setPaired(null);
       setTerminated(true);
@@ -76,9 +78,14 @@ export function useSurveyEchoLinkWatch(role: SpyEchoLinkRole): {
       sessionEpoch: creds.sessionEpoch ?? 0,
       nodeId: role === "mirage" ? (creds as SpyMiragePairCredentials).nodeId : undefined,
       deviceId: role === "powerfist" ? (creds as SpyPowerfistPairCredentials).deviceId : undefined,
+      echoHost: creds.echoHost,
+      httpPort: creds.httpPort,
     });
 
-    if (!status.ok) return;
+    if (!status.ok) {
+      traceSurveyPairing(`link poll skipped — ${status.reason}`);
+      return;
+    }
 
     if (!status.active) {
       handleTerminated(status.message);
