@@ -3,9 +3,9 @@ import { URL } from "node:url";
 import { completeCapturePair } from "./pair.mjs";
 import { DEFAULT_PAIR_HTTP_PORT } from "./config.mjs";
 import {
-  completeSpyPairEnterByPin,
-  getEchoSpyPairingStatus,
-  refreshEchoSpyPairCodes,
+  completeSurveyPairEnterByPin,
+  getEchoSurveyPairingStatus,
+  refreshEchoSurveyPairCodes,
 } from "./spy-echo-pairing.mjs";
 import * as logger from "./logger.mjs";
 
@@ -60,25 +60,25 @@ export function startPairServer(options) {
         return;
       }
 
-      if (url.pathname === "/api/spy/echo/codes" && req.method === "GET") {
-        const status = await getEchoSpyPairingStatus();
+      if (url.pathname === "/api/survey/echo/codes" && req.method === "GET") {
+        const status = await getEchoSurveyPairingStatus();
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, source: "echo-satellite", ...status }));
         return;
       }
 
-      if (url.pathname === "/api/spy/echo/codes" && req.method === "POST") {
-        await refreshEchoSpyPairCodes();
-        const status = await getEchoSpyPairingStatus();
+      if (url.pathname === "/api/survey/echo/codes" && req.method === "POST") {
+        await refreshEchoSurveyPairCodes();
+        const status = await getEchoSurveyPairingStatus();
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, source: "echo-satellite", ...status }));
         return;
       }
 
-      if (url.pathname === "/api/spy/pair/enter" && req.method === "POST") {
+      if (url.pathname === "/api/survey/pair/enter" && req.method === "POST") {
         const body = await readJsonBody(req);
         logger.log("pair-server: Spy PIN enter");
-        const result = await completeSpyPairEnterByPin({
+        const result = await completeSurveyPairEnterByPin({
           pin: String(body.pin ?? ""),
           role: body.role === "powerfist" ? "powerfist" : "mirage",
           nodeId: typeof body.nodeId === "string" ? body.nodeId : undefined,

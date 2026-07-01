@@ -24,9 +24,9 @@ import { startWsClient } from "./ws-client.mjs";
 import { createTrayManager } from "./tray.mjs";
 import * as logger from "./logger.mjs";
 import {
-  getEchoSpyPairingStatus,
+  getEchoSurveyPairingStatus,
   initSpyEchoPairing,
-  refreshEchoSpyPairCodes,
+  refreshEchoSurveyPairCodes,
 } from "./spy-echo-pairing.mjs";
 import { checkForSatelliteUpdate, downloadAndInstallSatelliteUpdate } from "./updater.mjs";
 
@@ -54,7 +54,7 @@ let lastMissionId = null;
 let cachedCredentials = null;
 /** @type {{ reachable: boolean, mirages: Array<{ nodeId: string, pairedAt: string }> }} */
 let cachedSpyLinks = { reachable: false, mirages: [] };
-/** @type {Awaited<ReturnType<typeof getEchoSpyPairingStatus>> | null} */
+/** @type {Awaited<ReturnType<typeof getEchoSurveyPairingStatus>> | null} */
 let cachedSpyStatus = null;
 
 let trayIcon = null;
@@ -77,7 +77,7 @@ function statusSnapshot() {
     lastMissionId: stats?.lastMissionId ?? lastMissionId,
     missionsHandled: stats?.missionsHandled ?? missionsHandled,
     spyMirages: cachedSpyLinks.mirages,
-    spyLinksReachable: cachedSpyLinks.reachable,
+    surveyLinksReachable: cachedSpyLinks.reachable,
     captureMirage: cachedCredentials
       ? {
           host: cachedCredentials.mirageHost,
@@ -158,13 +158,13 @@ function buildSpyStatusPayload() {
     armed: snapshot.armed,
     wsStatus: snapshot.wsStatus,
     captureMirage: snapshot.captureMirage,
-    spyLinksReachable: snapshot.spyLinksReachable,
+    surveyLinksReachable: snapshot.surveyLinksReachable,
   };
 }
 
 async function refreshSpyLinks() {
   try {
-    cachedSpyStatus = await getEchoSpyPairingStatus();
+    cachedSpyStatus = await getEchoSurveyPairingStatus();
     cachedSpyLinks = {
       reachable: true,
       mirages: cachedSpyStatus.pairedMirages.map((mirage) => ({
@@ -227,7 +227,7 @@ function registerIpc() {
   ipcMain.handle("satellite:get-status", () => statusSnapshot());
 
   ipcMain.handle("satellite:get-spy-codes", async () => {
-    const status = await getEchoSpyPairingStatus();
+    const status = await getEchoSurveyPairingStatus();
     cachedSpyStatus = status;
     cachedSpyLinks = {
       reachable: true,
@@ -240,8 +240,8 @@ function registerIpc() {
   });
 
   ipcMain.handle("satellite:regenerate-spy-codes", async () => {
-    await refreshEchoSpyPairCodes();
-    const status = await getEchoSpyPairingStatus();
+    await refreshEchoSurveyPairCodes();
+    const status = await getEchoSurveyPairingStatus();
     cachedSpyStatus = status;
     cachedSpyLinks = {
       reachable: true,

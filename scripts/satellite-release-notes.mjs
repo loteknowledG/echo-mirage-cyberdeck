@@ -8,7 +8,7 @@ Minimal capture drone for the **Echo** screenshot machine — tray on Windows, s
 
 - **Mirage pairing feedback** — Pair with ECHO shows searching, linked, or error; Satellite updates linked Mirages immediately
 - **6-digit Spy pairing codes in the app** — Mirage/PowerFist enter PIN only; no URL paste for team link
-- **Test capture preview** — Test silent capture now shows a thumbnail of what was captured
+- **Test capture preview** — Test capture now shows a thumbnail of what was captured
 - **Test capture no longer hangs** — 20s timeout with a clear error if Screen Recording needs re-grant after upgrade
 - **macOS PKG install fix** — installer no longer fails at Summary when upgrading over a running Echo Satellite
 - **Check for updates** in the app — one-click download and install from GitHub releases

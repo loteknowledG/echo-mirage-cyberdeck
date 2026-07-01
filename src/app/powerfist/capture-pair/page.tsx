@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { startStealthCaptureDeck } from "@/lib/cyberdeck/espionage-stealth-capture-deck";
+import { startSurveyCaptureDeck } from "@/lib/cyberdeck/survey-capture-deck";
 
-/** Echo capture-deck — blank surface, no mission UI, native silent capture only. */
+/** Echo capture-deck — blank surface, no mission UI, native capture only. */
 export default function PowerfistCapturePairPage() {
   useEffect(() => {
-    let deck: Awaited<ReturnType<typeof startStealthCaptureDeck>> = null;
+    let deck: Awaited<ReturnType<typeof startSurveyCaptureDeck>> = null;
 
-    void startStealthCaptureDeck().then((handle) => {
+    void startSurveyCaptureDeck().then((handle) => {
       deck = handle;
     });
 

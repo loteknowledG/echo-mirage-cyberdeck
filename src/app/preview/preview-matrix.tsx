@@ -370,18 +370,18 @@ export function PreviewMatrix() {
       const deck = activeDecks[deckIndex];
       const card = deck.cards[cardIndex];
 
-      if (card.title === "Espionage Capture") {
+      if (card.title === "Survey Capture") {
         const remote = remoteSocketRef.current;
         if (!remote) {
-          setPushReceiptHtml("Espionage Capture requires a paired PowerFist link to Mirage.");
+          setPushReceiptHtml("Survey Capture requires a paired PowerFist link to Mirage.");
           return;
         }
-        const result = await remote.sendEspionageCaptureMission();
+        const result = await remote.sendSurveyCaptureMission();
         if (pushReceiptTimerRef.current) clearTimeout(pushReceiptTimerRef.current);
         setPushReceiptHtml(
           result.ok
-            ? `Espionage mission <strong>${result.missionId?.slice(0, 8) ?? "—"}…</strong> — Echo captures, Mirage solves.`
-            : `Espionage mission failed: ${result.error ?? "unknown error"}`,
+            ? `Survey mission <strong>${result.missionId?.slice(0, 8) ?? "—"}…</strong> — Echo captures, Mirage solves.`
+            : `Survey mission failed: ${result.error ?? "unknown error"}`,
         );
         pushReceiptTimerRef.current = setTimeout(() => {
           setPushReceiptHtml(null);

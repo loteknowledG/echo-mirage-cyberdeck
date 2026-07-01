@@ -3,18 +3,18 @@
 import { useEffect, useState } from "react";
 import type { PowerfistSocketStatus } from "@/lib/cyberdeck/powerfist-remote-socket";
 import {
-  ESPIONAGE_ECHO_DISPLAY,
-  ESPIONAGE_MIRAGE_DISPLAY,
-  ESPIONAGE_MODE_SHORT,
-  ESPIONAGE_POWERFIST_LABEL,
-} from "@/lib/cyberdeck/espionage-mode";
+  SURVEY_ECHO_DISPLAY,
+  SURVEY_MIRAGE_DISPLAY,
+  SURVEY_MODE_SHORT,
+  SURVEY_POWERFIST_LABEL,
+} from "@/lib/cyberdeck/survey-mode";
 
 const STATUS_LABEL: Record<PowerfistSocketStatus, string> = {
-  disconnected: `${ESPIONAGE_POWERFIST_LABEL} // OFFLINE`,
-  connecting: `${ESPIONAGE_POWERFIST_LABEL} // LINKING…`,
-  connected: `${ESPIONAGE_POWERFIST_LABEL} // LINKED`,
-  error: `${ESPIONAGE_POWERFIST_LABEL} // ERROR`,
-  pairing: `${ESPIONAGE_POWERFIST_LABEL} // PAIRING…`,
+  disconnected: `${SURVEY_POWERFIST_LABEL} // OFFLINE`,
+  connecting: `${SURVEY_POWERFIST_LABEL} // LINKING…`,
+  connected: `${SURVEY_POWERFIST_LABEL} // LINKED`,
+  error: `${SURVEY_POWERFIST_LABEL} // ERROR`,
+  pairing: `${SURVEY_POWERFIST_LABEL} // PAIRING…`,
 };
 
 type PowerfistRemoteLinkBannerProps = {
@@ -32,11 +32,11 @@ export function PowerfistRemoteLinkBanner({ status, pairMessage }: PowerfistRemo
     }
     if (status === "connected") {
       setHint(
-        `${ESPIONAGE_MODE_SHORT}: trigger Echo capture → Mirage solve on ${ESPIONAGE_MIRAGE_DISPLAY}.`,
+        `${SURVEY_MODE_SHORT}: trigger Echo capture → Mirage solve on ${SURVEY_MIRAGE_DISPLAY}.`,
       );
       return;
     }
-    setHint(`Scan PowerFist QR on ${ESPIONAGE_MIRAGE_DISPLAY} (Settings → Espionage Mode).`);
+    setHint(`Scan PowerFist QR on ${SURVEY_MIRAGE_DISPLAY} (Settings → Survey Mode).`);
   }, [pairMessage, status]);
 
   return (
@@ -45,7 +45,7 @@ export function PowerfistRemoteLinkBanner({ status, pairMessage }: PowerfistRemo
       {hint ? (
         <span className="hint">
           {" "}
-          · {ESPIONAGE_ECHO_DISPLAY} + {ESPIONAGE_MIRAGE_DISPLAY} · {hint}
+          · {SURVEY_ECHO_DISPLAY} + {SURVEY_MIRAGE_DISPLAY} · {hint}
         </span>
       ) : null}
     </div>

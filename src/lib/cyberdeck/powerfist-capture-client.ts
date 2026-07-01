@@ -1,8 +1,8 @@
-import type { EspionageMissionEnvelope } from "@/lib/cyberdeck/powerfist-mission.types";
+import type { SurveyMissionEnvelope } from "@/lib/cyberdeck/powerfist-mission.types";
 import {
-  ESPIONAGE_ECHO_NODE_LABEL,
-  getOrCreateEspionageNodeId,
-} from "@/lib/cyberdeck/espionage-mode";
+  SURVEY_ECHO_NODE_LABEL,
+  getOrCreateSurveyNodeId,
+} from "@/lib/cyberdeck/survey-mode";
 import type { PowerfistSocketStatus } from "@/lib/cyberdeck/powerfist-remote-socket";
 
 const CAPTURE_HOST_STORAGE_KEY = "echo-mirage-espionage-capture-host";
@@ -100,7 +100,7 @@ export function buildPowerfistCaptureWsUrl(
 export async function completePowerfistCapturePairFromQr(
   params: PowerfistCapturePairParams,
 ): Promise<PowerfistCapturePairCompleteResult> {
-  const nodeId = getOrCreateEspionageNodeId();
+  const nodeId = getOrCreateSurveyNodeId();
   const mirageHub =
     params.mirageHost && params.mirageHttpPort
       ? { mirageHost: params.mirageHost, mirageHttpPort: params.mirageHttpPort }
@@ -109,7 +109,7 @@ export async function completePowerfistCapturePairFromQr(
   try {
     const res = await fetch(
       mirageHub
-        ? "/api/spy/relay/pair-capture"
+        ? "/api/survey/relay/pair-capture"
         : "/api/powerfist/pair/capture",
       {
         method: "POST",
@@ -127,7 +127,7 @@ export async function completePowerfistCapturePairFromQr(
                 pairId: params.pairId,
                 pairSecret: params.pairSecret,
                 nodeId,
-                label: ESPIONAGE_ECHO_NODE_LABEL,
+                label: SURVEY_ECHO_NODE_LABEL,
               },
         ),
       },
@@ -144,10 +144,10 @@ export async function completePowerfistCapturePairFromQr(
 
 async function runEchoSilentCapture(): Promise<{ ok: true; pngBase64: string } | { ok: false; error: string }> {
   try {
-    const res = await fetch("/api/spy/capture", { method: "POST" });
+    const res = await fetch("/api/survey/capture", { method: "POST" });
     const payload = (await res.json()) as { ok?: boolean; pngBase64?: string; error?: string };
     if (!payload.ok || !payload.pngBase64?.trim()) {
-      return { ok: false, error: payload.error || "Echo silent capture failed." };
+      return { ok: false, error: payload.error || "Echo capture failed." };
     }
     return { ok: true, pngBase64: payload.pngBase64.trim() };
   } catch {
@@ -156,13 +156,13 @@ async function runEchoSilentCapture(): Promise<{ ok: true; pngBase64: string } |
 }
 
 async function ingestEchoCaptureToMirage(
-  envelope: EspionageMissionEnvelope,
+  envelope: SurveyMissionEnvelope,
   pngBase64: string,
 ): Promise<{ ok: boolean; reason?: string }> {
   const mirageHub = readMirageHubCredentials();
   try {
     const res = await fetch(
-      mirageHub ? "/api/spy/relay/mission-ingest" : envelope.ingestUrl,
+      mirageHub ? "/api/survey/relay/mission-ingest" : envelope.ingestUrl,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -213,7 +213,7 @@ export function connectPowerfistCaptureSocket(options: {
     options.onStatus?.(next);
   };
 
-  const handleMission = async (envelope: EspionageMissionEnvelope) => {
+  const handleMission = async (envelope: SurveyMissionEnvelope) => {
     const captured = await runEchoSilentCapture();
     if (!captured.ok) {
       options.onMissionResult?.({
@@ -249,7 +249,7 @@ export function connectPowerfistCaptureSocket(options: {
         return;
       }
       if (!parsed || typeof parsed !== "object") return;
-      const message = parsed as EspionageMissionEnvelope & { type?: string };
+      const message = parsed as SurveyMissionEnvelope & { type?: string };
       if (message.type !== "mission" || message.kind !== "silent-capture-solve") return;
       void handleMission(message);
     };

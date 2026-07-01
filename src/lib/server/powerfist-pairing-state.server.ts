@@ -17,7 +17,7 @@ export type PowerfistPairedCapture = {
   nodeId: string;
   captureToken: string;
   pairedAt: string;
-  /** Espionage node kind — always `echo` for capture desk. */
+  /** Survey node kind — always `echo` for capture desk. */
   label?: string;
 };
 

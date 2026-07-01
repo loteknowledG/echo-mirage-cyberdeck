@@ -30,7 +30,7 @@ Push tag `satellite-v0.1.0` (or run **Satellite installer** workflow) to publish
 - `Echo-Satellite-{version}-setup.exe` (Windows)
 - `Echo-Satellite-{version}.dmg` (macOS Apple Silicon)
 
-Spy tab **Echo** pane links to `/api/satellite-install` for platform-correct downloads.
+Survey tab **Echo** pane links to `/api/satellite-install` for platform-correct downloads.
 
 ## Development
 

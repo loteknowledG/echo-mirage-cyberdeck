@@ -60,7 +60,7 @@ async function readStateFileMirages() {
 export async function fetchSpyMirageLinks() {
   for (const port of candidatePorts()) {
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/api/spy/echo/codes`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/survey/echo/codes`, {
         signal: AbortSignal.timeout(2000),
       });
       if (!res.ok) continue;

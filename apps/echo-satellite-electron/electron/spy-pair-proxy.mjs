@@ -6,7 +6,7 @@ const LOCAL_CYBERDECK_PORTS = [3000, 3001, 8080];
 export async function proxySpyPairEnter(body) {
   for (const port of LOCAL_CYBERDECK_PORTS) {
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/api/spy/pair/enter`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/survey/pair/enter`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -27,6 +27,6 @@ export async function proxySpyPairEnter(body) {
   return {
     ok: false,
     reason:
-      "Echo Satellite could not reach the local cyberdeck. Open Spy → Echo on this Mac (http://127.0.0.1:3000) so PIN codes are active.",
+      "Echo Satellite could not reach the local cyberdeck. Open Survey → Echo on this Mac (http://127.0.0.1:3000) so PIN codes are active.",
   };
 }

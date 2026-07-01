@@ -20,7 +20,7 @@ type SatelliteStatus = {
   lastMissionId?: string | null;
   missionsHandled: number;
   spyMirages: SpyMirageLink[];
-  spyLinksReachable: boolean;
+  surveyLinksReachable: boolean;
   captureMirage: CaptureMirageLink | null;
 };
 
@@ -147,9 +147,9 @@ function formatLinkedMirages(status: SatelliteStatus): string {
     lines.push(`${status.captureMirage.host}:${status.captureMirage.port} (Capture relay${armedSuffix})`);
   }
   if (lines.length === 0) {
-    return status.spyLinksReachable
+    return status.surveyLinksReachable
       ? "No Mirage linked yet"
-      : "Open cyberdeck Spy tab on this machine for Spy team links";
+      : "Open cyberdeck Survey tab on this machine for Spy team links";
   }
   return lines.join("\n");
 }

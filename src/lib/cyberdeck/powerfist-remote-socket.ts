@@ -1,5 +1,5 @@
 import type { PowerFistStackCommand } from "@/lib/cyberdeck/powerfist-events";
-import type { EspionageMissionSolveDetail } from "@/lib/cyberdeck/powerfist-mission.types";
+import type { SurveyMissionSolveDetail } from "@/lib/cyberdeck/powerfist-mission.types";
 
 export type PowerfistSocketStatus = "disconnected" | "connecting" | "connected" | "error" | "pairing";
 
@@ -216,7 +216,7 @@ function attachReconnectingSocket(options: {
   wsUrl: string;
   role: "deck" | "remote";
   onStackPush?: (command: PowerFistStackCommand) => void;
-  onMissionSolve?: (detail: EspionageMissionSolveDetail) => void;
+  onMissionSolve?: (detail: SurveyMissionSolveDetail) => void;
   onStatus?: (status: PowerfistSocketStatus) => void;
 }): SocketController {
   let status: PowerfistSocketStatus = "disconnected";
@@ -251,7 +251,7 @@ function attachReconnectingSocket(options: {
         type?: string;
         command?: PowerFistStackCommand;
         missionId?: string;
-        kind?: EspionageMissionSolveDetail["kind"];
+        kind?: SurveyMissionSolveDetail["kind"];
         imageDataUrl?: string;
         prompt?: string;
       };
@@ -307,7 +307,7 @@ function attachReconnectingSocket(options: {
 export function connectPowerfistDeckSocket(options: {
   wsUrl: string;
   onStackPush: (command: PowerFistStackCommand) => void;
-  onMissionSolve?: (detail: EspionageMissionSolveDetail) => void;
+  onMissionSolve?: (detail: SurveyMissionSolveDetail) => void;
   onStatus?: (status: PowerfistSocketStatus) => void;
 }): SocketController {
   return attachReconnectingSocket({ ...options, role: "deck" });
@@ -318,7 +318,7 @@ export function connectPowerfistRemoteSocket(options: {
   onStatus?: (status: PowerfistSocketStatus) => void;
 }): SocketController & {
   sendStackPush: (command: PowerFistStackCommand) => Promise<{ ok: boolean; delivered?: number; error?: string }>;
-  sendEspionageCaptureMission: () => Promise<{ ok: boolean; missionId?: string; error?: string }>;
+  sendSurveyCaptureMission: () => Promise<{ ok: boolean; missionId?: string; error?: string }>;
 } {
   let ws: WebSocket | null = null;
   let status: PowerfistSocketStatus = "disconnected";
@@ -436,7 +436,7 @@ export function connectPowerfistRemoteSocket(options: {
           resolve({ ok: false, error: "push timed out" });
         }, 8000);
       }),
-    sendEspionageCaptureMission: () =>
+    sendSurveyCaptureMission: () =>
       new Promise((resolve) => {
         if (!ws || ws.readyState !== WebSocket.OPEN) {
           resolve({ ok: false, error: "PowerFist remote socket not connected" });
@@ -449,7 +449,7 @@ export function connectPowerfistRemoteSocket(options: {
           const index = pendingMissions.indexOf(entry);
           if (index === -1) return;
           pendingMissions.splice(index, 1);
-          resolve({ ok: false, error: "espionage mission timed out" });
+          resolve({ ok: false, error: "survey mission timed out" });
         }, 30_000);
       }),
   };
