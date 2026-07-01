@@ -116,6 +116,22 @@ export function SurveyMiragePairingDock() {
         PAIR {SURVEY_MIRAGE_DISPLAY} WITH {SURVEY_ECHO_DISPLAY}
       </p>
 
+      <div className="mb-3 rounded border border-cyan-950/50 bg-cyan-950/15 px-3 py-2 text-[8px] leading-relaxed text-[#9ab8b8]">
+        <p className="mb-1 text-[9px] font-semibold tracking-[0.08em] text-cyan-300/90">Two machines</p>
+        <p>
+          <strong className="text-cyan-200/90">1. Echo Mac</strong> (screenshot computer) — open the{" "}
+          <strong className="text-cyan-200/90">Echo Satellite</strong> tray app (menu bar / system tray).
+          In cyberdeck → Survey → click <strong className="text-cyan-200/90">e</strong> to see the Mirage
+          6-digit code.
+        </p>
+        <p className="mt-1">
+          <strong className="text-fuchsia-200/90">2. This laptop</strong> (Mirage) — you are on{" "}
+          <strong className="text-fuchsia-200/90">m</strong>. Enter Echo&apos;s IP{" "}
+          <code className="text-cyan-100">100.66.91.18</code>, port <code className="text-cyan-100">3050</code>,
+          and the code from step 1. You cannot open Echo on this machine — Echo runs on the Mac.
+        </p>
+      </div>
+
       {terminated ? (
         <p className="mb-2 text-[9px] text-red-300/90">
           {terminatedMessage ?? ECHO_SURVEY_TERMINATED_MESSAGE} — re-pair below.
