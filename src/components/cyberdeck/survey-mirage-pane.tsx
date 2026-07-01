@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { SurveyMirageHubPanel } from "@/components/cyberdeck/survey-mirage-hub-panel";
 import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-panel";
 import { SurveyPairPinForm } from "@/components/cyberdeck/survey-pair-pin-form";
+import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import {
   ECHO_SURVEY_TERMINATED_MESSAGE,
   SURVEY_ECHO_DISPLAY,
@@ -29,12 +30,20 @@ import {
   initSurveyPairingDebug,
   notifySurveyPairingDebug,
 } from "@/lib/cyberdeck/survey-pairing-debug";
+import {
+  isEchoMirageDesktopShell,
+  isPwaStandaloneSession,
+  openDesktopCyberdeckApp,
+  probeLocalDesktopShell,
+} from "@/lib/electron/desktop-install.client";
 
 export function SurveyMiragePane() {
   const { paired, terminated, terminatedMessage, resetLinkWatch } = useSurveyEchoLinkWatch("mirage");
   const team = useSurveyTeamStatus();
   const [status, setStatus] = useState<string | null>(null);
+  const [launchingDesktop, setLaunchingDesktop] = useState(false);
   const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
+  const pwaShell = isPwaStandaloneSession() && !isEchoMirageDesktopShell();
 
   useEffect(() => {
     initSurveyPairingDebug();
@@ -46,6 +55,21 @@ export function SurveyMiragePane() {
     notifySurveyPairingDebug(`session terminated — ${terminatedMessage ?? ECHO_SURVEY_TERMINATED_MESSAGE}`);
     void emitSurveyPairingDiagnostics("link terminated");
   }, [terminated, terminatedMessage]);
+
+  const handleOpenDesktop = useCallback(async () => {
+    setLaunchingDesktop(true);
+    const localShell = await probeLocalDesktopShell();
+    openDesktopCyberdeckApp({
+      path: "/cyberdeck",
+      localOrigin: localShell.shell ? localShell.origin : null,
+    });
+    setStatus(
+      localShell.shell
+        ? "Opening desktop cyberdeck — pair there with IP + code."
+        : "Launching desktop cyberdeck… Install it if nothing opens.",
+    );
+    setLaunchingDesktop(false);
+  }, []);
 
   const handlePaired = useCallback(
     (result: {
@@ -81,7 +105,7 @@ export function SurveyMiragePane() {
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
       {terminated ? (
         <div className="rounded border border-red-900/50 bg-red-950/20 px-3 py-3 text-center">
           <p className="text-sm tracking-[0.12em] text-red-400/95">
@@ -92,6 +116,39 @@ export function SurveyMiragePane() {
           </p>
         </div>
       ) : null}
+
+      {pwaShell && !mirageLinked ? (
+        <div className="rounded border border-amber-900/50 bg-amber-950/20 px-3 py-3">
+          <p className="text-[9px] leading-relaxed text-amber-200/90">
+            <strong className="text-amber-100/95">PWA cannot pair over Tailscale.</strong> Use the desktop
+            cyberdeck on this laptop — it can reach Echo at{" "}
+            {team.echoHost ? (
+              <code className="text-amber-100">{team.echoHost}:3050</code>
+            ) : (
+              "your Echo IP"
+            )}
+            .
+          </p>
+          <CyberdeckActionButton
+            className="mt-3"
+            disabled={launchingDesktop}
+            onClick={() => void handleOpenDesktop()}
+          >
+            {launchingDesktop ? "Opening…" : "Open desktop cyberdeck to pair"}
+          </CyberdeckActionButton>
+        </div>
+      ) : null}
+
+      <SurveyPairPinForm
+        role="mirage"
+        roleLabel={SURVEY_MIRAGE_DISPLAY}
+        focusClassName="focus:border-fuchsia-900/60"
+        buttonLabel={
+          terminated ? `Re-pair with ${SURVEY_ECHO_DISPLAY}` : `Pair with ${SURVEY_ECHO_DISPLAY}`
+        }
+        defaultEchoHost={team.echoHost ?? readSurveyMiragePairCredentials()?.echoHost ?? null}
+        onPaired={handlePaired}
+      />
 
       <div>
         <p className="text-fuchsia-300/90">{SURVEY_MODE_TITLE} // {SURVEY_MIRAGE_DISPLAY}</p>
@@ -105,16 +162,6 @@ export function SurveyMiragePane() {
       ) : !terminated ? (
         <p className="text-[#8a8a8a]">Not paired with {SURVEY_ECHO_DISPLAY}.</p>
       ) : null}
-
-      <SurveyPairPinForm
-        role="mirage"
-        roleLabel={SURVEY_MIRAGE_DISPLAY}
-        focusClassName="focus:border-fuchsia-900/60"
-        buttonLabel={
-          terminated ? `Re-pair with ${SURVEY_ECHO_DISPLAY}` : `Pair with ${SURVEY_ECHO_DISPLAY}`
-        }
-        onPaired={handlePaired}
-      />
 
       {status ? <p className="text-emerald-300/80">{status}</p> : null}
 

@@ -22,6 +22,7 @@ type SurveyPairPinFormProps = {
   roleLabel: string;
   focusClassName?: string;
   buttonLabel: string;
+  defaultEchoHost?: string | null;
   onPaired: (result: {
     echoHost: string;
     httpPort: number;
@@ -56,6 +57,7 @@ export function SurveyPairPinForm({
   roleLabel,
   focusClassName,
   buttonLabel,
+  defaultEchoHost,
   onPaired,
 }: SurveyPairPinFormProps) {
   const [echoHost, setEchoHost] = useState("");
@@ -66,12 +68,12 @@ export function SurveyPairPinForm({
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    const lastHost = readLastEchoHost(role);
+    const lastHost = readLastEchoHost(role) || defaultEchoHost?.trim() || "";
     if (!lastHost) return;
     const formatted = formatEchoEndpointFields(lastHost, readLastEchoPort(role));
     setEchoHost(formatted.host);
     setEchoHttpPort(formatted.port);
-  }, [role]);
+  }, [role, defaultEchoHost]);
 
   const syncEndpointFields = useCallback(
     (hostInput: string, portInput: string) => {

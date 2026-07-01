@@ -35,6 +35,23 @@ const LOCAL_CYBERDECK_ORIGINS = ["http://127.0.0.1:3000", "http://localhost:3000
 const SATELLITE_STATUS_URL = "http://127.0.0.1:3050/spy/status";
 const SATELLITE_CODES_URL = "http://127.0.0.1:3050/api/survey/echo/codes";
 
+const PWA_PAIR_BLOCKED_MESSAGE =
+  "Installed PWA cannot reach Echo over Tailscale or LAN. On this laptop, click Open desktop cyberdeck below (or run pnpm electron:dev) and pair from there.";
+
+function isHttpsBrowserClient(): boolean {
+  return typeof window !== "undefined" && window.location.protocol === "https:";
+}
+
+function isPwaPairReachabilityError(reason: string): boolean {
+  const lower = reason.toLowerCase();
+  return (
+    lower.includes("could not reach") ||
+    lower.includes("could not find echo") ||
+    lower.includes("network") ||
+    lower.includes("failed to fetch")
+  );
+}
+
 export type EchoSurveyStatusSource = "cyberdeck" | "local-cyberdeck" | "satellite";
 
 export type EchoSurveyStatus = {
@@ -114,6 +131,16 @@ export async function fetchEchoRemoteSurveyCodesClient(
   const endpoint = parseEchoEndpointInput(echoHost, echoHttpPort);
   if (!endpoint.host) {
     return { ok: false, reason: "echoHost is required." };
+  }
+
+  if (isHttpsBrowserClient()) {
+    const proxy = await readEchoSurveyPayload(
+      `/api/survey/echo/remote-status?echoHost=${encodeURIComponent(endpoint.host)}&echoHttpPort=${endpoint.port}`,
+    );
+    if (proxy.ok) {
+      return { ...proxy, source: "satellite" };
+    }
+    return proxy;
   }
 
   const status = await readEchoSurveyPayload(
@@ -264,6 +291,45 @@ export async function enterSurveyPairPin(input: {
 
   type PairSuccess = Extract<Awaited<ReturnType<typeof enterSurveyPairPin>>, { ok: true }>;
 
+  async function postViaCyberdeckProxy(
+    host: string,
+    port: number,
+  ): Promise<PairSuccess | { ok: false; reason: string }> {
+    traceSurveyPairing(`pair POST /api/survey/pair/enter proxy → ${host}:${port} role=${input.role}`);
+    try {
+      const res = await fetch("/api/survey/pair/enter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          echoHost: host,
+          echoHttpPort: port,
+          pin: input.pin,
+          role: input.role,
+          nodeId,
+          deviceId,
+          hintHosts: input.hintHosts,
+        }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(35_000),
+      });
+      const serverResult = (await res.json()) as PairSuccess | { ok: false; reason: string };
+      if (serverResult.ok) {
+        traceSurveyPairing(`pair OK via cyberdeck proxy · ${serverResult.echoHost}:${serverResult.httpPort}`);
+        return serverResult;
+      }
+      traceSurveyPairing(`pair proxy fail — ${serverResult.reason}`);
+      if (isHttpsBrowserClient() && isPwaPairReachabilityError(serverResult.reason)) {
+        return { ok: false, reason: PWA_PAIR_BLOCKED_MESSAGE };
+      }
+      return serverResult;
+    } catch {
+      return {
+        ok: false,
+        reason: isHttpsBrowserClient() ? PWA_PAIR_BLOCKED_MESSAGE : "Pair request failed.",
+      };
+    }
+  }
+
   async function postDirect(host: string, port: number): Promise<PairSuccess | { ok: false; reason: string }> {
     if (!host.trim()) {
       return { ok: false, reason: "Enter Echo Satellite IP address." };
@@ -301,6 +367,9 @@ export async function enterSurveyPairPin(input: {
       traceSurveyPairing(`pair rejected ${host}:${port} — ${payload.reason}`);
       return payload;
     } catch (error) {
+      if (isHttpsBrowserClient()) {
+        return { ok: false, reason: PWA_PAIR_BLOCKED_MESSAGE };
+      }
       const detail =
         error instanceof Error && error.name === "TimeoutError"
           ? "Timed out — check Echo Satellite is running and Screen Recording is granted."
@@ -318,6 +387,12 @@ export async function enterSurveyPairPin(input: {
 
   if (typeof window !== "undefined") {
     if (resolvedEndpoint.host) {
+      if (isHttpsBrowserClient()) {
+        traceSurveyPairing(
+          `pair route: HTTPS cyberdeck proxy → ${resolvedEndpoint.host}:${resolvedEndpoint.port}`,
+        );
+        return postViaCyberdeckProxy(resolvedEndpoint.host, resolvedEndpoint.port);
+      }
       traceSurveyPairing(`pair route: direct to ${resolvedEndpoint.host}:${resolvedEndpoint.port}`);
       return postDirect(resolvedEndpoint.host, resolvedEndpoint.port);
     }
