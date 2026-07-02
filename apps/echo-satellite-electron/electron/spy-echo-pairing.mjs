@@ -59,6 +59,20 @@ function getLanHosts() {
   return addrs.length > 0 ? addrs : ["127.0.0.1"];
 }
 
+/** @param {string[]} lanHosts */
+export function preferredEchoHost(lanHosts) {
+  const hosts = Array.isArray(lanHosts) ? lanHosts.filter(Boolean) : [];
+  if (hosts.length === 0) return "127.0.0.1";
+
+  const tailscale = hosts.find((host) => /^100\./.test(host));
+  if (tailscale) return tailscale;
+
+  const privateLan = hosts.find((host) =>
+    /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host),
+  );
+  return privateLan ?? hosts[0];
+}
+
 /** @param {SpyPairCodeSession | null | undefined} session */
 function sessionExpired(session) {
   if (!session) return true;
@@ -185,7 +199,7 @@ export async function getEchoSurveyPairingStatus() {
     await saveEchoSurveyPairingState(state);
   }
 
-  const host = state.lanHosts[0] || "127.0.0.1";
+  const host = preferredEchoHost(state.lanHosts);
   const mirageSession = normalizeStoredSession(state.mirageCode);
   const powerfistSession = normalizeStoredSession(state.powerfistCode);
   const mirageActive = mirageSession && !sessionExpired(mirageSession);
@@ -196,6 +210,7 @@ export async function getEchoSurveyPairingStatus() {
     echoNodeId: state.echoNodeId,
     echoHost: host,
     httpPort: state.httpPort,
+    lanHosts: state.lanHosts,
     miragePin: mirageActive ? mirageSession.pin : null,
     powerfistPin: powerfistActive ? powerfistSession.pin : null,
     mirageExpiresAt: mirageActive ? mirageSession.expiresAt : null,

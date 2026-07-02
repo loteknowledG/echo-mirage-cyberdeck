@@ -17,18 +17,20 @@ import {
   notifySpyMuthurArchive,
 } from "@/lib/cyberdeck/survey-chat";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
+import { useSurveyTeamSocket } from "@/lib/cyberdeck/survey-team-socket.client";
 import {
+  isSurveyHttpsPairBlocked,
   readSurveyMiragePairCredentials,
   saveSurveyMiragePairCredentials,
 } from "@/lib/cyberdeck/survey-pairing-client";
+import { DEFAULT_ECHO_HTTP_PORT } from "@/lib/cyberdeck/survey-pair-pin";
 import {
   emitSurveyPairingDiagnostics,
   initSurveyPairingDebug,
   notifySurveyPairingDebug,
 } from "@/lib/cyberdeck/survey-pairing-debug";
 import {
-  isEchoMirageDesktopShell,
-  isPwaStandaloneSession,
+  buildSurveyMirageDesktopPath,
   openDesktopCyberdeckApp,
   probeLocalDesktopShell,
 } from "@/lib/electron/desktop-install.client";
@@ -40,9 +42,16 @@ export function SurveyMiragePairingDock() {
   const [status, setStatus] = useState<string | null>(null);
   const [launchingDesktop, setLaunchingDesktop] = useState(false);
   const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
-  const pwaShell = isPwaStandaloneSession() && !isEchoMirageDesktopShell();
-  const defaultHost =
-    team.echoHost ?? readSurveyMiragePairCredentials()?.echoHost ?? "100.66.91.18";
+  const pairBlocked = isSurveyHttpsPairBlocked();
+  const savedCreds = readSurveyMiragePairCredentials();
+  const defaultHost = team.echoHost ?? savedCreds?.echoHost ?? "100.66.91.18";
+  const defaultPort = savedCreds?.httpPort ?? DEFAULT_ECHO_HTTP_PORT;
+  const teamSocket = useSurveyTeamSocket({
+    role: "mirage",
+    echoHost: defaultHost,
+    httpPort: defaultPort,
+    enabled: !pairBlocked && !mirageLinked,
+  });
 
   useEffect(() => {
     initSurveyPairingDebug();
@@ -52,17 +61,18 @@ export function SurveyMiragePairingDock() {
   const handleOpenDesktop = useCallback(async () => {
     setLaunchingDesktop(true);
     const localShell = await probeLocalDesktopShell();
+    const path = buildSurveyMirageDesktopPath(defaultHost, defaultPort);
     openDesktopCyberdeckApp({
-      path: "/cyberdeck",
+      path,
       localOrigin: localShell.shell ? localShell.origin : null,
     });
     setStatus(
       localShell.shell
-        ? "Opening desktop cyberdeck — pair there with IP + code."
+        ? "Opening desktop cyberdeck — Survey → Mirage (m), then pair with IP + code."
         : "Launching desktop cyberdeck… Install it if nothing opens.",
     );
     setLaunchingDesktop(false);
-  }, []);
+  }, [defaultHost, defaultPort]);
 
   const handlePaired = useCallback(
     (result: {
@@ -138,18 +148,25 @@ export function SurveyMiragePairingDock() {
         </p>
       ) : null}
 
-      {pwaShell ? (
-        <div className="mb-3 rounded border border-amber-900/50 bg-amber-950/30 px-3 py-2">
-          <p className="text-[9px] leading-relaxed text-amber-100/95">
-            Installed PWA cannot reach Echo over Tailscale. Pair from the{" "}
-            <strong>desktop cyberdeck</strong> on this laptop.
+      {pairBlocked ? (
+        <div className="mb-3 rounded border border-cyan-900/50 bg-cyan-950/25 px-3 py-2">
+          <p className="text-[9px] leading-relaxed text-cyan-100/95">
+            <strong>Cloud relay</strong> — pair without Tailscale or Echo IP. On Echo Mac: Echo Satellite
+            → <strong>Send to Mirage</strong>. Enter the Echo team ID and code below.
           </p>
-          <CyberdeckActionButton
-            className="mt-2"
-            disabled={launchingDesktop}
-            onClick={() => void handleOpenDesktop()}
-          >
-            {launchingDesktop ? "Opening…" : "Open desktop cyberdeck"}
+        </div>
+      ) : null}
+
+      {!pairBlocked && teamSocket.status === "connected" ? (
+        <p className="mb-2 text-[8px] text-cyan-300/80">
+          Team channel live — Echo can push pairing details with Send to Mirage.
+        </p>
+      ) : null}
+
+      {pairBlocked ? (
+        <div className="mb-2 flex flex-wrap gap-2">
+          <CyberdeckActionButton disabled={launchingDesktop} onClick={() => void handleOpenDesktop()}>
+            {launchingDesktop ? "Opening…" : "Or: open desktop cyberdeck"}
           </CyberdeckActionButton>
         </div>
       ) : null}
@@ -162,6 +179,8 @@ export function SurveyMiragePairingDock() {
           terminated ? `Re-pair with ${SURVEY_ECHO_DISPLAY}` : `Pair with ${SURVEY_ECHO_DISPLAY}`
         }
         defaultEchoHost={defaultHost}
+        useCloudRelay={pairBlocked}
+        pushPrefill={teamSocket.lastBundle}
         onPaired={handlePaired}
       />
 

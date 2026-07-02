@@ -69,19 +69,43 @@ async function forwardPinToEcho(input: {
   deviceId?: string;
 }): Promise<PairEnterPayload> {
   const endpoint = parseEchoEndpointInput(input.echoHost, input.echoHttpPort);
-  try {
-    const forwardUrl = `http://${endpoint.host}:${endpoint.port}/api/survey/pair/enter`;
+  const body = JSON.stringify({
+    pin: input.pin,
+    role: input.role,
+    nodeId: input.nodeId,
+    deviceId: input.deviceId,
+  });
+
+  async function tryForward(path: string): Promise<{ status: number; payload: PairEnterPayload | null }> {
+    const forwardUrl = `http://${endpoint.host}:${endpoint.port}${path}`;
     const forwardRes = await fetch(forwardUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        pin: input.pin,
-        role: input.role,
-        nodeId: input.nodeId,
-        deviceId: input.deviceId,
-      }),
+      body,
     });
-    return (await forwardRes.json()) as PairEnterPayload;
+    const text = await forwardRes.text();
+    try {
+      return {
+        status: forwardRes.status,
+        payload: JSON.parse(text) as PairEnterPayload,
+      };
+    } catch {
+      return { status: forwardRes.status, payload: null };
+    }
+  }
+
+  try {
+    let result = await tryForward("/api/survey/pair/enter");
+    if ((!result.payload || !result.payload.ok) && result.status === 404) {
+      result = await tryForward("/api/spy/pair/enter");
+    }
+    if (!result.payload) {
+      return {
+        ok: false,
+        reason: `Could not reach Echo at ${endpoint.host}:${endpoint.port}.`,
+      };
+    }
+    return result.payload;
   } catch {
     return {
       ok: false,

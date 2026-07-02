@@ -17,9 +17,14 @@ export async function GET(request: Request) {
   }
 
   try {
-    const res = await fetch(`http://${echoHost}:${echoHttpPort}/api/survey/echo/codes`, {
+    let res = await fetch(`http://${echoHost}:${echoHttpPort}/api/survey/echo/codes`, {
       cache: "no-store",
     });
+    if (res.status === 404) {
+      res = await fetch(`http://${echoHost}:${echoHttpPort}/spy/status`, {
+        cache: "no-store",
+      });
+    }
     const payload = (await res.json()) as { ok?: boolean; reason?: string };
     return NextResponse.json(payload, { status: res.status });
   } catch {

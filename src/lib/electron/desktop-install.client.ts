@@ -158,6 +158,18 @@ export function buildDesktopCyberdeckProtocolUrl(path = "/cyberdeck"): string {
   return `${DESKTOP_CYBERDECK_PROTOCOL}://open${normalized}`;
 }
 
+/** Deep link into Mirage pairing with Echo host/port prefilled (desktop shell only). */
+export function buildSurveyMirageDesktopPath(echoHost?: string, echoHttpPort?: number): string {
+  const params = new URLSearchParams();
+  const host = echoHost?.trim();
+  if (host) params.set("echoHost", host);
+  if (echoHttpPort && Number.isFinite(echoHttpPort)) {
+    params.set("echoPort", String(echoHttpPort));
+  }
+  const query = params.toString();
+  return query ? `/cyberdeck?${query}` : "/cyberdeck";
+}
+
 /** Launch the installed desktop cyberdeck via custom protocol (or localhost when probed). */
 export function openDesktopCyberdeckApp(input?: {
   path?: string;

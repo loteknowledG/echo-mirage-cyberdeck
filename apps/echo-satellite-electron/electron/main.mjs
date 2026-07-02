@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import {
   app,
   BrowserWindow,
+  clipboard,
   ipcMain,
   Menu,
   nativeImage,
@@ -28,7 +29,13 @@ import {
   initSpyEchoPairing,
   refreshEchoSurveyPairCodes,
 } from "./spy-echo-pairing.mjs";
+import { buildMiragePairingBundle } from "./send-to-mirage.mjs";
 import { checkForSatelliteUpdate, downloadAndInstallSatelliteUpdate } from "./updater.mjs";
+import {
+  pollSurveyRelayPairRequests,
+  pushSurveyRelayBundle,
+} from "./survey-relay-client.mjs";
+import { completeSurveyPairEnterByPin } from "./spy-echo-pairing.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -39,7 +46,7 @@ let mainWindow = null;
 /** @type {ReturnType<typeof startWsClient> | null} */
 let wsClient = null;
 
-/** @type {ReturnType<typeof startPairServer> | null} */
+/** @type {{ server: import("node:http").Server, surveyTeamHub: ReturnType<typeof import("./survey-team-hub.mjs").attachSurveyTeamHub> } | null} */
 let pairServer = null;
 
 let armed = false;
@@ -172,6 +179,8 @@ async function refreshSpyLinks() {
         pairedAt: mirage.pairedAt,
       })),
     };
+    void pushSurveyRelayBundle(cachedSpyStatus);
+    void pollSurveyRelayPairRequests(cachedSpyStatus.echoNodeId, completeSurveyPairEnterByPin);
   } catch (error) {
     cachedSpyStatus = null;
     cachedSpyLinks = { reachable: false, mirages: [] };
@@ -191,7 +200,12 @@ async function initializeAfterReady() {
     onPaired: (creds) => {
       void armWithCredentials(creds, true);
     },
-    onSpyPaired: () => {
+    onSpyPaired: (result) => {
+      pairServer?.surveyTeamHub.notifyLinked({
+        role: result.role === "powerfist" ? "powerfist" : "mirage",
+        nodeId: typeof result.nodeId === "string" ? result.nodeId : undefined,
+        deviceId: typeof result.deviceId === "string" ? result.deviceId : undefined,
+      });
       void refreshSpyLinks();
     },
     getSpyStatus: () => buildSpyStatusPayload(),
@@ -252,6 +266,37 @@ function registerIpc() {
     };
     mainWindow?.webContents.send("satellite:status-changed", statusSnapshot());
     return { ok: true, ...status };
+  });
+
+  ipcMain.handle("satellite:send-to-mirage", async () => {
+    const status = await getEchoSurveyPairingStatus();
+    const bundle = buildMiragePairingBundle(status);
+    if (!bundle.ok) {
+      return bundle;
+    }
+    clipboard.writeText(bundle.clipboardText);
+    void pushSurveyRelayBundle(status);
+    const push = pairServer?.surveyTeamHub.pushPairingBundle({
+      host: bundle.host,
+      port: bundle.port,
+      pin: bundle.pin,
+      mirageUrl: bundle.mirageUrl,
+      echoNodeId: status.echoNodeId ?? null,
+      sessionEpoch: status.sessionEpoch ?? null,
+    });
+    const delivered = push?.delivered ?? 0;
+    return {
+      ok: true,
+      message:
+        delivered > 0
+          ? `Copied + pushed to ${delivered} Mirage desktop(s). Paste if needed.`
+          : bundle.message,
+      mirageUrl: bundle.mirageUrl,
+      host: bundle.host,
+      port: bundle.port,
+      pin: bundle.pin,
+      pushedToMirage: delivered,
+    };
   });
 
   ipcMain.handle("satellite:pair-from-url", async (_event, capturePairUrl) => {
@@ -367,5 +412,5 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   stopWs();
-  pairServer?.close();
+  pairServer?.server?.close();
 });

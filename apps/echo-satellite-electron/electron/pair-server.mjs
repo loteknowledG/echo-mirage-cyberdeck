@@ -8,6 +8,7 @@ import {
   refreshEchoSurveyPairCodes,
 } from "./spy-echo-pairing.mjs";
 import * as logger from "./logger.mjs";
+import { attachSurveyTeamHub } from "./survey-team-hub.mjs";
 
 function applyCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -25,7 +26,7 @@ async function readJsonBody(req) {
 }
 
 /**
- * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void, onSpyPaired?: () => void, getSpyStatus?: () => object }} options
+ * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void, onSpyPaired?: (result: object) => void, getSpyStatus?: () => object }} options
  */
 export function startPairServer(options) {
   const port = options.port ?? DEFAULT_PAIR_HTTP_PORT;
@@ -33,6 +34,8 @@ export function startPairServer(options) {
   const server = http.createServer((req, res) => {
     void handleRequest(req, res);
   });
+
+  const surveyTeamHub = attachSurveyTeamHub(server);
 
   async function handleRequest(req, res) {
     try {
@@ -85,10 +88,17 @@ export function startPairServer(options) {
           deviceId: typeof body.deviceId === "string" ? body.deviceId : undefined,
         });
         if (result.ok) {
-          options.onSpyPaired?.();
+          options.onSpyPaired?.(result);
         }
         res.writeHead(result.ok ? 200 : 403, { "Content-Type": "application/json" });
         res.end(JSON.stringify(result));
+        return;
+      }
+
+      if (url.pathname === "/api/survey/team/status" && req.method === "GET") {
+        const status = surveyTeamHub.teamStatusPayload();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, ...status }));
         return;
       }
 
@@ -138,8 +148,8 @@ export function startPairServer(options) {
   }
 
   server.listen(port, "0.0.0.0", () => {
-    logger.step(5, 8, `pair HTTP server listening on 0.0.0.0:${port}`);
+    logger.step(5, 8, `pair HTTP + survey-team Socket.IO on 0.0.0.0:${port}`);
   });
 
-  return server;
+  return { server, surveyTeamHub };
 }

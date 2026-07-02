@@ -15,11 +15,22 @@ import {
   formatSurveyEchoPowerfistLinkedLine,
   notifySpyMuthurArchive,
 } from "@/lib/cyberdeck/survey-chat";
-import { saveSurveyPowerfistPairCredentials } from "@/lib/cyberdeck/survey-pairing-client";
+import {
+  readSurveyPowerfistPairCredentials,
+  saveSurveyPowerfistPairCredentials,
+} from "@/lib/cyberdeck/survey-pairing-client";
+import { useSurveyTeamSocket } from "@/lib/cyberdeck/survey-team-socket.client";
 
 export function SurveyPowerfistPane() {
   const { paired, terminated, terminatedMessage, resetLinkWatch } = useSurveyEchoLinkWatch("powerfist");
   const [status, setStatus] = useState<string | null>(null);
+  const savedCreds = readSurveyPowerfistPairCredentials();
+  const teamSocket = useSurveyTeamSocket({
+    role: "powerfist",
+    echoHost: savedCreds?.echoHost ?? null,
+    httpPort: savedCreds?.httpPort ?? 3050,
+    enabled: !paired || terminated,
+  });
 
   const handlePaired = useCallback(
     (result: {
@@ -76,6 +87,10 @@ export function SurveyPowerfistPane() {
         </p>
       ) : !terminated ? (
         <p className="text-[#8a8a8a]">Not paired with {SURVEY_ECHO_DISPLAY}.</p>
+      ) : null}
+
+      {teamSocket.status === "connected" ? (
+        <p className="text-[8px] text-cyan-300/80">Team channel live with Echo Satellite.</p>
       ) : null}
 
       <SurveyPairPinForm

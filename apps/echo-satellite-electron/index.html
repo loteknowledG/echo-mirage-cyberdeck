@@ -31,11 +31,12 @@
       </section>
 
       <section class="card">
-        <h2>2 · Spy pairing codes</h2>
+        <h2>2 · Survey pairing codes</h2>
         <p class="hint">
-          On Mirage or PowerFist, open Spy and enter the 6-digit code below. Echo is found on Wi‑Fi
-          automatically — no IP or URL typing.
+          Mirage enters the <strong>Echo team ID</strong> and Mirage code in Survey → <strong>m</strong>
+          (cloud relay — no IP needed). Use <strong>Send to Mirage</strong> to push codes to the relay.
         </p>
+        <p id="echo-team-id" class="mono muted"></p>
         <p id="echo-lan" class="mono muted"></p>
         <div class="pin-grid">
           <div class="pin-block">
@@ -50,8 +51,10 @@
           </div>
         </div>
         <div class="actions">
+          <button id="send-to-mirage" type="button" class="accent">Send to Mirage</button>
           <button id="regenerate-codes" type="button">New codes</button>
         </div>
+        <p id="send-mirage-result" class="mono muted"></p>
       </section>
 
       <section class="card">

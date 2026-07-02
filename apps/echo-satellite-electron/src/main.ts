@@ -68,8 +68,10 @@ type UpdateCheckResult =
 
 type SpyCodes = {
   ok: true;
+  echoNodeId?: string;
   echoHost: string;
   httpPort: number;
+  lanHosts?: string[];
   miragePin: string | null;
   powerfistPin: string | null;
   mirageExpiresAt: string | null;
@@ -77,10 +79,22 @@ type SpyCodes = {
   pairedMirages: SpyMirageLink[];
 };
 
+type SendToMirageResult =
+  | {
+      ok: true;
+      message: string;
+      mirageUrl: string;
+      host: string;
+      port: number;
+      pin: string;
+    }
+  | { ok: false; reason: string };
+
 type SatelliteApi = {
   getStatus: () => Promise<SatelliteStatus>;
   getSpyCodes: () => Promise<SpyCodes | { ok: false; reason: string }>;
   regenerateSpyCodes: () => Promise<SpyCodes | { ok: false; reason: string }>;
+  sendToMirage: () => Promise<SendToMirageResult>;
   pairFromUrl: (capturePairUrl: string) => Promise<PairResult>;
   testCapture: () => Promise<TestCaptureResult>;
   disarm: () => Promise<SatelliteStatus>;
@@ -106,12 +120,15 @@ declare global {
 
 const api = window.satellite;
 
+const echoTeamIdEl = document.querySelector<HTMLElement>("#echo-team-id")!;
 const echoLanEl = document.querySelector<HTMLElement>("#echo-lan")!;
 const miragePinEl = document.querySelector<HTMLElement>("#mirage-pin")!;
 const powerfistPinEl = document.querySelector<HTMLElement>("#powerfist-pin")!;
 const miragePinExpiryEl = document.querySelector<HTMLElement>("#mirage-pin-expiry")!;
 const powerfistPinExpiryEl = document.querySelector<HTMLElement>("#powerfist-pin-expiry")!;
 const regenerateCodesBtn = document.querySelector<HTMLButtonElement>("#regenerate-codes")!;
+const sendToMirageBtn = document.querySelector<HTMLButtonElement>("#send-to-mirage")!;
+const sendMirageResultEl = document.querySelector<HTMLElement>("#send-mirage-result")!;
 const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
 const capturePreviewEl = document.querySelector<HTMLImageElement>("#capture-preview")!;
 const permissionResultEl = document.querySelector<HTMLElement>("#permission-result")!;
@@ -200,7 +217,11 @@ function formatCodeExpiry(expiresAt: string | null): string {
 }
 
 function renderSpyCodes(codes: SpyCodes): void {
-  echoLanEl.textContent = `Echo on LAN · ${codes.echoHost}:${codes.httpPort}`;
+  const hosts = codes.lanHosts?.length ? codes.lanHosts.join(", ") : codes.echoHost;
+  echoTeamIdEl.textContent = codes.echoNodeId
+    ? `Echo team ID (for Mirage cloud relay): ${codes.echoNodeId}`
+    : "Echo team ID: —";
+  echoLanEl.textContent = `Direct LAN/Tailscale: ${codes.echoHost}:${codes.httpPort}${codes.lanHosts && codes.lanHosts.length > 1 ? ` (${hosts})` : ""}`;
   miragePinEl.textContent = codes.miragePin ?? "———";
   powerfistPinEl.textContent = codes.powerfistPin ?? "———";
   miragePinExpiryEl.textContent = codes.miragePin
@@ -312,6 +333,22 @@ regenerateCodesBtn.addEventListener("click", async () => {
   }
   regenerateCodesBtn.disabled = false;
   await refreshStatus();
+});
+
+sendToMirageBtn.addEventListener("click", async () => {
+  sendToMirageBtn.disabled = true;
+  sendMirageResultEl.textContent = "Preparing…";
+  const result = await api.sendToMirage();
+  if (result.ok) {
+    const pushed =
+      "pushedToMirage" in result && typeof result.pushedToMirage === "number"
+        ? ` · pushed to ${result.pushedToMirage} Mirage`
+        : "";
+    sendMirageResultEl.textContent = `${result.message} IP ${result.host}:${result.port} · code ${result.pin}${pushed}`;
+  } else {
+    sendMirageResultEl.textContent = result.reason;
+  }
+  sendToMirageBtn.disabled = false;
 });
 
 document.querySelector<HTMLButtonElement>("#refresh-status")!.addEventListener("click", async () => {

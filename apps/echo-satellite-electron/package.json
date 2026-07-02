@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "node-screenshots": "^0.2.8",
+    "socket.io": "^4.8.3",
     "ws": "^8.18.1"
   },
   "devDependencies": {
@@ -52,7 +53,9 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64"]
+          "arch": [
+            "arm64"
+          ]
         }
       ],
       "artifactName": "Echo-Satellite_${version}_aarch64.${ext}",
@@ -68,7 +71,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "Echo-Satellite_${version}_x64-setup.${ext}"

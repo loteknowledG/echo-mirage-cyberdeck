@@ -1,0 +1,158 @@
+"use client";
+
+import { getOrCreatePowerfistDeviceId } from "@/lib/cyberdeck/survey-pairing-client";
+import { getOrCreateSurveyNodeId } from "@/lib/cyberdeck/survey-mode";
+import { traceSurveyPairing } from "@/lib/cyberdeck/survey-pairing-trace";
+import type { SurveyRelayBundleClient } from "@/lib/cyberdeck/survey-relay-types";
+
+export async function fetchSurveyRelayBundle(
+  echoNodeId: string,
+): Promise<{ ok: true; bundle: SurveyRelayBundleClient } | { ok: false; reason: string }> {
+  const id = echoNodeId.trim();
+  if (!id) {
+    return { ok: false, reason: "Enter Echo team ID (from Echo Satellite status panel)." };
+  }
+
+  try {
+    const res = await fetch(`/api/survey/relay/bundle?echoNodeId=${encodeURIComponent(id)}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    });
+    const payload = (await res.json()) as
+      | { ok: true; bundle: SurveyRelayBundleClient }
+      | { ok: false; reason?: string };
+    if (!payload.ok) {
+      return { ok: false, reason: payload.reason ?? "Relay bundle not available." };
+    }
+    return { ok: true, bundle: payload.bundle };
+  } catch {
+    return { ok: false, reason: "Could not reach cloud relay." };
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+export async function enterSurveyPairPinViaRelay(input: {
+  echoNodeId: string;
+  pin: string;
+  role: "mirage" | "powerfist";
+}): Promise<
+  | {
+      ok: true;
+      role: "mirage" | "powerfist";
+      echoNodeId: string;
+      echoHost: string;
+      httpPort: number;
+      token: string;
+      nodeId?: string;
+      deviceId?: string;
+      sessionEpoch: number;
+    }
+  | { ok: false; reason: string }
+> {
+  const echoNodeId = input.echoNodeId.trim();
+  const pin = input.pin.trim();
+  const nodeId = getOrCreateSurveyNodeId();
+  const deviceId = getOrCreatePowerfistDeviceId();
+
+  traceSurveyPairing(`relay pair start · echo ${echoNodeId.slice(0, 8)}… · role ${input.role}`);
+
+  let requestId: string;
+  try {
+    const res = await fetch("/api/survey/relay/pair-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        echoNodeId,
+        role: input.role,
+        pin,
+        nodeId,
+        deviceId,
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    });
+    const payload = (await res.json()) as { ok: boolean; requestId?: string; reason?: string };
+    if (!payload.ok || !payload.requestId) {
+      return { ok: false, reason: payload.reason ?? "Relay pair request failed." };
+    }
+    requestId = payload.requestId;
+  } catch {
+    return { ok: false, reason: "Could not submit pair request to cloud relay." };
+  }
+
+  traceSurveyPairing(`relay pair waiting · request ${requestId.slice(0, 8)}…`);
+
+  const deadline = Date.now() + 45_000;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(
+        `/api/survey/relay/pair-request?requestId=${encodeURIComponent(requestId)}`,
+        { cache: "no-store", signal: AbortSignal.timeout(12_000) },
+      );
+      const payload = (await res.json()) as
+        | { ok: true; pending: true }
+        | {
+            ok: true;
+            result: {
+              ok: boolean;
+              role?: "mirage" | "powerfist";
+              echoNodeId?: string;
+              echoHost?: string;
+              httpPort?: number;
+              token?: string;
+              nodeId?: string;
+              deviceId?: string;
+              sessionEpoch?: number;
+              reason?: string;
+            };
+          }
+        | { ok: false; reason?: string };
+
+      if (!payload.ok) {
+        return { ok: false, reason: payload.reason ?? "Relay pair poll failed." };
+      }
+
+      if ("pending" in payload && payload.pending) {
+        await sleep(1500);
+        continue;
+      }
+
+      if ("result" in payload) {
+        const result = payload.result;
+        if (!result.ok) {
+          return { ok: false, reason: result.reason ?? "Pairing rejected by Echo." };
+        }
+        if (result.role !== input.role) {
+          return {
+            ok: false,
+            reason: `That code is for ${result.role === "mirage" ? "Mirage" : "PowerFist"}, not ${input.role}.`,
+          };
+        }
+        traceSurveyPairing(`relay pair OK · ${result.echoHost}:${result.httpPort}`);
+        return {
+          ok: true,
+          role: input.role,
+          echoNodeId: result.echoNodeId ?? echoNodeId,
+          echoHost: result.echoHost ?? "relay",
+          httpPort: result.httpPort ?? 3050,
+          token: result.token ?? "",
+          nodeId: result.nodeId,
+          deviceId: result.deviceId,
+          sessionEpoch: result.sessionEpoch ?? 1,
+        };
+      }
+    } catch {
+      /* retry until deadline */
+    }
+    await sleep(1500);
+  }
+
+  return {
+    ok: false,
+    reason:
+      "Echo did not answer the relay pair request in time. On Echo Mac, open Echo Satellite and ensure it can reach the cyberdeck URL.",
+  };
+}

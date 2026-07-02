@@ -6,6 +6,7 @@ import {
 import { discoverEchoEndpointsOnLan } from "@/lib/cyberdeck/survey-echo-discovery.client";
 import { parseEchoEndpointInput } from "@/lib/cyberdeck/survey-pair-pin";
 import { traceSurveyPairing } from "@/lib/cyberdeck/survey-pairing-trace";
+import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
 
 const SURVEY_MIRAGE_PAIR_STORAGE_KEY = "echo-mirage-survey-mirage-pair";
 const SURVEY_POWERFIST_PAIR_STORAGE_KEY = "echo-mirage-survey-powerfist-pair";
@@ -34,12 +35,19 @@ export function normalizePairedMirages(status: {
 const LOCAL_CYBERDECK_ORIGINS = ["http://127.0.0.1:3000", "http://localhost:3000"];
 const SATELLITE_STATUS_URL = "http://127.0.0.1:3050/spy/status";
 const SATELLITE_CODES_URL = "http://127.0.0.1:3050/api/survey/echo/codes";
+const LEGACY_SPY_STATUS_PATH = "/spy/status";
+const LEGACY_SPY_PAIR_ENTER_PATH = "/api/spy/pair/enter";
 
-const PWA_PAIR_BLOCKED_MESSAGE =
+export const SURVEY_PWA_PAIR_BLOCKED_MESSAGE =
   "Installed PWA cannot reach Echo over Tailscale or LAN. On this laptop, click Open desktop cyberdeck below (or run pnpm electron:dev) and pair from there.";
 
 function isHttpsBrowserClient(): boolean {
   return typeof window !== "undefined" && window.location.protocol === "https:";
+}
+
+/** HTTPS PWA / hosted cyberdeck cannot call Echo Satellite on Tailscale or LAN. */
+export function isSurveyHttpsPairBlocked(): boolean {
+  return isHttpsBrowserClient() && !isEchoMirageDesktopShell();
 }
 
 function isPwaPairReachabilityError(reason: string): boolean {
@@ -95,10 +103,24 @@ async function readEchoSurveyPayload(url: string): Promise<EchoSurveyStatus | { 
       mirageExpiresAt: payload.mirageExpiresAt ?? null,
       powerfistExpiresAt: payload.powerfistExpiresAt ?? null,
       pairedPowerfist: payload.pairedPowerfist ?? null,
+      echoSurveyActive: payload.echoSurveyActive ?? true,
     };
   } catch {
     return { ok: false, reason: "Could not reach Echo status endpoint." };
   }
+}
+
+async function readRemoteEchoSurveyPayload(
+  host: string,
+  port: number,
+): Promise<EchoSurveyStatus | { ok: false; reason: string }> {
+  const survey = await readEchoSurveyPayload(
+    `http://${host}:${port}/api/survey/echo/codes`,
+  );
+  if (survey.ok) {
+    return survey;
+  }
+  return readEchoSurveyPayload(`http://${host}:${port}${LEGACY_SPY_STATUS_PATH}`);
 }
 
 /** Load Echo Survey status from a known Echo Satellite on the LAN (browser → Echo direct). */
@@ -116,7 +138,7 @@ export async function fetchEchoRemoteSurveyStatusClient(
     return { ok: false, reason: "echoHost is required." };
   }
 
-  const status = await readEchoSurveyPayload(`http://${endpoint.host}:${endpoint.port}/spy/status`);
+  const status = await readRemoteEchoSurveyPayload(endpoint.host, endpoint.port);
   if (!status.ok) {
     return status;
   }
@@ -143,9 +165,7 @@ export async function fetchEchoRemoteSurveyCodesClient(
     return proxy;
   }
 
-  const status = await readEchoSurveyPayload(
-    `http://${endpoint.host}:${endpoint.port}/api/survey/echo/codes`,
-  );
+  const status = await readRemoteEchoSurveyPayload(endpoint.host, endpoint.port);
   if (!status.ok) {
     return status;
   }
@@ -260,6 +280,7 @@ export async function regenerateEchoSurveyCodes(): Promise<
 export async function enterSurveyPairPin(input: {
   echoHost?: string;
   echoHttpPort: number;
+  echoNodeId?: string;
   pin: string;
   role: "mirage" | "powerfist";
   hintHosts?: string[];
@@ -319,13 +340,13 @@ export async function enterSurveyPairPin(input: {
       }
       traceSurveyPairing(`pair proxy fail — ${serverResult.reason}`);
       if (isHttpsBrowserClient() && isPwaPairReachabilityError(serverResult.reason)) {
-        return { ok: false, reason: PWA_PAIR_BLOCKED_MESSAGE };
+        return { ok: false, reason: SURVEY_PWA_PAIR_BLOCKED_MESSAGE };
       }
       return serverResult;
     } catch {
       return {
         ok: false,
-        reason: isHttpsBrowserClient() ? PWA_PAIR_BLOCKED_MESSAGE : "Pair request failed.",
+        reason: isHttpsBrowserClient() ? SURVEY_PWA_PAIR_BLOCKED_MESSAGE : "Pair request failed.",
       };
     }
   }
@@ -334,56 +355,101 @@ export async function enterSurveyPairPin(input: {
     if (!host.trim()) {
       return { ok: false, reason: "Enter Echo Satellite IP address." };
     }
-    traceSurveyPairing(`pair POST http://${host}:${port}/api/survey/pair/enter role=${input.role}`);
-    try {
-      const res = await fetch(`http://${host}:${port}/api/survey/pair/enter`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        cache: "no-store",
-        mode: "cors",
-        signal: AbortSignal.timeout(8_000),
-      });
-      const text = await res.text();
-      let payload: PairSuccess | { ok: false; reason: string };
+
+    async function postPairEnter(path: string): Promise<{
+      ok: boolean;
+      status: number;
+      payload?: PairSuccess | { ok: false; reason: string };
+      reason?: string;
+    }> {
+      traceSurveyPairing(`pair POST http://${host}:${port}${path} role=${input.role}`);
       try {
-        payload = JSON.parse(text) as PairSuccess | { ok: false; reason: string };
-      } catch {
+        const res = await fetch(`http://${host}:${port}${path}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          cache: "no-store",
+          mode: "cors",
+          signal: AbortSignal.timeout(8_000),
+        });
+        const text = await res.text();
+        try {
+          const payload = JSON.parse(text) as PairSuccess | { ok: false; reason: string };
+          return { ok: payload.ok === true, status: res.status, payload };
+        } catch {
+          return {
+            ok: false,
+            status: res.status,
+            reason: `Echo at ${host}:${port} returned an unexpected response (HTTP ${res.status}).`,
+          };
+        }
+      } catch (error) {
+        const detail =
+          error instanceof Error && error.name === "TimeoutError"
+            ? "Timed out — check Echo Satellite is running and Screen Recording is granted."
+            : "";
         return {
           ok: false,
-          reason: `Echo at ${host}:${port} returned an unexpected response (HTTP ${res.status}).`,
+          status: 0,
+          reason: [`Could not reach Echo at ${host}:${port}.`, detail].filter(Boolean).join(" "),
         };
       }
-      if (payload.ok) {
-        traceSurveyPairing(
-          `pair OK via ${host}:${port} · echoNode ${payload.echoNodeId.slice(0, 8)}… · epoch ${payload.sessionEpoch}`,
-        );
-        return {
-          ...payload,
-          echoHost: payload.echoHost || host,
-          httpPort: payload.httpPort || port,
-        };
-      }
-      traceSurveyPairing(`pair rejected ${host}:${port} — ${payload.reason}`);
-      return payload;
-    } catch (error) {
+    }
+
+    let result = await postPairEnter("/api/survey/pair/enter");
+    if (!result.ok && result.status === 404) {
+      traceSurveyPairing(`pair route fallback → legacy ${LEGACY_SPY_PAIR_ENTER_PATH}`);
+      result = await postPairEnter(LEGACY_SPY_PAIR_ENTER_PATH);
+    }
+
+    if (result.reason) {
       if (isHttpsBrowserClient()) {
-        return { ok: false, reason: PWA_PAIR_BLOCKED_MESSAGE };
+        return { ok: false, reason: SURVEY_PWA_PAIR_BLOCKED_MESSAGE };
       }
-      const detail =
-        error instanceof Error && error.name === "TimeoutError"
-          ? "Timed out — check Echo Satellite is running and Screen Recording is granted."
-          : "";
+      return { ok: false, reason: result.reason };
+    }
+
+    const payload = result.payload;
+    if (!payload) {
+      return { ok: false, reason: `Could not reach Echo at ${host}:${port}.` };
+    }
+
+    if (payload.ok) {
+      traceSurveyPairing(
+        `pair OK via ${host}:${port} · echoNode ${payload.echoNodeId.slice(0, 8)}… · epoch ${payload.sessionEpoch}`,
+      );
       return {
-        ok: false,
-        reason: [`Could not reach Echo at ${host}:${port}.`, detail].filter(Boolean).join(" "),
+        ...payload,
+        echoHost: payload.echoHost || host,
+        httpPort: payload.httpPort || port,
       };
     }
+
+    traceSurveyPairing(`pair rejected ${host}:${port} — ${payload.reason}`);
+    return payload;
   }
 
   traceSurveyPairing(
     `pair start role=${input.role} node=${nodeId.slice(0, 8)}… host=${resolvedEndpoint.host || "LAN discovery"} port=${resolvedEndpoint.port}`,
   );
+
+  if (isSurveyHttpsPairBlocked()) {
+    traceSurveyPairing("pair route: cloud relay (HTTPS shell)");
+    const echoNodeId = input.echoNodeId?.trim();
+    if (!echoNodeId) {
+      return {
+        ok: false,
+        reason:
+          "Enter Echo team ID from Echo Satellite (cloud relay). IP/port are not required in the PWA.",
+      };
+    }
+    const { enterSurveyPairPinViaRelay } = await import("@/lib/cyberdeck/survey-relay.client");
+    return enterSurveyPairPinViaRelay({
+      echoNodeId,
+      pin: input.pin,
+      role: input.role,
+    });
+  }
 
   if (typeof window !== "undefined") {
     if (resolvedEndpoint.host) {

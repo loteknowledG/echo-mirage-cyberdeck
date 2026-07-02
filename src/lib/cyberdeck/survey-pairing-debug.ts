@@ -65,6 +65,24 @@ export async function emitSurveyPairingDiagnostics(trigger: string): Promise<voi
 
   const probeHost = creds?.echoHost ?? null;
   const probePort = creds?.httpPort ?? 3050;
+  const probeNodeId = creds?.echoNodeId ?? null;
+
+  if (probeNodeId) {
+    try {
+      const relay = await fetch(
+        `/api/survey/relay/bundle?echoNodeId=${encodeURIComponent(probeNodeId)}`,
+        { cache: "no-store", signal: AbortSignal.timeout(8000) },
+      );
+      const payload = (await relay.json()) as { ok?: boolean; storage?: string; reason?: string };
+      notifySurveyPairingDebug(
+        relay.ok && payload.ok
+          ? `cloud relay bundle: ok · storage ${payload.storage ?? "?"}`
+          : `cloud relay bundle: ${payload.reason ?? `HTTP ${relay.status}`}`,
+      );
+    } catch {
+      notifySurveyPairingDebug("cloud relay bundle: fetch failed");
+    }
+  }
 
   if (probeHost) {
     const remote = await fetchEchoRemoteSurveyCodesClient(probeHost, probePort);
