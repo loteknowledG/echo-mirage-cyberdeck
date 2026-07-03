@@ -51,6 +51,25 @@ async function isSpyLinkActive(
   return status.active;
 }
 
+function formatPowerfistLinkDetail(deviceId: string, echoHost?: string | null): string {
+  const prefix = echoHost ? `${echoHost} · ` : "";
+  return `${prefix}device ${deviceId.slice(0, 8)}…`;
+}
+
+async function fetchAuthoritativeEchoStatus(input: {
+  echoHost: string | null;
+  echoHttpPort: number;
+  legacyPairing: boolean;
+}): Promise<EchoSurveyStatus | null> {
+  const echoLocal = await fetchEchoSurveyStatus();
+  if (echoLocal.ok) return echoLocal;
+
+  if (!input.legacyPairing || !input.echoHost) return null;
+
+  const remote = await fetchEchoRemoteSurveyStatusClient(input.echoHost, input.echoHttpPort);
+  return remote.ok ? remote : null;
+}
+
 export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promise<void> } {
   const [status, setStatus] = useState<SurveyTeamStatus>(EMPTY_SPY_TEAM_STATUS);
 
@@ -63,50 +82,52 @@ export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promi
 
     let echoMirage = linkFromBool(false, "Enter Mirage code on this machine.");
     let echoPowerfist = linkFromBool(false, "Enter PowerFist code on the phone.");
-    let miragePowerfist = linkFromBool(false, "Scan Mirage hub phone QR on PowerFist.");
+    let miragePowerfist = linkFromBool(
+      false,
+      "Enter Mirage hub code on PowerFist tab, or scan hub QR.",
+    );
 
-    const echoLocal = await fetchEchoSurveyStatus();
-    let remote: EchoSurveyStatus | { ok: false; reason?: string } | null = null;
+    const authoritative = await fetchAuthoritativeEchoStatus({
+      echoHost,
+      echoHttpPort,
+      legacyPairing,
+    });
 
-    if (echoLocal.ok) {
-      const localMirages = normalizePairedMirages(echoLocal);
-      echoMirage = localMirages.length
-        ? linkFromBool(true, formatMirageLinkDetail(localMirages))
+    if (authoritative) {
+      const mirages = normalizePairedMirages(authoritative);
+      echoMirage = mirages.length
+        ? linkFromBool(true, formatMirageLinkDetail(mirages))
         : linkFromBool(false, "Waiting for Mirage code.");
-      echoPowerfist = echoLocal.pairedPowerfist
-        ? linkFromBool(true, `device ${echoLocal.pairedPowerfist.deviceId.slice(0, 8)}…`)
+      echoPowerfist = authoritative.pairedPowerfist
+        ? linkFromBool(
+            true,
+            formatPowerfistLinkDetail(authoritative.pairedPowerfist.deviceId, authoritative.echoHost),
+          )
         : linkFromBool(false, "Waiting for PowerFist code.");
-    } else if (legacyPairing && echoHost) {
-      remote = await fetchEchoRemoteSurveyStatusClient(echoHost, echoHttpPort);
-      if (remote.ok) {
-        const remoteMirages = normalizePairedMirages(remote);
-        echoMirage = remoteMirages.length
-          ? linkFromBool(true, formatMirageLinkDetail(remoteMirages))
-          : linkFromBool(false, "Echo has no Mirage pairing yet.");
-        echoPowerfist = remote.pairedPowerfist
-          ? linkFromBool(true, `device ${remote.pairedPowerfist.deviceId.slice(0, 8)}…`)
-          : linkFromBool(false, "Echo has no PowerFist pairing yet.");
-      }
     }
 
     if (legacyPairing && mirageCreds) {
       const linkActive = await isSpyLinkActive("mirage", mirageCreds);
-      echoMirage = linkFromBool(
-        linkActive !== false,
-        linkActive === false
-          ? "Re-enter Mirage code — Echo session may have reset."
-          : `${mirageCreds.echoHost} · node ${mirageCreds.nodeId.slice(0, 8)}…`,
-      );
+      if (linkActive === false) {
+        echoMirage = linkFromBool(false, "Re-enter Mirage code — Echo session may have reset.");
+      } else {
+        echoMirage = linkFromBool(
+          echoMirage.state === "linked" || linkActive === true,
+          `${mirageCreds.echoHost} · node ${mirageCreds.nodeId.slice(0, 8)}…`,
+        );
+      }
     }
 
     if (legacyPairing && powerfistSpyCreds) {
       const linkActive = await isSpyLinkActive("powerfist", powerfistSpyCreds);
-      echoPowerfist = linkFromBool(
-        linkActive !== false,
-        linkActive === false
-          ? "Re-enter PowerFist code on the phone."
-          : `${powerfistSpyCreds.echoHost} · device ${powerfistSpyCreds.deviceId.slice(0, 8)}…`,
-      );
+      if (linkActive === false) {
+        echoPowerfist = linkFromBool(false, "Re-enter PowerFist code on the phone.");
+      } else {
+        echoPowerfist = linkFromBool(
+          echoPowerfist.state === "linked" || linkActive === true,
+          formatPowerfistLinkDetail(powerfistSpyCreds.deviceId, powerfistSpyCreds.echoHost),
+        );
+      }
     }
 
     const pfSession = await fetchPowerfistQrSession();
@@ -121,7 +142,7 @@ export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promi
       echoMirage,
       echoPowerfist,
       miragePowerfist,
-      echoHost: echoLocal.ok ? echoLocal.echoHost : echoHost,
+      echoHost: authoritative?.echoHost ?? echoHost,
       loading: false,
     });
   }, []);

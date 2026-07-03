@@ -3,6 +3,7 @@
 import { SurveyMirageHubPanel } from "@/components/cyberdeck/survey-mirage-hub-panel";
 import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-panel";
 import {
+  SURVEY_ECHO_DISPLAY,
   SURVEY_MIRAGE_DISPLAY,
   SURVEY_MIRAGE_TAGLINE,
   SURVEY_MODE_TITLE,
@@ -17,7 +18,7 @@ export function SurveyMiragePane() {
   const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
+    <div className="flex flex-col gap-3 p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
       <div>
         <p className="text-fuchsia-300/90">{SURVEY_MODE_TITLE} // {SURVEY_MIRAGE_DISPLAY}</p>
         <p className="mt-1 text-[9px] text-[#6a6a8a]">{SURVEY_MIRAGE_TAGLINE}</p>

@@ -81,7 +81,24 @@ async function waitForSidecarReady() {
   }
 }
 
+async function waitForDevServerState() {
+  const deadline = Date.now() + DEV_STARTUP_DEADLINE_MS;
+  while (Date.now() < deadline) {
+    try {
+      const state = JSON.parse(await fs.readFile(devStatePath, 'utf8'));
+      if (Number.isFinite(state?.appPort) && Number.isFinite(state?.readyPort)) {
+        return state;
+      }
+    } catch {
+      /* dev-server.json not written yet */
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error('[warm] timed out waiting for dev-server.json');
+}
+
 async function warmCyberdeck() {
+  await waitForDevServerState();
   const origin = await resolveDevOrigin();
   process.stdout.write(
     `[warm] waiting for sidecar before compile (${origin}) · budget ${Math.round(DEV_STARTUP_DEADLINE_MS / 60_000)} min…\n`,

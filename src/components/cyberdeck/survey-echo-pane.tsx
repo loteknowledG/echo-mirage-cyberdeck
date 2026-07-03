@@ -141,7 +141,7 @@ export function SurveyEchoPane() {
 
   if (notEchoMachine) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
+      <div className="flex flex-col gap-3 p-6 font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]">
         <p className="max-w-md leading-relaxed">
           This browser tab is the <strong className="text-[#9a9a9a]">hosted cyberdeck</strong>, not the Echo
           screenshot machine. Pairing codes and linked Mirages for {SURVEY_ECHO_DISPLAY} live on the Mac
@@ -168,7 +168,7 @@ export function SurveyEchoPane() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
+    <div className="flex flex-col gap-4 p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
       <div>
         <p className="text-cyan-300/90">{SURVEY_MODE_TITLE} // {SURVEY_ECHO_DISPLAY}</p>
         <p className="mt-1 text-[9px] text-[#6a8a8a]">{SURVEY_ECHO_TAGLINE}</p>

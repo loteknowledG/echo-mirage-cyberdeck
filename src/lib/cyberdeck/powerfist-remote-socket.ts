@@ -14,6 +14,7 @@ export type PowerfistDeckConnectInfo = {
 export type PowerfistQrSession = {
   ok: true;
   previewUrl: string | null;
+  remotePin: string | null;
   expiresAt: string | null;
   pairedRemote: { deviceId: string; pairedAt: string } | null;
   capturePairUrl?: string | null;
@@ -112,23 +113,51 @@ export async function fetchPowerfistDeckConnect(): Promise<PowerfistDeckConnectI
   }
 }
 
+const QR_FETCH_MS = 15_000;
+
 export async function fetchPowerfistQrSession(): Promise<PowerfistQrSession | { ok: false; reason: string }> {
   try {
-    const res = await fetch("/api/powerfist/pairing/qr", { cache: "no-store" });
+    const res = await fetch("/api/powerfist/pairing/qr", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(QR_FETCH_MS),
+    });
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as { reason?: string } | null;
+      return { ok: false, reason: payload?.reason ?? `Mirage hub relay HTTP ${res.status}.` };
+    }
     return (await res.json()) as PowerfistQrSession | { ok: false; reason: string };
-  } catch {
-    return { ok: false, reason: "qr session fetch failed" };
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "TimeoutError";
+    return {
+      ok: false,
+      reason: timedOut ? "Mirage hub relay timed out — click PowerFist QR to retry." : "qr session fetch failed",
+    };
   }
 }
 
 export async function createPowerfistQrSession(): Promise<
-  | { ok: true; previewUrl: string; expiresAt: string; pairedRemote: { deviceId: string; pairedAt: string } | null }
+  | {
+      ok: true;
+      previewUrl: string;
+      remotePin: string;
+      expiresAt: string;
+      pairedRemote: { deviceId: string; pairedAt: string } | null;
+    }
   | { ok: false; reason: string }
 > {
   try {
-    const res = await fetch("/api/powerfist/pairing/qr", { method: "POST" });
+    const res = await fetch("/api/powerfist/pairing/qr", {
+      method: "POST",
+      signal: AbortSignal.timeout(QR_FETCH_MS),
+    });
     return (await res.json()) as
-      | { ok: true; previewUrl: string; expiresAt: string; pairedRemote: { deviceId: string; pairedAt: string } | null }
+      | {
+          ok: true;
+          previewUrl: string;
+          remotePin: string;
+          expiresAt: string;
+          pairedRemote: { deviceId: string; pairedAt: string } | null;
+        }
       | { ok: false; reason: string };
   } catch {
     return { ok: false, reason: "qr session create failed" };
@@ -196,6 +225,26 @@ export async function completePowerfistPairFromQr(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pairId, pairSecret, deviceId }),
+    });
+    const payload = (await res.json()) as PowerfistPairCompleteResult;
+    if (payload.ok) {
+      savePowerfistRemoteCredentials(payload.wsHost, payload.wsPort, payload.remoteToken);
+    }
+    return payload;
+  } catch {
+    return { ok: false, reason: "Pair request failed." };
+  }
+}
+
+export async function completePowerfistPairFromPin(
+  pin: string,
+): Promise<PowerfistPairCompleteResult> {
+  const deviceId = getOrCreatePowerfistDeviceId();
+  try {
+    const res = await fetch("/api/powerfist/pair", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin, deviceId }),
     });
     const payload = (await res.json()) as PowerfistPairCompleteResult;
     if (payload.ok) {

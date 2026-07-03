@@ -16,6 +16,7 @@ const devStatePath = path.join(devStateDir, 'dev-server.json');
 const DEFAULT_APP_PORT = 3050;
 const DEFAULT_READY_PORT = 3051;
 const MAX_AUTO_PORT = 3099;
+const MIN_AUTO_APP_PORT = Number(process.env.CYBERDECK_DEV_MIN_APP_PORT) || DEFAULT_APP_PORT;
 // Cap V8 heap so dev + Electron + OS fit on ~16GB machines (16384 caused OS OOM / ArrayBuffer failures).
 const HEAP_MB = Number(process.env.CYBERDECK_DEV_HEAP_MB) || 6144;
 
@@ -53,7 +54,7 @@ async function choosePorts() {
     return { appPort: DEFAULT_APP_PORT, readyPort: DEFAULT_READY_PORT };
   }
 
-  for (let appPort = DEFAULT_APP_PORT; appPort < MAX_AUTO_PORT; appPort += 2) {
+  for (let appPort = MIN_AUTO_APP_PORT; appPort < MAX_AUTO_PORT; appPort += 2) {
     const readyPort = appPort + 1;
     if ((await canListen(appPort)) && (await canListen(readyPort))) {
       return { appPort, readyPort };

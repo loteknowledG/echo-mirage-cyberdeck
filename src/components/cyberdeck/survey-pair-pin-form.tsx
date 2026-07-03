@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { SurveyPairOtpInput } from "@/components/cyberdeck/survey-pair-otp-input";
-import { SURVEY_ECHO_DISPLAY } from "@/lib/cyberdeck/survey-mode";
+import { SURVEY_ECHO_DISPLAY, SURVEY_MIRAGE_DISPLAY } from "@/lib/cyberdeck/survey-mode";
 import {
   DEFAULT_ECHO_HTTP_PORT,
   formatEchoEndpointFields,
@@ -80,49 +80,79 @@ function readLastEchoNodeId(role: "mirage" | "powerfist"): string {
   return readSurveyPowerfistPairCredentials()?.echoNodeId ?? "";
 }
 
+function readMirageEchoEndpoint(): { host: string; port: string } | null {
+  const mirage = readSurveyMiragePairCredentials();
+  if (!mirage?.echoHost?.trim()) return null;
+  const formatted = formatEchoEndpointFields(mirage.echoHost, String(mirage.httpPort ?? DEFAULT_ECHO_HTTP_PORT));
+  return formatted;
+}
+
+function resolveEchoHostForRole(
+  role: "mirage" | "powerfist",
+  defaultEchoHost?: string | null,
+): string {
+  const own = readLastEchoHost(role);
+  if (own.trim()) return own.trim();
+  if (defaultEchoHost?.trim()) return defaultEchoHost.trim();
+  if (role === "powerfist") {
+    return readMirageEchoEndpoint()?.host ?? "";
+  }
+  return "";
+}
+
+function resolveEchoPortForRole(role: "mirage" | "powerfist", host: string): string {
+  if (!host.trim()) return String(DEFAULT_ECHO_HTTP_PORT);
+  const own = readLastEchoHost(role);
+  if (own.trim()) return readLastEchoPort(role);
+  if (role === "powerfist") {
+    const mirage = readMirageEchoEndpoint();
+    if (mirage?.host) return mirage.port;
+  }
+  return String(DEFAULT_ECHO_HTTP_PORT);
+}
+
 function readInitialPairFormState(
   role: "mirage" | "powerfist",
   defaultEchoHost?: string | null,
   useCloudRelay = false,
 ): { echoHost: string; echoHttpPort: string; pin: string; echoNodeId: string } {
-  const draft = readSurveyPairPinDraft(role);
-  if (draft) {
-    return draft;
-  }
-
   const fromUrl = readPairingUrlDefaults();
   const echoNodeId = readLastEchoNodeId(role) || fromUrl.echoNodeId;
 
   if (useCloudRelay) {
+    const draft = readSurveyPairPinDraft(role);
     return {
       echoHost: "",
       echoHttpPort: String(DEFAULT_ECHO_HTTP_PORT),
-      pin: "",
+      pin: draft?.pin ?? "",
+      echoNodeId: draft?.echoNodeId || echoNodeId,
+    };
+  }
+
+  const draft = readSurveyPairPinDraft(role);
+  const resolvedHost =
+    draft?.echoHost.trim() ||
+    resolveEchoHostForRole(role, defaultEchoHost) ||
+    fromUrl.echoHost ||
+    "";
+  const resolvedPort = draft?.echoHttpPort.trim()
+    ? draft.echoHttpPort
+    : fromUrl.echoPort || resolveEchoPortForRole(role, resolvedHost);
+
+  if (!resolvedHost) {
+    return {
+      echoHost: "",
+      echoHttpPort: String(DEFAULT_ECHO_HTTP_PORT),
+      pin: draft?.pin ?? "",
       echoNodeId,
     };
   }
 
-  const lastHost =
-    readLastEchoHost(role) || defaultEchoHost?.trim() || fromUrl.echoHost || "";
-  const lastPort =
-    readLastEchoHost(role) || defaultEchoHost
-      ? readLastEchoPort(role)
-      : fromUrl.echoPort || String(DEFAULT_ECHO_HTTP_PORT);
-
-  if (!lastHost) {
-    return {
-      echoHost: "",
-      echoHttpPort: String(DEFAULT_ECHO_HTTP_PORT),
-      pin: "",
-      echoNodeId,
-    };
-  }
-
-  const formatted = formatEchoEndpointFields(lastHost, lastPort);
+  const formatted = formatEchoEndpointFields(resolvedHost, resolvedPort);
   return {
     echoHost: formatted.host,
     echoHttpPort: formatted.port,
-    pin: "",
+    pin: draft?.pin ?? "",
     echoNodeId,
   };
 }
@@ -192,33 +222,49 @@ export function SurveyPairPinForm({
   }, [useCloudRelay, echoNodeId, pullRelayBundle]);
 
   useEffect(() => {
-    if (!pushPrefill?.echoHost || !pushPrefill.miragePin) return;
+    if (useCloudRelay || role !== "powerfist") return;
+    const mirage = readMirageEchoEndpoint();
+    if (!mirage?.host || echoHost.trim()) return;
+    setFormState((prev) => ({
+      ...prev,
+      echoHost: mirage.host,
+      echoHttpPort: mirage.port,
+    }));
+    setError(null);
+    setStatus(`Echo endpoint copied from linked ${SURVEY_MIRAGE_DISPLAY}.`);
+  }, [role, useCloudRelay, echoHost]);
+
+  useEffect(() => {
+    if (!pushPrefill?.echoHost) return;
+    const code = role === "mirage" ? pushPrefill.miragePin : pushPrefill.powerfistPin;
+    if (!code) return;
     const formatted = formatEchoEndpointFields(
       pushPrefill.echoHost,
       String(pushPrefill.httpPort ?? DEFAULT_ECHO_HTTP_PORT),
     );
     setEchoHost(formatted.host);
     setEchoHttpPort(formatted.port);
-    setPin(normalizeSurveyPairPin(pushPrefill.miragePin));
+    setPin(normalizeSurveyPairPin(code));
     setError(null);
     setStatus("Pairing details received from Echo — confirm and pair.");
     notifySurveyPairingDebug(
       `form prefilled from team socket · ${formatted.host}:${formatted.port}`,
     );
-  }, [pushPrefill]);
+  }, [pushPrefill, role]);
 
   useEffect(() => {
     const onBundle = (event: Event) => {
       const detail = (event as CustomEvent<SurveyPairingBundlePush>).detail;
-      if (!detail?.echoHost || !detail.miragePin) return;
-      if (role === "powerfist") return;
+      if (!detail?.echoHost) return;
+      const code = role === "mirage" ? detail.miragePin : detail.powerfistPin;
+      if (!code) return;
       const formatted = formatEchoEndpointFields(
         detail.echoHost,
         String(detail.httpPort ?? DEFAULT_ECHO_HTTP_PORT),
       );
       setEchoHost(formatted.host);
       setEchoHttpPort(formatted.port);
-      setPin(normalizeSurveyPairPin(detail.miragePin));
+      setPin(normalizeSurveyPairPin(code));
       setError(null);
       setStatus("Pairing details received from Echo — confirm and pair.");
     };
@@ -300,7 +346,17 @@ export function SurveyPairPinForm({
       return;
     }
 
-    const { host, port: portText } = syncEndpointFields(echoHost, echoHttpPort);
+    let { host, port: portText } = syncEndpointFields(echoHost, echoHttpPort);
+
+    if (!host.trim() && role === "powerfist") {
+      const mirage = readMirageEchoEndpoint();
+      if (mirage?.host) {
+        host = mirage.host;
+        portText = mirage.port;
+        syncEndpointFields(host, portText);
+      }
+    }
+
     const port = Number(portText);
 
     if (!host.trim()) {
@@ -407,7 +463,7 @@ export function SurveyPairPinForm({
           spellCheck={false}
           autoCapitalize="off"
           autoComplete="off"
-          placeholder="100.66.91.18"
+          placeholder="e.g. 127.0.0.1 or 100.66.91.18"
           className={inputClassName}
         />
         <span className="text-[8px] leading-relaxed text-[#7a7a7a]">

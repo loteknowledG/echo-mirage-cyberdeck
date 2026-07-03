@@ -186,9 +186,14 @@ export async function fetchEchoSurveyStatus(): Promise<EchoSurveyStatus | { ok: 
     }
   }
 
-  const satellite = await readEchoSurveyPayload(SATELLITE_STATUS_URL);
+  const satellite = await readEchoSurveyPayload(SATELLITE_CODES_URL);
   if (satellite.ok) {
     return { ...satellite, source: "satellite" };
+  }
+
+  const satelliteStatus = await readEchoSurveyPayload(SATELLITE_STATUS_URL);
+  if (satelliteStatus.ok) {
+    return { ...satelliteStatus, source: "satellite" };
   }
 
   return direct;

@@ -4,6 +4,8 @@ import path from "node:path";
 export type PowerfistPairingSession = {
   pairId: string;
   pairSecret: string;
+  /** 6-digit code for same-machine pairing (Survey → PowerFist tab). */
+  pin: string;
   expiresAt: string;
 };
 

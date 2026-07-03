@@ -16,16 +16,18 @@ export function CyberdeckSurveyPaneBody() {
 
   return (
     <div className="cyberdeck-spy-pane flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-black">
-      <SurveySubRail active={activeSubPane} onSelect={setActiveSubPane} />
-      <SurveyLegacyNotice />
-      <SurveyMiragePairingDock />
-      <SurveyTeamStatusPanel />
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="relative z-30 shrink-0 bg-black">
+        <SurveySubRail active={activeSubPane} onSelect={setActiveSubPane} />
+      </div>
+      <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <SurveyLegacyNotice />
+        <SurveyMiragePairingDock />
+        <SurveyTeamStatusPanel />
         {activeSubPane === "echo" ? <SurveyEchoPane /> : null}
         {activeSubPane === "mirage" ? <SurveyMiragePane /> : null}
         {activeSubPane === "powerfist" ? <SurveyPowerfistPane /> : null}
+        {activeSubPane !== "mirage" ? <SurveyDesktopInstallPanel activeSubPane={activeSubPane} /> : null}
       </div>
-      {activeSubPane !== "mirage" ? <SurveyDesktopInstallPanel activeSubPane={activeSubPane} /> : null}
     </div>
   );
 }

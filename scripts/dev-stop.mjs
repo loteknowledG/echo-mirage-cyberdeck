@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const devStatePath = path.join(root, '.tmp', 'dev-server.json');
 const isWindows = process.platform === 'win32';
-const PORTS = new Set([3050, 3051]);
+const PORTS = new Set([3050, 3051, 1420]);
 for (let port = 3052; port <= 3059; port += 1) PORTS.add(port);
 
 try {

@@ -27,7 +27,7 @@ export function SurveySubRail({ active, onSelect }: SurveySubRailProps) {
   return (
     <CyberdeckRailTooltipProvider>
       <nav
-        className="spy-sub-rail cyberdeck-server-rail flex shrink-0 flex-row items-end gap-1 border-b border-[#1c1c1c] bg-black/90 px-3 py-2"
+        className="spy-sub-rail cyberdeck-server-rail relative z-30 flex shrink-0 flex-row items-end gap-1 border-b border-[#1c1c1c] bg-black/90 px-3 py-2"
         aria-label="Survey sub-panes"
       >
         <div className="flex flex-row items-end gap-1">

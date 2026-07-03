@@ -15,6 +15,16 @@ import { SURVEY_SILENT_CAPTURE_PROMPT } from "@/lib/cyberdeck/powerfist-mission.
 import { SURVEY_ECHO_NODE_LABEL } from "@/lib/cyberdeck/survey-mode";
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
+const MIRAGE_HUB_PIN_LENGTH = 6;
+
+function newMirageHubPin(): string {
+  return String(
+    Math.floor(
+      10 ** (MIRAGE_HUB_PIN_LENGTH - 1) +
+        Math.random() * 9 * 10 ** (MIRAGE_HUB_PIN_LENGTH - 1),
+    ),
+  );
+}
 
 const REGISTRY_KEY = "__echoMiragePowerfistPairingRegistry";
 
@@ -72,6 +82,7 @@ function previewPairUrl(state: PowerfistPairingState): string | null {
 export async function createPowerfistQrSession(): Promise<{
   ok: true;
   previewUrl: string;
+  remotePin: string;
   expiresAt: string;
   pairedRemote: PowerfistPairedRemote | null;
 }> {
@@ -83,19 +94,21 @@ export async function createPowerfistQrSession(): Promise<{
   state.pairingSession = {
     pairId: crypto.randomUUID(),
     pairSecret: crypto.randomBytes(18).toString("base64url"),
+    pin: newMirageHubPin(),
     expiresAt: new Date(Date.now() + PAIRING_TTL_MS).toISOString(),
   };
   state.httpPort = state.httpPort ?? resolveHttpPort();
   await savePowerfistPairingRegistry(state);
 
   const previewUrl = previewPairUrl(state);
-  if (!previewUrl) {
+  if (!previewUrl || !state.pairingSession.pin) {
     throw new Error("Failed to build pairing URL.");
   }
 
   return {
     ok: true,
     previewUrl,
+    remotePin: state.pairingSession.pin,
     expiresAt: state.pairingSession.expiresAt,
     pairedRemote: state.pairedRemote ?? null,
   };
@@ -121,20 +134,17 @@ export async function completePowerfistPair(input: {
 
   const session = state.pairingSession;
   if (!session || pairingSessionExpired(state)) {
-    return { ok: false, reason: "Pairing QR expired. Generate a new code on the desktop." };
+    return { ok: false, reason: "Pairing code expired. Generate a new code on Mirage hub." };
   }
 
   if (session.pairId !== input.pairId || session.pairSecret !== input.pairSecret) {
     return { ok: false, reason: "Invalid pairing code." };
   }
 
-  if (
-    state.pairedRemote &&
-    state.pairedRemote.deviceId !== input.deviceId
-  ) {
+  if (state.pairedRemote && state.pairedRemote.deviceId !== input.deviceId) {
     return {
       ok: false,
-      reason: "Another phone is already paired. Unpair from desktop Settings first.",
+      reason: "Another phone is already paired. Unpair from Mirage hub first.",
     };
   }
 
@@ -154,6 +164,36 @@ export async function completePowerfistPair(input: {
     wsHost: state.lanHosts[0] || "127.0.0.1",
     wsPort: state.port,
   };
+}
+
+export async function completePowerfistPairByPin(input: {
+  pin: string;
+  deviceId: string;
+}): Promise<PairResult> {
+  const pin = input.pin.trim();
+  if (!/^\d{6}$/.test(pin)) {
+    return { ok: false, reason: "Enter the 6-digit Mirage hub code." };
+  }
+
+  const state = await loadPowerfistPairingRegistry();
+  if (!state?.deckToken) {
+    return { ok: false, reason: "PowerFist relay is not running on this deck." };
+  }
+
+  const session = state.pairingSession;
+  if (!session || pairingSessionExpired(state)) {
+    return { ok: false, reason: "Pairing code expired. Generate a new code on Mirage hub." };
+  }
+
+  if (session.pin !== pin) {
+    return { ok: false, reason: "Invalid Mirage hub pairing code." };
+  }
+
+  return completePowerfistPair({
+    pairId: session.pairId,
+    pairSecret: session.pairSecret,
+    deviceId: input.deviceId,
+  });
 }
 
 export function validatePowerfistDeckToken(state: PowerfistPairingState | null, token: string): boolean {
@@ -418,6 +458,7 @@ export async function buildSilentCaptureMissionEnvelope(): Promise<
 export async function getPowerfistQrSessionForDesktop(): Promise<{
   ok: true;
   previewUrl: string | null;
+  remotePin: string | null;
   expiresAt: string | null;
   pairedRemote: PowerfistPairedRemote | null;
   capturePairUrl: string | null;
@@ -430,6 +471,7 @@ export async function getPowerfistQrSessionForDesktop(): Promise<{
     return {
       ok: true,
       previewUrl: null,
+      remotePin: null,
       expiresAt: null,
       pairedRemote: null,
       capturePairUrl: null,
@@ -450,6 +492,7 @@ export async function getPowerfistQrSessionForDesktop(): Promise<{
   return {
     ok: true,
     previewUrl: phoneExpired ? null : previewPairUrl(state),
+    remotePin: phoneExpired ? null : state.pairingSession?.pin ?? null,
     expiresAt: phoneExpired ? null : state.pairingSession?.expiresAt ?? null,
     pairedRemote: state.pairedRemote ?? null,
     capturePairUrl: captureExpired ? null : capturePairUrl(state),

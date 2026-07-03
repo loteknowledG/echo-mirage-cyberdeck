@@ -26,6 +26,7 @@
     "electron:pack:mac:dir": "node scripts/prepare-electron-standalone.mjs && electron-builder --mac --dir",
     "satellite:dev": "pnpm --dir apps/echo-satellite-electron dev",
     "satellite:build": "pnpm --dir apps/echo-satellite-electron build",
+    "survey:local": "node scripts/survey-local-dev.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint --ext .js,.jsx,.ts,.tsx . --fix",
     "lint:watch": "eslint --ext .js,.jsx,.ts,.tsx . --fix --watch",

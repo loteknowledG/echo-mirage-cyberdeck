@@ -39,6 +39,7 @@ export function SurveyMirageHubPanel(props: {
 }) {
   const [nodeId, setNodeId] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [remotePin, setRemotePin] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [capturePairUrl, setCapturePairUrl] = useState<string | null>(null);
   const [captureExpiresAt, setCaptureExpiresAt] = useState<string | null>(null);
@@ -49,6 +50,31 @@ export function SurveyMirageHubPanel(props: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const prevPairedDeviceRef = useRef<string | null>(null);
+  const announcedPinRef = useRef<string | null>(null);
+
+  const announceHubPin = useCallback((pin: string) => {
+    if (!pin || announcedPinRef.current === pin) return;
+    announcedPinRef.current = pin;
+    notifySpyMuthurArchive(
+      `SURVEY // ${SURVEY_MIRAGE_DISPLAY} hub PowerFist code: ${pin} — enter on Survey → ${SURVEY_POWERFIST_LABEL} tab (TRIPLE LINK). Not an Echo Satellite code.`,
+    );
+  }, []);
+
+  const applyPhoneSession = useCallback(
+    (session: {
+      previewUrl: string | null;
+      remotePin?: string | null;
+      expiresAt: string | null;
+      pairedRemote?: { deviceId: string; pairedAt: string } | null;
+    }) => {
+      setPreviewUrl(session.previewUrl);
+      setRemotePin(session.remotePin ?? null);
+      setExpiresAt(session.expiresAt);
+      setPairedDeviceId(session.pairedRemote?.deviceId ?? null);
+      if (session.remotePin) announceHubPin(session.remotePin);
+    },
+    [announceHubPin],
+  );
 
   useEffect(() => {
     if (!pairedDeviceId || pairedDeviceId === prevPairedDeviceRef.current) return;
@@ -63,10 +89,11 @@ export function SurveyMirageHubPanel(props: {
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const session = await fetchPowerfistQrSession();
+    let session = await fetchPowerfistQrSession();
     if (!session.ok) {
       setError("reason" in session ? session.reason : "Could not load Survey pairing.");
       setPreviewUrl(null);
+      setRemotePin(null);
       setExpiresAt(null);
       setCapturePairUrl(null);
       setCaptureExpiresAt(null);
@@ -76,15 +103,29 @@ export function SurveyMirageHubPanel(props: {
       setLoading(false);
       return;
     }
-    setPreviewUrl(session.previewUrl);
-    setExpiresAt(session.expiresAt);
+
+    if (!session.remotePin && !session.pairedRemote) {
+      const created = await createPowerfistQrSession();
+      if (created.ok) {
+        session = {
+          ...session,
+          previewUrl: created.previewUrl,
+          remotePin: created.remotePin,
+          expiresAt: created.expiresAt,
+          pairedRemote: created.pairedRemote,
+        };
+      } else if (!session.previewUrl) {
+        setError(created.reason);
+      }
+    }
+
+    applyPhoneSession(session);
     setCapturePairUrl(session.capturePairUrl ?? null);
     setCaptureExpiresAt(session.captureExpiresAt ?? null);
-    setPairedDeviceId(session.pairedRemote?.deviceId ?? null);
     setPairedEchoNodeId(session.pairedCapture?.nodeId ?? null);
     setMirageNodeId(session.mirageNode?.nodeId ?? null);
     setLoading(false);
-  }, []);
+  }, [applyPhoneSession]);
 
   useEffect(() => {
     void refresh();
@@ -99,10 +140,8 @@ export function SurveyMirageHubPanel(props: {
       setError(session.reason);
       return;
     }
-    setPreviewUrl(session.previewUrl);
-    setExpiresAt(session.expiresAt);
-    setPairedDeviceId(session.pairedRemote?.deviceId ?? null);
-  }, []);
+    applyPhoneSession(session);
+  }, [applyPhoneSession]);
 
   const handleGenerateEchoQr = useCallback(async () => {
     if (!props.echoHost || !props.echoHttpPort) {
@@ -136,6 +175,7 @@ export function SurveyMirageHubPanel(props: {
     }
     setPairedDeviceId(null);
     setPreviewUrl(null);
+    setRemotePin(null);
     setExpiresAt(null);
   }, []);
 
@@ -159,75 +199,88 @@ export function SurveyMirageHubPanel(props: {
       </p>
       <p className="text-[9px] text-[#6a6a8a]">{SURVEY_MIRAGE_TAGLINE}</p>
 
-      {loading ? (
-        <p className="text-[#8a8a8a]">Loading relay…</p>
-      ) : (
-        <>
-          <div className="border-b border-[#1c1c1c] pb-4">
-            <div className="mb-2 text-[10px] tracking-[0.06em] text-[#8a8a8a]">
-              {SURVEY_POWERFIST_LABEL} // phone
-            </div>
-            <p className="mb-3 text-[9px] text-[#5f5f5f]">{SURVEY_POWERFIST_TAGLINE}</p>
-            {pairedDeviceId ? (
-              <p className="mb-3 text-emerald-300/90">PAIRED // PowerFist {pairedDeviceId.slice(0, 8)}…</p>
-            ) : (
-              <p className="mb-3 text-[#8a8a8a]">No phone paired.</p>
-            )}
-            {previewUrl ? (
-              <div className="mb-3 flex flex-col items-center gap-2 rounded border border-[#2d2d2d] bg-white p-3">
-                <QRCodeSVG value={previewUrl} size={140} level="M" includeMargin />
-                <p className="text-[8px] text-[#333]">Expires in {formatExpiry(expiresAt)}</p>
-              </div>
-            ) : (
-              <p className="mb-3 text-[#8a8a8a]">Generate QR for PowerFist on phone.</p>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <CyberdeckActionButton disabled={busy} onClick={() => void handleGeneratePhoneQr()}>
-                {previewUrl ? "New PowerFist QR" : "PowerFist QR"}
-              </CyberdeckActionButton>
-              {pairedDeviceId ? (
-                <CyberdeckActionButton disabled={busy} onClick={() => void handleUnpairPhone()}>
-                  Unpair phone
-                </CyberdeckActionButton>
-              ) : null}
-            </div>
-          </div>
+      {loading ? <p className="text-[#8a8a8a]">Loading relay…</p> : null}
 
-          <div>
-            <div className="mb-2 text-[10px] tracking-[0.06em] text-[#8a8a8a]">
-              {SURVEY_ECHO_DISPLAY} // screenshot computer
-            </div>
-            <p className="mb-3 text-[9px] text-[#5f5f5f]">{SURVEY_ECHO_TAGLINE}</p>
-            {pairedEchoNodeId ? (
-              <p className="mb-3 text-emerald-300/90">
-                PAIRED // {SURVEY_ECHO_DISPLAY} {pairedEchoNodeId.slice(0, 8)}…
-              </p>
-            ) : (
-              <p className="mb-3 text-[#8a8a8a]">Echo not paired.</p>
-            )}
-            {capturePairUrl ? (
-              <div className="mb-3 flex flex-col items-center gap-2 rounded border border-cyan-900/30 bg-white p-3">
-                <QRCodeSVG value={capturePairUrl} size={140} level="M" includeMargin />
-                <p className="max-w-full break-all text-center text-[8px] text-[#333]">
-                  Scan on {SURVEY_ECHO_DISPLAY} · expires in {formatExpiry(captureExpiresAt)}
-                </p>
-              </div>
-            ) : (
-              <p className="mb-3 text-[#8a8a8a]">Generate QR for the screenshot computer.</p>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <CyberdeckActionButton disabled={busy} onClick={() => void handleGenerateEchoQr()}>
-                {capturePairUrl ? "New Echo QR" : "Echo QR"}
-              </CyberdeckActionButton>
-              {pairedEchoNodeId ? (
-                <CyberdeckActionButton disabled={busy} onClick={() => void handleUnpairEcho()}>
-                  Unpair Echo
-                </CyberdeckActionButton>
-              ) : null}
-            </div>
+      <div className="border-b border-[#1c1c1c] pb-4">
+        <div className="mb-2 text-[10px] tracking-[0.06em] text-[#8a8a8a]">
+          {SURVEY_POWERFIST_LABEL} // phone
+        </div>
+        <p className="mb-3 text-[9px] text-[#5f5f5f]">{SURVEY_POWERFIST_TAGLINE}</p>
+        <p className="mb-3 text-[9px] leading-relaxed text-amber-200/80">
+          Triple-link code lives here (not on Echo Satellite, not in MUTHUR memory). Survey →{" "}
+          {SURVEY_POWERFIST_LABEL} tab → TRIPLE LINK.
+        </p>
+        {pairedDeviceId ? (
+          <p className="mb-3 text-emerald-300/90">PAIRED // PowerFist {pairedDeviceId.slice(0, 8)}…</p>
+        ) : (
+          <p className="mb-3 text-[#8a8a8a]">No phone paired.</p>
+        )}
+        {remotePin ? (
+          <div className="mb-3 rounded border border-amber-900/40 bg-amber-950/20 p-3">
+            <p className="mb-2 text-[9px] tracking-[0.08em] text-amber-200/90">
+              Same-machine code (Survey → PowerFist tab)
+            </p>
+            <p className="font-mono text-2xl tracking-[0.35em] text-amber-100">{remotePin}</p>
+            <p className="mt-2 text-[8px] text-[#6a6a6a]">
+              Expires in {formatExpiry(expiresAt)} · or scan QR below
+            </p>
           </div>
-        </>
-      )}
+        ) : (
+          <p className="mb-3 text-[#8a8a8a]">
+            {loading ? "Generating code…" : "Click PowerFist QR to show the 6-digit code."}
+          </p>
+        )}
+        {previewUrl ? (
+          <div className="mb-3 flex flex-col items-center gap-2 rounded border border-[#2d2d2d] bg-white p-3">
+            <QRCodeSVG value={previewUrl} size={140} level="M" includeMargin />
+            <p className="text-[8px] text-[#333]">Expires in {formatExpiry(expiresAt)}</p>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <CyberdeckActionButton disabled={busy || loading} onClick={() => void handleGeneratePhoneQr()}>
+            {previewUrl || remotePin ? "New PowerFist QR + code" : "PowerFist QR"}
+          </CyberdeckActionButton>
+          {pairedDeviceId ? (
+            <CyberdeckActionButton disabled={busy} onClick={() => void handleUnpairPhone()}>
+              Unpair phone
+            </CyberdeckActionButton>
+          ) : null}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-2 text-[10px] tracking-[0.06em] text-[#8a8a8a]">
+          {SURVEY_ECHO_DISPLAY} // screenshot computer
+        </div>
+        <p className="mb-3 text-[9px] text-[#5f5f5f]">{SURVEY_ECHO_TAGLINE}</p>
+        {pairedEchoNodeId ? (
+          <p className="mb-3 text-emerald-300/90">
+            PAIRED // {SURVEY_ECHO_DISPLAY} {pairedEchoNodeId.slice(0, 8)}…
+          </p>
+        ) : (
+          <p className="mb-3 text-[#8a8a8a]">Echo not paired.</p>
+        )}
+        {capturePairUrl ? (
+          <div className="mb-3 flex flex-col items-center gap-2 rounded border border-cyan-900/30 bg-white p-3">
+            <QRCodeSVG value={capturePairUrl} size={140} level="M" includeMargin />
+            <p className="max-w-full break-all text-center text-[8px] text-[#333]">
+              Scan on {SURVEY_ECHO_DISPLAY} · expires in {formatExpiry(captureExpiresAt)}
+            </p>
+          </div>
+        ) : (
+          <p className="mb-3 text-[#8a8a8a]">Generate QR for the screenshot computer.</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <CyberdeckActionButton disabled={busy || loading} onClick={() => void handleGenerateEchoQr()}>
+            {capturePairUrl ? "New Echo QR" : "Echo QR"}
+          </CyberdeckActionButton>
+          {pairedEchoNodeId ? (
+            <CyberdeckActionButton disabled={busy} onClick={() => void handleUnpairEcho()}>
+              Unpair Echo
+            </CyberdeckActionButton>
+          ) : null}
+        </div>
+      </div>
 
       {error ? <p className="text-red-300/90">{error}</p> : null}
     </div>
