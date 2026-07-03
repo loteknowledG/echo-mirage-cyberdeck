@@ -39,3 +39,14 @@ export const EMPTY_SPY_TEAM_STATUS: SurveyTeamStatus = {
   echoHost: null,
   loading: true,
 };
+
+export function isSurveyTeamTripleLinked(
+  team: Pick<SurveyTeamStatus, "echoMirage" | "echoPowerfist" | "miragePowerfist" | "loading">,
+): boolean {
+  if (team.loading) return false;
+  return (
+    team.echoMirage.state === "linked" &&
+    team.echoPowerfist.state === "linked" &&
+    team.miragePowerfist.state === "linked"
+  );
+}

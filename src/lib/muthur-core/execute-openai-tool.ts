@@ -12,6 +12,7 @@ import {
   formatOperatorBrowserResult,
   formatSuggestOperatorEditResult,
   formatSamusHandsEyesResult,
+  formatSurveyAutoConnectResult,
   formatWorkspaceExecResult,
 } from "@/lib/muthur-core/format-tool-result";
 import { extractOperatorEditFromToolOutput } from "@/lib/muthur-core/suggest-operator-edit";
@@ -19,6 +20,7 @@ import { recordCodingTouch } from "@/lib/muthur-core/coding-touch";
 import { extractOperatorBrowserRef } from "@/lib/muthur-core/operator-browser-ref";
 import { extractOperatorConversionRef } from "@/lib/muthur-core/operator-conversion-ref";
 import { extractOperatorOpenRef } from "@/lib/muthur-core/operator-open-file-ref";
+import { extractSurveyAutoConnectRef } from "@/lib/muthur-core/survey-auto-connect-ref";
 import { formatBlockedToolMessage, isToolAllowedForPosture, type MuthurPostureToolContext } from "@/lib/muthur/muthur-posture";
 import type { MuthurToolExecutionContext, ToolCall, ToolRegistry } from "@/lib/muthur-core/types";
 
@@ -87,6 +89,13 @@ export async function executeRegistryToolForOpenAi(
       if (browserRef) ctx.operatorBrowser = browserRef;
     }
     return formatOperatorBrowserResult(result.output);
+  }
+  if (functionName === "survey_auto_connect") {
+    if (result.ok && ctx) {
+      const surveyRef = extractSurveyAutoConnectRef(result.output);
+      if (surveyRef) ctx.surveyAutoConnect = surveyRef;
+    }
+    return formatSurveyAutoConnectResult(result.output);
   }
   if (functionName === "clock") {
     return formatClockResult(result.output);

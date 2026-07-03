@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { SurveyPairOtpInput } from "@/components/cyberdeck/survey-pair-otp-input";
+import { SurveyPairPinCopyHint } from "@/components/cyberdeck/survey-pair-pin-display";
 import { SURVEY_ECHO_DISPLAY, SURVEY_MIRAGE_DISPLAY } from "@/lib/cyberdeck/survey-mode";
 import {
   DEFAULT_ECHO_HTTP_PORT,
@@ -505,6 +506,7 @@ export function SurveyPairPinForm({
           disabled={busy}
           focusClassName={focusClassName}
         />
+        <SurveyPairPinCopyHint pin={pin} />
       </div>
 
       <CyberdeckActionButton disabled={busy} onClick={() => void handlePair()}>

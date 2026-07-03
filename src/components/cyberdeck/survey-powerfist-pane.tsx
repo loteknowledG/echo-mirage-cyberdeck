@@ -3,7 +3,9 @@
 import { useCallback, useState } from "react";
 import { SurveyPairPinForm } from "@/components/cyberdeck/survey-pair-pin-form";
 import { SurveyPairOtpInput } from "@/components/cyberdeck/survey-pair-otp-input";
+import { SurveyPairPinCopyHint } from "@/components/cyberdeck/survey-pair-pin-display";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
+import { PowerfistDeckEmbed } from "@/components/cyberdeck/powerfist-deck-embed";
 import {
   ECHO_SURVEY_TERMINATED_MESSAGE,
   SURVEY_ECHO_DISPLAY,
@@ -13,7 +15,7 @@ import {
   SURVEY_POWERFIST_TAGLINE,
 } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyEchoLinkWatch } from "@/lib/cyberdeck/survey-echo-link-watch";
-import { notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
+import { isSurveyTeamTripleLinked, notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import {
   formatSurveyEchoPowerfistLinkedLine,
   formatSurveyMiragePowerfistLinkedLine,
@@ -37,7 +39,7 @@ import {
   normalizeSurveyPairPin,
 } from "@/lib/cyberdeck/survey-pair-pin";
 
-export function SurveyPowerfistPane() {
+function SurveyPowerfistPairingPanel() {
   const { paired, terminated, terminatedMessage, resetLinkWatch } = useSurveyEchoLinkWatch("powerfist");
   const team = useSurveyTeamStatus();
   const [status, setStatus] = useState<string | null>(null);
@@ -109,7 +111,7 @@ export function SurveyPowerfistPane() {
   }, [hubPin]);
 
   return (
-    <div className="flex flex-col gap-4 p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
+    <>
       {terminated ? (
         <div className="rounded border border-red-900/50 bg-red-950/20 px-3 py-3 text-center">
           <p className="text-sm tracking-[0.12em] text-red-400/95">
@@ -122,7 +124,9 @@ export function SurveyPowerfistPane() {
       ) : null}
 
       <div>
-        <p className="text-amber-200/90">{SURVEY_MODE_TITLE} // {SURVEY_POWERFIST_LABEL}</p>
+        <p className="text-amber-200/90">
+          {SURVEY_MODE_TITLE} // {SURVEY_POWERFIST_LABEL}
+        </p>
         <p className="mt-1 text-[9px] text-[#6a6a8a]">{SURVEY_POWERFIST_TAGLINE}</p>
       </div>
 
@@ -194,6 +198,7 @@ export function SurveyPowerfistPane() {
             disabled={hubBusy}
             focusClassName="focus:border-fuchsia-500/70"
           />
+          <SurveyPairPinCopyHint pin={hubPin} />
         </div>
         <div className="mt-3">
           <CyberdeckActionButton disabled={hubBusy} onClick={() => void handleMirageHubPair()}>
@@ -205,6 +210,38 @@ export function SurveyPowerfistPane() {
         ) : null}
         {hubError ? <p className="mt-2 text-[9px] text-red-300/90">{hubError}</p> : null}
       </div>
+    </>
+  );
+}
+
+export function SurveyPowerfistPane() {
+  const team = useSurveyTeamStatus();
+  const tripleLinked = isSurveyTeamTripleLinked(team);
+
+  if (tripleLinked) {
+    return (
+      <div className="cyberdeck-survey-powerfist-deck cyberdeck-rola-dex-pane flex min-h-0 flex-1 flex-col overflow-hidden bg-[#050807]">
+        <div className="shrink-0 border-b border-[#1a1a1a] bg-[#080808] px-4 py-2 font-mono">
+          <p className="text-[9px] tracking-[0.08em] text-emerald-300/90">
+            TRIPLE LINKED // {SURVEY_POWERFIST_LABEL} deck · hold a card to arm, then push to MUTHUR
+          </p>
+          <p className="mt-0.5 text-[8px] text-[#6a6a6a]">
+            Swipe the card matrix — same deck as the MIRAGE PowerFist rail pane.
+          </p>
+        </div>
+        <div className="relative min-h-[min(520px,58vh)] min-w-0 flex-1">
+          <PowerfistDeckEmbed
+            embedSurface="survey"
+            className="absolute inset-0 min-h-0 overflow-hidden"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
+      <SurveyPowerfistPairingPanel />
     </div>
   );
 }

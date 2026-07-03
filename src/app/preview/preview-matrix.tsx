@@ -77,7 +77,7 @@ function composerPlaceholderForArg(arg: string): string {
   }
 }
 
-export function PreviewMatrix() {
+export function PreviewMatrix({ embedSurface = "page" }: { embedSurface?: "page" | "survey" | "rola-dex" }) {
   const [activeDeckIndex, setActiveDeckIndex] = useState(0);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [isCompactCards, setIsCompactCards] = useState(false);
@@ -269,15 +269,27 @@ export function PreviewMatrix() {
       resizeObserver.observe(matrix);
     }
 
+    const retryTimers =
+      embedSurface === "survey"
+        ? [120, 400, 1200, 2400].map((ms) =>
+            window.setTimeout(() => {
+              if (!cancelled) syncCarousels();
+            }, ms),
+          )
+        : [];
+
     return () => {
       cancelled = true;
+      for (const timer of retryTimers) {
+        window.clearTimeout(timer);
+      }
       resizeObserver?.disconnect();
       deckEmblaRef.current?.destroy();
       deckEmblaRef.current = null;
       handEmblaRefs.current.forEach((embla) => embla?.destroy());
       handEmblaRefs.current = [];
     };
-  }, [activeDecks, mountCarousels, setActiveFocus]);
+  }, [activeDecks, embedSurface, mountCarousels, setActiveFocus]);
 
   useEffect(() => {
     const matrix = matrixRef.current;
@@ -581,9 +593,15 @@ export function PreviewMatrix() {
 
 
   return (
-    <div className="powerfist-preview-root" data-compact-cards={isCompactCards ? "true" : "false"}>
+    <div
+      className="powerfist-preview-root"
+      data-compact-cards={isCompactCards ? "true" : "false"}
+      data-embed-surface={embedSurface}
+    >
       <main className="shell" ref={paneRef}>
-        <PowerfistRemoteLinkBanner status={remoteSocketStatus} pairMessage={pairMessage} />
+        {embedSurface !== "survey" ? (
+          <PowerfistRemoteLinkBanner status={remoteSocketStatus} pairMessage={pairMessage} />
+        ) : null}
         <div className="powerfistMainLayout">
           <section className="matrixStage">
           <section className="matrix" ref={matrixRef} data-testid="preview-matrix">

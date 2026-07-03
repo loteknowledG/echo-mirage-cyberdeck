@@ -309,6 +309,31 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   {
     type: "function",
     function: {
+      name: "survey_auto_connect",
+      description:
+        "Zero-click Survey TEAM LINKS on desktop cyberdeck: read Echo Satellite pairing codes and wire Echo↔Mirage, Echo↔PowerFist, and Mirage↔PowerFist in this session. Call when the operator asks to connect, pair, link, or auto-connect Survey / team links / Echo / Mirage / PowerFist. No Survey tab clicks. Prerequisite: Echo Satellite Survey tab open so codes exist (same machine: 127.0.0.1:3050).",
+      parameters: {
+        type: "object",
+        properties: {
+          echoHost: {
+            type: "string",
+            description: "Echo Satellite host (default 127.0.0.1 for same-machine dev).",
+          },
+          echoHttpPort: {
+            type: "integer",
+            description: "Echo Satellite HTTP port (default 3050).",
+          },
+          force: {
+            type: "boolean",
+            description: "Retry even if auto-pair ran recently (default true).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "clock",
       description: "Current date/time on the server machine.",
       parameters: {

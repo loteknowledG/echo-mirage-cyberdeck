@@ -97,6 +97,9 @@ function toolsUsedHeaders(
   if (toolCtx.operatorBrowser) {
     headers["X-Muthur-Operator-Browser"] = JSON.stringify(toolCtx.operatorBrowser);
   }
+  if (toolCtx.surveyAutoConnect) {
+    headers["X-Muthur-Survey-Auto-Connect"] = JSON.stringify(toolCtx.surveyAutoConnect);
+  }
   if (toolCtx.codingVerify) {
     headers["X-Muthur-Coding-Verify"] = JSON.stringify(toolCtx.codingVerify);
   }
@@ -290,6 +293,7 @@ export async function muthurChatWithModelTools(options: {
             toolCtx.operatorOpenFile,
             toolCtx.codingVerify,
             toolCtx.operatorBrowser,
+            toolCtx.surveyAutoConnect,
           ),
         );
         return;
@@ -358,6 +362,7 @@ export async function muthurChatWithModelTools(options: {
             toolCtx.operatorOpenFile,
             toolCtx.codingVerify,
             toolCtx.operatorBrowser,
+            toolCtx.surveyAutoConnect,
           ),
         );
         return;
@@ -401,6 +406,7 @@ export async function muthurChatWithModelTools(options: {
         toolCtx.operatorOpenFile,
         toolCtx.codingVerify,
         toolCtx.operatorBrowser,
+        toolCtx.surveyAutoConnect,
       ),
     );
   }, mergeReceiptHeaders({}, providerReceipt));

@@ -184,11 +184,16 @@ active provider model (OpenCode / OpenRouter / OpenAI).
 
 clear · clear chat · muthur clear  — wipe chat log (local)
 
+Survey TEAM LINKS (desktop, Echo Satellite running):
+  connect team links · survey auto connect
+  Or ask in natural language — MUTHUR calls survey_auto_connect.
+
 Memory context from MUTHUR memory is attached automatically.
 Browser snapshot included when browser pane is active.
 
 Examples:
   explain the repo structure
+  connect the survey team
   summarize the last assistant reply
   what does this error mean?`,
 };

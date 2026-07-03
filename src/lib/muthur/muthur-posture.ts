@@ -60,6 +60,7 @@ function resolveMissionExecutionActive(context?: MuthurPostureToolContext): bool
 const PLAN_TOOLS = new Set([
   "observe_operator_pane",
   "operator_browser",
+  "survey_auto_connect",
   "clock",
   "git_status",
   "git_diff",
@@ -80,6 +81,7 @@ const DIRECT_EXECUTION_TOOLS = new Set([
   "justbash",
   "localfs",
   "operator_browser",
+  "survey_auto_connect",
   "open_operator_file",
   "suggest_operator_edit",
   "workspace_exec",
@@ -158,6 +160,9 @@ export function isToolAllowedForPosture(
   context?: MuthurPostureToolContext,
 ): boolean {
   if (posture === "commander" && !resolveMissionExecutionActive(context)) {
+    if (toolName === "survey_auto_connect" || toolName === "observe_operator_pane") {
+      return true;
+    }
     return false;
   }
   if (isPiDelegationTool(toolName) && posture !== "commander") {
@@ -217,6 +222,7 @@ export function buildMuthurPostureSystemPrompt(posture: MuthurPosture): string {
     case "agent":
       return (
         "\n\nMUTHUR POSTURE: AGENT (USE). Execute a single user-directed task end-to-end yourself — observe, edit via suggest_operator_edit, localfs write, operator_browser, workspace_exec, samus_hands_eyes (local Windows desktop), glyph channel. " +
+        "For Survey TEAM LINKS (Echo↔Mirage↔PowerFist), call survey_auto_connect when the operator asks to connect/pair/link the team — zero Survey tab clicks. Echo Satellite Survey tab must be open first. " +
         "Do NOT delegate to Pi or request a control lease; desktop embodiment is Commander-only. " +
         "For ASCII art use [GLYPH:…] / fenced ascii blocks; for web use operator_browser; for code use localfs. " +
         "Operator pane edits auto-save to disk when a writable path exists. Confirm what changed; Ctrl+Z still undoes in the pane."

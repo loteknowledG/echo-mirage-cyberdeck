@@ -43,6 +43,7 @@ import {
 } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
 import { runSamusHandsEyes } from "@/lib/samus-manus/hands-eyes.server";
 import { isSamusHandsEyesEnabled } from "@/lib/samus-manus/samus-manus-config.server";
+import { runSurveyAutoConnect } from "@/lib/muthur/survey/survey-auto-connect.server";
 import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
@@ -733,6 +734,12 @@ export function createMuthurToolRegistry(): ToolRegistry {
         description:
           "Control the operator web pane: goto URL or search query, snapshot page text, back/forward/reload, click/type/submit by CSS selector. Use for web research — not for local disk paths (use localfs).",
         run: runOperatorBrowser,
+      },
+      survey_auto_connect: {
+        name: "survey_auto_connect",
+        description:
+          "Zero-click Survey TEAM LINKS: read Echo Satellite pairing codes and wire Echo↔Mirage, Echo↔PowerFist, and Mirage↔PowerFist in this cyberdeck session. Call when the operator asks to connect/pair/link Survey, team links, Echo, Mirage, or PowerFist — no Survey tab required. Echo Satellite Survey tab must be open first so codes exist.",
+        run: runSurveyAutoConnect,
       },
       workspace_exec: {
         name: "workspace_exec",

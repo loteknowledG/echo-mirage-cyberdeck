@@ -228,6 +228,40 @@ export function formatOperatorBrowserResult(result: unknown): string {
   return parts.join("\n\n");
 }
 
+export function formatSurveyAutoConnectResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] survey_auto_connect returned no output.";
+  }
+
+  const payload = result as {
+    queued?: boolean;
+    force?: boolean;
+    echoHost?: string;
+    echoHttpPort?: number;
+    preflight?: {
+      echoReachable?: boolean;
+      miragePinAvailable?: boolean;
+      powerfistPinAvailable?: boolean;
+      pairedMirageCount?: number;
+      pairedPowerfist?: boolean;
+      reason?: string;
+    };
+  };
+
+  const pre = payload.preflight;
+  const parts = [
+    "[TOOL OK] SURVEY_AUTO_CONNECT // QUEUED_FOR_CYBERDECK",
+    "The deck will wire Echo ↔ Mirage ↔ PowerFist TEAM LINKS in this browser session — no Survey tab clicks.",
+    payload.echoHost ? `ECHO // ${payload.echoHost}:${payload.echoHttpPort ?? 3050}` : null,
+    pre?.echoReachable
+      ? `PREFLIGHT // echo=ok mirage_pin=${pre.miragePinAvailable ? "yes" : "no"} powerfist_pin=${pre.powerfistPinAvailable ? "yes" : "no"} paired_mirage=${pre.pairedMirageCount ?? 0} paired_powerfist=${pre.pairedPowerfist ? "yes" : "no"}`
+      : null,
+    pre?.reason ? `NOTE // ${pre.reason}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n\n");
+}
+
 export function formatConvertDocumentResult(result: unknown): string {
   if (!result || typeof result !== "object") {
     return "[TOOL] convert_document_to_markdown returned no output.";

@@ -44,5 +44,24 @@ export function isSurveyPairingDebugEnabled(): boolean {
   return process.env.NEXT_PUBLIC_SURVEY_PAIRING_DEBUG === "1";
 }
 
+/** Desktop / localhost: MUTHUR auto-wires TEAM LINKS from Echo Satellite codes. Default on when legacy pairing is allowed. */
+export function isSurveyAutoPairEnabled(): boolean {
+  if (typeof window === "undefined") {
+    if (process.env.NEXT_PUBLIC_SURVEY_AUTO_PAIR === "0") return false;
+    if (process.env.NEXT_PUBLIC_SURVEY_AUTO_PAIR === "1") return true;
+    return process.env.NEXT_PUBLIC_SURVEY_LEGACY_PAIRING === "1";
+  }
+  try {
+    const override = window.localStorage.getItem("survey-auto-pair");
+    if (override === "1") return true;
+    if (override === "0") return false;
+  } catch {
+    /* ignore */
+  }
+  if (process.env.NEXT_PUBLIC_SURVEY_AUTO_PAIR === "0") return false;
+  if (process.env.NEXT_PUBLIC_SURVEY_AUTO_PAIR === "1") return true;
+  return isSurveyLegacyPairingEnabled();
+}
+
 export const SURVEY_HUB_NOTICE =
   "Survey pairing is moving to Survey Hub (central server + thin clients). Legacy IP/Tailscale pairing is frozen — MUTHUR, memory, and capture missions stay in cyberdeck.";

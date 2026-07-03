@@ -123,6 +123,7 @@ import {
 } from "@/lib/muthur-core/muthur-diagnostics-channel";
 import { parseOperatorConversionJson } from "@/lib/muthur-core/operator-conversion-ref";
 import { parseOperatorBrowserJson } from "@/lib/muthur-core/operator-browser-ref";
+import { parseSurveyAutoConnectJson } from "@/lib/muthur-core/survey-auto-connect-ref";
 import { parseOperatorOpenJson } from "@/lib/muthur-core/operator-open-file-ref";
 import type { MuthurOperatorOpenFileRef } from "@/lib/muthur-core/types";
 import type { MuthurCodingVerifyReceipt } from "@/lib/muthur-core/types";
@@ -198,6 +199,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
 import { CyberdeckScrollbarHost } from "@/components/cyberdeck/cyberdeck-scrollbar-host";
+import { SurveyAutoPairHost } from "@/components/cyberdeck/survey-auto-pair-host";
 import { MORPHISM_ZONE_REALMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import {
   CyberdeckComposerControl,
@@ -357,6 +359,11 @@ import {
   SURVEY_MUTHUR_ARCHIVE_EVENT,
   notifySurveyFocusChat,
 } from "@/lib/cyberdeck/survey-chat";
+import {
+  formatSurveyAutoPairResultForMuthur,
+  runSurveyAutoPair,
+} from "@/lib/cyberdeck/survey-auto-pair.client";
+import { parseSurveyAutoConnectIntent } from "@/lib/cyberdeck/survey-auto-connect-intent";
 import { terminateEchoSurveySession } from "@/lib/cyberdeck/survey-pairing-client";
 import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
@@ -5481,6 +5488,26 @@ export default function CyberdeckApp() {
     setGeneratedUI(null);
 
     const glyphCommand = resolveGlyphCommand(userMessage);
+    if (parseSurveyAutoConnectIntent(userMessage)) {
+      try {
+        const pairResult = await runSurveyAutoPair({ force: true });
+        setMessages((prev) => [
+          ...prev,
+          { role: "system", text: formatSurveyAutoPairResultForMuthur(pairResult) },
+        ]);
+      } catch (err) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: `SURVEY AUTO-CONNECT // FAILED // ${err instanceof Error ? err.message : "pairing failed"}`,
+          },
+        ]);
+      }
+      setIsStreaming(false);
+      return;
+    }
+
     if (glyphCommand) {
       try {
         await handleGlyphOperatorCommand(glyphCommand);
@@ -6414,6 +6441,27 @@ ${diff}`;
                 : `BROWSER_ACTION // ${operatorBrowserRef.kind.toUpperCase()} // ${actionResult}`,
             },
           ]);
+        }
+
+        const surveyAutoConnectRef =
+          streamPayload.surveyAutoConnect ??
+          parseSurveyAutoConnectJson(res.headers.get("x-muthur-survey-auto-connect"));
+        if (surveyAutoConnectRef) {
+          try {
+            const pairResult = await runSurveyAutoPair({ force: surveyAutoConnectRef.force });
+            setMessages((prev) => [
+              ...prev,
+              { role: "system", text: formatSurveyAutoPairResultForMuthur(pairResult) },
+            ]);
+          } catch (err) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                text: `SURVEY AUTO-CONNECT // FAILED // ${err instanceof Error ? err.message : "pairing failed"}`,
+              },
+            ]);
+          }
         }
 
         const editsToApply =
@@ -7806,6 +7854,7 @@ ${diff}`;
       <DeckModeProvider mode={deckMode}>
       <CyberdeckScrollbarHost />
       <CyberdeckBootSequence />
+      <SurveyAutoPairHost />
       <CyberdeckTabPersistence
         uiStateStorageKey={UI_STATE_STORAGE_KEY}
         workspaceHydrated={workspaceHydrated}

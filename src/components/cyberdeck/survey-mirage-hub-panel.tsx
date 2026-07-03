@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
+import { SurveyPairPinDisplay } from "@/components/cyberdeck/survey-pair-pin-display";
 import {
   SURVEY_ECHO_DISPLAY,
   SURVEY_ECHO_TAGLINE,
@@ -220,7 +221,7 @@ export function SurveyMirageHubPanel(props: {
             <p className="mb-2 text-[9px] tracking-[0.08em] text-amber-200/90">
               Same-machine code (Survey → PowerFist tab)
             </p>
-            <p className="font-mono text-2xl tracking-[0.35em] text-amber-100">{remotePin}</p>
+            <SurveyPairPinDisplay pin={remotePin} tone="amber" />
             <p className="mt-2 text-[8px] text-[#6a6a6a]">
               Expires in {formatExpiry(expiresAt)} · or scan QR below
             </p>

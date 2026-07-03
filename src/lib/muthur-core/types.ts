@@ -17,6 +17,12 @@ export type MuthurOperatorOpenFileRef = {
   mode: "edit" | "view";
 };
 
+export type MuthurSurveyAutoConnectRef = {
+  force: boolean;
+  echoHost?: string;
+  echoHttpPort?: number;
+};
+
 export type MuthurLoopAction = "respond" | "defer" | "tool";
 
 export type MuthurCodingVerifyReceipt = {
@@ -35,6 +41,7 @@ export type MuthurToolExecutionContext = {
   operatorConversion: MuthurOperatorConversionRef | null;
   operatorOpenFile: MuthurOperatorOpenFileRef | null;
   operatorBrowser: MuthurOperatorBrowserRef | null;
+  surveyAutoConnect: MuthurSurveyAutoConnectRef | null;
   codingTouches: string[];
   codingVerify: MuthurCodingVerifyReceipt | null;
   posture: MuthurPosture;
@@ -53,6 +60,7 @@ export function createMuthurToolExecutionContext(
     operatorConversion: null,
     operatorOpenFile: null,
     operatorBrowser: null,
+    surveyAutoConnect: null,
     codingTouches: [],
     codingVerify: null,
     posture,

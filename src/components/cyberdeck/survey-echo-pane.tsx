@@ -19,6 +19,7 @@ import {
 } from "@/lib/cyberdeck/survey-pairing-client";
 import { SATELLITE_GITHUB_RELEASES_URL } from "@/lib/electron/desktop-install.client";
 import { readPowerfistCaptureCredentials } from "@/lib/cyberdeck/powerfist-capture-client";
+import { SurveyPairPinDisplay } from "@/components/cyberdeck/survey-pair-pin-display";
 
 function PairPinBlock({
   label,
@@ -43,7 +44,10 @@ function PairPinBlock({
       <p className="mb-2 text-[9px] tracking-[0.08em] text-[#8a8a8a]">
         {label} · expires in {formatCodeExpiry(expiresAt)}
       </p>
-      <p className="font-mono text-2xl tracking-[0.35em] text-cyan-200/90">{pin}</p>
+      <SurveyPairPinDisplay
+        pin={pin}
+        tone={label.includes("MIRAGE") ? "cyan" : "amber"}
+      />
       <p className="mt-2 text-[8px] leading-relaxed text-[#5f5f5f]">
         Type this 6-digit code on the {label.includes("MIRAGE") ? SURVEY_MIRAGE_DISPLAY : SURVEY_POWERFIST_LABEL}{" "}
         device Survey tab. Mirage finds Echo on Wi‑Fi automatically — no IP needed.

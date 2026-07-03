@@ -4,10 +4,12 @@ import type {
   MuthurOperatorBrowserRef,
   MuthurOperatorConversionRef,
   MuthurOperatorOpenFileRef,
+  MuthurSurveyAutoConnectRef,
 } from "@/lib/muthur-core/types";
 import { parseOperatorBrowserJson } from "@/lib/muthur-core/operator-browser-ref";
 import { parseOperatorConversionJson } from "@/lib/muthur-core/operator-conversion-ref";
 import { parseOperatorOpenJson } from "@/lib/muthur-core/operator-open-file-ref";
+import { parseSurveyAutoConnectJson } from "@/lib/muthur-core/survey-auto-connect-ref";
 import { stripDsmlToolMarkup } from "@/lib/muthur-core/parse-dsml-tool-calls";
 import { stripPiControlLeaseStreamMarkers } from "@/lib/muthur/control/pi-control-lease-stream";
 
@@ -19,6 +21,8 @@ const OPERATOR_OPEN_FOOTER_RE =
   /\n\n\[MUTHUR_OPERATOR_OPEN\]([\s\S]*?)\[\/MUTHUR_OPERATOR_OPEN\]\s*$/;
 const OPERATOR_BROWSER_FOOTER_RE =
   /\n\n\[MUTHUR_OPERATOR_BROWSER\]([\s\S]*?)\[\/MUTHUR_OPERATOR_BROWSER\]\s*$/;
+const SURVEY_AUTO_CONNECT_FOOTER_RE =
+  /\n\n\[MUTHUR_SURVEY_AUTO_CONNECT\]([\s\S]*?)\[\/MUTHUR_SURVEY_AUTO_CONNECT\]\s*$/;
 const VERIFY_RECEIPT_FOOTER_RE =
   /\n\n\[MUTHUR_VERIFY_RECEIPT\]([\s\S]*?)\[\/MUTHUR_VERIFY_RECEIPT\]\s*$/;
 const TOOLS_USED_FOOTER_RE = /\n\n\[MUTHUR_TOOLS_USED\]([\s\S]*?)\[\/MUTHUR_TOOLS_USED\]/;
@@ -99,6 +103,7 @@ export function appendMuthurStreamFooters(
   operatorOpenFile?: MuthurOperatorOpenFileRef | null,
   codingVerify?: MuthurCodingVerifyReceipt | null,
   operatorBrowser?: MuthurOperatorBrowserRef | null,
+  surveyAutoConnect?: MuthurSurveyAutoConnectRef | null,
 ): string {
   let out = text;
   if (toolsUsed.length > 0) {
@@ -112,6 +117,9 @@ export function appendMuthurStreamFooters(
   }
   if (operatorBrowser) {
     out += `\n\n[MUTHUR_OPERATOR_BROWSER]${JSON.stringify(operatorBrowser)}[/MUTHUR_OPERATOR_BROWSER]`;
+  }
+  if (surveyAutoConnect) {
+    out += `\n\n[MUTHUR_SURVEY_AUTO_CONNECT]${JSON.stringify(surveyAutoConnect)}[/MUTHUR_SURVEY_AUTO_CONNECT]`;
   }
   if (operatorEdits.length > 0) {
     out += `\n\n[MUTHUR_OPERATOR_EDITS]${JSON.stringify(operatorEdits)}[/MUTHUR_OPERATOR_EDITS]`;
@@ -129,6 +137,7 @@ export function splitMuthurStreamPayload(text: string): {
   operatorConversion: MuthurOperatorConversionRef | null;
   operatorOpenFile: MuthurOperatorOpenFileRef | null;
   operatorBrowser: MuthurOperatorBrowserRef | null;
+  surveyAutoConnect: MuthurSurveyAutoConnectRef | null;
   codingVerify: MuthurCodingVerifyReceipt | null;
   toolsUsed: string;
 } {
@@ -137,6 +146,7 @@ export function splitMuthurStreamPayload(text: string): {
   let operatorConversion: MuthurOperatorConversionRef | null = null;
   let operatorOpenFile: MuthurOperatorOpenFileRef | null = null;
   let operatorBrowser: MuthurOperatorBrowserRef | null = null;
+  let surveyAutoConnect: MuthurSurveyAutoConnectRef | null = null;
   let codingVerify: MuthurCodingVerifyReceipt | null = null;
 
   const verifyMatch = body.match(VERIFY_RECEIPT_FOOTER_RE);
@@ -163,6 +173,12 @@ export function splitMuthurStreamPayload(text: string): {
     operatorBrowser = parseOperatorBrowserJson(browserMatch[1]);
   }
 
+  const surveyMatch = body.match(SURVEY_AUTO_CONNECT_FOOTER_RE);
+  if (surveyMatch) {
+    body = body.slice(0, surveyMatch.index ?? body.length);
+    surveyAutoConnect = parseSurveyAutoConnectJson(surveyMatch[1]);
+  }
+
   const conversionMatch = body.match(OPERATOR_CONVERSION_FOOTER_RE);
   if (conversionMatch) {
     body = body.slice(0, conversionMatch.index ?? body.length);
@@ -183,7 +199,7 @@ export function splitMuthurStreamPayload(text: string): {
       .replace(/^=+$\n?/gm, "")
       .trim(),
   );
-  return { displayText, operatorEdits, operatorConversion, operatorOpenFile, operatorBrowser, codingVerify, toolsUsed };
+  return { displayText, operatorEdits, operatorConversion, operatorOpenFile, operatorBrowser, surveyAutoConnect, codingVerify, toolsUsed };
 }
 
 /** Pick text to commit after uplink — never drop a visible stream body when footers strip to empty. */
