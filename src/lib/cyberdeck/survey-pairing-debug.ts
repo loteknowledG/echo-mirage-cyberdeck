@@ -1,6 +1,7 @@
 "use client";
 
 import { getOrCreateSurveyNodeId } from "@/lib/cyberdeck/survey-mode";
+import { isSurveyPairingDebugEnabled } from "@/lib/cyberdeck/survey-boundary";
 import { notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
 import {
   fetchEchoRemoteSurveyCodesClient,
@@ -25,7 +26,7 @@ function shellLabel(): string {
 
 export function notifySurveyPairingDebug(text: string): void {
   const line = text.trim();
-  if (!line) return;
+  if (!line || !isSurveyPairingDebugEnabled()) return;
   notifySurveyMuthurArchive(`${DEBUG_PREFIX} ${line}`);
 }
 

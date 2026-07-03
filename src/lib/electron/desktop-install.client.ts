@@ -194,6 +194,56 @@ export function isPwaStandaloneSession(): boolean {
   );
 }
 
+export type SurveyCyberdeckShellKind = "desktop" | "pwa" | "browser";
+
+export type SurveyCyberdeckShellInfo = {
+  kind: SurveyCyberdeckShellKind;
+  label: string;
+  detail: string;
+  /** Direct HTTP pair to Echo Satellite (LAN/Tailscale/localhost). */
+  canDirectPairEcho: boolean;
+};
+
+export function resolveSurveyCyberdeckShell(): SurveyCyberdeckShellInfo {
+  if (typeof window === "undefined") {
+    return {
+      kind: "browser",
+      label: "BROWSER",
+      detail: "unknown",
+      canDirectPairEcho: false,
+    };
+  }
+
+  const host = window.location.hostname;
+  const origin = `${window.location.protocol}//${host}${window.location.port ? `:${window.location.port}` : ""}`;
+
+  if (isEchoMirageDesktopShell()) {
+    return {
+      kind: "desktop",
+      label: "DESKTOP",
+      detail: `Electron shell · ${origin}`,
+      canDirectPairEcho: true,
+    };
+  }
+
+  if (isPwaStandaloneSession()) {
+    return {
+      kind: "pwa",
+      label: "PWA",
+      detail: `Installed app · ${host}`,
+      canDirectPairEcho: false,
+    };
+  }
+
+  const localhost = host === "localhost" || host === "127.0.0.1";
+  return {
+    kind: "browser",
+    label: "BROWSER",
+    detail: localhost ? `Browser tab · ${origin}` : `Browser tab · ${host}`,
+    canDirectPairEcho: window.location.protocol === "http:" && localhost,
+  };
+}
+
 export function subscribePwaInstallPrompt(
   onPrompt: (event: BeforeInstallPromptEvent) => void,
 ): () => void {

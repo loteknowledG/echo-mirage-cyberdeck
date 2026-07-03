@@ -240,7 +240,16 @@
       "@google/genai",
       "@mongodb-js/zstd",
       "electron",
-      "node-screenshots"
+      "electron-winstaller",
+      "esbuild",
+      "koffi",
+      "node-liblzma",
+      "node-pty",
+      "node-screenshots",
+      "protobufjs",
+      "puppeteer",
+      "sharp",
+      "unrs-resolver"
     ]
   },
   "build": {

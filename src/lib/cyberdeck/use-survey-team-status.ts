@@ -17,6 +17,7 @@ import {
   readSurveyPowerfistPairCredentials,
   type EchoSurveyStatus,
 } from "@/lib/cyberdeck/survey-pairing-client";
+import { isSurveyLegacyPairingEnabled } from "@/lib/cyberdeck/survey-boundary";
 
 const REFRESH_MS = 3000;
 
@@ -54,6 +55,7 @@ export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promi
   const [status, setStatus] = useState<SurveyTeamStatus>(EMPTY_SPY_TEAM_STATUS);
 
   const refresh = useCallback(async () => {
+    const legacyPairing = isSurveyLegacyPairingEnabled();
     const mirageCreds = readSurveyMiragePairCredentials();
     const powerfistSpyCreds = readSurveyPowerfistPairCredentials();
     const echoHost = mirageCreds?.echoHost ?? powerfistSpyCreds?.echoHost ?? null;
@@ -74,7 +76,7 @@ export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promi
       echoPowerfist = echoLocal.pairedPowerfist
         ? linkFromBool(true, `device ${echoLocal.pairedPowerfist.deviceId.slice(0, 8)}…`)
         : linkFromBool(false, "Waiting for PowerFist code.");
-    } else if (echoHost) {
+    } else if (legacyPairing && echoHost) {
       remote = await fetchEchoRemoteSurveyStatusClient(echoHost, echoHttpPort);
       if (remote.ok) {
         const remoteMirages = normalizePairedMirages(remote);
@@ -87,7 +89,7 @@ export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promi
       }
     }
 
-    if (mirageCreds) {
+    if (legacyPairing && mirageCreds) {
       const linkActive = await isSpyLinkActive("mirage", mirageCreds);
       echoMirage = linkFromBool(
         linkActive !== false,
@@ -97,7 +99,7 @@ export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promi
       );
     }
 
-    if (powerfistSpyCreds) {
+    if (legacyPairing && powerfistSpyCreds) {
       const linkActive = await isSpyLinkActive("powerfist", powerfistSpyCreds);
       echoPowerfist = linkFromBool(
         linkActive !== false,

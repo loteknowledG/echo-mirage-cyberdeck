@@ -17,6 +17,11 @@ import {
 } from "@/lib/cyberdeck/survey-pairing-client";
 import { fetchSurveyRelayBundle } from "@/lib/cyberdeck/survey-relay.client";
 import { emitSurveyPairingDiagnostics, notifySurveyPairingDebug } from "@/lib/cyberdeck/survey-pairing-debug";
+import {
+  clearSurveyPairPinDraft,
+  readSurveyPairPinDraft,
+  writeSurveyPairPinDraft,
+} from "@/lib/cyberdeck/survey-pair-pin-draft";
 import { SURVEY_PAIRING_BUNDLE_EVENT, type SurveyPairingBundlePush } from "@/lib/cyberdeck/survey-team-socket-types";
 
 type SurveyPairPinFormProps = {
@@ -75,6 +80,53 @@ function readLastEchoNodeId(role: "mirage" | "powerfist"): string {
   return readSurveyPowerfistPairCredentials()?.echoNodeId ?? "";
 }
 
+function readInitialPairFormState(
+  role: "mirage" | "powerfist",
+  defaultEchoHost?: string | null,
+  useCloudRelay = false,
+): { echoHost: string; echoHttpPort: string; pin: string; echoNodeId: string } {
+  const draft = readSurveyPairPinDraft(role);
+  if (draft) {
+    return draft;
+  }
+
+  const fromUrl = readPairingUrlDefaults();
+  const echoNodeId = readLastEchoNodeId(role) || fromUrl.echoNodeId;
+
+  if (useCloudRelay) {
+    return {
+      echoHost: "",
+      echoHttpPort: String(DEFAULT_ECHO_HTTP_PORT),
+      pin: "",
+      echoNodeId,
+    };
+  }
+
+  const lastHost =
+    readLastEchoHost(role) || defaultEchoHost?.trim() || fromUrl.echoHost || "";
+  const lastPort =
+    readLastEchoHost(role) || defaultEchoHost
+      ? readLastEchoPort(role)
+      : fromUrl.echoPort || String(DEFAULT_ECHO_HTTP_PORT);
+
+  if (!lastHost) {
+    return {
+      echoHost: "",
+      echoHttpPort: String(DEFAULT_ECHO_HTTP_PORT),
+      pin: "",
+      echoNodeId,
+    };
+  }
+
+  const formatted = formatEchoEndpointFields(lastHost, lastPort);
+  return {
+    echoHost: formatted.host,
+    echoHttpPort: formatted.port,
+    pin: "",
+    echoNodeId,
+  };
+}
+
 export function SurveyPairPinForm({
   role,
   roleLabel,
@@ -85,32 +137,29 @@ export function SurveyPairPinForm({
   pushPrefill,
   onPaired,
 }: SurveyPairPinFormProps) {
-  const [echoHost, setEchoHost] = useState("");
-  const [echoHttpPort, setEchoHttpPort] = useState(String(DEFAULT_ECHO_HTTP_PORT));
-  const [echoNodeId, setEchoNodeId] = useState("");
-  const [pin, setPin] = useState("");
+  const [formState, setFormState] = useState(() =>
+    readInitialPairFormState(role, defaultEchoHost, useCloudRelay),
+  );
+  const { echoHost, echoHttpPort, echoNodeId, pin } = formState;
+  const setEchoHost = useCallback((value: string) => {
+    setFormState((prev) => ({ ...prev, echoHost: value }));
+  }, []);
+  const setEchoHttpPort = useCallback((value: string) => {
+    setFormState((prev) => ({ ...prev, echoHttpPort: value }));
+  }, []);
+  const setEchoNodeId = useCallback((value: string) => {
+    setFormState((prev) => ({ ...prev, echoNodeId: value }));
+  }, []);
+  const setPin = useCallback((value: string) => {
+    setFormState((prev) => ({ ...prev, pin: value }));
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    const fromUrl = readPairingUrlDefaults();
-    const lastNodeId = readLastEchoNodeId(role) || fromUrl.echoNodeId;
-    if (lastNodeId) setEchoNodeId(lastNodeId);
-
-    if (useCloudRelay) return;
-
-    const lastHost =
-      readLastEchoHost(role) || defaultEchoHost?.trim() || fromUrl.echoHost || "";
-    const lastPort =
-      readLastEchoHost(role) || defaultEchoHost
-        ? readLastEchoPort(role)
-        : fromUrl.echoPort || String(DEFAULT_ECHO_HTTP_PORT);
-    if (!lastHost) return;
-    const formatted = formatEchoEndpointFields(lastHost, lastPort);
-    setEchoHost(formatted.host);
-    setEchoHttpPort(formatted.port);
-  }, [role, defaultEchoHost, useCloudRelay]);
+    writeSurveyPairPinDraft(role, { echoHost, echoHttpPort, pin, echoNodeId });
+  }, [role, echoHost, echoHttpPort, pin, echoNodeId]);
 
   const pullRelayBundle = useCallback(async (teamId: string) => {
     const id = teamId.trim();
@@ -177,19 +226,22 @@ export function SurveyPairPinForm({
     return () => window.removeEventListener(SURVEY_PAIRING_BUNDLE_EVENT, onBundle);
   }, [role]);
 
-  const syncEndpointFields = useCallback(
-    (hostInput: string, portInput: string) => {
-      const formatted = formatEchoEndpointFields(hostInput, portInput);
-      setEchoHost(formatted.host);
-      setEchoHttpPort(formatted.port);
-      return formatted;
-    },
-    [],
-  );
-
-  const handlePinChange = useCallback((next: string) => {
-    setPin(normalizeSurveyPairPin(next));
+  const syncEndpointFields = useCallback((hostInput: string, portInput: string) => {
+    const formatted = formatEchoEndpointFields(hostInput, portInput);
+    setFormState((prev) => ({
+      ...prev,
+      echoHost: formatted.host,
+      echoHttpPort: formatted.port,
+    }));
+    return formatted;
   }, []);
+
+  const handlePinChange = useCallback(
+    (next: string) => {
+      setPin(normalizeSurveyPairPin(next));
+    },
+    [setPin],
+  );
 
   const handleAddressChange = useCallback(
     (value: string) => {
@@ -242,6 +294,7 @@ export function SurveyPairPinForm({
       }
       onPaired(result);
       setPin("");
+      clearSurveyPairPinDraft(role);
       setError(null);
       setStatus(`Linked with ${SURVEY_ECHO_DISPLAY} via cloud relay.`);
       return;
@@ -290,6 +343,7 @@ export function SurveyPairPinForm({
 
     onPaired(result);
     setPin("");
+    clearSurveyPairPinDraft(role);
     setError(null);
     setStatus(`Linked with ${SURVEY_ECHO_DISPLAY} at ${result.echoHost}:${result.httpPort}.`);
     syncEndpointFields(result.echoHost, String(result.httpPort));

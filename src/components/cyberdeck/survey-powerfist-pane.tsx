@@ -15,6 +15,7 @@ import {
   formatSurveyEchoPowerfistLinkedLine,
   notifySpyMuthurArchive,
 } from "@/lib/cyberdeck/survey-chat";
+import { isSurveyLegacyPairingEnabled } from "@/lib/cyberdeck/survey-boundary";
 import {
   readSurveyPowerfistPairCredentials,
   saveSurveyPowerfistPairCredentials,
@@ -24,12 +25,13 @@ import { useSurveyTeamSocket } from "@/lib/cyberdeck/survey-team-socket.client";
 export function SurveyPowerfistPane() {
   const { paired, terminated, terminatedMessage, resetLinkWatch } = useSurveyEchoLinkWatch("powerfist");
   const [status, setStatus] = useState<string | null>(null);
+  const legacyPairing = isSurveyLegacyPairingEnabled();
   const savedCreds = readSurveyPowerfistPairCredentials();
   const teamSocket = useSurveyTeamSocket({
     role: "powerfist",
     echoHost: savedCreds?.echoHost ?? null,
     httpPort: savedCreds?.httpPort ?? 3050,
-    enabled: !paired || terminated,
+    enabled: legacyPairing && (!paired || terminated),
   });
 
   const handlePaired = useCallback(
@@ -93,15 +95,19 @@ export function SurveyPowerfistPane() {
         <p className="text-[8px] text-cyan-300/80">Team channel live with Echo Satellite.</p>
       ) : null}
 
-      <SurveyPairPinForm
-        role="powerfist"
-        roleLabel={SURVEY_POWERFIST_LABEL}
-        focusClassName="focus:border-amber-900/60"
-        buttonLabel={
-          terminated ? `Re-pair with ${SURVEY_ECHO_DISPLAY}` : `Pair with ${SURVEY_ECHO_DISPLAY}`
-        }
-        onPaired={handlePaired}
-      />
+      {legacyPairing ? (
+        <SurveyPairPinForm
+          role="powerfist"
+          roleLabel={SURVEY_POWERFIST_LABEL}
+          focusClassName="focus:border-amber-900/60"
+          buttonLabel={
+            terminated ? `Re-pair with ${SURVEY_ECHO_DISPLAY}` : `Pair with ${SURVEY_ECHO_DISPLAY}`
+          }
+          onPaired={handlePaired}
+        />
+      ) : (
+        <p className="text-[9px] text-[#8a8a8a]">Legacy PowerFist pairing frozen — Survey Hub coming.</p>
+      )}
 
       {status ? <p className="text-emerald-300/80">{status}</p> : null}
     </div>
