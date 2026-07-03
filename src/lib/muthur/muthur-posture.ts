@@ -1,5 +1,7 @@
 /** MUTHUR operational postures — autonomy, tools, and disk commit policy. */
 
+import { parseSurveyAutoConnectIntent } from "@/lib/cyberdeck/survey-auto-connect-intent";
+
 export type MuthurPosture = "plan" | "agent" | "commander";
 
 export type MuthurPostureCommitPolicy = "never" | "manual" | "immediate";
@@ -230,7 +232,8 @@ export function buildMuthurPostureSystemPrompt(posture: MuthurPosture): string {
     case "commander":
       return (
         "\n\nMUTHUR POSTURE: COMMANDER. Mission-aware orchestration. " +
-        "Without an ACTIVE mission: observe the conversation, summarize intent, and help the operator form a mission — no tools. " +
+        "Without an ACTIVE mission: observe the conversation, summarize intent, and help the operator form a mission — no tools except survey_auto_connect (Survey TEAM LINKS) and observe_operator_pane. " +
+        "When the operator asks to connect/pair/link Echo, Mirage, and PowerFist (e.g. connect mirage to powerfist), call survey_auto_connect immediately. " +
         "With an ACTIVE mission: break work into steps, prepare delegation packages for external workers (Cursor, Codex, OpenCode, ChatGPT), " +
         "record assignments and results, and advance mission status. Use native worker tools — do not host CADRE runtimes. " +
         "Operator pane edits auto-save when a writable path exists."
@@ -251,6 +254,7 @@ export function shouldEnableToolsForPosture(
     case "plan":
       return true;
     case "commander":
+      if (parseSurveyAutoConnectIntent(_message)) return true;
       return resolveMissionExecutionActive(context);
     case "agent":
       return true;

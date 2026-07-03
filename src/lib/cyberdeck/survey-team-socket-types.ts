@@ -11,6 +11,7 @@ export type SurveyPairingBundlePush = {
   echoHost: string;
   httpPort: number;
   miragePin: string;
+  powerfistPin?: string;
   mirageUrl?: string | null;
   echoNodeId?: string | null;
   sessionEpoch?: number | null;

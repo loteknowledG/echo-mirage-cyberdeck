@@ -284,7 +284,9 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
               ? "ENTER GATEWAY KEY..."
               : glyphModeActive
                 ? "⟁ Glyph mode on — compose on ⟁ tab; $ here is MUTHUR chat"
-                : "Enter command or message... (Shift+Enter for new line)"
+                : isStreaming
+                  ? "Steer MUTHUR — type and Enter to interrupt (Shift+Enter for new line)"
+                  : "Enter command or message... (Shift+Enter for new line)"
           }
           style={{ height: TEXTAREA_MIN_HEIGHT_PX }}
           className="muthur-command-input min-h-[44px] max-h-[200px] min-w-0 flex-1 resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-1 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"

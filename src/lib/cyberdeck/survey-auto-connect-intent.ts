@@ -1,6 +1,14 @@
+const SURVEY_LINK_VERB = "(?:connect|pair|wire|link)";
+const SURVEY_NODE = "(?:echo|mirage|powerfist)";
+const SURVEY_NODE_JOIN = "(?:\\s+(?:to|with|and|,|↔)\\s+|\\s*,\\s*)";
+
+function stripMuthurPrefix(input: string): string {
+  return input.replace(/^muthur\s*,?\s*/i, "").trim();
+}
+
 /** Local chat commands — wire Survey TEAM LINKS without opening the Survey tab. */
 export function parseSurveyAutoConnectIntent(input: string): boolean {
-  const trimmed = input.trim();
+  const trimmed = stripMuthurPrefix(input.trim());
   if (!trimmed) return false;
 
   if (
@@ -12,15 +20,28 @@ export function parseSurveyAutoConnectIntent(input: string): boolean {
   }
 
   if (
-    /^(?:connect|pair|wire|link)\s+(?:the\s+)?(?:survey\s+)?team(?:\s+links)?$/i.test(trimmed)
+    new RegExp(`^${SURVEY_LINK_VERB}\\s+(?:the\\s+)?(?:survey\\s+)?team(?:\\s+links?)?$`, "i").test(
+      trimmed,
+    )
   ) {
     return true;
   }
 
   if (
-    /^(?:connect|pair|wire|link)\s+(?:echo|mirage|powerfist)(?:\s*,\s*(?:echo|mirage|powerfist))*\s*(?:for\s+)?survey$/i.test(
-      trimmed,
-    )
+    new RegExp(
+      `^${SURVEY_LINK_VERB}\\s+${SURVEY_NODE}(?:${SURVEY_NODE_JOIN}${SURVEY_NODE})*\\s*(?:for\\s+)?survey$`,
+      "i",
+    ).test(trimmed)
+  ) {
+    return true;
+  }
+
+  // connect mirage to powerfist · link echo and mirage · pair powerfist with echo
+  if (
+    new RegExp(
+      `^${SURVEY_LINK_VERB}\\s+${SURVEY_NODE}(?:${SURVEY_NODE_JOIN}${SURVEY_NODE})+$`,
+      "i",
+    ).test(trimmed)
   ) {
     return true;
   }

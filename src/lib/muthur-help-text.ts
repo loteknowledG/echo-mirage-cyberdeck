@@ -186,6 +186,7 @@ clear · clear chat · muthur clear  — wipe chat log (local)
 
 Survey TEAM LINKS (desktop, Echo Satellite running):
   connect team links · survey auto connect
+  connect mirage to powerfist · link echo and mirage
   Or ask in natural language — MUTHUR calls survey_auto_connect.
 
 Memory context from MUTHUR memory is attached automatically.

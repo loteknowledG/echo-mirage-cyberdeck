@@ -1353,6 +1353,11 @@ export default function CyberdeckApp() {
   const gatewayBlankSettingsRef = useRef<HTMLDivElement>(null);
   const cyberdeckRootRef = useRef<HTMLDivElement>(null);
   const chatAbortRef = useRef<AbortController | null>(null);
+  const steerAbortRef = useRef(false);
+  const steerPendingRef = useRef<{
+    userMessage: string;
+    options?: { preserveSelectedSurface?: boolean; surveyMission?: boolean };
+  } | null>(null);
   const modelProbeAbortRef = useRef<AbortController | null>(null);
   const modelProbeCacheRef = useRef<Record<string, { status: string; at: number }>>({});
   const modelProbeLastAtRef = useRef<Record<string, number>>({});
@@ -5374,11 +5379,14 @@ export default function CyberdeckApp() {
   const handleSend = async (
     messageText?: string,
     options?: { preserveSelectedSurface?: boolean; surveyMission?: boolean },
+    sendOptions?: { skipAppendUser?: boolean },
   ) => {
     const userMessage = (messageText ?? messageInputRef.current?.getValue() ?? "").trim();
     if (!userMessage) return;
 
     if (parseMuthurClearChatIntent(userMessage)) {
+      steerPendingRef.current = null;
+      steerAbortRef.current = false;
       abortMotherSpeech();
       if (chatAbortRef.current) {
         chatAbortRef.current.abort();
@@ -5405,7 +5413,32 @@ export default function CyberdeckApp() {
       return;
     }
 
-    if (isStreaming) return;
+    const tabCommand = parseCustomTabCommand(userMessage);
+    if (!sendOptions?.skipAppendUser) {
+      setInputHistory((prev) => [...prev, userMessage]);
+      messageInputRef.current?.clear();
+      pinMuthurChatToBottom();
+      setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
+    }
+
+    if (isStreaming) {
+      steerPendingRef.current = { userMessage, options };
+      steerAbortRef.current = true;
+      if (chatAbortRef.current) {
+        chatAbortRef.current.abort();
+      } else {
+        setIsStreaming(false);
+        setStreamText("");
+        setStreamToolTrace("");
+        const pending = steerPendingRef.current;
+        steerPendingRef.current = null;
+        if (pending) {
+          void handleSend(pending.userMessage, pending.options, { skipAppendUser: true });
+        }
+      }
+      return;
+    }
+
     const providerCooldownUntil = providerRateLimitUntilRef.current[activeProvider] || 0;
     if (providerCooldownUntil && Date.now() < providerCooldownUntil) {
       setMessages((prev) => [
@@ -5427,12 +5460,6 @@ export default function CyberdeckApp() {
       ]);
       return;
     }
-
-    const tabCommand = parseCustomTabCommand(userMessage);
-    setInputHistory((prev) => [...prev, userMessage]);
-    messageInputRef.current?.clear();
-    pinMuthurChatToBottom();
-    setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
 
     if (muthurPosture === "agent" && piControlLease.snapshot.activeLease) {
       try {
@@ -6576,6 +6603,11 @@ ${diff}`;
       const msg = String(err);
       setMuthurResponseFailed(true);
       if (msg.includes("AbortError")) {
+        if (steerAbortRef.current) {
+          steerAbortRef.current = false;
+          setStreamText("");
+          return;
+        }
         setMessages((prev) => [
           ...prev,
           {
@@ -6636,6 +6668,11 @@ ${diff}`;
       chatAbortRef.current = null;
       setStreamToolTrace("");
       setIsStreaming(false);
+      const pendingSteer = steerPendingRef.current;
+      if (pendingSteer) {
+        steerPendingRef.current = null;
+        void handleSend(pendingSteer.userMessage, pendingSteer.options, { skipAppendUser: true });
+      }
     }
   };
 
@@ -6781,6 +6818,8 @@ ${diff}`;
   });
 
   const handleStop = useCallback(() => {
+    steerPendingRef.current = null;
+    steerAbortRef.current = false;
     abortMotherSpeech();
     void loadComputerUse().then((cu) => {
       cu.emergencyStop();
@@ -8292,7 +8331,7 @@ ${diff}`;
                   </button>
                   <MuthurPostureRoller
                     posture={muthurPosture}
-                    disabled={isStreaming}
+                    disabled={false}
                     onChange={handleMuthurPostureChange}
                   />
                   </div>
@@ -8449,6 +8488,39 @@ ${diff}`;
                       </CyberdeckComposerControl>
                       </CyberdeckControlTooltip>
                     ) : (
+                      <>
+                        {canSendInput ? (
+                          <CyberdeckControlTooltip label="Steer — send now (interrupts current reply)">
+                            <CyberdeckComposerControl
+                              control={{ size: "send", signal: true }}
+                              onClick={() => void handleSend()}
+                              aria-label="Steer MUTHUR"
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                width="16"
+                                height="16"
+                                fill="none"
+                                aria-hidden="true"
+                                className="h-4 w-4 shrink-0"
+                              >
+                                <path
+                                  d="M3 11.5L20.5 3.5L13.5 20.5L11.2 13.8L3 11.5Z"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                <path
+                                  d="M11.3 13.7L20.4 3.6"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            </CyberdeckComposerControl>
+                          </CyberdeckControlTooltip>
+                        ) : null}
                       <CyberdeckControlTooltip label="Stop">
                       <CyberdeckComposerControl
                         control={{
@@ -8465,6 +8537,7 @@ ${diff}`;
                         </svg>
                       </CyberdeckComposerControl>
                       </CyberdeckControlTooltip>
+                      </>
                     )}
                     </CyberdeckPaneTooltipProvider>
                   </div>

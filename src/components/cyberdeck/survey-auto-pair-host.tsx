@@ -19,7 +19,7 @@ export function SurveyAutoPairHost() {
     if (!isSurveyAutoPairEnabled()) return;
 
     let cancelled = false;
-    const timers: ReturnType<typeof setTimeout>[] = [];
+    const cleanups: Array<() => void> = [];
 
     const run = async (force: boolean, quiet: boolean) => {
       if (runningRef.current || cancelled) return;
@@ -34,11 +34,10 @@ export function SurveyAutoPairHost() {
     };
 
     for (const delayMs of AUTO_PAIR_RETRY_MS) {
-      timers.push(
-        window.setTimeout(() => {
-          void run(true, delayMs > 0);
-        }, delayMs),
-      );
+      const timerId = window.setTimeout(() => {
+        void run(true, delayMs > 0);
+      }, delayMs);
+      cleanups.push(() => window.clearTimeout(timerId));
     }
 
     const onRequest = () => {
@@ -48,8 +47,8 @@ export function SurveyAutoPairHost() {
 
     return () => {
       cancelled = true;
-      for (const timer of timers) {
-        window.clearTimeout(timer);
+      for (const cleanup of cleanups) {
+        cleanup();
       }
       window.removeEventListener(SURVEY_AUTO_PAIR_REQUEST_EVENT, onRequest);
     };
