@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchPowerfistQrSession } from "@/lib/cyberdeck/powerfist-remote-socket";
+import { fetchPowerfistQrSession, readPowerfistRemoteCredentials } from "@/lib/cyberdeck/powerfist-remote-socket";
 import {
   EMPTY_SPY_TEAM_STATUS,
   linkFromBool,
@@ -131,10 +131,16 @@ export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promi
     }
 
     const pfSession = await fetchPowerfistQrSession();
+    const savedRemote = readPowerfistRemoteCredentials();
     if (pfSession.ok && pfSession.pairedRemote) {
       miragePowerfist = linkFromBool(
         true,
         `device ${pfSession.pairedRemote.deviceId.slice(0, 8)}…`,
+      );
+    } else if (savedRemote) {
+      miragePowerfist = linkFromBool(
+        false,
+        `Saved hub device ${savedRemote.deviceId.slice(0, 8)}… — auto-reconnect pending.`,
       );
     }
 

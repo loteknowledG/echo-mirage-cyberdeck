@@ -77,6 +77,11 @@ export function attachSurveyTeamHub(httpServer) {
       logger.log(`survey-team: ${role} joined (${socket.id.slice(0, 8)}…)`);
     });
 
+    socket.on("survey:mirage-queue-control", (payload) => {
+      if (!payload?.control) return;
+      socket.broadcast.emit("survey:mirage-queue-control", payload);
+    });
+
     socket.on("disconnect", () => {
       members.delete(socket.id);
       broadcastTeamStatus();

@@ -31,3 +31,9 @@ export type SurveyTeamLinkedNotice = {
   deviceId?: string | null;
   at?: string;
 };
+
+export type SurveyMirageQueueControlPayload = {
+  control: { action: "select" | "next" | "prev"; index?: number };
+  source: "mirage" | "powerfist";
+  clientId?: string;
+};

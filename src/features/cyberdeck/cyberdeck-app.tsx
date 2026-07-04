@@ -349,6 +349,10 @@ import {
 } from "@/lib/cyberdeck/powerfist-events";
 import { connectPowerfistDeckSocket, fetchPowerfistDeckConnect } from "@/lib/cyberdeck/powerfist-remote-socket";
 import {
+  SURVEY_MIRAGE_ITEM_DISPLAY_EVENT,
+  type SurveyMirageQueueItem,
+} from "@/lib/cyberdeck/survey-mirage-item-queue.client";
+import {
   SURVEY_MISSION_SOLVE_EVENT,
   type SurveyMissionSolveDetail,
 } from "@/lib/cyberdeck/powerfist-mission.types";
@@ -6806,12 +6810,39 @@ ${diff}`;
         (event as CustomEvent<SurveyMissionSolveDetail>).detail,
       );
     };
+    const handleMirageItemDisplay = (event: Event) => {
+      const item = (event as CustomEvent<SurveyMirageQueueItem>).detail;
+      if (!item?.imageDataUrl) return;
+      revokeOperatorBlobUrl(operatorPreviewBlobUrlRef.current);
+      operatorPreviewBlobUrlRef.current = null;
+      setOperatorDroppedAsset({
+        kind: "image",
+        name: `mirage-${item.id.slice(0, 8)}.png`,
+        mimeType: "image/png",
+        size: 0,
+        surface: "image",
+        imageSrc: item.imageDataUrl,
+      });
+      setOperatorSurfaceMode("workspace");
+      setOperatorDocMode("edit");
+      const displayLine = `SURVEY // DISPLAY // ${item.title}`;
+      setMessages((prev) => [...prev, { role: "system", text: displayLine }]);
+      appendSurveyChatMessage({ role: "system", text: displayLine });
+      if (item.transcript?.trim() || item.prompt?.trim()) {
+        appendSurveyChatMessage({
+          role: "user",
+          text: item.transcript?.trim() || item.prompt.trim(),
+        });
+      }
+    };
     window.addEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
     window.addEventListener(SURVEY_MISSION_SOLVE_EVENT, handleSurveyMissionEvent);
+    window.addEventListener(SURVEY_MIRAGE_ITEM_DISPLAY_EVENT, handleMirageItemDisplay);
     return () => {
       cancelled = true;
       window.removeEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
       window.removeEventListener(SURVEY_MISSION_SOLVE_EVENT, handleSurveyMissionEvent);
+      window.removeEventListener(SURVEY_MIRAGE_ITEM_DISPLAY_EVENT, handleMirageItemDisplay);
       channel?.close();
       deckSocket?.close();
     };

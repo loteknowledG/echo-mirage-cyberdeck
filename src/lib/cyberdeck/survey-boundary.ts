@@ -64,4 +64,21 @@ export function isSurveyAutoPairEnabled(): boolean {
 }
 
 export const SURVEY_HUB_NOTICE =
-  "Survey pairing is moving to Survey Hub (central server + thin clients). Legacy IP/Tailscale pairing is frozen — MUTHUR, memory, and capture missions stay in cyberdeck.";
+  "Survey Hub wires Echo ↔ Mirage ↔ PowerFist automatically. Open Echo Satellite Survey tab, enter your team ID once, then Connect team.";
+
+/** Survey Hub — cloud + desktop auto-connect. Default on. */
+export function isSurveyHubEnabled(): boolean {
+  if (typeof window === "undefined") {
+    if (process.env.NEXT_PUBLIC_SURVEY_HUB === "0") return false;
+    return true;
+  }
+  try {
+    const override = window.localStorage.getItem("survey-hub");
+    if (override === "1") return true;
+    if (override === "0") return false;
+  } catch {
+    /* ignore */
+  }
+  if (process.env.NEXT_PUBLIC_SURVEY_HUB === "0") return false;
+  return true;
+}

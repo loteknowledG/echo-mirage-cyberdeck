@@ -5,7 +5,8 @@ import { SurveyPairPinForm } from "@/components/cyberdeck/survey-pair-pin-form";
 import { SurveyPairOtpInput } from "@/components/cyberdeck/survey-pair-otp-input";
 import { SurveyPairPinCopyHint } from "@/components/cyberdeck/survey-pair-pin-display";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
-import { PowerfistDeckEmbed } from "@/components/cyberdeck/powerfist-deck-embed";
+import { SurveyTriforceDeckEmbed } from "@/components/cyberdeck/survey-triforce-deck-embed";
+import { SurveyMirageQueueTeamHost } from "@/components/cyberdeck/survey-mirage-queue-sync";
 import {
   ECHO_SURVEY_TERMINATED_MESSAGE,
   SURVEY_ECHO_DISPLAY,
@@ -169,7 +170,9 @@ function SurveyPowerfistPairingPanel() {
           onPaired={handlePaired}
         />
       ) : (
-        <p className="text-[9px] text-[#8a8a8a]">Legacy PowerFist pairing frozen — Survey Hub coming.</p>
+        <p className="text-[9px] text-[#8a8a8a]">
+          Use Survey Hub above — Connect team wires Echo + PowerFist automatically.
+        </p>
       )}
 
       {status ? <p className="text-emerald-300/80">{status}</p> : null}
@@ -221,19 +224,9 @@ export function SurveyPowerfistPane() {
   if (tripleLinked) {
     return (
       <div className="cyberdeck-survey-powerfist-deck cyberdeck-rola-dex-pane flex min-h-0 flex-1 flex-col overflow-hidden bg-[#050807]">
-        <div className="shrink-0 border-b border-[#1a1a1a] bg-[#080808] px-4 py-2 font-mono">
-          <p className="text-[9px] tracking-[0.08em] text-emerald-300/90">
-            TRIPLE LINKED // {SURVEY_POWERFIST_LABEL} deck · hold a card to arm, then push to MUTHUR
-          </p>
-          <p className="mt-0.5 text-[8px] text-[#6a6a6a]">
-            Swipe the card matrix — same deck as the MIRAGE PowerFist rail pane.
-          </p>
-        </div>
-        <div className="relative min-h-[min(520px,58vh)] min-w-0 flex-1">
-          <PowerfistDeckEmbed
-            embedSurface="survey"
-            className="absolute inset-0 min-h-0 overflow-hidden"
-          />
+        <SurveyMirageQueueTeamHost role="powerfist" />
+        <div className="relative min-h-0 min-w-0 flex-1">
+          <SurveyTriforceDeckEmbed className="absolute inset-0 min-h-0 overflow-hidden" />
         </div>
       </div>
     );

@@ -311,7 +311,7 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
     function: {
       name: "survey_auto_connect",
       description:
-        "Zero-click Survey TEAM LINKS on desktop cyberdeck: read Echo Satellite pairing codes and wire Echo↔Mirage, Echo↔PowerFist, and Mirage↔PowerFist in this session. Call when the operator asks to connect, pair, link, or auto-connect Survey / team links / Echo / Mirage / PowerFist. No Survey tab clicks. Prerequisite: Echo Satellite Survey tab open so codes exist (same machine: 127.0.0.1:3050).",
+        "Survey Hub: wire Echo↔Mirage↔PowerFist with one action. Desktop reads Echo pins locally; HTTPS uses cloud relay with saved team ID. Call when the operator asks to connect/pair/link the survey team. Prerequisite: Echo Satellite Survey tab open.",
       parameters: {
         type: "object",
         properties: {

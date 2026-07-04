@@ -29,12 +29,16 @@ import {
   type PowerfistSocketStatus,
 } from "@/lib/cyberdeck/powerfist-remote-socket";
 import { PowerfistRemoteLinkBanner } from "@/components/cyberdeck/powerfist-remote-link-banner";
-import { ALL_PREVIEW_DECKS } from "./preview-data";
+import { ALL_PREVIEW_DECKS, type PreviewDeckWithTarget } from "./preview-data";
 import { scrollMatrixTo, wrapIndex } from "./preview-matrix-nav";
 import { PowerfistJoystickControls } from "./powerfist-joystick-controls";
 import "./preview-matrix.css";
 
-const CARD_PLAY_TRAIL_DURATION_MS = 900;
+/** One lap around the card border trace (ms). */
+const CARD_PLAY_LAP_DURATION_MS = 900;
+/** Laps required before a held card becomes armed. */
+const CARD_PLAY_LAPS = 2;
+const CARD_PLAY_TRAIL_DURATION_MS = CARD_PLAY_LAP_DURATION_MS * CARD_PLAY_LAPS;
 const CARD_PUSH_RECEIPT_DURATION_MS = 2400;
 const CARD_PLAY_TRACE_PATH =
   "M 50 1 L 93 1 A 6 6 0 0 1 99 7 L 99 93 A 6 6 0 0 1 93 99 L 7 99 A 6 6 0 0 1 1 93 L 1 7 A 6 6 0 0 1 7 1 L 50 1";
@@ -77,7 +81,15 @@ function composerPlaceholderForArg(arg: string): string {
   }
 }
 
-export function PreviewMatrix({ embedSurface = "page" }: { embedSurface?: "page" | "survey" | "rola-dex" }) {
+export function PreviewMatrix({
+  embedSurface = "page",
+  decks,
+  onDeckCommand,
+}: {
+  embedSurface?: "page" | "survey" | "rola-dex";
+  decks?: PreviewDeckWithTarget[];
+  onDeckCommand?: (command: string) => Promise<{ ok: boolean; message: string }>;
+}) {
   const [activeDeckIndex, setActiveDeckIndex] = useState(0);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [isCompactCards, setIsCompactCards] = useState(false);
@@ -106,7 +118,8 @@ export function PreviewMatrix({ embedSurface = "page" }: { embedSurface?: "page"
   } | null>(null);
   const pushReceiptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const activeDecks = ALL_PREVIEW_DECKS;
+  const activeDecks = decks ?? ALL_PREVIEW_DECKS;
+  const surveyCommandMode = Boolean(onDeckCommand);
   const armedCard = useMemo(() => {
     if (!armedCardKey) return null;
     const [deckIndex, cardIndex] = armedCardKey.split(":").map(Number);
@@ -382,6 +395,21 @@ export function PreviewMatrix({ embedSurface = "page" }: { embedSurface?: "page"
       const deck = activeDecks[deckIndex];
       const card = deck.cards[cardIndex];
 
+      if (card.surveyCommand && onDeckCommand) {
+        const result = await onDeckCommand(card.surveyCommand);
+        if (pushReceiptTimerRef.current) clearTimeout(pushReceiptTimerRef.current);
+        setPushReceiptHtml(
+          result.ok
+            ? `<strong>${card.title}</strong> — ${result.message}`
+            : `<strong>${card.title}</strong> failed — ${result.message}`,
+        );
+        pushReceiptTimerRef.current = setTimeout(() => {
+          setPushReceiptHtml(null);
+          pushReceiptTimerRef.current = null;
+        }, CARD_PUSH_RECEIPT_DURATION_MS);
+        return;
+      }
+
       if (card.title === "Survey Capture") {
         const remote = remoteSocketRef.current;
         if (!remote) {
@@ -456,10 +484,11 @@ export function PreviewMatrix({ embedSurface = "page" }: { embedSurface?: "page"
         pushReceiptTimerRef.current = null;
       }, CARD_PUSH_RECEIPT_DURATION_MS);
     },
-    [activeDecks, applyFocus, composerText],
+    [activeDecks, applyFocus, composerText, onDeckCommand],
   );
 
   useEffect(() => {
+    if (surveyCommandMode) return;
     let cancelled = false;
     let socket: ReturnType<typeof connectPowerfistRemoteSocket> | null = null;
 
@@ -505,7 +534,7 @@ export function PreviewMatrix({ embedSurface = "page" }: { embedSurface?: "page"
       socket?.close();
       remoteSocketRef.current = null;
     };
-  }, []);
+  }, [surveyCommandMode]);
 
   const cancelCardHold = useCallback(() => {
     const hold = cardHoldRef.current;
@@ -597,9 +626,14 @@ export function PreviewMatrix({ embedSurface = "page" }: { embedSurface?: "page"
       className="powerfist-preview-root"
       data-compact-cards={isCompactCards ? "true" : "false"}
       data-embed-surface={embedSurface}
+      style={
+        {
+          "--pf-card-play-trail-ms": `${CARD_PLAY_TRAIL_DURATION_MS}ms`,
+        } as React.CSSProperties
+      }
     >
       <main className="shell" ref={paneRef}>
-        {embedSurface !== "survey" ? (
+        {embedSurface !== "survey" && !surveyCommandMode ? (
           <PowerfistRemoteLinkBanner status={remoteSocketStatus} pairMessage={pairMessage} />
         ) : null}
         <div className="powerfistMainLayout">

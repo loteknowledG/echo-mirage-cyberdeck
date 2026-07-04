@@ -41,7 +41,7 @@ async function armSelectedCard(page: import("@playwright/test").Page) {
   expect(box).not.toBeNull();
   await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
   await page.mouse.down();
-  await page.waitForTimeout(980);
+  await page.waitForTimeout(1900);
   await page.mouse.up();
   await expect(page.getByTestId("powerfist-open-card")).toBeVisible();
 }
@@ -402,7 +402,7 @@ test.describe("Rola Dex / Preview matrix", () => {
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.down();
     await expect(card).toHaveClass(/is-arming/);
-    await page.waitForTimeout(980);
+    await page.waitForTimeout(1900);
     await expect(card).not.toHaveClass(/is-arming/);
     await page.mouse.up();
     await expect(card).toHaveClass(/is-armed/);

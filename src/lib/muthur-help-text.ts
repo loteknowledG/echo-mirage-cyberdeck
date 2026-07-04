@@ -184,10 +184,11 @@ active provider model (OpenCode / OpenRouter / OpenAI).
 
 clear · clear chat · muthur clear  — wipe chat log (local)
 
-Survey TEAM LINKS (desktop, Echo Satellite running):
-  connect team links · survey auto connect
-  connect mirage to powerfist · link echo and mirage
-  Or ask in natural language — MUTHUR calls survey_auto_connect.
+Survey Hub (TEAM LINKS):
+  Open Survey tab → Connect team (or: connect team links in chat)
+  Enter Echo team ID once — saved for next time.
+  Same machine: leave team ID blank; Hub finds Echo on localhost.
+  Prerequisite: Echo Satellite Survey tab open.
 
 Memory context from MUTHUR memory is attached automatically.
 Browser snapshot included when browser pane is active.

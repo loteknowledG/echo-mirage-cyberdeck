@@ -8,9 +8,16 @@ import { getOrCreatePowerfistDeviceId } from "@/lib/cyberdeck/survey-pairing-cli
 import { notifySurveyPairingDebug } from "@/lib/cyberdeck/survey-pairing-debug";
 import { notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import {
+  applyMirageQueueControl,
+  SURVEY_MIRAGE_QUEUE_CONTROL_EVENT,
+  type SurveyMirageQueueControl,
+  type SurveyMirageQueueControlSource,
+} from "@/lib/cyberdeck/survey-mirage-item-queue.client";
+import {
   SURVEY_PAIRING_BUNDLE_EVENT,
   SURVEY_TEAM_SOCKET_PATH,
   SURVEY_TEAM_SOCKET_STATUS_EVENT,
+  type SurveyMirageQueueControlPayload,
   type SurveyPairingBundlePush,
   type SurveyTeamLinkedNotice,
   type SurveyTeamRoster,
@@ -58,6 +65,9 @@ export function useSurveyTeamSocket(options: UseSurveyTeamSocketOptions): UseSur
   const [roster, setRoster] = useState<SurveyTeamRoster | null>(null);
   const [lastBundle, setLastBundle] = useState<SurveyPairingBundlePush | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const clientIdRef = useRef(
+    typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now()),
+  );
 
   useEffect(() => {
     const host = echoHost?.trim() ?? "";
@@ -133,6 +143,13 @@ export function useSurveyTeamSocket(options: UseSurveyTeamSocketOptions): UseSur
         notifySurveyTeamStatusChanged();
       });
 
+      socket.on("survey:mirage-queue-control", (payload: SurveyMirageQueueControlPayload) => {
+        if (cancelled || !payload?.control || payload.clientId === clientIdRef.current) return;
+        applyMirageQueueControl(payload.control as SurveyMirageQueueControl, payload.source, {
+          broadcast: false,
+        });
+      });
+
       socket.on("connect_error", (error: Error) => {
         if (cancelled) return;
         setStatus("error");
@@ -156,6 +173,29 @@ export function useSurveyTeamSocket(options: UseSurveyTeamSocketOptions): UseSur
       socketRef.current = null;
     };
   }, [role, echoHost, httpPort, enabled]);
+
+  useEffect(() => {
+    const onLocalControl = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          control: SurveyMirageQueueControl;
+          source: SurveyMirageQueueControlSource;
+          local?: boolean;
+        }>
+      ).detail;
+      if (!detail?.local || !detail.control) return;
+      const socket = socketRef.current;
+      if (!socket?.connected) return;
+      socket.emit("survey:mirage-queue-control", {
+        control: detail.control,
+        source: detail.source,
+        clientId: clientIdRef.current,
+      } satisfies SurveyMirageQueueControlPayload);
+    };
+
+    window.addEventListener(SURVEY_MIRAGE_QUEUE_CONTROL_EVENT, onLocalControl);
+    return () => window.removeEventListener(SURVEY_MIRAGE_QUEUE_CONTROL_EVENT, onLocalControl);
+  }, []);
 
   return { status, roster, lastBundle };
 }

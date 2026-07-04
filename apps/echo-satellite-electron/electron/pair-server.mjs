@@ -9,6 +9,7 @@ import {
 } from "./spy-echo-pairing.mjs";
 import * as logger from "./logger.mjs";
 import { attachSurveyTeamHub } from "./survey-team-hub.mjs";
+import { executeEchoSatelliteCommand } from "./echo-commands.mjs";
 
 function applyCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -26,7 +27,7 @@ async function readJsonBody(req) {
 }
 
 /**
- * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void, onSpyPaired?: (result: object) => void, getSpyStatus?: () => object }} options
+ * @param {{ port?: number, getNodeId: () => Promise<string>, onPaired: (creds: object) => void, onSpyPaired?: (result: object) => void, getSpyStatus?: () => object, app?: import("electron").App }} options
  */
 export function startPairServer(options) {
   const port = options.port ?? DEFAULT_PAIR_HTTP_PORT;
@@ -99,6 +100,16 @@ export function startPairServer(options) {
         const status = surveyTeamHub.teamStatusPayload();
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, ...status }));
+        return;
+      }
+
+      if (url.pathname === "/api/survey/echo/command" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const action = String(body.action ?? "").trim();
+        logger.log(`pair-server: echo command ${action}`);
+        const result = await executeEchoSatelliteCommand(action, { app: options.app });
+        res.writeHead(result.ok ? 200 : 400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
         return;
       }
 

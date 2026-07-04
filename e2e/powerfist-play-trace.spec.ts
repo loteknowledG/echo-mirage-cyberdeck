@@ -20,7 +20,7 @@ test("powerfist card long press prepares push without blocking swipe", async ({ 
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await expect(card.locator(".card.is-arming")).toHaveCount(1);
-  await page.waitForTimeout(980);
+  await page.waitForTimeout(1900);
   await expect(card.locator(".card.is-arming")).toHaveCount(0);
   await page.mouse.up();
   await expect(card.locator(".card.is-armed")).toHaveCount(1);

@@ -350,7 +350,7 @@
   stroke-dashoffset: 1;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
-  animation: powerfist-card-play-trace 900ms linear forwards;
+  animation: powerfist-card-play-trace var(--pf-card-play-trail-ms, 1800ms) linear forwards;
 }
 
 .powerfist-preview-root .card.is-arming {
@@ -371,7 +371,7 @@
 
 @keyframes powerfist-card-play-trace {
   to {
-    stroke-dashoffset: 0;
+    stroke-dashoffset: -1;
   }
 }
 

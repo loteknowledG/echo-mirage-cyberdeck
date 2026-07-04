@@ -86,9 +86,19 @@ export function SurveyTeamStatusPanel() {
               {SURVEY_ECHO_DISPLAY} @ {team.echoHost}
             </p>
           ) : null}
-          <CyberdeckActionButton disabled={refreshing || team.loading} onClick={() => void handleRefresh()}>
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </CyberdeckActionButton>
+        <CyberdeckActionButton disabled={refreshing || team.loading} onClick={() => void handleRefresh()}>
+          {refreshing ? "Refreshing…" : "Refresh"}
+        </CyberdeckActionButton>
+        <CyberdeckActionButton
+          disabled={team.loading}
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("echo-mirage:survey-hub-connect-request"));
+            }
+          }}
+        >
+          Connect team
+        </CyberdeckActionButton>
         </div>
       </div>
 

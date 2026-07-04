@@ -1,6 +1,8 @@
 "use client";
 
 import { SurveyMirageHubPanel } from "@/components/cyberdeck/survey-mirage-hub-panel";
+import { SurveyMirageItemSelectList } from "@/components/cyberdeck/survey-mirage-item-select-list";
+import { SurveyMirageQueueTeamHost } from "@/components/cyberdeck/survey-mirage-queue-sync";
 import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-panel";
 import {
   SURVEY_ECHO_DISPLAY,
@@ -19,6 +21,7 @@ export function SurveyMiragePane() {
 
   return (
     <div className="flex flex-col gap-3 p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
+      <SurveyMirageQueueTeamHost role="mirage" />
       <div>
         <p className="text-fuchsia-300/90">{SURVEY_MODE_TITLE} // {SURVEY_MIRAGE_DISPLAY}</p>
         <p className="mt-1 text-[9px] text-[#6a6a8a]">{SURVEY_MIRAGE_TAGLINE}</p>
@@ -29,9 +32,12 @@ export function SurveyMiragePane() {
       ) : null}
 
       {mirageLinked ? (
-        <div className="border-t border-[#1c1c1c] pt-4">
-          <SurveySolutionsPanel />
-        </div>
+        <>
+          <SurveyMirageItemSelectList surface="mirage" className="-mx-4 rounded-none border-x-0" />
+          <div className="border-t border-[#1c1c1c] pt-4">
+            <SurveySolutionsPanel />
+          </div>
+        </>
       ) : null}
 
       <div className="border-t border-[#1c1c1c] pt-4">

@@ -19,6 +19,8 @@ export type PreviewCard = {
     value: string;
   };
   toolOverride?: PreviewCardToolOverride;
+  /** Survey triforce deck — routed to Echo Satellite or Mirage hub (not MUTHUR stack). */
+  surveyCommand?: string;
 };
 
 export type PreviewDeck = {

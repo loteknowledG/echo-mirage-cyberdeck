@@ -196,6 +196,7 @@ async function initializeAfterReady() {
   initSpyEchoPairing(app);
 
   pairServer = startPairServer({
+    app,
     getNodeId: () => getOrCreateNodeId(app),
     onPaired: (creds) => {
       void armWithCredentials(creds, true);

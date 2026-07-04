@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { SurveyHubPanel } from "@/components/cyberdeck/survey-hub-panel";
 import { SurveySubRail } from "@/components/cyberdeck/survey-sub-rail";
 import { SurveyLegacyNotice } from "@/components/cyberdeck/survey-legacy-notice";
+import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
 import { SurveyDesktopInstallPanel } from "@/components/cyberdeck/survey-desktop-install-panel";
 import { SurveyEchoPane } from "@/components/cyberdeck/survey-echo-pane";
 import { SurveyMiragePane } from "@/components/cyberdeck/survey-mirage-pane";
@@ -20,34 +22,22 @@ export function CyberdeckSurveyPaneBody() {
     activeSubPane === "powerfist" && isSurveyTeamTripleLinked(team);
 
   return (
-    <div className="cyberdeck-spy-pane flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-black">
-      <div className="relative z-30 shrink-0 bg-black">
-        <SurveySubRail active={activeSubPane} onSelect={setActiveSubPane} />
-      </div>
+    <div className="cyberdeck-spy-pane flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-black min-[769px]:flex-row">
+      <SurveySubRail active={activeSubPane} onSelect={setActiveSubPane} />
       <div
         className={
           powerfistDeckMode
-            ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-            : "custom-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+            ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            : "custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden"
         }
       >
         {!powerfistDeckMode ? (
           <>
-            <SurveyLegacyNotice />
-            <SurveyMiragePairingDock />
+            {isSurveyHubEnabled() ? <SurveyHubPanel /> : <SurveyLegacyNotice />}
+            {!isSurveyHubEnabled() ? <SurveyMiragePairingDock /> : null}
           </>
         ) : null}
-        {powerfistDeckMode ? (
-          <div className="shrink-0 border-b border-[#1a1a1a] bg-[#080808] px-4 py-1.5 font-mono text-[8px] tracking-[0.06em] text-emerald-300/85">
-            TEAM LINKS // all green
-            {team.echoHost ? (
-              <>
-                {" "}
-                · ECHO @ <span className="text-emerald-200/90">{team.echoHost}</span>
-              </>
-            ) : null}
-          </div>
-        ) : (
+        {powerfistDeckMode ? null : (
           <SurveyTeamStatusPanel />
         )}
         {activeSubPane === "echo" ? <SurveyEchoPane /> : null}

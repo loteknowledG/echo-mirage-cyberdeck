@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SURVEY_HUB_CONNECT_REQUEST_EVENT } from "@/lib/cyberdeck/survey-hub.client";
 import { SURVEY_ECHO_LINK_CHANNEL } from "@/lib/cyberdeck/survey-mode";
 import {
-  clearSurveyMiragePairCredentials,
-  clearSurveyPowerfistPairCredentials,
   ECHO_SURVEY_TERMINATED_MESSAGE,
   fetchEchoSurveyLinkStatus,
   readSurveyMiragePairCredentials,
@@ -16,18 +15,15 @@ import { traceSurveyPairing } from "@/lib/cyberdeck/survey-pairing-trace";
 
 const LINK_POLL_MS = 2500;
 
+function requestSurveyAutoReconnect(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(SURVEY_HUB_CONNECT_REQUEST_EVENT));
+}
+
 type SpyEchoLinkRole = "mirage" | "powerfist";
 
 function readCredentials(role: SpyEchoLinkRole): SpyMiragePairCredentials | SpyPowerfistPairCredentials | null {
   return role === "mirage" ? readSurveyMiragePairCredentials() : readSurveyPowerfistPairCredentials();
-}
-
-function clearCredentials(role: SpyEchoLinkRole): void {
-  if (role === "mirage") {
-    clearSurveyMiragePairCredentials();
-  } else {
-    clearSurveyPowerfistPairCredentials();
-  }
 }
 
 export function useSurveyEchoLinkWatch(role: "mirage"): {
@@ -52,15 +48,14 @@ export function useSurveyEchoLinkWatch(role: SpyEchoLinkRole): {
   const [terminated, setTerminated] = useState(false);
   const [terminatedMessage, setTerminatedMessage] = useState<string | null>(null);
 
-  const handleTerminated = useCallback(
+  const handleStaleLink = useCallback(
     (message: string) => {
-      traceSurveyPairing(`clearing saved creds — ${message}`);
-      clearCredentials(role);
-      setPaired(null);
+      traceSurveyPairing(`Echo link stale — keeping saved creds for auto-reconnect · ${message}`);
       setTerminated(true);
       setTerminatedMessage(message);
+      requestSurveyAutoReconnect();
     },
-    [role],
+    [],
   );
 
   const pollLink = useCallback(async () => {
@@ -88,9 +83,13 @@ export function useSurveyEchoLinkWatch(role: SpyEchoLinkRole): {
     }
 
     if (!status.active) {
-      handleTerminated(status.message);
+      handleStaleLink(status.message);
+      return;
     }
-  }, [handleTerminated, role]);
+
+    setTerminated(false);
+    setTerminatedMessage(null);
+  }, [handleStaleLink, role]);
 
   useEffect(() => {
     void pollLink();
@@ -99,7 +98,7 @@ export function useSurveyEchoLinkWatch(role: SpyEchoLinkRole): {
     const onBroadcast = (event: MessageEvent) => {
       const data = event.data as { type?: string } | null;
       if (data?.type === "echo-survey-terminated") {
-        handleTerminated(ECHO_SURVEY_TERMINATED_MESSAGE);
+        handleStaleLink(ECHO_SURVEY_TERMINATED_MESSAGE);
       }
     };
 
@@ -112,7 +111,7 @@ export function useSurveyEchoLinkWatch(role: SpyEchoLinkRole): {
     }
 
     const onCustomEvent = () => {
-      handleTerminated(ECHO_SURVEY_TERMINATED_MESSAGE);
+      handleStaleLink(ECHO_SURVEY_TERMINATED_MESSAGE);
     };
     window.addEventListener(SURVEY_ECHO_LINK_CHANNEL, onCustomEvent);
 
@@ -122,7 +121,7 @@ export function useSurveyEchoLinkWatch(role: SpyEchoLinkRole): {
       channel?.close();
       window.removeEventListener(SURVEY_ECHO_LINK_CHANNEL, onCustomEvent);
     };
-  }, [handleTerminated, pollLink]);
+  }, [handleStaleLink, pollLink]);
 
   const resetLinkWatch = useCallback(() => {
     setTerminated(false);

@@ -31,7 +31,7 @@ function pairHint(shell: SurveyCyberdeckShellInfo): string {
   return "Use cloud relay or desktop for remote Echo";
 }
 
-/** Shows whether Survey is running in desktop Electron, installed PWA, or browser tab. */
+/** Shell indicator — stacks in the EMP rail on wide screens, inline at rail end on mobile. */
 export function SurveyShellBadge() {
   const [shell, setShell] = useState<SurveyCyberdeckShellInfo | null>(null);
 
@@ -43,13 +43,15 @@ export function SurveyShellBadge() {
 
   return (
     <div
-      className={`ml-auto shrink-0 rounded border px-2 py-1 font-mono text-[8px] leading-tight tracking-[0.06em] ${shellClassName(shell.kind)}`}
-      title={shell.detail}
+      className={`survey-shell-badge shrink-0 rounded border px-2 py-1 font-mono text-[8px] leading-tight tracking-[0.06em] ${shellClassName(shell.kind)}`}
+      title={`${shell.detail} · ${pairHint(shell)}`}
       aria-label={`Cyberdeck shell: ${shell.label}. ${shell.detail}. ${pairHint(shell)}.`}
     >
-      <p className="font-semibold tracking-[0.12em]">SHELL // {shell.label}</p>
-      <p className="mt-0.5 max-w-[11rem] truncate text-[7px] opacity-85">{shell.detail}</p>
-      <p className="mt-0.5 text-[7px] opacity-75">{pairHint(shell)}</p>
+      <p className="survey-shell-badge-title font-semibold tracking-[0.12em]">SHELL // {shell.label}</p>
+      <p className="survey-shell-badge-detail mt-0.5 max-w-[11rem] truncate text-[7px] opacity-85">
+        {shell.detail}
+      </p>
+      <p className="survey-shell-badge-hint mt-0.5 text-[7px] opacity-75">{pairHint(shell)}</p>
     </div>
   );
 }
