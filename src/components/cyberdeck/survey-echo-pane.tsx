@@ -188,7 +188,7 @@ export function SurveyEchoPane() {
       {statusSource === "satellite" ? (
         <p className="rounded border border-cyan-950/40 bg-cyan-950/10 px-3 py-2 text-[8px] leading-relaxed text-[#7a9a9a]">
           Reading from Echo Satellite on this Mac. PIN codes also appear in the Satellite window under{" "}
-          <strong className="text-[#9a9a9a]">Spy pairing codes</strong>.
+          <strong className="text-[#9a9a9a]">Survey pairing codes</strong>.
         </p>
       ) : null}
 

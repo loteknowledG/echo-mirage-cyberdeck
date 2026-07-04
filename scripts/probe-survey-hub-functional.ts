@@ -16,7 +16,7 @@ import {
 import {
   isSurveyTeamTripleLinked,
   linkFromBool,
-  EMPTY_SPY_TEAM_STATUS,
+  EMPTY_SURVEY_TEAM_STATUS,
 } from "../src/lib/cyberdeck/survey-team-status";
 import {
   applySurveyTeamStatusSnapshot,
@@ -24,6 +24,7 @@ import {
   isSurveyTripleLinkedSync,
 } from "../src/lib/cyberdeck/survey-team-status-store.client";
 import { normalizePairedMirages } from "../src/lib/cyberdeck/survey-echo-status.client";
+import { formatSurveyMissionSystemLine } from "../src/lib/cyberdeck/survey-muthur-mission.client";
 import { resolveSurveyHubTeamId, saveSurveyHubTeamId } from "../src/lib/cyberdeck/survey-hub-store.client";
 
 function probeAutoConnectIntent(): void {
@@ -37,7 +38,7 @@ function probeAutoConnectIntent(): void {
 }
 
 function probeTripleLinkStatus(): void {
-  assert.equal(isSurveyTeamTripleLinked({ ...EMPTY_SPY_TEAM_STATUS, loading: true }), false);
+  assert.equal(isSurveyTeamTripleLinked({ ...EMPTY_SURVEY_TEAM_STATUS, loading: true }), false);
 
   const allGreen = {
     echoMirage: linkFromBool(true, "mirage"),
@@ -55,7 +56,7 @@ function probeTripleLinkStatus(): void {
 }
 
 function probeTripleLinkStore(): void {
-  applySurveyTeamStatusSnapshot({ ...EMPTY_SPY_TEAM_STATUS, loading: true });
+  applySurveyTeamStatusSnapshot({ ...EMPTY_SURVEY_TEAM_STATUS, loading: true });
   assert.equal(isSurveyTripleLinkedSync(), false);
 
   applySurveyTeamStatusSnapshot({
@@ -116,6 +117,41 @@ function probeSurveyPairingSplit(): void {
   assert.deepEqual(normalizePairedMirages({ pairedMirage: { nodeId: "n1", pairedAt: "t" } }), [
     { nodeId: "n1", pairedAt: "t" },
   ]);
+}
+
+function probeStep4SpyRenameAndEmbed(): void {
+  const paneBody = readFileSync(resolve("src/components/cyberdeck/survey-pane-body.tsx"), "utf8");
+  assert.ok(paneBody.includes("cyberdeck-survey-pane"), "survey pane uses cyberdeck-survey-pane class");
+  assert.ok(!paneBody.includes("cyberdeck-spy-pane"), "survey pane must not use cyberdeck-spy-pane");
+
+  const subRail = readFileSync(resolve("src/components/cyberdeck/survey-sub-rail.tsx"), "utf8");
+  assert.ok(!subRail.includes("spy-sub-rail"), "survey sub-rail must not use spy-sub-rail");
+
+  const teamStatus = readFileSync(resolve("src/lib/cyberdeck/survey-team-status.ts"), "utf8");
+  assert.ok(teamStatus.includes("SURVEY_TEAM_STATUS_CHANGED_EVENT"), "team status uses survey event name");
+  assert.ok(teamStatus.includes("EMPTY_SURVEY_TEAM_STATUS"), "team status uses survey empty constant");
+
+  const creds = readFileSync(resolve("src/lib/cyberdeck/survey-pair-credentials.client.ts"), "utf8");
+  assert.ok(creds.includes("SurveyMiragePairCredentials"), "credentials use survey type names");
+
+  const capture = readFileSync(resolve("src/lib/cyberdeck/powerfist-capture-client.ts"), "utf8");
+  assert.ok(capture.includes("SURVEY_CAPTURE_HOST_STORAGE_KEY"), "capture storage uses survey keys");
+  assert.ok(capture.includes("readStorageWithLegacyFallback"), "capture storage migrates legacy espionage keys");
+}
+
+function probeDeckMatrixEmbed(): void {
+  const embed = readFileSync(resolve("src/components/cyberdeck/deck-matrix-embed.tsx"), "utf8");
+  assert.ok(embed.includes("export function DeckMatrixEmbed"), "DeckMatrixEmbed exists");
+
+  const triforce = readFileSync(resolve("src/components/cyberdeck/survey-triforce-deck-embed.tsx"), "utf8");
+  assert.ok(triforce.includes("DeckMatrixEmbed"), "SurveyTriforceDeckEmbed uses DeckMatrixEmbed");
+  assert.ok(!triforce.includes("PreviewMatrix"), "SurveyTriforceDeckEmbed must not import PreviewMatrix directly");
+
+  const css = readFileSync(resolve("src/app/preview/preview-matrix.css"), "utf8");
+  assert.ok(
+    !css.includes(".cyberdeck-survey-powerfist-deck .powerfist-preview-root .deckSlide"),
+    "survey deck CSS must not duplicate rola-dex deck chrome",
+  );
 }
 
 function probePreviewMatrixSplit(): void {
@@ -219,6 +255,16 @@ async function probeConnectEventBridge(): Promise<void> {
   assert.deepEqual(result, expected);
 }
 
+function probeStep5CyberdeckExtraction(): void {
+  const line = formatSurveyMissionSystemLine({
+    missionId: "abcd-1234",
+    kind: "silent-capture-solve",
+    imageDataUrl: "data:image/png;base64,abc",
+    prompt: "solve",
+  });
+  assert.match(line, /mission abcd-123/);
+}
+
 function probeCyberdeckAppBoundary(): void {
   const appPath = resolve("src/features/cyberdeck/cyberdeck-app.tsx");
   const source = readFileSync(appPath, "utf8");
@@ -240,16 +286,36 @@ function probeCyberdeckAppBoundary(): void {
     "cyberdeck-app must not import survey-auto-pair.client",
   );
   assert.ok(
-    source.includes("requestSurveyHubConnectAndWait"),
-    "cyberdeck-app must use requestSurveyHubConnectAndWait",
+    !source.includes("requestSurveyHubConnectAndWait"),
+    "cyberdeck-app must not call requestSurveyHubConnectAndWait directly",
   );
   assert.ok(
-    source.includes("survey-connect-request.client"),
-    "cyberdeck-app must import survey-connect-request.client",
+    !source.includes("survey-connect-request.client"),
+    "cyberdeck-app must not import survey-connect-request.client",
   );
   assert.ok(
-    source.includes("terminateEchoSurveySession"),
-    "terminateEchoSurveySession remains allowed on cyberdeck-app",
+    !source.includes("terminateEchoSurveySession"),
+    "cyberdeck-app must not call terminateEchoSurveySession directly",
+  );
+  assert.ok(
+    !source.includes("survey-pairing-client"),
+    "cyberdeck-app must not import survey-pairing-client",
+  );
+  assert.ok(
+    source.includes("survey-muthur-connect.client"),
+    "cyberdeck-app must use survey-muthur-connect.client",
+  );
+  assert.ok(
+    source.includes("useSurveyMuthurArchive"),
+    "cyberdeck-app must use useSurveyMuthurArchive hook",
+  );
+  assert.ok(
+    source.includes("useSurveyMuthurMissionHandlers"),
+    "cyberdeck-app must use useSurveyMuthurMissionHandlers hook",
+  );
+  assert.ok(
+    source.includes("survey-tab-lifecycle.client"),
+    "cyberdeck-app must use survey-tab-lifecycle.client",
   );
 }
 
@@ -260,6 +326,9 @@ async function main(): Promise<void> {
   probeHubUsesSharedTripleLinkProbe();
   probeSurveyPairingSplit();
   probePreviewMatrixSplit();
+  probeStep4SpyRenameAndEmbed();
+  probeDeckMatrixEmbed();
+  probeStep5CyberdeckExtraction();
   probeHubResultFormatting();
   probeTeamIdStore();
   await probeConnectEventBridge();

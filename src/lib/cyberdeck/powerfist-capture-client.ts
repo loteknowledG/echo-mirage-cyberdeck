@@ -5,12 +5,29 @@ import {
 } from "@/lib/cyberdeck/survey-mode";
 import type { PowerfistSocketStatus } from "@/lib/cyberdeck/powerfist-remote-socket";
 
-const CAPTURE_HOST_STORAGE_KEY = "echo-mirage-espionage-capture-host";
-const CAPTURE_PORT_STORAGE_KEY = "echo-mirage-espionage-capture-port";
-const CAPTURE_TOKEN_STORAGE_KEY = "echo-mirage-espionage-capture-token";
-const CAPTURE_NODE_STORAGE_KEY = "echo-mirage-espionage-capture-node";
-const MIRAGE_HUB_HOST_STORAGE_KEY = "echo-mirage-espionage-mirage-hub-host";
-const MIRAGE_HUB_HTTP_PORT_STORAGE_KEY = "echo-mirage-espionage-mirage-hub-http-port";
+const SURVEY_CAPTURE_HOST_STORAGE_KEY = "echo-mirage-survey-capture-host";
+const SURVEY_CAPTURE_PORT_STORAGE_KEY = "echo-mirage-survey-capture-port";
+const SURVEY_CAPTURE_TOKEN_STORAGE_KEY = "echo-mirage-survey-capture-token";
+const SURVEY_CAPTURE_NODE_STORAGE_KEY = "echo-mirage-survey-capture-node";
+const SURVEY_MIRAGE_HUB_HOST_STORAGE_KEY = "echo-mirage-survey-mirage-hub-host";
+const SURVEY_MIRAGE_HUB_HTTP_PORT_STORAGE_KEY = "echo-mirage-survey-mirage-hub-http-port";
+
+const LEGACY_CAPTURE_HOST_STORAGE_KEY = "echo-mirage-espionage-capture-host";
+const LEGACY_CAPTURE_PORT_STORAGE_KEY = "echo-mirage-espionage-capture-port";
+const LEGACY_CAPTURE_TOKEN_STORAGE_KEY = "echo-mirage-espionage-capture-token";
+const LEGACY_CAPTURE_NODE_STORAGE_KEY = "echo-mirage-espionage-capture-node";
+const LEGACY_MIRAGE_HUB_HOST_STORAGE_KEY = "echo-mirage-espionage-mirage-hub-host";
+const LEGACY_MIRAGE_HUB_HTTP_PORT_STORAGE_KEY = "echo-mirage-espionage-mirage-hub-http-port";
+
+function readStorageWithLegacyFallback(surveyKey: string, legacyKey: string): string | null {
+  if (typeof window === "undefined") return null;
+  const current = window.localStorage.getItem(surveyKey)?.trim();
+  if (current) return current;
+  const legacy = window.localStorage.getItem(legacyKey)?.trim();
+  if (!legacy) return null;
+  window.localStorage.setItem(surveyKey, legacy);
+  return legacy;
+}
 
 export type PowerfistCapturePairParams = {
   pairId: string;
@@ -42,14 +59,20 @@ export function readPowerfistCapturePairParamsFromQuery(): PowerfistCapturePairP
 
 export function saveMirageHubCredentials(mirageHost: string, mirageHttpPort: number): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(MIRAGE_HUB_HOST_STORAGE_KEY, mirageHost);
-  window.localStorage.setItem(MIRAGE_HUB_HTTP_PORT_STORAGE_KEY, String(mirageHttpPort));
+  window.localStorage.setItem(SURVEY_MIRAGE_HUB_HOST_STORAGE_KEY, mirageHost);
+  window.localStorage.setItem(SURVEY_MIRAGE_HUB_HTTP_PORT_STORAGE_KEY, String(mirageHttpPort));
 }
 
 export function readMirageHubCredentials(): { mirageHost: string; mirageHttpPort: number } | null {
   if (typeof window === "undefined") return null;
-  const mirageHost = window.localStorage.getItem(MIRAGE_HUB_HOST_STORAGE_KEY)?.trim();
-  const portRaw = window.localStorage.getItem(MIRAGE_HUB_HTTP_PORT_STORAGE_KEY)?.trim();
+  const mirageHost = readStorageWithLegacyFallback(
+    SURVEY_MIRAGE_HUB_HOST_STORAGE_KEY,
+    LEGACY_MIRAGE_HUB_HOST_STORAGE_KEY,
+  );
+  const portRaw = readStorageWithLegacyFallback(
+    SURVEY_MIRAGE_HUB_HTTP_PORT_STORAGE_KEY,
+    LEGACY_MIRAGE_HUB_HTTP_PORT_STORAGE_KEY,
+  );
   const mirageHttpPort = Number(portRaw);
   if (!mirageHost || !Number.isFinite(mirageHttpPort) || mirageHttpPort <= 0) return null;
   return { mirageHost, mirageHttpPort };
@@ -62,10 +85,10 @@ export function savePowerfistCaptureCredentials(
   nodeId: string,
 ): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(CAPTURE_HOST_STORAGE_KEY, host);
-  window.localStorage.setItem(CAPTURE_PORT_STORAGE_KEY, String(port));
-  window.localStorage.setItem(CAPTURE_TOKEN_STORAGE_KEY, captureToken);
-  window.localStorage.setItem(CAPTURE_NODE_STORAGE_KEY, nodeId);
+  window.localStorage.setItem(SURVEY_CAPTURE_HOST_STORAGE_KEY, host);
+  window.localStorage.setItem(SURVEY_CAPTURE_PORT_STORAGE_KEY, String(port));
+  window.localStorage.setItem(SURVEY_CAPTURE_TOKEN_STORAGE_KEY, captureToken);
+  window.localStorage.setItem(SURVEY_CAPTURE_NODE_STORAGE_KEY, nodeId);
 }
 
 export function readPowerfistCaptureCredentials(): {
@@ -75,10 +98,22 @@ export function readPowerfistCaptureCredentials(): {
   nodeId: string;
 } | null {
   if (typeof window === "undefined") return null;
-  const host = window.localStorage.getItem(CAPTURE_HOST_STORAGE_KEY)?.trim();
-  const portRaw = window.localStorage.getItem(CAPTURE_PORT_STORAGE_KEY)?.trim();
-  const captureToken = window.localStorage.getItem(CAPTURE_TOKEN_STORAGE_KEY)?.trim();
-  const nodeId = window.localStorage.getItem(CAPTURE_NODE_STORAGE_KEY)?.trim();
+  const host = readStorageWithLegacyFallback(
+    SURVEY_CAPTURE_HOST_STORAGE_KEY,
+    LEGACY_CAPTURE_HOST_STORAGE_KEY,
+  );
+  const portRaw = readStorageWithLegacyFallback(
+    SURVEY_CAPTURE_PORT_STORAGE_KEY,
+    LEGACY_CAPTURE_PORT_STORAGE_KEY,
+  );
+  const captureToken = readStorageWithLegacyFallback(
+    SURVEY_CAPTURE_TOKEN_STORAGE_KEY,
+    LEGACY_CAPTURE_TOKEN_STORAGE_KEY,
+  );
+  const nodeId = readStorageWithLegacyFallback(
+    SURVEY_CAPTURE_NODE_STORAGE_KEY,
+    LEGACY_CAPTURE_NODE_STORAGE_KEY,
+  );
   const port = Number(portRaw);
   if (!host || !captureToken || !nodeId || !Number.isFinite(port) || port <= 0) return null;
   return { host, port, captureToken, nodeId };

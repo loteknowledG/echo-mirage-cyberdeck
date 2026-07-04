@@ -8,11 +8,11 @@ import {
   SURVEY_POWERFIST_HINT,
 } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
-import type { SpyTeamLink } from "@/lib/cyberdeck/survey-team-status";
+import type { SurveyTeamLink } from "@/lib/cyberdeck/survey-team-status";
 import { emitSurveyPairingDiagnostics } from "@/lib/cyberdeck/survey-pairing-debug";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 
-function linkLabel(link: SpyTeamLink): string {
+function linkLabel(link: SurveyTeamLink): string {
   switch (link.state) {
     case "linked":
       return "LINKED";
@@ -25,7 +25,7 @@ function linkLabel(link: SpyTeamLink): string {
   }
 }
 
-function linkClass(link: SpyTeamLink): string {
+function linkClass(link: SurveyTeamLink): string {
   switch (link.state) {
     case "linked":
       return "text-emerald-300/90";
@@ -45,7 +45,7 @@ function TeamLinkRow({
 }: {
   left: string;
   right: string;
-  link: SpyTeamLink;
+  link: SurveyTeamLink;
 }) {
   return (
     <div className="flex flex-col gap-0.5 border-b border-[#151515] py-2 last:border-b-0">

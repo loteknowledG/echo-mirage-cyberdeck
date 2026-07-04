@@ -20,7 +20,7 @@ import { isSurveyTeamTripleLinked, notifySurveyTeamStatusChanged } from "@/lib/c
 import {
   formatSurveyEchoPowerfistLinkedLine,
   formatSurveyMiragePowerfistLinkedLine,
-  notifySpyMuthurArchive,
+  notifySurveyMuthurArchive,
 } from "@/lib/cyberdeck/survey-chat";
 import { isSurveyLegacyPairingEnabled } from "@/lib/cyberdeck/survey-boundary";
 import {
@@ -83,7 +83,7 @@ function SurveyPowerfistPairingPanel() {
       saveSurveyPowerfistPairCredentials(creds);
       resetLinkWatch();
       notifySurveyTeamStatusChanged();
-      notifySpyMuthurArchive(formatSurveyEchoPowerfistLinkedLine(result.echoHost));
+      notifySurveyMuthurArchive(formatSurveyEchoPowerfistLinkedLine(result.echoHost));
       setStatus(`Paired with ${SURVEY_ECHO_DISPLAY} at ${result.echoHost}.`);
     },
     [resetLinkWatch],
@@ -108,7 +108,7 @@ function SurveyPowerfistPairingPanel() {
     setHubError(null);
     setHubStatus(`Linked with ${SURVEY_MIRAGE_DISPLAY} hub.`);
     notifySurveyTeamStatusChanged();
-    notifySpyMuthurArchive(formatSurveyMiragePowerfistLinkedLine(result.deviceId));
+    notifySurveyMuthurArchive(formatSurveyMiragePowerfistLinkedLine(result.deviceId));
   }, [hubPin]);
 
   return (

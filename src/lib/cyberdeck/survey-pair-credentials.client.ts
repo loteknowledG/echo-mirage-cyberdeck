@@ -2,7 +2,7 @@ const SURVEY_MIRAGE_PAIR_STORAGE_KEY = "echo-mirage-survey-mirage-pair";
 const SURVEY_POWERFIST_PAIR_STORAGE_KEY = "echo-mirage-survey-powerfist-pair";
 const POWERFIST_DEVICE_ID_KEY = "echo-mirage-powerfist-device-id";
 
-export type SpyMiragePairCredentials = {
+export type SurveyMiragePairCredentials = {
   echoHost: string;
   httpPort: number;
   echoNodeId: string;
@@ -11,8 +11,10 @@ export type SpyMiragePairCredentials = {
   sessionEpoch: number;
   pairedAt: string;
 };
+/** @deprecated use SurveyMiragePairCredentials */
+export type SpyMiragePairCredentials = SurveyMiragePairCredentials;
 
-export type SpyPowerfistPairCredentials = {
+export type SurveyPowerfistPairCredentials = {
   echoHost: string;
   httpPort: number;
   echoNodeId: string;
@@ -21,6 +23,8 @@ export type SpyPowerfistPairCredentials = {
   sessionEpoch: number;
   pairedAt: string;
 };
+/** @deprecated use SurveyPowerfistPairCredentials */
+export type SpyPowerfistPairCredentials = SurveyPowerfistPairCredentials;
 
 export function getOrCreatePowerfistDeviceId(): string {
   if (typeof window === "undefined") return "";
@@ -31,33 +35,33 @@ export function getOrCreatePowerfistDeviceId(): string {
   return created;
 }
 
-export function saveSurveyMiragePairCredentials(creds: SpyMiragePairCredentials): void {
+export function saveSurveyMiragePairCredentials(creds: SurveyMiragePairCredentials): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(SURVEY_MIRAGE_PAIR_STORAGE_KEY, JSON.stringify(creds));
 }
 
-export function readSurveyMiragePairCredentials(): SpyMiragePairCredentials | null {
+export function readSurveyMiragePairCredentials(): SurveyMiragePairCredentials | null {
   if (typeof window === "undefined") return null;
   const raw = window.localStorage.getItem(SURVEY_MIRAGE_PAIR_STORAGE_KEY)?.trim();
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as SpyMiragePairCredentials;
+    return JSON.parse(raw) as SurveyMiragePairCredentials;
   } catch {
     return null;
   }
 }
 
-export function saveSurveyPowerfistPairCredentials(creds: SpyPowerfistPairCredentials): void {
+export function saveSurveyPowerfistPairCredentials(creds: SurveyPowerfistPairCredentials): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(SURVEY_POWERFIST_PAIR_STORAGE_KEY, JSON.stringify(creds));
 }
 
-export function readSurveyPowerfistPairCredentials(): SpyPowerfistPairCredentials | null {
+export function readSurveyPowerfistPairCredentials(): SurveyPowerfistPairCredentials | null {
   if (typeof window === "undefined") return null;
   const raw = window.localStorage.getItem(SURVEY_POWERFIST_PAIR_STORAGE_KEY)?.trim();
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as SpyPowerfistPairCredentials;
+    return JSON.parse(raw) as SurveyPowerfistPairCredentials;
   } catch {
     return null;
   }

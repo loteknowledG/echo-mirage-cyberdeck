@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { PreviewMatrix } from "@/app/preview/preview-matrix";
-import "@/app/preview/preview-matrix.css";
+import { DeckMatrixEmbed } from "@/components/cyberdeck/deck-matrix-embed";
 import { SURVEY_TRIFORCE_DECKS, type SurveyDeckCommandId } from "@/lib/cyberdeck/survey-deck-data";
 import { executeSurveyDeckCommand } from "@/lib/cyberdeck/survey-deck-command.client";
 import {
@@ -35,12 +34,11 @@ export function SurveyTriforceDeckEmbed({ className = "" }: SurveyTriforceDeckEm
   );
 
   return (
-    <div className={`powerfist-preview-layout min-h-0 w-full overflow-hidden ${className}`.trim()}>
-      <PreviewMatrix
-        embedSurface="survey"
-        decks={SURVEY_TRIFORCE_DECKS}
-        onDeckCommand={handleDeckCommand}
-      />
-    </div>
+    <DeckMatrixEmbed
+      className={className}
+      embedSurface="survey"
+      decks={SURVEY_TRIFORCE_DECKS}
+      onDeckCommand={handleDeckCommand}
+    />
   );
 }

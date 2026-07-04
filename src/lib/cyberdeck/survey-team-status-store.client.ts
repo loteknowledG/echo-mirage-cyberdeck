@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  EMPTY_SPY_TEAM_STATUS,
+  EMPTY_SURVEY_TEAM_STATUS,
   isSurveyTeamTripleLinked,
   type SurveyTeamStatus,
 } from "@/lib/cyberdeck/survey-team-status";
 import { probeSurveyTeamStatus } from "@/lib/cyberdeck/survey-team-status-probe.client";
 
-let snapshot: SurveyTeamStatus = { ...EMPTY_SPY_TEAM_STATUS };
+let snapshot: SurveyTeamStatus = { ...EMPTY_SURVEY_TEAM_STATUS };
 
 export function getSurveyTeamStatusSnapshot(): SurveyTeamStatus {
   return snapshot;

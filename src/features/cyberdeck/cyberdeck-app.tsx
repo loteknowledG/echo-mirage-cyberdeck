@@ -348,25 +348,18 @@ import {
   type PowerFistStackCommand,
 } from "@/lib/cyberdeck/powerfist-events";
 import { connectPowerfistDeckSocket, fetchPowerfistDeckConnect } from "@/lib/cyberdeck/powerfist-remote-socket";
+import { appendSurveyChatMessage } from "@/lib/cyberdeck/survey-chat";
 import {
-  SURVEY_MIRAGE_ITEM_DISPLAY_EVENT,
-  type SurveyMirageQueueItem,
-} from "@/lib/cyberdeck/survey-mirage-item-queue.client";
+  executeSurveyHubConnectForMuthur,
+  surveyAutoConnectFailureMessage,
+  tryExecuteSurveyAutoConnectFromChat,
+} from "@/lib/cyberdeck/survey-muthur-connect.client";
 import {
-  SURVEY_MISSION_SOLVE_EVENT,
-  type SurveyMissionSolveDetail,
-} from "@/lib/cyberdeck/powerfist-mission.types";
-import { SURVEY_ECHO_DISPLAY, SURVEY_MIRAGE_DISPLAY } from "@/lib/cyberdeck/survey-mode";
-import {
-  appendSurveyChatMessage,
-  SURVEY_FOCUS_CHAT_EVENT,
-  SURVEY_MUTHUR_ARCHIVE_EVENT,
-  notifySurveyFocusChat,
-} from "@/lib/cyberdeck/survey-chat";
-import { formatSurveyHubResultForMuthur } from "@/lib/cyberdeck/survey-hub-connect-events";
-import { requestSurveyHubConnectAndWait } from "@/lib/cyberdeck/survey-connect-request.client";
-import { parseSurveyAutoConnectIntent } from "@/lib/cyberdeck/survey-auto-connect-intent";
-import { terminateEchoSurveySession } from "@/lib/cyberdeck/survey-pairing-client";
+  terminateSurveySessionWhenTabClosed,
+  terminateSurveySessionWhenTabsCleared,
+} from "@/lib/cyberdeck/survey-tab-lifecycle.client";
+import { useSurveyMuthurArchive } from "@/features/cyberdeck/hooks/use-survey-muthur-archive";
+import { useSurveyMuthurMissionHandlers } from "@/features/cyberdeck/hooks/use-survey-muthur-mission-handlers";
 import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
@@ -4123,28 +4116,22 @@ export default function CyberdeckApp() {
     const closingTab = useCyberdeckTabStore
       .getState()
       .customTabs.find((tab) => tab.id === activeCustomTabId);
-    const isSurveyTab = closingTab?.kind === "survey";
     useCyberdeckTabStore.getState().setCustomTabs((prev) => prev.filter((tab) => tab.id !== activeCustomTabId));
     useCyberdeckTabStore.setState((state) => ({
       mountedCustomTabIds: state.mountedCustomTabIds.filter((id) => id !== activeCustomTabId),
     }));
     useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-    if (isSurveyTab) {
-      void terminateEchoSurveySession();
-    }
+    terminateSurveySessionWhenTabClosed(closingTab?.kind);
     playDeckSystemSound("click", 0.02);
   }, [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
 
   const clearSavedCustomTabState = useCallback(() => {
     const tabs = useCyberdeckTabStore.getState().customTabs;
     const removedCount = tabs.length;
-    const hasSurveyTab = tabs.some((tab) => tab.kind === "survey");
+    terminateSurveySessionWhenTabsCleared(tabs);
     useCyberdeckTabStore.getState().setCustomTabs([]);
     useCyberdeckTabStore.setState({ mountedCustomTabIds: [] });
     useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-    if (hasSurveyTab) {
-      void terminateEchoSurveySession();
-    }
 
     try {
       const raw = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
@@ -4344,27 +4331,16 @@ export default function CyberdeckApp() {
       scrollContentRef: muthurChatScrollContentRef,
     });
 
-  useEffect(() => {
-    const onSpyMuthurArchive = (event: Event) => {
-      const detail = (event as CustomEvent<{ text?: string }>).detail;
-      const text = typeof detail?.text === "string" ? detail.text.trim() : "";
-      if (!text) return;
-      archiveMuthurHistoryLine(text);
-      setMessagesRaw((prev) => [...prev, { role: "assistant", text }]);
-      pinMuthurChatToBottom();
-    };
-    const onSurveyFocusChat = () => {
-      pinMuthurChatToBottom();
-      messageScrollRef.current?.focus({ preventScroll: true });
-    };
+  const appendMuthurAssistantMessage = useCallback((text: string) => {
+    setMessagesRaw((prev) => [...prev, { role: "assistant", text }]);
+  }, []);
 
-    window.addEventListener(SURVEY_MUTHUR_ARCHIVE_EVENT, onSpyMuthurArchive);
-    window.addEventListener(SURVEY_FOCUS_CHAT_EVENT, onSurveyFocusChat);
-    return () => {
-      window.removeEventListener(SURVEY_MUTHUR_ARCHIVE_EVENT, onSpyMuthurArchive);
-      window.removeEventListener(SURVEY_FOCUS_CHAT_EVENT, onSurveyFocusChat);
-    };
-  }, [archiveMuthurHistoryLine, pinMuthurChatToBottom]);
+  useSurveyMuthurArchive({
+    archiveMuthurHistoryLine,
+    appendAssistantMessage: appendMuthurAssistantMessage,
+    pinMuthurChatToBottom,
+    focusMessageScroll: () => messageScrollRef.current?.focus({ preventScroll: true }),
+  });
 
   useEffect(() => {
     if (isStreaming && isAudioAllowed()) {
@@ -5517,22 +5493,18 @@ export default function CyberdeckApp() {
     setGeneratedUI(null);
 
     const glyphCommand = resolveGlyphCommand(userMessage);
-    if (parseSurveyAutoConnectIntent(userMessage)) {
-      try {
-        const pairResult = await requestSurveyHubConnectAndWait({ force: true });
-        setMessages((prev) => [
-          ...prev,
-          { role: "system", text: formatSurveyHubResultForMuthur(pairResult) },
-        ]);
-      } catch (err) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: `SURVEY AUTO-CONNECT // FAILED // ${err instanceof Error ? err.message : "pairing failed"}`,
-          },
-        ]);
+    try {
+      const surveyConnectLine = await tryExecuteSurveyAutoConnectFromChat(userMessage);
+      if (surveyConnectLine) {
+        setMessages((prev) => [...prev, { role: "system", text: surveyConnectLine }]);
+        setIsStreaming(false);
+        return;
       }
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: surveyAutoConnectFailureMessage(err) },
+      ]);
       setIsStreaming(false);
       return;
     }
@@ -6477,20 +6449,15 @@ ${diff}`;
           parseSurveyAutoConnectJson(res.headers.get("x-muthur-survey-auto-connect"));
         if (surveyAutoConnectRef) {
           try {
-            const pairResult = await requestSurveyHubConnectAndWait({
-              force: surveyAutoConnectRef.force,
-            });
+            const connectLine = await executeSurveyHubConnectForMuthur(surveyAutoConnectRef.force);
             setMessages((prev) => [
               ...prev,
-              { role: "system", text: formatSurveyHubResultForMuthur(pairResult) },
+              { role: "system", text: connectLine },
             ]);
           } catch (err) {
             setMessages((prev) => [
               ...prev,
-              {
-                role: "system",
-                text: `SURVEY AUTO-CONNECT // FAILED // ${err instanceof Error ? err.message : "pairing failed"}`,
-              },
+              { role: "system", text: surveyAutoConnectFailureMessage(err) },
             ]);
           }
         }
@@ -6680,6 +6647,34 @@ ${diff}`;
     }
   };
 
+  const showSurveyOperatorImage = useCallback((asset: DroppedOperatorAsset) => {
+    setOperatorDroppedAsset(asset);
+    setOperatorSurfaceMode("workspace");
+    setOperatorDocMode("edit");
+  }, []);
+
+  const prependMuthurSystemMessage = useCallback((text: string) => {
+    setMessages((prev) => [...prev, { role: "system", text }]);
+  }, []);
+
+  const sendSurveyMuthurPrompt = useCallback(
+    (
+      prompt: string,
+      options?: { preserveSelectedSurface?: boolean; surveyMission?: boolean },
+    ) => {
+      void handleSend(prompt, options);
+    },
+    [handleSend],
+  );
+
+  const { handleSurveyMissionSolve } = useSurveyMuthurMissionHandlers({
+    revokeOperatorBlobUrl,
+    operatorPreviewBlobUrlRef,
+    showOperatorImage: showSurveyOperatorImage,
+    prependSystemMessage: prependMuthurSystemMessage,
+    sendMuthurPrompt: sendSurveyMuthurPrompt,
+  });
+
   useEffect(() => {
     const pushToChat = async (detail: PowerFistStackCommand | undefined) => {
       if (!detail) return;
@@ -6752,33 +6747,6 @@ ${diff}`;
       if (!message) return;
       void handleSend(message, { preserveSelectedSurface: true });
     };
-    const handleSurveyMissionSolve = (detail: SurveyMissionSolveDetail) => {
-      revokeOperatorBlobUrl(operatorPreviewBlobUrlRef.current);
-      operatorPreviewBlobUrlRef.current = null;
-      setOperatorDroppedAsset({
-        kind: "image",
-        name: `echo-${detail.missionId.slice(0, 8)}.png`,
-        mimeType: "image/png",
-        size: 0,
-        surface: "image",
-        imageSrc: detail.imageDataUrl,
-      });
-      setOperatorSurfaceMode("workspace");
-      setOperatorDocMode("edit");
-      const missionLine = `SURVEY // ${SURVEY_ECHO_DISPLAY} capture → ${SURVEY_MIRAGE_DISPLAY} // mission ${detail.missionId.slice(0, 8)}…`;
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "system",
-          text: missionLine,
-        },
-      ]);
-      appendSurveyChatMessage({ role: "system", text: missionLine });
-      appendSurveyChatMessage({ role: "user", text: detail.prompt });
-      const prompt = `${detail.prompt}\n\n[System: ${SURVEY_ECHO_DISPLAY} screenshot is in the operator image preview. Use observe_operator_pane (surface operator) to inspect it before answering.]`;
-      notifySurveyFocusChat();
-      void handleSend(prompt, { preserveSelectedSurface: true, surveyMission: true });
-    };
     const handlePowerFistPush = (event: Event) => {
       event.preventDefault();
       void pushToChat((event as CustomEvent<PowerFistStackCommand>).detail);
@@ -6805,44 +6773,10 @@ ${diff}`;
         onMissionSolve: handleSurveyMissionSolve,
       });
     })();
-    const handleSurveyMissionEvent = (event: Event) => {
-      handleSurveyMissionSolve(
-        (event as CustomEvent<SurveyMissionSolveDetail>).detail,
-      );
-    };
-    const handleMirageItemDisplay = (event: Event) => {
-      const item = (event as CustomEvent<SurveyMirageQueueItem>).detail;
-      if (!item?.imageDataUrl) return;
-      revokeOperatorBlobUrl(operatorPreviewBlobUrlRef.current);
-      operatorPreviewBlobUrlRef.current = null;
-      setOperatorDroppedAsset({
-        kind: "image",
-        name: `mirage-${item.id.slice(0, 8)}.png`,
-        mimeType: "image/png",
-        size: 0,
-        surface: "image",
-        imageSrc: item.imageDataUrl,
-      });
-      setOperatorSurfaceMode("workspace");
-      setOperatorDocMode("edit");
-      const displayLine = `SURVEY // DISPLAY // ${item.title}`;
-      setMessages((prev) => [...prev, { role: "system", text: displayLine }]);
-      appendSurveyChatMessage({ role: "system", text: displayLine });
-      if (item.transcript?.trim() || item.prompt?.trim()) {
-        appendSurveyChatMessage({
-          role: "user",
-          text: item.transcript?.trim() || item.prompt.trim(),
-        });
-      }
-    };
     window.addEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
-    window.addEventListener(SURVEY_MISSION_SOLVE_EVENT, handleSurveyMissionEvent);
-    window.addEventListener(SURVEY_MIRAGE_ITEM_DISPLAY_EVENT, handleMirageItemDisplay);
     return () => {
       cancelled = true;
       window.removeEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
-      window.removeEventListener(SURVEY_MISSION_SOLVE_EVENT, handleSurveyMissionEvent);
-      window.removeEventListener(SURVEY_MIRAGE_ITEM_DISPLAY_EVENT, handleMirageItemDisplay);
       channel?.close();
       deckSocket?.close();
     };

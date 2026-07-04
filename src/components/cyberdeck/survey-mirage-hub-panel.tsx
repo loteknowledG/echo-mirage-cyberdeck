@@ -15,7 +15,7 @@ import {
 } from "@/lib/cyberdeck/survey-mode";
 import {
   formatSurveyMiragePowerfistLinkedLine,
-  notifySpyMuthurArchive,
+  notifySurveyMuthurArchive,
 } from "@/lib/cyberdeck/survey-chat";
 import {
   createPowerfistCaptureQrSession,
@@ -56,7 +56,7 @@ export function SurveyMirageHubPanel(props: {
   const announceHubPin = useCallback((pin: string) => {
     if (!pin || announcedPinRef.current === pin) return;
     announcedPinRef.current = pin;
-    notifySpyMuthurArchive(
+    notifySurveyMuthurArchive(
       `SURVEY // ${SURVEY_MIRAGE_DISPLAY} hub PowerFist code: ${pin} — enter on Survey → ${SURVEY_POWERFIST_LABEL} tab (TRIPLE LINK). Not an Echo Satellite code.`,
     );
   }, []);
@@ -80,7 +80,7 @@ export function SurveyMirageHubPanel(props: {
   useEffect(() => {
     if (!pairedDeviceId || pairedDeviceId === prevPairedDeviceRef.current) return;
     prevPairedDeviceRef.current = pairedDeviceId;
-    notifySpyMuthurArchive(formatSurveyMiragePowerfistLinkedLine(pairedDeviceId));
+    notifySurveyMuthurArchive(formatSurveyMiragePowerfistLinkedLine(pairedDeviceId));
   }, [pairedDeviceId]);
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export function SurveyMirageHubPanel(props: {
 
   const handleGenerateEchoQr = useCallback(async () => {
     if (!props.echoHost || !props.echoHttpPort) {
-      setError(`Pair Spy ${SURVEY_MIRAGE_DISPLAY} with ${SURVEY_ECHO_DISPLAY} first (paste :M code).`);
+      setError(`Pair ${SURVEY_MIRAGE_DISPLAY} with ${SURVEY_ECHO_DISPLAY} first (paste :M code).`);
       return;
     }
     setBusy(true);

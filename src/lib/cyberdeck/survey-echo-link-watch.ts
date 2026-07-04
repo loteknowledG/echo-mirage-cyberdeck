@@ -8,8 +8,8 @@ import {
   fetchEchoSurveyLinkStatus,
   readSurveyMiragePairCredentials,
   readSurveyPowerfistPairCredentials,
-  type SpyMiragePairCredentials,
-  type SpyPowerfistPairCredentials,
+  type SurveyMiragePairCredentials,
+  type SurveyPowerfistPairCredentials,
 } from "@/lib/cyberdeck/survey-pairing-client";
 import { traceSurveyPairing } from "@/lib/cyberdeck/survey-pairing-trace";
 
@@ -19,26 +19,28 @@ function requestSurveyAutoReconnect(): void {
   requestSurveyHubConnect({ force: true });
 }
 
-type SpyEchoLinkRole = "mirage" | "powerfist";
+type SurveyEchoLinkRole = "mirage" | "powerfist";
 
-function readCredentials(role: SpyEchoLinkRole): SpyMiragePairCredentials | SpyPowerfistPairCredentials | null {
+function readCredentials(
+  role: SurveyEchoLinkRole,
+): SurveyMiragePairCredentials | SurveyPowerfistPairCredentials | null {
   return role === "mirage" ? readSurveyMiragePairCredentials() : readSurveyPowerfistPairCredentials();
 }
 
 export function useSurveyEchoLinkWatch(role: "mirage"): {
-  paired: SpyMiragePairCredentials | null;
+  paired: SurveyMiragePairCredentials | null;
   terminated: boolean;
   terminatedMessage: string | null;
   resetLinkWatch: () => void;
 };
 export function useSurveyEchoLinkWatch(role: "powerfist"): {
-  paired: SpyPowerfistPairCredentials | null;
+  paired: SurveyPowerfistPairCredentials | null;
   terminated: boolean;
   terminatedMessage: string | null;
   resetLinkWatch: () => void;
 };
-export function useSurveyEchoLinkWatch(role: SpyEchoLinkRole): {
-  paired: SpyMiragePairCredentials | SpyPowerfistPairCredentials | null;
+export function useSurveyEchoLinkWatch(role: SurveyEchoLinkRole): {
+  paired: SurveyMiragePairCredentials | SurveyPowerfistPairCredentials | null;
   terminated: boolean;
   terminatedMessage: string | null;
   resetLinkWatch: () => void;
@@ -70,8 +72,8 @@ export function useSurveyEchoLinkWatch(role: SpyEchoLinkRole): {
       echoNodeId: creds.echoNodeId,
       role,
       sessionEpoch: creds.sessionEpoch ?? 0,
-      nodeId: role === "mirage" ? (creds as SpyMiragePairCredentials).nodeId : undefined,
-      deviceId: role === "powerfist" ? (creds as SpyPowerfistPairCredentials).deviceId : undefined,
+      nodeId: role === "mirage" ? (creds as SurveyMiragePairCredentials).nodeId : undefined,
+      deviceId: role === "powerfist" ? (creds as SurveyPowerfistPairCredentials).deviceId : undefined,
       echoHost: creds.echoHost,
       httpPort: creds.httpPort,
     });

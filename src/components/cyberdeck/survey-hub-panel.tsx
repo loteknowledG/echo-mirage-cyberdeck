@@ -15,7 +15,7 @@ import {
 import { isSurveyTeamTripleLinked } from "@/lib/cyberdeck/survey-team-status";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import { SURVEY_ECHO_DISPLAY } from "@/lib/cyberdeck/survey-mode";
-import { notifySpyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
+import { notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
 
 /** Survey Hub — one team ID, one Connect button, all three links. */
 export function SurveyHubPanel() {
@@ -52,7 +52,7 @@ export function SurveyHubPanel() {
       });
 
       setBusy(false);
-      notifySpyMuthurArchive(formatSurveyHubResultForMuthur(result));
+      notifySurveyMuthurArchive(formatSurveyHubResultForMuthur(result));
 
       if (!result.ran) {
         setStatus(null);

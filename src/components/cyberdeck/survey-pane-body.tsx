@@ -22,7 +22,7 @@ export function CyberdeckSurveyPaneBody() {
     activeSubPane === "powerfist" && isSurveyTeamTripleLinked(team);
 
   return (
-    <div className="cyberdeck-spy-pane flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-black min-[769px]:flex-row">
+    <div className="cyberdeck-survey-pane flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-black min-[769px]:flex-row">
       <SurveySubRail active={activeSubPane} onSelect={setActiveSubPane} />
       <div
         className={

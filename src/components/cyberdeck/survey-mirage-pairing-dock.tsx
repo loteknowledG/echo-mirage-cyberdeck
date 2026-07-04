@@ -14,7 +14,7 @@ import {
   formatSurveyEchoMirageLinkedLine,
   formatSurveySolutionsReadyLine,
   notifySurveyFocusChat,
-  notifySpyMuthurArchive,
+  notifySurveyMuthurArchive,
 } from "@/lib/cyberdeck/survey-chat";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import { useSurveyTeamSocket } from "@/lib/cyberdeck/survey-team-socket.client";
@@ -102,8 +102,8 @@ export function SurveyMiragePairingDock() {
       saveSurveyMiragePairCredentials(creds);
       resetLinkWatch();
       notifySurveyTeamStatusChanged();
-      notifySpyMuthurArchive(formatSurveyEchoMirageLinkedLine(result.echoHost));
-      notifySpyMuthurArchive(formatSurveySolutionsReadyLine());
+      notifySurveyMuthurArchive(formatSurveyEchoMirageLinkedLine(result.echoHost));
+      notifySurveyMuthurArchive(formatSurveySolutionsReadyLine());
       notifySurveyFocusChat();
       notifySurveyPairingDebug(
         `pair saved · ${result.echoHost}:${result.httpPort} · node ${creds.nodeId.slice(0, 8)}…`,

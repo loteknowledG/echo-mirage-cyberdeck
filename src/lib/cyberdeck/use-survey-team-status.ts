@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  SPY_TEAM_STATUS_CHANGED_EVENT,
+  EMPTY_SURVEY_TEAM_STATUS,
+  SURVEY_TEAM_STATUS_CHANGED_EVENT,
   type SurveyTeamStatus,
 } from "@/lib/cyberdeck/survey-team-status";
 import {
@@ -26,10 +27,10 @@ export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promi
     void refresh();
     const interval = window.setInterval(() => void refresh(), REFRESH_MS);
     const onChanged = () => void refresh();
-    window.addEventListener(SPY_TEAM_STATUS_CHANGED_EVENT, onChanged);
+    window.addEventListener(SURVEY_TEAM_STATUS_CHANGED_EVENT, onChanged);
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener(SPY_TEAM_STATUS_CHANGED_EVENT, onChanged);
+      window.removeEventListener(SURVEY_TEAM_STATUS_CHANGED_EVENT, onChanged);
     };
   }, [refresh]);
 

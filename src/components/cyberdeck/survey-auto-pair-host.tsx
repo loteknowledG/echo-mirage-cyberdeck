@@ -85,3 +85,6 @@ export function SurveyAutoPairHost() {
 
   return null;
 }
+
+/** @deprecated use SurveyAutoPairHost */
+export const SurveyHubAutoConnectHost = SurveyAutoPairHost;

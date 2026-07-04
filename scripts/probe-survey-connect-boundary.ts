@@ -30,8 +30,13 @@ function main(): void {
   assertNoImport(cyberdeckApp, "survey-relay.client", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "runSurveyAutoPair", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "runSurveyHubConnect", "cyberdeck-app");
-  assertHasImport(cyberdeckApp, "survey-connect-request.client", "cyberdeck-app");
-  assertHasImport(cyberdeckApp, "survey-hub-connect-events", "cyberdeck-app");
+  assertNoImport(cyberdeckApp, "survey-pairing-client", "cyberdeck-app");
+  assertNoImport(cyberdeckApp, "survey-connect-request.client", "cyberdeck-app");
+  assertNoImport(cyberdeckApp, "requestSurveyHubConnectAndWait", "cyberdeck-app");
+  assertHasImport(cyberdeckApp, "survey-muthur-connect.client", "cyberdeck-app");
+  assertHasImport(cyberdeckApp, "survey-tab-lifecycle.client", "cyberdeck-app");
+  assertHasImport(cyberdeckApp, "useSurveyMuthurArchive", "cyberdeck-app");
+  assertHasImport(cyberdeckApp, "useSurveyMuthurMissionHandlers", "cyberdeck-app");
 
   const connectRequest = read("src/lib/cyberdeck/survey-connect-request.client.ts");
   assertNoImport(connectRequest, "survey-pairing-client", "survey-connect-request");
