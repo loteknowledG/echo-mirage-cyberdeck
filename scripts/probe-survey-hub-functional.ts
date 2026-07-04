@@ -411,6 +411,16 @@ function probeHubOnlyUi(): void {
   );
 }
 
+function probeSurveyTransportDecisionTree(): void {
+  const boundary = readFileSync(resolve("src/lib/cyberdeck/survey-boundary.ts"), "utf8");
+  assert.ok(boundary.includes("Three transports (decision tree)"), "boundary documents transport tree");
+  assert.ok(boundary.includes("cloud relay"), "boundary documents cloud relay path");
+  assert.ok(boundary.includes("survey-team-socket.client.ts"), "boundary documents team socket as auxiliary");
+  assert.ok(boundary.includes("powerfist-remote-socket"), "boundary documents mirage hub WS");
+  assert.ok(boundary.includes("resolvePreferredSurveyPairTransport"), "boundary exports transport resolver");
+  assert.ok(boundary.includes("SurveyAutoPairHost"), "boundary ties orchestration to AutoPairHost");
+}
+
 async function main(): Promise<void> {
   probeAutoConnectIntent();
   probeTripleLinkStatus();
@@ -423,6 +433,7 @@ async function main(): Promise<void> {
   probeSingleConnectOrchestrator();
   probeHubOnlyUi();
   probeSpyNamingAndShims();
+  probeSurveyTransportDecisionTree();
   probeStep5CyberdeckExtraction();
   probeHubResultFormatting();
   probeTeamIdStore();
