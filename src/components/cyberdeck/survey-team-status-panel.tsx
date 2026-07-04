@@ -41,6 +41,19 @@ function linkClass(link: SurveyTeamLink): string {
   }
 }
 
+function linkLampClass(link: SurveyTeamLink): string {
+  switch (link.state) {
+    case "linked":
+      return "survey-team-link-lamp survey-team-link-lamp--linked";
+    case "terminated":
+      return "survey-team-link-lamp survey-team-link-lamp--stale";
+    case "not-linked":
+      return "survey-team-link-lamp survey-team-link-lamp--off";
+    default:
+      return "survey-team-link-lamp survey-team-link-lamp--pending";
+  }
+}
+
 function TeamLinkRow({
   left,
   right,
@@ -53,9 +66,12 @@ function TeamLinkRow({
   return (
     <div className="flex flex-col gap-0.5 border-b border-[#151515] py-2 last:border-b-0">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">
-          {left} ↔ {right}
-        </span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={linkLampClass(link)} aria-hidden />
+          <span className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">
+            {left} ↔ {right}
+          </span>
+        </div>
         <span className={`text-[9px] font-semibold tracking-[0.12em] ${linkClass(link)}`}>
           {linkLabel(link)}
         </span>
@@ -85,7 +101,16 @@ export function SurveyTeamStatusPanel() {
       aria-label="Survey team link status"
     >
       <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-[9px] tracking-[0.14em] text-[#9a9a9a]">TEAM LINKS</p>
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className={`survey-team-squad-lamp ${tripleLinked ? "survey-team-squad-lamp--linked" : team.loading ? "survey-team-squad-lamp--pending" : "survey-team-squad-lamp--off"}`}
+            aria-hidden
+          />
+          <p className="text-[9px] tracking-[0.14em] text-[#9a9a9a]">TEAM LINKS</p>
+          {tripleLinked ? (
+            <span className="text-[8px] font-semibold tracking-[0.14em] text-emerald-300/90">SQUAD LINKED</span>
+          ) : null}
+        </div>
         <div className="flex items-center gap-2">
           {team.echoHost ? (
             <p className="text-[8px] tracking-[0.06em] text-[#5f5f5f]">

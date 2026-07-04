@@ -50,7 +50,7 @@ function SurveyPowerfistPairingPanel() {
   const [hubError, setHubError] = useState<string | null>(null);
   const [hubStatus, setHubStatus] = useState<string | null>(null);
   const mirageHubCreds = readPowerfistRemoteCredentials();
-  const mirageHubLinked = team.miragePowerfist.state === "linked" || Boolean(mirageHubCreds);
+  const mirageHubLinked = team.miragePowerfist.state === "linked";
   const legacyPairing = isSurveyLegacyPairingEnabled();
   const hubEnabled = isSurveyHubEnabled();
   const savedCreds = readSurveyPowerfistPairCredentials();

@@ -164,6 +164,16 @@ async function getDevOrigin() {
 
   if (!app.isPackaged) {
     try {
+      const empLaunchPath = path.resolve(__dirname, '..', '.tmp', 'emp-electron-launch.json');
+      const emp = JSON.parse(await fs.readFile(empLaunchPath, 'utf8'));
+      if (emp?.origin) {
+        return String(emp.origin);
+      }
+    } catch {
+      /* EMP launch file optional */
+    }
+
+    try {
       const statePath = path.resolve(__dirname, '..', '.tmp', 'dev-server.json');
       const state = JSON.parse(await fs.readFile(statePath, 'utf8'));
       if (state?.origin) {
@@ -178,6 +188,32 @@ async function getDevOrigin() {
   }
 
   return 'http://127.0.0.1:3050';
+}
+
+/** @param {import('electron').BrowserWindow} win @param {string} url @param {number} [attempts] */
+async function loadUrlWithRetry(win, url, attempts = 8) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await win.loadURL(url);
+      return;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const refused =
+        message.includes('ERR_CONNECTION_REFUSED') ||
+        message.includes('(-102)') ||
+        message.includes('ECONNREFUSED');
+      if (!refused || attempt >= attempts) {
+        throw error;
+      }
+      process.stderr.write(
+        `[echo-mirage] load retry ${attempt}/${attempts} for ${url} (${message})\n`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1_500 * attempt));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 const OPERATOR_FOLDER_IGNORED_NAMES = new Set([
@@ -558,28 +594,20 @@ async function loadStartupErrorPage(win, message) {
   await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 }
 
-async function createWindow() {
-  const startInSilentTray = getSilentMode();
+function createCyberdeckBrowserWindow(options = {}) {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
     show: false,
     backgroundColor: '#000000',
+    ...options,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       webviewTag: true,
       preload: path.join(__dirname, 'preload.js'),
+      ...(options.webPreferences ?? {}),
     },
-  });
-
-  setMainWindow(win);
-
-  win.on('close', (event) => {
-    if (shouldPreventWindowClose()) {
-      event.preventDefault();
-      hideMainWindowToTray();
-    }
   });
 
   win.webContents.on('context-menu', (_event, params) => {
@@ -593,15 +621,51 @@ async function createWindow() {
     );
   });
 
+  return win;
+}
+
+/** EMP ignition: second Electron window for PowerFist (no external browser). */
+async function createEmpSquadPowerfistWindow(origin) {
+  if (process.env.ECHO_MIRAGE_EMP_SQUAD !== '1') return;
+
+  const launchPath = process.env.ECHO_MIRAGE_POWERFIST_PATH || '/cyberdeck?surveyEmp=powerfist';
+  const win = createCyberdeckBrowserWindow({ title: 'Echo Mirage Cyberdeck // PowerFist' });
+
+  try {
+    await loadUrlWithRetry(win, `${origin}${launchPath}`);
+    win.show();
+    process.stdout.write(`[echo-mirage] EMP PowerFist window ready (${launchPath})\n`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`[echo-mirage:powerfist] startup error: ${message}\n`);
+    await loadStartupErrorPage(win, message);
+    win.show();
+  }
+}
+
+async function createWindow() {
+  const startInSilentTray = getSilentMode();
+  const win = createCyberdeckBrowserWindow();
+
+  setMainWindow(win);
+
+  win.on('close', (event) => {
+    if (shouldPreventWindowClose()) {
+      event.preventDefault();
+      hideMainWindowToTray();
+    }
+  });
+
   try {
     const origin = await getDevOrigin();
     const protocolArg = findProtocolLaunchArg();
     if (protocolArg && !pendingProtocolPath) {
       pendingProtocolPath = parseProtocolLaunchPath(protocolArg);
     }
-    const launchPath = pendingProtocolPath || '/cyberdeck';
+    const launchPath = pendingProtocolPath || process.env.ECHO_MIRAGE_LAUNCH_PATH || '/cyberdeck';
     pendingProtocolPath = null;
-    await win.loadURL(`${origin}${launchPath}`);
+    await loadUrlWithRetry(win, `${origin}${launchPath}`);
+    await createEmpSquadPowerfistWindow(origin);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`[echo-mirage] startup error: ${message}\n`);

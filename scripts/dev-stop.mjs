@@ -79,9 +79,20 @@ for (const port of PORTS) {
 
 if (targets.size === 0) {
   process.stdout.write(`[dev:stop] no listeners on ${[...PORTS].map((port) => `:${port}`).join(', ')}\n`);
-  process.exit(0);
+} else {
+  for (const pid of targets) {
+    stopPid(pid);
+  }
 }
 
-for (const pid of targets) {
-  stopPid(pid);
+for (const stalePath of [
+  devStatePath,
+  path.join(root, '.tmp', 'emp-electron-launch.json'),
+]) {
+  try {
+    fs.unlinkSync(stalePath);
+    process.stdout.write(`[dev:stop] removed ${path.relative(root, stalePath)}\n`);
+  } catch {
+    /* already gone */
+  }
 }

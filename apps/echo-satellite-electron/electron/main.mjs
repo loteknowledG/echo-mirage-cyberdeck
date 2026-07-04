@@ -94,6 +94,20 @@ function statusSnapshot() {
   };
 }
 
+/** Avoid spam when the setup window is closed but tray + pair server keep running. */
+function sendToMainWindow(channel, payload) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const contents = mainWindow.webContents;
+  if (contents.isDestroyed()) return;
+  try {
+    contents.send(channel, payload);
+  } catch (error) {
+    logger.log(
+      `renderer send skipped (${channel}): ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 function stopWs() {
   wsClient?.stop();
   wsClient = null;
@@ -107,16 +121,16 @@ async function armWithCredentials(creds, hideWindow) {
   wsClient = startWsClient(creds, {
     onStatus: (status) => {
       wsStatus = status;
-      mainWindow?.webContents.send("satellite:status-changed", statusSnapshot());
+      sendToMainWindow("satellite:status-changed", statusSnapshot());
     },
     onMission: () => {
-      mainWindow?.webContents.send("satellite:status-changed", statusSnapshot());
+      sendToMainWindow("satellite:status-changed", statusSnapshot());
     },
   });
   armed = true;
   logger.log("armed with Mirage credentials");
   if (hideWindow) trayManager.hideMainWindow();
-  mainWindow?.webContents.send("satellite:status-changed", statusSnapshot());
+  sendToMainWindow("satellite:status-changed", statusSnapshot());
 }
 
 function createMainWindow() {
@@ -144,6 +158,10 @@ function createMainWindow() {
   mainWindow.once("ready-to-show", () => {
     logger.step(8, 8, "setup window ready");
     mainWindow?.show();
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
   });
 }
 
@@ -188,7 +206,7 @@ async function refreshSpyLinks() {
       `spy codes refresh failed: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  mainWindow?.webContents.send("satellite:status-changed", statusSnapshot());
+  sendToMainWindow("satellite:status-changed", statusSnapshot());
 }
 
 async function initializeAfterReady() {
@@ -229,7 +247,7 @@ async function initializeAfterReady() {
   setTimeout(() => {
     void checkForSatelliteUpdate(version).then((result) => {
       if (result.ok && result.updateAvailable) {
-        mainWindow?.webContents.send("satellite:update-available", result);
+        sendToMainWindow("satellite:update-available", result);
       }
     });
   }, 8000);
@@ -265,7 +283,7 @@ function registerIpc() {
         pairedAt: mirage.pairedAt,
       })),
     };
-    mainWindow?.webContents.send("satellite:status-changed", statusSnapshot());
+    sendToMainWindow("satellite:status-changed", statusSnapshot());
     return { ok: true, ...status };
   });
 

@@ -27,6 +27,7 @@
     "satellite:dev": "pnpm --dir apps/echo-satellite-electron dev",
     "satellite:build": "pnpm --dir apps/echo-satellite-electron build",
     "survey:local": "node scripts/survey-local-dev.mjs",
+    "survey:emp": "node scripts/survey-emp-ignition.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint --ext .js,.jsx,.ts,.tsx . --fix",
     "lint:watch": "eslint --ext .js,.jsx,.ts,.tsx . --fix --watch",

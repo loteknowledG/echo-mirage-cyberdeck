@@ -135,7 +135,23 @@ async function mirageHubLinkActive(): Promise<boolean> {
   return false;
 }
 
-async function restoreMirageHubLink(): Promise<{ ok: boolean; detail: string }> {
+async function waitForPowerfistRelayReady(attempts = 25): Promise<boolean> {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const res = await fetch("/api/powerfist/pairing/status", { cache: "no-store" });
+      if (res.ok) {
+        const status = (await res.json()) as { relayRunning?: boolean };
+        if (status.relayRunning) return true;
+      }
+    } catch {
+      /* relay still booting */
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  return false;
+}
+
+export async function restoreMirageHubLink(): Promise<{ ok: boolean; detail: string }> {
   const savedRemote = readPowerfistRemoteCredentials();
   const hubSession = await fetchPowerfistQrSession();
   if (hubSession.ok && hubSession.pairedRemote) {
@@ -163,6 +179,37 @@ async function restoreMirageHubLink(): Promise<{ ok: boolean; detail: string }> 
     return { ok: true, detail: label };
   }
   return { ok: false, detail: paired.reason };
+}
+
+/** Third edge only — Mirage hub ↔ PowerFist (runs best from the PowerFist surface). */
+export async function runSurveyMiragePowerfistHubRestore(options?: {
+  quiet?: boolean;
+}): Promise<{ ok: boolean; detail: string }> {
+  if (!isSurveyHubEnabled()) {
+    return { ok: false, detail: "Survey Hub disabled." };
+  }
+
+  if (await mirageHubLinkActive()) {
+    return { ok: true, detail: "already linked" };
+  }
+
+  const relayReady = await waitForPowerfistRelayReady();
+  if (!relayReady) {
+    return { ok: false, detail: "PowerFist relay not ready — reload cyberdeck and retry." };
+  }
+
+  const restored = await restoreMirageHubLink();
+  if (restored.ok && !options?.quiet) {
+    log(
+      formatSurveyMiragePowerfistLinkedLine(
+        readPowerfistRemoteCredentials()?.deviceId ?? "remote",
+      ),
+    );
+  }
+  if (restored.ok) {
+    notifySurveyTeamStatusChanged();
+  }
+  return restored;
 }
 
 type PairSuccess = {
@@ -436,13 +483,19 @@ export async function runSurveyHubConnect(options?: {
   const hubSession = await fetchPowerfistQrSession();
   const hubLinked = await mirageHubLinkActive();
   if (!hubLinked) {
-    const restored = await restoreMirageHubLink();
-    if (restored.ok) {
-      log(formatSurveyMiragePowerfistLinkedLine(readPowerfistRemoteCredentials()?.deviceId ?? "remote"));
-      steps.push({ id: "powerfist-hub", ok: true, detail: restored.detail });
+    const relayReady = await waitForPowerfistRelayReady();
+    if (!relayReady) {
+      log("Mirage hub failed — PowerFist relay not ready.");
+      steps.push({ id: "powerfist-hub", ok: false, detail: "PowerFist relay not ready." });
     } else {
-      log(`Mirage hub failed — ${restored.detail}`);
-      steps.push({ id: "powerfist-hub", ok: false, detail: restored.detail });
+      const restored = await restoreMirageHubLink();
+      if (restored.ok) {
+        log(formatSurveyMiragePowerfistLinkedLine(readPowerfistRemoteCredentials()?.deviceId ?? "remote"));
+        steps.push({ id: "powerfist-hub", ok: true, detail: restored.detail });
+      } else {
+        log(`Mirage hub failed — ${restored.detail}`);
+        steps.push({ id: "powerfist-hub", ok: false, detail: restored.detail });
+      }
     }
   } else {
     steps.push({

@@ -46,21 +46,31 @@ export function PreviewMatrix({
     !surveyCommandMode,
   );
 
+  const handlePushCardRef = useRef<(deckIndex: number, cardIndex: number) => void>(() => {});
+
   const {
     armedCard,
     armedCardKey,
     armingCardKey,
+    armedPanelArming,
+    armedPanelTraceKey,
     composerText,
     setComposerText,
     cancelCardHold,
+    cancelArmedPanelHold,
     resetCardPlay,
     handleCardPointerDown,
     handleCardPointerMove,
+    handleArmedPanelPointerDown,
+    handleArmedPanelPointerMove,
   } = usePreviewMatrixCardPlay({
     activeDecks,
     applyFocus,
     navigateCard,
     navigateDeck,
+    onArmedPanelPush: (deckIndex, cardIndex) => {
+      handlePushCardRef.current(deckIndex, cardIndex);
+    },
   });
 
   const { handlePushCard, pushReceiptHtml } = useSurveyDeckCommands({
@@ -71,6 +81,10 @@ export function PreviewMatrix({
     onDeckCommand,
     remoteSocketRef,
   });
+
+  handlePushCardRef.current = (deckIndex, cardIndex) => {
+    void handlePushCard(deckIndex, cardIndex);
+  };
 
   return (
     <div
@@ -179,12 +193,41 @@ export function PreviewMatrix({
                 </div>
               </div>
               {armedCard ? (
-                <section className="cardOpenViewport" data-testid="powerfist-open-card">
+                <section
+                  className={`cardOpenViewport${armedPanelArming === "push" ? " is-arming-push" : ""}${armedPanelArming === "cancel" ? " is-arming-cancel" : ""}`}
+                  data-testid="powerfist-open-card"
+                  onPointerDown={handleArmedPanelPointerDown}
+                  onPointerMove={handleArmedPanelPointerMove}
+                  onPointerUp={cancelArmedPanelHold}
+                  onPointerCancel={cancelArmedPanelHold}
+                >
+                  {armedPanelArming ? (
+                    <svg
+                      aria-hidden
+                      className={`cardPlayTrace cardOpenViewportTrace${armedPanelArming === "cancel" ? " is-cancel" : ""}`}
+                      preserveAspectRatio="none"
+                      viewBox="0 0 100 100"
+                    >
+                      <path
+                        key={armedPanelTraceKey}
+                        className={`cardPlayTracePath${armedPanelArming === "cancel" ? " is-reverse" : ""}`}
+                        d={CARD_PLAY_TRACE_PATH}
+                        pathLength="1"
+                      />
+                    </svg>
+                  ) : null}
                   <div className="cardOpenViewportHeader">
                     <div>
                       <div className="cardArmedPanelStatus">
-                        <span className="cardArmedPanelDot" aria-hidden />
-                        Prepared // Locked
+                        <span
+                          className={`cardArmedPanelDot${armedPanelArming === "cancel" ? " is-cancel" : ""}`}
+                          aria-hidden
+                        />
+                        {armedPanelArming === "cancel"
+                          ? "Disarming // Red reverse ×2"
+                          : armedPanelArming === "push"
+                            ? "Arming push // Trace ×2"
+                            : "Prepared // Locked"}
                       </div>
                       <h2 className="cardOpenViewportTitle">{armedCard.card.title}</h2>
                     </div>
@@ -231,6 +274,9 @@ export function PreviewMatrix({
                       </label>
                     ) : null}
                   </div>
+                  <p className="cardOpenViewportGestureHint">
+                    Hold panel — clockwise trace ×2 to push · counter-clockwise red ×2 to cancel
+                  </p>
                   <div className="cardOpenViewportActions">
                     <button type="button" className="cardClose" onClick={resetCardPlay}>
                       Close
