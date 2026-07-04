@@ -55,6 +55,12 @@ function main(): void {
   assertHasImport(autoPairHost, "useSurveyTeamStatus", "SurveyAutoPairHost");
   assertHasImport(autoPairHost, "isSurveyTeamTripleLinked", "SurveyAutoPairHost");
   assertNoImport(autoPairHost, "isSurveyTripleLinked", "SurveyAutoPairHost");
+  assertHasImport(autoPairHost, "runSurveyHubConnect", "SurveyAutoPairHost");
+
+  const hubPanel = read("src/components/cyberdeck/survey-hub-panel.tsx");
+  assertNoImport(hubPanel, "runSurveyHubConnect", "SurveyHubPanel");
+  assertNoImport(hubPanel, "survey-hub.client", "SurveyHubPanel");
+  assertHasImport(hubPanel, "requestSurveyHubConnectAndWait", "SurveyHubPanel");
 
   console.log("probe-survey-connect-boundary: all checks passed");
 }

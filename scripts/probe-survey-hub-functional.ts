@@ -255,6 +255,28 @@ async function probeConnectEventBridge(): Promise<void> {
   assert.deepEqual(result, expected);
 }
 
+function probeSingleConnectOrchestrator(): void {
+  const panelSource = readFileSync(resolve("src/components/cyberdeck/survey-hub-panel.tsx"), "utf8");
+  assert.ok(
+    !panelSource.includes("runSurveyHubConnect"),
+    "SurveyHubPanel must not call runSurveyHubConnect directly",
+  );
+  assert.ok(
+    panelSource.includes("requestSurveyHubConnectAndWait"),
+    "SurveyHubPanel must request connect via event bridge",
+  );
+  assert.ok(
+    !panelSource.includes("quiet: true"),
+    "SurveyHubPanel must not run quiet auto-connect on mount",
+  );
+
+  const hostSource = readFileSync(resolve("src/components/cyberdeck/survey-auto-pair-host.tsx"), "utf8");
+  assert.ok(
+    hostSource.includes("runSurveyHubConnect"),
+    "SurveyAutoPairHost must remain sole runSurveyHubConnect caller",
+  );
+}
+
 function probeStep5CyberdeckExtraction(): void {
   const line = formatSurveyMissionSystemLine({
     missionId: "abcd-1234",
@@ -328,6 +350,7 @@ async function main(): Promise<void> {
   probePreviewMatrixSplit();
   probeStep4SpyRenameAndEmbed();
   probeDeckMatrixEmbed();
+  probeSingleConnectOrchestrator();
   probeStep5CyberdeckExtraction();
   probeHubResultFormatting();
   probeTeamIdStore();

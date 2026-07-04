@@ -8,10 +8,8 @@ import {
   resolveSurveyHubTeamId,
   saveSurveyHubTeamId,
 } from "@/lib/cyberdeck/survey-hub-store.client";
-import {
-  formatSurveyHubResultForMuthur,
-  runSurveyHubConnect,
-} from "@/lib/cyberdeck/survey-hub.client";
+import { requestSurveyHubConnectAndWait } from "@/lib/cyberdeck/survey-connect-request.client";
+import { formatSurveyHubResultForMuthur } from "@/lib/cyberdeck/survey-hub-connect-events";
 import { isSurveyTeamTripleLinked } from "@/lib/cyberdeck/survey-team-status";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import { SURVEY_ECHO_DISPLAY } from "@/lib/cyberdeck/survey-mode";
@@ -35,23 +33,17 @@ export function SurveyHubPanel() {
     }
   }, [teamId]);
 
-  const handleConnect = useCallback(
-    async (quiet = false) => {
-      if (!hubEnabled) return;
-      const id = teamId.trim();
-      if (id) saveSurveyHubTeamId(id);
+  const handleConnect = useCallback(async () => {
+    if (!hubEnabled) return;
+    const id = teamId.trim();
+    if (id) saveSurveyHubTeamId(id);
 
-      setBusy(true);
-      setError(null);
-      setStatus(quiet ? null : "Connecting team…");
+    setBusy(true);
+    setError(null);
+    setStatus("Connecting team…");
 
-      const result = await runSurveyHubConnect({
-        echoNodeId: id || undefined,
-        force: true,
-        quiet,
-      });
-
-      setBusy(false);
+    try {
+      const result = await requestSurveyHubConnectAndWait({ force: true, quiet: false });
       notifySurveyMuthurArchive(formatSurveyHubResultForMuthur(result));
 
       if (!result.ran) {
@@ -68,27 +60,13 @@ export function SurveyHubPanel() {
         setStatus(null);
         setError(`${failed} link(s) failed — open ${SURVEY_ECHO_DISPLAY} Survey tab and retry.`);
       }
-    },
-    [hubEnabled, teamId],
-  );
-
-  useEffect(() => {
-    if (!hubEnabled || team.loading || tripleLinked) return;
-    let cancelled = false;
-    void (async () => {
-      const saved = resolveSurveyHubTeamId();
-      if (!saved || cancelled) return;
-      setBusy(true);
-      const result = await runSurveyHubConnect({ echoNodeId: saved, force: true, quiet: true });
+    } catch (err) {
+      setStatus(null);
+      setError(err instanceof Error ? err.message : "Could not connect.");
+    } finally {
       setBusy(false);
-      if (!cancelled && result.ran && result.steps.every((step) => step.ok)) {
-        setStatus("All team links connected.");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [hubEnabled, team.loading, tripleLinked]);
+    }
+  }, [hubEnabled, teamId]);
 
   if (!hubEnabled) {
     return null;
@@ -129,7 +107,7 @@ export function SurveyHubPanel() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <CyberdeckActionButton disabled={busy} onClick={() => void handleConnect(false)}>
+        <CyberdeckActionButton disabled={busy} onClick={() => void handleConnect()}>
           {busy ? "Connecting…" : "Connect team"}
         </CyberdeckActionButton>
         <p className="text-[8px] text-[#6a8a9a]">
