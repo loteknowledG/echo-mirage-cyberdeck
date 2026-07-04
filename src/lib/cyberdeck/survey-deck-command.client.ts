@@ -14,6 +14,11 @@ import {
 } from "@/lib/cyberdeck/survey-mirage-item-queue.client";
 import { SURVEY_SILENT_CAPTURE_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
 import { notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
+import {
+  readSurveyMiragePairCredentials,
+  readSurveyPowerfistPairCredentials,
+} from "@/lib/cyberdeck/survey-pairing-client";
+import { DEFAULT_ECHO_HTTP_PORT } from "@/lib/cyberdeck/survey-pair-pin";
 
 export const SURVEY_LAST_CAPTURE_STORAGE_KEY = "echo-mirage-survey-last-capture-v1";
 export const SURVEY_LAST_CAPTURE_EVENT = "echo-mirage-survey-last-capture";
@@ -24,10 +29,35 @@ export type SurveyDeckCommandResult = {
   pngBase64?: string;
 };
 
-type SurveyDeckCommandContext = {
+export type SurveyDeckCommandContext = {
   echoHost: string | null;
   echoHttpPort: number;
 };
+
+/** Resolve Echo Satellite endpoint for deck commands (team probe + saved pair creds). */
+export function resolveSurveyEchoDeckContext(
+  teamEchoHost?: string | null,
+): SurveyDeckCommandContext {
+  const mirageCreds = readSurveyMiragePairCredentials();
+  const powerfistCreds = readSurveyPowerfistPairCredentials();
+  let echoHost =
+    teamEchoHost?.trim() ||
+    mirageCreds?.echoHost?.trim() ||
+    powerfistCreds?.echoHost?.trim() ||
+    null;
+  const echoHttpPort =
+    mirageCreds?.httpPort ?? powerfistCreds?.httpPort ?? DEFAULT_ECHO_HTTP_PORT;
+
+  // One-machine dev (EMP ignition): loopback Echo before pair creds land in localStorage.
+  if (!echoHost && typeof window !== "undefined") {
+    const { hostname } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      echoHost = "127.0.0.1";
+    }
+  }
+
+  return { echoHost, echoHttpPort };
+}
 
 function logDeck(line: string): void {
   notifySurveyMuthurArchive(`SURVEY DECK // ${line}`);

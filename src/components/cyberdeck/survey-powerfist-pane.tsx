@@ -265,8 +265,9 @@ function SurveyPowerfistPairingPanel() {
 export function SurveyPowerfistPane() {
   const team = useSurveyTeamStatus();
   const tripleLinked = isSurveyTeamTripleLinked(team);
+  const echoLinked = team.echoPowerfist.state === "linked";
 
-  if (tripleLinked) {
+  if (tripleLinked || echoLinked) {
     return (
       <div className="cyberdeck-survey-powerfist-deck cyberdeck-rola-dex-pane flex min-h-0 flex-1 flex-col overflow-hidden bg-[#050807]">
         <SurveyMirageQueueTeamHost role="powerfist" />

@@ -187,7 +187,14 @@ function probePreviewMatrixSplit(): void {
   assert.ok(carousels.includes("export function usePreviewMatrixCarousels"), "carousel hook must exist");
 
   const deckCommands = readFileSync(resolve("src/app/preview/use-survey-deck-commands.ts"), "utf8");
-  assert.ok(deckCommands.includes("export function useSurveyDeckCommands"), "deck command hook must exist");
+  assert.ok(deckCommands.includes("executeSurveyDeckCommand"), "deck commands must route survey cards to Echo");
+  assert.ok(deckCommands.includes("resolveSurveyEchoDeckContext"), "deck commands must resolve Echo host from creds");
+
+  const deckCommandClient = readFileSync(resolve("src/lib/cyberdeck/survey-deck-command.client.ts"), "utf8");
+  assert.ok(
+    deckCommandClient.includes("resolveSurveyEchoDeckContext"),
+    "survey deck command client must resolve Echo host",
+  );
 
   const play = readFileSync(resolve("src/app/preview/preview-matrix-play.ts"), "utf8");
   assert.ok(play.includes("CARD_PLAY_LAPS = 2"), "play module owns card arm timing");

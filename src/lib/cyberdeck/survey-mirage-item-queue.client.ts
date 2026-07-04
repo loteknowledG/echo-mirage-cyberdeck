@@ -31,6 +31,7 @@ export type SurveyMirageQueueControlSource = "mirage" | "powerfist";
 export const SURVEY_MIRAGE_ITEM_CHANGED_EVENT = "echo-mirage:survey-mirage-item-changed";
 export const SURVEY_MIRAGE_ITEM_DISPLAY_EVENT = "echo-mirage:survey-mirage-item-display";
 export const SURVEY_MIRAGE_QUEUE_CONTROL_EVENT = "echo-mirage:survey-mirage-queue-control";
+export const SURVEY_MIRAGE_QUEUE_SYNC_CHANNEL = "echo-mirage-survey-mirage-queue-sync";
 
 const ITEMS_STORAGE_KEY = "echo-mirage-survey-mirage-items-v1";
 const INDEX_STORAGE_KEY = "echo-mirage-survey-mirage-item-index-v1";
@@ -57,6 +58,21 @@ function emitChanged(source?: SurveyMirageQueueControlSource): void {
       detail: { source: source ?? null },
     }),
   );
+}
+
+function broadcastQueueIngest(item: SurveyMirageQueueItem): void {
+  if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+  const channel = new BroadcastChannel(SURVEY_MIRAGE_QUEUE_SYNC_CHANNEL);
+  channel.postMessage({ type: "ingest", item });
+  channel.close();
+}
+
+function mergeRemoteQueueIngest(item: SurveyMirageQueueItem): void {
+  const items = readItems();
+  if (items.some((entry) => entry.id === item.id)) return;
+  const next = [...items, item];
+  writeItems(next);
+  writeIndex(next.length - 1, "powerfist");
 }
 
 function readItems(): SurveyMirageQueueItem[] {
@@ -130,6 +146,7 @@ export function ingestMirageQueueItem(input: {
   imageDataUrl?: string;
   source?: SurveyMirageQueueItemSource;
   select?: boolean;
+  sync?: boolean;
 }): SurveyMirageQueueItem {
   const items = readItems();
   const item: SurveyMirageQueueItem = {
@@ -144,6 +161,9 @@ export function ingestMirageQueueItem(input: {
   writeItems(next);
   if (input.select !== false) {
     writeIndex(next.length - 1);
+  }
+  if (input.sync !== false) {
+    broadcastQueueIngest(item);
   }
   notifySurveyMuthurArchive(
     `SURVEY // Mirage item queue · ${next.length} total · ${summarizeItem(item)}`,
@@ -370,7 +390,18 @@ export function installMirageQueueListeners(): () => void {
   };
 
   window.addEventListener(SURVEY_LAST_CAPTURE_EVENT, onCapture);
+
+  let syncChannel: BroadcastChannel | null = null;
+  if ("BroadcastChannel" in window) {
+    syncChannel = new BroadcastChannel(SURVEY_MIRAGE_QUEUE_SYNC_CHANNEL);
+    syncChannel.onmessage = (event: MessageEvent<{ type?: string; item?: SurveyMirageQueueItem }>) => {
+      if (event.data?.type !== "ingest" || !event.data.item) return;
+      mergeRemoteQueueIngest(event.data.item);
+    };
+  }
+
   return () => {
     window.removeEventListener(SURVEY_LAST_CAPTURE_EVENT, onCapture);
+    syncChannel?.close();
   };
 }

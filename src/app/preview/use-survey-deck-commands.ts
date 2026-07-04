@@ -8,6 +8,11 @@ import {
   type PowerFistStackCommand,
 } from "@/lib/cyberdeck/powerfist-events";
 import type { connectPowerfistRemoteSocket } from "@/lib/cyberdeck/powerfist-remote-socket";
+import {
+  executeSurveyDeckCommand,
+  resolveSurveyEchoDeckContext,
+} from "@/lib/cyberdeck/survey-deck-command.client";
+import type { SurveyDeckCommandId } from "@/lib/cyberdeck/survey-deck-data";
 import type { PreviewDeckWithTarget } from "./preview-data";
 import { CARD_PUSH_RECEIPT_DURATION_MS, cardChatMessage } from "./preview-matrix-play";
 
@@ -55,8 +60,13 @@ export function useSurveyDeckCommands({
       const deck = activeDecks[deckIndex];
       const card = deck.cards[cardIndex];
 
-      if (card.surveyCommand && onDeckCommand) {
-        const result = await onDeckCommand(card.surveyCommand);
+      if (card.surveyCommand) {
+        const result = onDeckCommand
+          ? await onDeckCommand(card.surveyCommand)
+          : await executeSurveyDeckCommand(
+              card.surveyCommand as SurveyDeckCommandId,
+              resolveSurveyEchoDeckContext(),
+            );
         showPushReceipt(
           result.ok
             ? `<strong>${card.title}</strong> — ${result.message}`
