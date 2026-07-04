@@ -13,6 +13,8 @@ import { isSurveyTeamTripleLinked } from "@/lib/cyberdeck/survey-team-status";
 import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
 import { requestSurveyHubConnect } from "@/lib/cyberdeck/survey-connect-request.client";
 import { emitSurveyPairingDiagnostics } from "@/lib/cyberdeck/survey-pairing-debug";
+import { formatHubConnectStepLabel } from "@/lib/cyberdeck/survey-hub-diagnostics.client";
+import { useSurveyHubDiagnostics } from "@/lib/cyberdeck/use-survey-hub-diagnostics";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 
 function linkLabel(link: SurveyTeamLink): string {
@@ -83,6 +85,7 @@ function TeamLinkRow({
 
 export function SurveyTeamStatusPanel() {
   const { refresh, ...team } = useSurveyTeamStatus();
+  const diagnostics = useSurveyHubDiagnostics();
   const [refreshing, setRefreshing] = useState(false);
   const tripleLinked = isSurveyTeamTripleLinked(team);
   const hubEnabled = isSurveyHubEnabled();
@@ -91,9 +94,10 @@ export function SurveyTeamStatusPanel() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await refresh();
+    await diagnostics.refreshRelay();
     await emitSurveyPairingDiagnostics("TEAM LINKS refresh");
     setRefreshing(false);
-  }, [refresh]);
+  }, [diagnostics, refresh]);
 
   return (
     <section
@@ -146,6 +150,56 @@ export function SurveyTeamStatusPanel() {
             right={`${SURVEY_POWERFIST_DISPLAY} (${SURVEY_POWERFIST_HINT})`}
             link={team.miragePowerfist}
           />
+          {hubEnabled && !tripleLinked ? (
+            <div className="survey-hub-diagnostics mt-2 border-t border-[#151515] pt-2">
+              <p className="mb-1.5 text-[8px] tracking-[0.12em] text-[#7a8a8a]">HUB DIAGNOSTICS</p>
+              {diagnostics.relay ? (
+                <p className="text-[8px] leading-relaxed text-[#5f5f5f]">
+                  Relay{" "}
+                  {diagnostics.relay.relayRunning ? (
+                    <span className="text-emerald-300/80">running</span>
+                  ) : (
+                    <span className="text-amber-300/80">offline</span>
+                  )}
+                  {diagnostics.relay.paired
+                    ? ` · paired ${diagnostics.relay.deviceId?.slice(0, 8) ?? "device"}…`
+                    : " · not paired on server"}
+                  {diagnostics.relay.reason ? ` · ${diagnostics.relay.reason}` : null}
+                </p>
+              ) : null}
+              {diagnostics.lastConnect ? (
+                <div className="mt-1 space-y-0.5">
+                  <p className="text-[8px] text-[#5f5f5f]">
+                    Last connect{" "}
+                    {diagnostics.lastConnect.ran
+                      ? diagnostics.lastConnect.steps.every((step) => step.ok)
+                        ? "· all steps OK"
+                        : "· partial"
+                      : `· skipped (${diagnostics.lastConnect.skipped ?? "n/a"})`}
+                  </p>
+                  {diagnostics.lastConnect.steps.map((step) => (
+                    <p
+                      key={step.id}
+                      className={`text-[8px] leading-relaxed ${step.ok ? "text-[#5f5f5f]" : "text-amber-300/90"}`}
+                    >
+                      {formatHubConnectStepLabel(step.id)} — {step.ok ? "OK" : "FAIL"} — {step.detail}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+              {diagnostics.lastHubRestore && team.miragePowerfist.state !== "linked" ? (
+                <p
+                  className={`mt-1 text-[8px] leading-relaxed ${diagnostics.lastHubRestore.ok ? "text-[#5f5f5f]" : "text-amber-300/90"}`}
+                >
+                  Last hub restore ({diagnostics.lastHubRestore.source}) —{" "}
+                  {diagnostics.lastHubRestore.ok ? "OK" : "FAIL"} — {diagnostics.lastHubRestore.detail}
+                </p>
+              ) : null}
+              <p className="mt-1.5 text-[8px] leading-relaxed text-[#4a4a4a]">
+                Ask MUTHUR: &quot;link the squad&quot; or &quot;connect survey team&quot;
+              </p>
+            </div>
+          ) : null}
         </>
       )}
     </section>

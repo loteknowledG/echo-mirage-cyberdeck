@@ -6,9 +6,18 @@ function stripMuthurPrefix(input: string): string {
   return input.replace(/^muthur\s*,?\s*/i, "").trim();
 }
 
+function normalizeSurveyConnectMessage(input: string): string {
+  return stripMuthurPrefix(input)
+    .replace(/\becho\s+d\s+mirage\b/gi, "echo and mirage")
+    .replace(/\bmirage\s+d\s+powerfist\b/gi, "mirage and powerfist")
+    .replace(/\b(?:and|to|with)\s+d\s+/gi, " and ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Local chat commands — wire Survey TEAM LINKS without opening the Survey tab. */
 export function parseSurveyAutoConnectIntent(input: string): boolean {
-  const trimmed = stripMuthurPrefix(input.trim());
+  const trimmed = normalizeSurveyConnectMessage(input.trim());
   if (!trimmed) return false;
 
   if (
@@ -43,6 +52,23 @@ export function parseSurveyAutoConnectIntent(input: string): boolean {
       "i",
     ).test(trimmed)
   ) {
+    return true;
+  }
+
+  if (
+    new RegExp(
+      `^${SURVEY_LINK_VERB}\\s+(?:them|the\\s+squad|the\\s+team|survey|all(?:\\s+three|\\s+3)?)$`,
+      "i",
+    ).test(trimmed)
+  ) {
+    return true;
+  }
+
+  if (/^triple[\s-]?link(?:\s+(?:survey|team|squad|them))?$/i.test(trimmed)) {
+    return true;
+  }
+
+  if (/^(?:squad|team)\s+link(?:\s+survey)?$/i.test(trimmed)) {
     return true;
   }
 

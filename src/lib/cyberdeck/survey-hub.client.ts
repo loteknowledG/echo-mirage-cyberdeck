@@ -34,6 +34,10 @@ import {
 import { resolveSurveyHubTeamId, saveSurveyHubTeamId } from "@/lib/cyberdeck/survey-hub-store.client";
 import { notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import { isSurveyTripleLinked } from "@/lib/cyberdeck/survey-team-status-store.client";
+import {
+  recordSurveyHubConnectDiagnostic,
+  recordSurveyHubRestoreDiagnostic,
+} from "@/lib/cyberdeck/survey-hub-diagnostics.client";
 
 export {
   SURVEY_AUTO_PAIR_REQUEST_EVENT,
@@ -209,6 +213,11 @@ export async function runSurveyMiragePowerfistHubRestore(options?: {
   if (restored.ok) {
     notifySurveyTeamStatusChanged();
   }
+  recordSurveyHubRestoreDiagnostic({
+    ok: restored.ok,
+    detail: restored.detail,
+    source: "hub-restore",
+  });
   return restored;
 }
 
@@ -335,6 +344,11 @@ async function pairPowerfistEchoRelay(
   };
 }
 
+function finishSurveyHubConnect(result: SurveyHubConnectResult): SurveyHubConnectResult {
+  recordSurveyHubConnectDiagnostic(result);
+  return result;
+}
+
 /**
  * Survey Hub — one-shot connect for Echo ↔ Mirage ↔ PowerFist.
  * Desktop: reads Echo pins locally. HTTPS / cross-network: cloud relay (no manual PIN entry).
@@ -348,10 +362,10 @@ export async function runSurveyHubConnect(options?: {
   const quiet = options?.quiet === true;
 
   if (!isSurveyHubEnabled()) {
-    return { ran: false, skipped: "Survey Hub disabled.", steps };
+    return finishSurveyHubConnect({ ran: false, skipped: "Survey Hub disabled.", steps });
   }
   if (!options?.force && shouldThrottleHubConnect()) {
-    return { ran: false, skipped: "Survey Hub connect ran recently.", steps };
+    return finishSurveyHubConnect({ ran: false, skipped: "Survey Hub connect ran recently.", steps });
   }
 
   if (await isSurveyTripleLinked()) {
@@ -359,7 +373,7 @@ export async function runSurveyHubConnect(options?: {
       resolveSurveyHubTeamId(options?.echoNodeId) ??
       readSurveyMiragePairCredentials()?.echoNodeId ??
       null;
-    return {
+    return finishSurveyHubConnect({
       ran: true,
       echoNodeId: teamId,
       steps: [
@@ -367,7 +381,7 @@ export async function runSurveyHubConnect(options?: {
         { id: "powerfist-echo", ok: true, detail: "already linked" },
         { id: "powerfist-hub", ok: true, detail: "already linked" },
       ],
-    };
+    });
   }
 
   if (!quiet) {
@@ -517,11 +531,11 @@ export async function runSurveyHubConnect(options?: {
     log(`${failed} link(s) need attention — ensure Echo Satellite Survey tab is open, then retry.`);
   }
 
-  return {
+  return finishSurveyHubConnect({
     ran: true,
     steps,
     echoNodeId: echoNodeId ?? resolveSurveyHubTeamId(),
-  };
+  });
 }
 
 /** @deprecated use runSurveyHubConnect */
