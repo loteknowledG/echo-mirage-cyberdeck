@@ -10,7 +10,6 @@ import {
 } from "@/lib/cyberdeck/survey-hub-store.client";
 import {
   formatSurveyHubResultForMuthur,
-  isSurveyTripleLinked,
   runSurveyHubConnect,
 } from "@/lib/cyberdeck/survey-hub.client";
 import { isSurveyTeamTripleLinked } from "@/lib/cyberdeck/survey-team-status";
@@ -74,15 +73,13 @@ export function SurveyHubPanel() {
   );
 
   useEffect(() => {
-    if (!hubEnabled || tripleLinked) return;
+    if (!hubEnabled || team.loading || tripleLinked) return;
     let cancelled = false;
     void (async () => {
-      if (cancelled || (await isSurveyTripleLinked())) return;
       const saved = resolveSurveyHubTeamId();
-      if (!saved) return;
-      const id = saved;
+      if (!saved || cancelled) return;
       setBusy(true);
-      const result = await runSurveyHubConnect({ echoNodeId: id, force: true, quiet: true });
+      const result = await runSurveyHubConnect({ echoNodeId: saved, force: true, quiet: true });
       setBusy(false);
       if (!cancelled && result.ran && result.steps.every((step) => step.ok)) {
         setStatus("All team links connected.");
@@ -91,7 +88,7 @@ export function SurveyHubPanel() {
     return () => {
       cancelled = true;
     };
-  }, [hubEnabled, tripleLinked]);
+  }, [hubEnabled, team.loading, tripleLinked]);
 
   if (!hubEnabled) {
     return null;

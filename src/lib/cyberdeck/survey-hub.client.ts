@@ -26,31 +26,33 @@ import {
   type EchoSurveyStatus,
 } from "@/lib/cyberdeck/survey-pairing-client";
 import { enterSurveyPairPinViaRelay, fetchSurveyRelayBundle } from "@/lib/cyberdeck/survey-relay.client";
+import {
+  type SurveyAutoPairResult,
+  type SurveyHubConnectResult,
+  type SurveyHubConnectStep,
+} from "@/lib/cyberdeck/survey-hub-connect-events";
 import { resolveSurveyHubTeamId, saveSurveyHubTeamId } from "@/lib/cyberdeck/survey-hub-store.client";
 import { notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
+import { isSurveyTripleLinked } from "@/lib/cyberdeck/survey-team-status-store.client";
 
-export const SURVEY_HUB_CONNECT_REQUEST_EVENT = "echo-mirage:survey-hub-connect-request";
-/** @deprecated use SURVEY_HUB_CONNECT_REQUEST_EVENT */
-export const SURVEY_AUTO_PAIR_REQUEST_EVENT = SURVEY_HUB_CONNECT_REQUEST_EVENT;
+export {
+  SURVEY_AUTO_PAIR_REQUEST_EVENT,
+  SURVEY_HUB_CONNECT_REQUEST_EVENT,
+  SURVEY_HUB_CONNECT_RESULT_EVENT,
+  dispatchSurveyHubConnectResult,
+  formatSurveyAutoPairResultForMuthur,
+  formatSurveyHubResultForMuthur,
+  type SurveyAutoPairResult,
+  type SurveyAutoPairStep,
+  type SurveyHubConnectRequestDetail,
+  type SurveyHubConnectResult,
+  type SurveyHubConnectStep,
+} from "@/lib/cyberdeck/survey-hub-connect-events";
+
+export { isSurveyTripleLinked } from "@/lib/cyberdeck/survey-team-status-store.client";
 
 const HUB_CONNECT_SESSION_KEY = "echo-mirage-survey-hub-connect-at";
 const HUB_CONNECT_COOLDOWN_MS = 45_000;
-
-export type SurveyHubConnectStep = {
-  id: "mirage" | "powerfist-echo" | "powerfist-hub";
-  ok: boolean;
-  detail: string;
-};
-
-export type SurveyHubConnectResult = {
-  ran: boolean;
-  skipped?: string;
-  steps: SurveyHubConnectStep[];
-  echoNodeId?: string | null;
-};
-
-export type SurveyAutoPairStep = SurveyHubConnectStep;
-export type SurveyAutoPairResult = SurveyHubConnectResult;
 
 function log(line: string): void {
   notifySurveyMuthurArchive(`SURVEY HUB // ${line}`);
@@ -161,16 +163,6 @@ async function restoreMirageHubLink(): Promise<{ ok: boolean; detail: string }> 
     return { ok: true, detail: label };
   }
   return { ok: false, detail: paired.reason };
-}
-
-/** True when Echo↔Mirage, Echo↔PowerFist, and Mirage↔PowerFist hub are all active. */
-export async function isSurveyTripleLinked(): Promise<boolean> {
-  const [mirage, powerfistEcho, hub] = await Promise.all([
-    mirageEchoLinkActive(),
-    powerfistEchoLinkActive(),
-    mirageHubLinkActive(),
-  ]);
-  return mirage && powerfistEcho && hub;
 }
 
 type PairSuccess = {
@@ -487,25 +479,3 @@ export async function runSurveyAutoPair(options?: {
   return runSurveyHubConnect(options);
 }
 
-export function formatSurveyHubResultForMuthur(result: SurveyHubConnectResult): string {
-  if (!result.ran) {
-    return `SURVEY HUB // SKIPPED // ${result.skipped ?? "not run"}`;
-  }
-
-  const lines = result.steps.map(
-    (step) => `${step.id.toUpperCase()} // ${step.ok ? "OK" : "FAIL"} // ${step.detail}`,
-  );
-  const failed = result.steps.filter((step) => !step.ok).length;
-  const header =
-    failed === 0
-      ? "SURVEY HUB // CONNECTED // all TEAM LINKS green"
-      : `SURVEY HUB // PARTIAL // ${failed} link(s) need attention`;
-
-  const teamLine = result.echoNodeId ? `TEAM ID // ${result.echoNodeId}` : null;
-  return [header, teamLine, ...lines].filter(Boolean).join("\n");
-}
-
-/** @deprecated use formatSurveyHubResultForMuthur */
-export function formatSurveyAutoPairResultForMuthur(result: SurveyAutoPairResult): string {
-  return formatSurveyHubResultForMuthur(result);
-}

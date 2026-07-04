@@ -6,7 +6,6 @@ export {
   SURVEY_HUB_CONNECT_REQUEST_EVENT,
   formatSurveyAutoPairResultForMuthur,
   formatSurveyHubResultForMuthur,
-  isSurveyTripleLinked,
   runSurveyAutoPair,
   runSurveyHubConnect,
   type SurveyAutoPairResult,
@@ -14,3 +13,5 @@ export {
   type SurveyHubConnectResult,
   type SurveyHubConnectStep,
 } from "@/lib/cyberdeck/survey-hub.client";
+
+export { isSurveyTripleLinked } from "@/lib/cyberdeck/survey-team-status-store.client";

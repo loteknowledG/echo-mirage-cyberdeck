@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { SURVEY_HUB_CONNECT_REQUEST_EVENT } from "@/lib/cyberdeck/survey-hub.client";
+import { requestSurveyHubConnect } from "@/lib/cyberdeck/survey-connect-request.client";
 import { SURVEY_ECHO_LINK_CHANNEL } from "@/lib/cyberdeck/survey-mode";
 import {
   ECHO_SURVEY_TERMINATED_MESSAGE,
@@ -16,8 +16,7 @@ import { traceSurveyPairing } from "@/lib/cyberdeck/survey-pairing-trace";
 const LINK_POLL_MS = 2500;
 
 function requestSurveyAutoReconnect(): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(SURVEY_HUB_CONNECT_REQUEST_EVENT));
+  requestSurveyHubConnect({ force: true });
 }
 
 type SpyEchoLinkRole = "mirage" | "powerfist";

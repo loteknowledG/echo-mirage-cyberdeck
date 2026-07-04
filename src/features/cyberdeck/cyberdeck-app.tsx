@@ -363,10 +363,8 @@ import {
   SURVEY_MUTHUR_ARCHIVE_EVENT,
   notifySurveyFocusChat,
 } from "@/lib/cyberdeck/survey-chat";
-import {
-  formatSurveyAutoPairResultForMuthur,
-  runSurveyAutoPair,
-} from "@/lib/cyberdeck/survey-auto-pair.client";
+import { formatSurveyHubResultForMuthur } from "@/lib/cyberdeck/survey-hub-connect-events";
+import { requestSurveyHubConnectAndWait } from "@/lib/cyberdeck/survey-connect-request.client";
 import { parseSurveyAutoConnectIntent } from "@/lib/cyberdeck/survey-auto-connect-intent";
 import { terminateEchoSurveySession } from "@/lib/cyberdeck/survey-pairing-client";
 import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
@@ -5521,10 +5519,10 @@ export default function CyberdeckApp() {
     const glyphCommand = resolveGlyphCommand(userMessage);
     if (parseSurveyAutoConnectIntent(userMessage)) {
       try {
-        const pairResult = await runSurveyAutoPair({ force: true });
+        const pairResult = await requestSurveyHubConnectAndWait({ force: true });
         setMessages((prev) => [
           ...prev,
-          { role: "system", text: formatSurveyAutoPairResultForMuthur(pairResult) },
+          { role: "system", text: formatSurveyHubResultForMuthur(pairResult) },
         ]);
       } catch (err) {
         setMessages((prev) => [
@@ -6479,10 +6477,12 @@ ${diff}`;
           parseSurveyAutoConnectJson(res.headers.get("x-muthur-survey-auto-connect"));
         if (surveyAutoConnectRef) {
           try {
-            const pairResult = await runSurveyAutoPair({ force: surveyAutoConnectRef.force });
+            const pairResult = await requestSurveyHubConnectAndWait({
+              force: surveyAutoConnectRef.force,
+            });
             setMessages((prev) => [
               ...prev,
-              { role: "system", text: formatSurveyAutoPairResultForMuthur(pairResult) },
+              { role: "system", text: formatSurveyHubResultForMuthur(pairResult) },
             ]);
           } catch (err) {
             setMessages((prev) => [

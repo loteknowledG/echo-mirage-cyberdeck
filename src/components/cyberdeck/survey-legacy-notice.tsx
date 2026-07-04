@@ -1,7 +1,7 @@
 "use client";
 
 import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
-import { requestSurveyAutoPair } from "@/components/cyberdeck/survey-auto-pair-host";
+import { requestSurveyHubConnect } from "@/lib/cyberdeck/survey-connect-request.client";
 import { resolveSurveyCyberdeckShell } from "@/lib/electron/desktop-install.client";
 
 /** Dev-only legacy pairing notice — hidden when Survey Hub is active. */
@@ -25,7 +25,7 @@ export function SurveyLegacyNotice() {
           <button
             type="button"
             className="text-emerald-200 underline decoration-emerald-500/40 hover:text-emerald-100"
-            onClick={() => requestSurveyAutoPair()}
+            onClick={() => requestSurveyHubConnect()}
           >
             retry connect
           </button>
