@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type RefObject,
+  type MutableRefObject,
 } from "react";
 import EmblaCarousel, { type EmblaCarouselType } from "embla-carousel";
 import { ensurePickerSnappedToCenter } from "@/lib/embla-ios-picker-loop";
@@ -17,9 +18,9 @@ import { attachMatrixGrabCursor } from "./preview-matrix-play";
 type PreviewMatrixEmbedSurface = "page" | "survey" | "rola-dex";
 
 export type PreviewMatrixCarousels = {
-  matrixRef: RefObject<HTMLElement | null>;
-  deckViewportRef: RefObject<HTMLDivElement | null>;
-  handViewportRefs: RefObject<(HTMLDivElement | null)[]>;
+  matrixRef: RefObject<HTMLElement>;
+  deckViewportRef: RefObject<HTMLDivElement>;
+  handViewportRefs: MutableRefObject<(HTMLDivElement | null)[]>;
   activeDeckIndex: number;
   activeCardIndex: number;
   isCompactCards: boolean;
