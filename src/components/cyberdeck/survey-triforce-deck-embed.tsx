@@ -24,8 +24,8 @@ export function SurveyTriforceDeckEmbed({ className = "" }: SurveyTriforceDeckEm
     DEFAULT_ECHO_HTTP_PORT;
 
   const handleDeckCommand = useCallback(
-    async (command: SurveyDeckCommandId) => {
-      return executeSurveyDeckCommand(command, {
+    async (command: string) => {
+      return executeSurveyDeckCommand(command as SurveyDeckCommandId, {
         echoHost: team.echoHost,
         echoHttpPort,
       });
