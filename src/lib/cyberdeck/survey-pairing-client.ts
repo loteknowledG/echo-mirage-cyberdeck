@@ -14,8 +14,6 @@ export {
   saveSurveyPowerfistPairCredentials,
   type SurveyMiragePairCredentials,
   type SurveyPowerfistPairCredentials,
-  type SpyMiragePairCredentials,
-  type SpyPowerfistPairCredentials,
 } from "@/lib/cyberdeck/survey-pair-credentials.client";
 
 export {

@@ -3,7 +3,7 @@
  *   pnpm probe:survey-hub
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseSurveyAutoConnectIntent } from "../src/lib/cyberdeck/survey-auto-connect-intent";
 import {
@@ -128,11 +128,20 @@ function probeStep4SpyRenameAndEmbed(): void {
   assert.ok(!subRail.includes("spy-sub-rail"), "survey sub-rail must not use spy-sub-rail");
 
   const teamStatus = readFileSync(resolve("src/lib/cyberdeck/survey-team-status.ts"), "utf8");
-  assert.ok(teamStatus.includes("SURVEY_TEAM_STATUS_CHANGED_EVENT"), "team status uses survey event name");
+  assert.ok(
+    teamStatus.includes('echo-mirage-survey-team-status-changed'),
+    "team status event uses survey name",
+  );
+  assert.ok(
+    teamStatus.includes("LEGACY_SPY_TEAM_STATUS_CHANGED_EVENT"),
+    "legacy spy team event kept for migration",
+  );
   assert.ok(teamStatus.includes("EMPTY_SURVEY_TEAM_STATUS"), "team status uses survey empty constant");
 
   const creds = readFileSync(resolve("src/lib/cyberdeck/survey-pair-credentials.client.ts"), "utf8");
   assert.ok(creds.includes("SurveyMiragePairCredentials"), "credentials use survey type names");
+  assert.ok(creds.includes("readJsonStorageWithLegacyFallback"), "pair credentials migrate legacy storage keys");
+  assert.ok(!creds.includes("SpyMiragePairCredentials"), "credentials must not export spy type aliases");
 
   const capture = readFileSync(resolve("src/lib/cyberdeck/powerfist-capture-client.ts"), "utf8");
   assert.ok(capture.includes("SURVEY_CAPTURE_HOST_STORAGE_KEY"), "capture storage uses survey keys");
@@ -158,6 +167,9 @@ function probePreviewMatrixSplit(): void {
   const matrix = readFileSync(resolve("src/app/preview/preview-matrix.tsx"), "utf8");
   assert.ok(matrix.includes("preview-matrix-play"), "preview-matrix must import play helpers");
   assert.ok(matrix.includes("use-powerfist-matrix-remote"), "preview-matrix must import remote hook");
+  assert.ok(matrix.includes("use-preview-matrix-carousels"), "preview-matrix must import carousel hook");
+  assert.ok(matrix.includes("use-preview-matrix-card-play"), "preview-matrix must import card play hook");
+  assert.ok(matrix.includes("use-survey-deck-commands"), "preview-matrix must import deck command hook");
   assert.ok(
     !matrix.includes("function cardChatMessage"),
     "preview-matrix must not inline cardChatMessage",
@@ -166,6 +178,16 @@ function probePreviewMatrixSplit(): void {
     !matrix.includes("connectPowerfistRemoteSocket"),
     "preview-matrix must not inline remote socket wiring",
   );
+  assert.ok(!matrix.includes("EmblaCarousel("), "preview-matrix must not inline Embla setup");
+
+  const matrixLines = matrix.split("\n").length;
+  assert.ok(matrixLines < 320, "preview-matrix.tsx should be a thin view layer");
+
+  const carousels = readFileSync(resolve("src/app/preview/use-preview-matrix-carousels.ts"), "utf8");
+  assert.ok(carousels.includes("export function usePreviewMatrixCarousels"), "carousel hook must exist");
+
+  const deckCommands = readFileSync(resolve("src/app/preview/use-survey-deck-commands.ts"), "utf8");
+  assert.ok(deckCommands.includes("export function useSurveyDeckCommands"), "deck command hook must exist");
 
   const play = readFileSync(resolve("src/app/preview/preview-matrix-play.ts"), "utf8");
   assert.ok(play.includes("CARD_PLAY_LAPS = 2"), "play module owns card arm timing");
@@ -341,6 +363,54 @@ function probeCyberdeckAppBoundary(): void {
   );
 }
 
+function probeSpyNamingAndShims(): void {
+  const hook = readFileSync(resolve("src/lib/cyberdeck/use-survey-team-status.ts"), "utf8");
+  assert.ok(
+    hook.includes("LEGACY_SPY_TEAM_STATUS_CHANGED_EVENT"),
+    "team status hook listens for legacy spy event",
+  );
+
+  const boundary = readFileSync(resolve("src/lib/cyberdeck/survey-boundary.ts"), "utf8");
+  assert.ok(
+    boundary.includes("return isSurveyHubEnabled()"),
+    "isSurveyAutoPairEnabled delegates to Survey Hub",
+  );
+
+  const chat = readFileSync(resolve("src/lib/cyberdeck/survey-chat.ts"), "utf8");
+  assert.ok(!chat.includes("notifySpyMuthurArchive"), "survey-chat must not export spy archive alias");
+
+  const pairingBarrel = readFileSync(resolve("src/lib/cyberdeck/survey-pairing-client.ts"), "utf8");
+  assert.ok(!pairingBarrel.includes("SpyMiragePairCredentials"), "pairing barrel must not re-export spy types");
+
+  assert.ok(
+    !existsSync(resolve("src/lib/cyberdeck/survey-auto-pair.client.ts")),
+    "survey-auto-pair.client shim must be deleted",
+  );
+}
+
+function probeHubOnlyUi(): void {
+  const powerfist = readFileSync(resolve("src/components/cyberdeck/survey-powerfist-pane.tsx"), "utf8");
+  assert.ok(powerfist.includes("isSurveyHubEnabled"), "PowerFist pane gates on Survey Hub");
+  assert.ok(powerfist.includes("SurveyHubSubPaneHint"), "PowerFist pane uses hub retry hint");
+  assert.ok(
+    powerfist.includes("if (hubEnabled)"),
+    "PowerFist pane must short-circuit when Survey Hub is on",
+  );
+
+  const mirage = readFileSync(resolve("src/components/cyberdeck/survey-mirage-pane.tsx"), "utf8");
+  assert.ok(mirage.includes("!hubEnabled"), "Mirage pane hides hub QR panel when Survey Hub is on");
+  assert.ok(mirage.includes("SurveyHubSubPaneHint"), "Mirage pane uses hub retry hint");
+
+  const echo = readFileSync(resolve("src/components/cyberdeck/survey-echo-pane.tsx"), "utf8");
+  assert.ok(echo.includes("!hubEnabled"), "Echo pane hides legacy PIN UI when Survey Hub is on");
+
+  const hint = readFileSync(resolve("src/components/cyberdeck/survey-hub-subpane-hint.tsx"), "utf8");
+  assert.ok(
+    hint.includes("requestSurveyHubConnectAndWait"),
+    "hub sub-pane hint must use event connect bridge",
+  );
+}
+
 async function main(): Promise<void> {
   probeAutoConnectIntent();
   probeTripleLinkStatus();
@@ -351,6 +421,8 @@ async function main(): Promise<void> {
   probeStep4SpyRenameAndEmbed();
   probeDeckMatrixEmbed();
   probeSingleConnectOrchestrator();
+  probeHubOnlyUi();
+  probeSpyNamingAndShims();
   probeStep5CyberdeckExtraction();
   probeHubResultFormatting();
   probeTeamIdStore();

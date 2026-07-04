@@ -21,7 +21,7 @@ function resolveChatEndpoint(provider: string): string | null {
   return null;
 }
 
-export type SpyAnalyzeInput = {
+export type SurveyAnalyzeInput = {
   pngBase64: string;
   prompt?: string;
   provider?: string;
@@ -29,11 +29,11 @@ export type SpyAnalyzeInput = {
   model?: string;
 };
 
-export type SpyAnalyzeResult =
+export type SurveyAnalyzeResult =
   | { ok: true; text: string; model: string; provider: string }
   | { ok: false; error: string };
 
-export async function analyzeSurveyCapture(input: SpyAnalyzeInput): Promise<SpyAnalyzeResult> {
+export async function analyzeSurveyCapture(input: SurveyAnalyzeInput): Promise<SurveyAnalyzeResult> {
   const pngBase64 = input.pngBase64.trim();
   if (!pngBase64) {
     return { ok: false, error: "pngBase64 is required." };

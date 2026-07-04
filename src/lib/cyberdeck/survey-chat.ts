@@ -59,9 +59,6 @@ export function notifySurveyMuthurArchive(text: string): void {
   window.dispatchEvent(new CustomEvent(SURVEY_MUTHUR_ARCHIVE_EVENT, { detail: { text: line } }));
 }
 
-/** @deprecated Use notifySurveyMuthurArchive */
-export const notifySpyMuthurArchive = notifySurveyMuthurArchive;
-
 export function notifySurveyFocusChat(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(SURVEY_FOCUS_CHAT_EVENT));

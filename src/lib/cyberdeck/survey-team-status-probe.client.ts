@@ -69,9 +69,9 @@ async function fetchAuthoritativeEchoStatus(input: {
 export async function probeSurveyTeamStatus(): Promise<SurveyTeamStatus> {
   const legacyPairing = isSurveyLegacyPairingEnabled();
   const mirageCreds = readSurveyMiragePairCredentials();
-  const powerfistSpyCreds = readSurveyPowerfistPairCredentials();
-  const echoHost = mirageCreds?.echoHost ?? powerfistSpyCreds?.echoHost ?? null;
-  const echoHttpPort = mirageCreds?.httpPort ?? powerfistSpyCreds?.httpPort ?? 3050;
+  const powerfistCreds = readSurveyPowerfistPairCredentials();
+  const echoHost = mirageCreds?.echoHost ?? powerfistCreds?.echoHost ?? null;
+  const echoHttpPort = mirageCreds?.httpPort ?? powerfistCreds?.httpPort ?? 3050;
 
   let echoMirage = linkFromBool(false, "Enter Mirage code on this machine.");
   let echoPowerfist = linkFromBool(false, "Enter PowerFist code on the phone.");
@@ -111,14 +111,14 @@ export async function probeSurveyTeamStatus(): Promise<SurveyTeamStatus> {
     }
   }
 
-  if (legacyPairing && powerfistSpyCreds) {
-    const linkActive = await isEchoRoleLinkActive("powerfist", powerfistSpyCreds);
+  if (legacyPairing && powerfistCreds) {
+    const linkActive = await isEchoRoleLinkActive("powerfist", powerfistCreds);
     if (linkActive === false) {
       echoPowerfist = linkFromBool(false, "Re-enter PowerFist code on the phone.");
     } else {
       echoPowerfist = linkFromBool(
         echoPowerfist.state === "linked" || linkActive === true,
-        formatPowerfistLinkDetail(powerfistSpyCreds.deviceId, powerfistSpyCreds.echoHost),
+        formatPowerfistLinkDetail(powerfistCreds.deviceId, powerfistCreds.echoHost),
       );
     }
   }

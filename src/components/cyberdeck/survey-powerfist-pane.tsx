@@ -22,7 +22,8 @@ import {
   formatSurveyMiragePowerfistLinkedLine,
   notifySurveyMuthurArchive,
 } from "@/lib/cyberdeck/survey-chat";
-import { isSurveyLegacyPairingEnabled } from "@/lib/cyberdeck/survey-boundary";
+import { isSurveyLegacyPairingEnabled, isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
+import { SurveyHubSubPaneHint } from "@/components/cyberdeck/survey-hub-subpane-hint";
 import {
   readSurveyMiragePairCredentials,
   readSurveyPowerfistPairCredentials,
@@ -51,6 +52,7 @@ function SurveyPowerfistPairingPanel() {
   const mirageHubCreds = readPowerfistRemoteCredentials();
   const mirageHubLinked = team.miragePowerfist.state === "linked" || Boolean(mirageHubCreds);
   const legacyPairing = isSurveyLegacyPairingEnabled();
+  const hubEnabled = isSurveyHubEnabled();
   const savedCreds = readSurveyPowerfistPairCredentials();
   const mirageCreds = readSurveyMiragePairCredentials();
   const defaultEchoHost = mirageCreds?.echoHost ?? team.echoHost ?? null;
@@ -110,6 +112,49 @@ function SurveyPowerfistPairingPanel() {
     notifySurveyTeamStatusChanged();
     notifySurveyMuthurArchive(formatSurveyMiragePowerfistLinkedLine(result.deviceId));
   }, [hubPin]);
+
+  if (hubEnabled) {
+    return (
+      <>
+        {terminated ? (
+          <div className="rounded border border-red-900/50 bg-red-950/20 px-3 py-3 text-center">
+            <p className="text-sm tracking-[0.12em] text-red-400/95">
+              {terminatedMessage ?? ECHO_SURVEY_TERMINATED_MESSAGE}
+            </p>
+            <p className="mt-1 text-[9px] text-[#8a8a8a]">
+              {SURVEY_ECHO_DISPLAY} closed its Survey tab. Retry connect when it is active again.
+            </p>
+          </div>
+        ) : null}
+
+        <div>
+          <p className="text-amber-200/90">
+            {SURVEY_MODE_TITLE} // {SURVEY_POWERFIST_LABEL}
+          </p>
+          <p className="mt-1 text-[9px] text-[#6a6a8a]">{SURVEY_POWERFIST_TAGLINE}</p>
+        </div>
+
+        {paired && !terminated ? (
+          <p className="text-emerald-300/80">
+            LINKED // {SURVEY_ECHO_DISPLAY} {paired.echoHost} · device {paired.deviceId.slice(0, 8)}…
+          </p>
+        ) : !terminated ? (
+          <p className="text-[#8a8a8a]">Waiting for Survey Hub to link {SURVEY_ECHO_DISPLAY}.</p>
+        ) : null}
+
+        {mirageHubLinked ? (
+          <p className="text-emerald-300/80">
+            LINKED // {SURVEY_MIRAGE_DISPLAY} hub · device{" "}
+            {(mirageHubCreds?.deviceId ?? team.miragePowerfist.detail ?? "").slice(0, 8)}…
+          </p>
+        ) : (
+          <p className="text-[#8a8a8a]">Waiting for Survey Hub to link {SURVEY_MIRAGE_DISPLAY}.</p>
+        )}
+
+        <SurveyHubSubPaneHint />
+      </>
+    );
+  }
 
   return (
     <>

@@ -11,12 +11,15 @@ import {
   SURVEY_MODE_TITLE,
 } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyEchoLinkWatch } from "@/lib/cyberdeck/survey-echo-link-watch";
+import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
+import { SurveyHubSubPaneHint } from "@/components/cyberdeck/survey-hub-subpane-hint";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import { readSurveyMiragePairCredentials } from "@/lib/cyberdeck/survey-pairing-client";
 
 export function SurveyMiragePane() {
   const { paired, terminated } = useSurveyEchoLinkWatch("mirage");
   const team = useSurveyTeamStatus();
+  const hubEnabled = isSurveyHubEnabled();
   const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
 
   return (
@@ -28,7 +31,13 @@ export function SurveyMiragePane() {
       </div>
 
       {!mirageLinked && !terminated ? (
-        <p className="text-[#8a8a8a]">Use the pairing box above TEAM LINKS to connect with {SURVEY_ECHO_DISPLAY}.</p>
+        hubEnabled ? (
+          <SurveyHubSubPaneHint />
+        ) : (
+          <p className="text-[#8a8a8a]">
+            Use the pairing box above TEAM LINKS to connect with {SURVEY_ECHO_DISPLAY}.
+          </p>
+        )
       ) : null}
 
       {mirageLinked ? (
@@ -40,12 +49,14 @@ export function SurveyMiragePane() {
         </>
       ) : null}
 
-      <div className="border-t border-[#1c1c1c] pt-4">
-        <SurveyMirageHubPanel
-          echoHost={paired?.echoHost ?? readSurveyMiragePairCredentials()?.echoHost ?? null}
-          echoHttpPort={paired?.httpPort ?? readSurveyMiragePairCredentials()?.httpPort ?? null}
-        />
-      </div>
+      {!hubEnabled ? (
+        <div className="border-t border-[#1c1c1c] pt-4">
+          <SurveyMirageHubPanel
+            echoHost={paired?.echoHost ?? readSurveyMiragePairCredentials()?.echoHost ?? null}
+            echoHttpPort={paired?.httpPort ?? readSurveyMiragePairCredentials()?.httpPort ?? null}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

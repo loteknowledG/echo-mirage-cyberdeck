@@ -3,7 +3,7 @@
  *   pnpm probe:survey-connect-boundary
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = process.cwd();
@@ -29,6 +29,10 @@ function main(): void {
   assertNoImport(cyberdeckApp, "survey-auto-pair.client", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "survey-relay.client", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "runSurveyAutoPair", "cyberdeck-app");
+  assert.ok(
+    !existsSync(resolve(ROOT, "src/lib/cyberdeck/survey-auto-pair.client.ts")),
+    "survey-auto-pair.client shim must be deleted",
+  );
   assertNoImport(cyberdeckApp, "runSurveyHubConnect", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "survey-pairing-client", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "survey-connect-request.client", "cyberdeck-app");

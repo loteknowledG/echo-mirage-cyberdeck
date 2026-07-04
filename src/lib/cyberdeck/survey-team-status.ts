@@ -1,18 +1,15 @@
 /** Broadcast when any Survey team link changes so the team status bar refreshes. */
-export const SURVEY_TEAM_STATUS_CHANGED_EVENT = "echo-mirage-spy-team-status-changed";
-/** @deprecated use SURVEY_TEAM_STATUS_CHANGED_EVENT */
-export const SPY_TEAM_STATUS_CHANGED_EVENT = SURVEY_TEAM_STATUS_CHANGED_EVENT;
+export const SURVEY_TEAM_STATUS_CHANGED_EVENT = "echo-mirage-survey-team-status-changed";
+
+/** @deprecated listen via SURVEY_TEAM_STATUS_CHANGED_EVENT — still dispatched for one release */
+export const LEGACY_SPY_TEAM_STATUS_CHANGED_EVENT = "echo-mirage-spy-team-status-changed";
 
 export type SurveyTeamLinkState = "linked" | "not-linked" | "terminated" | "unknown";
-/** @deprecated use SurveyTeamLinkState */
-export type SpyTeamLinkState = SurveyTeamLinkState;
 
 export type SurveyTeamLink = {
   state: SurveyTeamLinkState;
   detail: string | null;
 };
-/** @deprecated use SurveyTeamLink */
-export type SpyTeamLink = SurveyTeamLink;
 
 export type SurveyTeamStatus = {
   echoMirage: SurveyTeamLink;
@@ -25,6 +22,7 @@ export type SurveyTeamStatus = {
 export function notifySurveyTeamStatusChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(SURVEY_TEAM_STATUS_CHANGED_EVENT));
+  window.dispatchEvent(new CustomEvent(LEGACY_SPY_TEAM_STATUS_CHANGED_EVENT));
 }
 
 export function linkFromBool(linked: boolean, detail: string | null): SurveyTeamLink {
@@ -45,8 +43,6 @@ export const EMPTY_SURVEY_TEAM_STATUS: SurveyTeamStatus = {
   echoHost: null,
   loading: true,
 };
-/** @deprecated use EMPTY_SURVEY_TEAM_STATUS */
-export const EMPTY_SPY_TEAM_STATUS = EMPTY_SURVEY_TEAM_STATUS;
 
 export function isSurveyTeamTripleLinked(
   team: Pick<SurveyTeamStatus, "echoMirage" | "echoPowerfist" | "miragePowerfist" | "loading">,

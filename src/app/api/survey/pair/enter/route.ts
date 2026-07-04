@@ -10,14 +10,14 @@ import { parseEchoEndpointInput } from "@/lib/cyberdeck/survey-pair-pin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SPY_CORS_HEADERS = {
+const SURVEY_CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { status: 204, headers: SPY_CORS_HEADERS });
+  return NextResponse.json({}, { status: 204, headers: SURVEY_CORS_HEADERS });
 }
 
 type EnterBody = {
@@ -208,7 +208,7 @@ export async function POST(request: Request) {
       });
       return NextResponse.json(result, {
         status: result.ok ? 200 : result.reason === "Invalid pairing code." ? 403 : 502,
-        headers: SPY_CORS_HEADERS,
+        headers: SURVEY_CORS_HEADERS,
       });
     }
 
@@ -221,7 +221,7 @@ export async function POST(request: Request) {
         nodeId: body.nodeId,
         deviceId: body.deviceId,
       });
-      return NextResponse.json(result, { status: result.ok ? 200 : 502, headers: SPY_CORS_HEADERS });
+      return NextResponse.json(result, { status: result.ok ? 200 : 502, headers: SURVEY_CORS_HEADERS });
     }
 
     const result = await completeSurveyPairEnterByPin({
@@ -230,7 +230,7 @@ export async function POST(request: Request) {
       nodeId: body.nodeId,
       deviceId: body.deviceId,
     });
-    return NextResponse.json(result, { status: result.ok ? 200 : 403, headers: SPY_CORS_HEADERS });
+    return NextResponse.json(result, { status: result.ok ? 200 : 403, headers: SURVEY_CORS_HEADERS });
   }
 
   const code = body.code?.trim();

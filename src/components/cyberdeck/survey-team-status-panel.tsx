@@ -9,6 +9,9 @@ import {
 } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import type { SurveyTeamLink } from "@/lib/cyberdeck/survey-team-status";
+import { isSurveyTeamTripleLinked } from "@/lib/cyberdeck/survey-team-status";
+import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
+import { requestSurveyHubConnect } from "@/lib/cyberdeck/survey-connect-request.client";
 import { emitSurveyPairingDiagnostics } from "@/lib/cyberdeck/survey-pairing-debug";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 
@@ -65,6 +68,9 @@ function TeamLinkRow({
 export function SurveyTeamStatusPanel() {
   const { refresh, ...team } = useSurveyTeamStatus();
   const [refreshing, setRefreshing] = useState(false);
+  const tripleLinked = isSurveyTeamTripleLinked(team);
+  const hubEnabled = isSurveyHubEnabled();
+  const connectLabel = hubEnabled && !tripleLinked ? "Retry connect" : "Connect team";
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -89,16 +95,14 @@ export function SurveyTeamStatusPanel() {
         <CyberdeckActionButton disabled={refreshing || team.loading} onClick={() => void handleRefresh()}>
           {refreshing ? "Refreshing…" : "Refresh"}
         </CyberdeckActionButton>
-        <CyberdeckActionButton
-          disabled={team.loading}
-          onClick={() => {
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent("echo-mirage:survey-hub-connect-request"));
-            }
-          }}
-        >
-          Connect team
-        </CyberdeckActionButton>
+        {!tripleLinked && hubEnabled ? (
+          <CyberdeckActionButton
+            disabled={team.loading}
+            onClick={() => requestSurveyHubConnect({ force: true, quiet: false })}
+          >
+            {connectLabel}
+          </CyberdeckActionButton>
+        ) : null}
         </div>
       </div>
 

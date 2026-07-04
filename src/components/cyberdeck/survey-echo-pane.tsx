@@ -20,6 +20,7 @@ import {
 import { SATELLITE_GITHUB_RELEASES_URL } from "@/lib/electron/desktop-install.client";
 import { readPowerfistCaptureCredentials } from "@/lib/cyberdeck/powerfist-capture-client";
 import { SurveyPairPinDisplay } from "@/components/cyberdeck/survey-pair-pin-display";
+import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
 
 function PairPinBlock({
   label,
@@ -57,6 +58,7 @@ function PairPinBlock({
 }
 
 export function SurveyEchoPane() {
+  const hubEnabled = isSurveyHubEnabled();
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -163,8 +165,20 @@ export function SurveyEchoPane() {
           </a>{" "}
           from GitHub, open it from the Dock (Status → Linked Mirages), or open the{" "}
           <strong className="text-[#9a9a9a]">local cyberdeck</strong> at{" "}
-          <code className="text-[#bdbdbd]">http://127.0.0.1:3000</code>. Use{" "}
-          <strong className="text-[#9a9a9a]">TEAM LINKS</strong> above after Mirage/PowerFist pair.
+          <code className="text-[#bdbdbd]">http://127.0.0.1:3000</code>.
+          {hubEnabled ? (
+            <>
+              {" "}
+              Use <strong className="text-[#9a9a9a]">SURVEY HUB</strong> → Connect team — manual PIN
+              codes are disabled when Hub is on.
+            </>
+          ) : (
+            <>
+              {" "}
+              Use <strong className="text-[#9a9a9a]">TEAM LINKS</strong> above after Mirage/PowerFist
+              pair.
+            </>
+          )}
         </p>
         {error ? <p className="text-red-300/90">{error}</p> : null}
       </div>
@@ -185,10 +199,17 @@ export function SurveyEchoPane() {
         ) : null}
       </div>
 
-      {statusSource === "satellite" ? (
+      {statusSource === "satellite" && !hubEnabled ? (
         <p className="rounded border border-cyan-950/40 bg-cyan-950/10 px-3 py-2 text-[8px] leading-relaxed text-[#7a9a9a]">
           Reading from Echo Satellite on this Mac. PIN codes also appear in the Satellite window under{" "}
           <strong className="text-[#9a9a9a]">Survey pairing codes</strong>.
+        </p>
+      ) : null}
+
+      {hubEnabled ? (
+        <p className="rounded border border-cyan-950/40 bg-cyan-950/10 px-3 py-2 text-[8px] leading-relaxed text-[#7a9a9a]">
+          Survey Hub is on — pairing codes are managed automatically. Open Echo Satellite Survey tab,
+          then Connect team from SURVEY HUB on the cyberdeck.
         </p>
       ) : null}
 
@@ -196,7 +217,7 @@ export function SurveyEchoPane() {
         <p className="text-[#8a8a8a]">Loading pairing codes…</p>
       ) : (
         <>
-          {miragePin || powerfistPin ? (
+          {!hubEnabled && (miragePin || powerfistPin) ? (
             <>
               <PairPinBlock
                 label={`CODE FOR ${SURVEY_MIRAGE_DISPLAY}`}
@@ -209,7 +230,7 @@ export function SurveyEchoPane() {
                 expiresAt={powerfistExpiresAt}
               />
             </>
-          ) : statusSource === "satellite" ? (
+          ) : !hubEnabled && statusSource === "satellite" ? (
             <p className="text-[9px] text-[#8a8a8a]">
               No active PIN codes — open Echo Satellite or tap New codes below.
             </p>
@@ -243,9 +264,11 @@ export function SurveyEchoPane() {
             <CyberdeckActionButton disabled={busy} onClick={() => void handleRefreshStatus()}>
               Refresh status
             </CyberdeckActionButton>
-            <CyberdeckActionButton disabled={busy} onClick={() => void handleRegenerate()}>
-              New codes
-            </CyberdeckActionButton>
+            {!hubEnabled ? (
+              <CyberdeckActionButton disabled={busy} onClick={() => void handleRegenerate()}>
+                New codes
+              </CyberdeckActionButton>
+            ) : null}
           </div>
 
           <div className="rounded border border-[#1c1c1c] bg-black/50 p-3">

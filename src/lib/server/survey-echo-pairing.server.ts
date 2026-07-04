@@ -1,4 +1,4 @@
-// SERVER ONLY — Echo-centric Spy pairing (Mirage + PowerFist enter codes from Echo).
+// SERVER ONLY — Echo-centric Survey pairing (Mirage + PowerFist enter codes from Echo).
 
 import crypto from "crypto";
 import fs from "fs/promises";
@@ -9,7 +9,7 @@ import { resolveHttpPort } from "@/lib/server/is-localhost-request.server";
 
 export type SurveyPairRole = "mirage" | "powerfist";
 
-export type SpyPairCodeSession = {
+export type SurveyPairCodeSession = {
   pairId: string;
   pairSecret: string;
   pin: string;
@@ -22,7 +22,7 @@ export type SurveyPairedMirageClient = {
   pairedAt: string;
 };
 
-export type SpyPairedPowerfistClient = {
+export type SurveyPairedPowerfistClient = {
   deviceId: string;
   remoteToken: string;
   pairedAt: string;
@@ -36,10 +36,10 @@ export type EchoSurveyPairingState = {
   /** Survey tab open on Echo — when false, linked Mirage/PowerFist are disconnected. */
   echoSurveyActive: boolean;
   sessionEpoch: number;
-  mirageCode: SpyPairCodeSession | null;
-  powerfistCode: SpyPairCodeSession | null;
+  mirageCode: SurveyPairCodeSession | null;
+  powerfistCode: SurveyPairCodeSession | null;
   pairedMirages: SurveyPairedMirageClient[];
-  pairedPowerfist: SpyPairedPowerfistClient | null;
+  pairedPowerfist: SurveyPairedPowerfistClient | null;
   /** @deprecated Migrated to pairedMirages on load */
   pairedMirage?: SurveyPairedMirageClient | null;
 };
@@ -77,7 +77,7 @@ function registryStore(): { state: EchoSurveyPairingState | null } {
   return globalStore[REGISTRY_KEY];
 }
 
-function sessionExpired(session: SpyPairCodeSession | null | undefined): boolean {
+function sessionExpired(session: SurveyPairCodeSession | null | undefined): boolean {
   if (!session) return true;
   return Date.parse(session.expiresAt) <= Date.now();
 }
@@ -98,10 +98,10 @@ function newPairPin(taken: Set<string>): string {
       return pin;
     }
   }
-  throw new Error("Failed to allocate unique Spy pairing PIN.");
+  throw new Error("Failed to allocate unique Survey pairing PIN.");
 }
 
-function normalizeStoredSession(session: SpyPairCodeSession | null | undefined): SpyPairCodeSession | null {
+function normalizeStoredSession(session: SurveyPairCodeSession | null | undefined): SurveyPairCodeSession | null {
   if (!session) return null;
   const pin = session.pin?.trim() || session.pairId?.trim();
   if (!pin || !/^\d{6}$/.test(pin)) return null;
@@ -135,7 +135,7 @@ export function normalizePairedMirages(
   return [];
 }
 
-function normalizeEchoSpyState(state: EchoSurveyPairingState): EchoSurveyPairingState {
+function normalizeEchoSurveyState(state: EchoSurveyPairingState): EchoSurveyPairingState {
   const pairedMirages = normalizePairedMirages(state);
   return {
     ...state,
@@ -150,7 +150,7 @@ export async function loadEchoSurveyPairingState(): Promise<EchoSurveyPairingSta
   if (store.state) return store.state;
 
   try {
-    const raw = normalizeEchoSpyState(
+    const raw = normalizeEchoSurveyState(
       JSON.parse(await fs.readFile(echoSpyPairingStatePath(), "utf8")) as EchoSurveyPairingState,
     );
     store.state = raw;
@@ -172,7 +172,7 @@ export async function saveEchoSurveyPairingState(state: EchoSurveyPairingState):
   await fs.writeFile(statePath, JSON.stringify(state, null, 2), "utf8");
 }
 
-function createCodeSession(takenPins: Set<string>): SpyPairCodeSession {
+function createCodeSession(takenPins: Set<string>): SurveyPairCodeSession {
   return {
     pairId: newPairId(),
     pairSecret: newPairSecret(),
@@ -184,7 +184,7 @@ function createCodeSession(takenPins: Set<string>): SpyPairCodeSession {
 export function formatSurveyPairCode(
   host: string,
   httpPort: number,
-  session: SpyPairCodeSession,
+  session: SurveyPairCodeSession,
   role: SurveyPairRole,
 ): string {
   const tag = role === "mirage" ? "M" : "P";
@@ -266,7 +266,7 @@ export async function getEchoSurveyPairingStatus(): Promise<{
   pairedMirages: SurveyPairedMirageClient[];
   /** First linked Mirage — legacy alias for single-client consumers */
   pairedMirage: SurveyPairedMirageClient | null;
-  pairedPowerfist: SpyPairedPowerfistClient | null;
+  pairedPowerfist: SurveyPairedPowerfistClient | null;
   echoSurveyActive: boolean;
   sessionEpoch: number;
 }> {

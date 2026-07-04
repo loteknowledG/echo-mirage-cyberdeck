@@ -2,6 +2,16 @@ const SURVEY_MIRAGE_PAIR_STORAGE_KEY = "echo-mirage-survey-mirage-pair";
 const SURVEY_POWERFIST_PAIR_STORAGE_KEY = "echo-mirage-survey-powerfist-pair";
 const POWERFIST_DEVICE_ID_KEY = "echo-mirage-powerfist-device-id";
 
+const LEGACY_MIRAGE_PAIR_STORAGE_KEYS = [
+  "echo-mirage-espionage-mirage-pair",
+  "echo-mirage-spy-mirage-pair",
+] as const;
+
+const LEGACY_POWERFIST_PAIR_STORAGE_KEYS = [
+  "echo-mirage-espionage-powerfist-pair",
+  "echo-mirage-spy-powerfist-pair",
+] as const;
+
 export type SurveyMiragePairCredentials = {
   echoHost: string;
   httpPort: number;
@@ -11,8 +21,6 @@ export type SurveyMiragePairCredentials = {
   sessionEpoch: number;
   pairedAt: string;
 };
-/** @deprecated use SurveyMiragePairCredentials */
-export type SpyMiragePairCredentials = SurveyMiragePairCredentials;
 
 export type SurveyPowerfistPairCredentials = {
   echoHost: string;
@@ -23,8 +31,22 @@ export type SurveyPowerfistPairCredentials = {
   sessionEpoch: number;
   pairedAt: string;
 };
-/** @deprecated use SurveyPowerfistPairCredentials */
-export type SpyPowerfistPairCredentials = SurveyPowerfistPairCredentials;
+
+function readJsonStorageWithLegacyFallback(
+  surveyKey: string,
+  legacyKeys: readonly string[],
+): string | null {
+  if (typeof window === "undefined") return null;
+  const current = window.localStorage.getItem(surveyKey)?.trim();
+  if (current) return current;
+  for (const legacyKey of legacyKeys) {
+    const legacy = window.localStorage.getItem(legacyKey)?.trim();
+    if (!legacy) continue;
+    window.localStorage.setItem(surveyKey, legacy);
+    return legacy;
+  }
+  return null;
+}
 
 export function getOrCreatePowerfistDeviceId(): string {
   if (typeof window === "undefined") return "";
@@ -41,8 +63,10 @@ export function saveSurveyMiragePairCredentials(creds: SurveyMiragePairCredentia
 }
 
 export function readSurveyMiragePairCredentials(): SurveyMiragePairCredentials | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(SURVEY_MIRAGE_PAIR_STORAGE_KEY)?.trim();
+  const raw = readJsonStorageWithLegacyFallback(
+    SURVEY_MIRAGE_PAIR_STORAGE_KEY,
+    LEGACY_MIRAGE_PAIR_STORAGE_KEYS,
+  );
   if (!raw) return null;
   try {
     return JSON.parse(raw) as SurveyMiragePairCredentials;
@@ -57,8 +81,10 @@ export function saveSurveyPowerfistPairCredentials(creds: SurveyPowerfistPairCre
 }
 
 export function readSurveyPowerfistPairCredentials(): SurveyPowerfistPairCredentials | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(SURVEY_POWERFIST_PAIR_STORAGE_KEY)?.trim();
+  const raw = readJsonStorageWithLegacyFallback(
+    SURVEY_POWERFIST_PAIR_STORAGE_KEY,
+    LEGACY_POWERFIST_PAIR_STORAGE_KEYS,
+  );
   if (!raw) return null;
   try {
     return JSON.parse(raw) as SurveyPowerfistPairCredentials;
@@ -70,9 +96,15 @@ export function readSurveyPowerfistPairCredentials(): SurveyPowerfistPairCredent
 export function clearSurveyMiragePairCredentials(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(SURVEY_MIRAGE_PAIR_STORAGE_KEY);
+  for (const legacyKey of LEGACY_MIRAGE_PAIR_STORAGE_KEYS) {
+    window.localStorage.removeItem(legacyKey);
+  }
 }
 
 export function clearSurveyPowerfistPairCredentials(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(SURVEY_POWERFIST_PAIR_STORAGE_KEY);
+  for (const legacyKey of LEGACY_POWERFIST_PAIR_STORAGE_KEYS) {
+    window.localStorage.removeItem(legacyKey);
+  }
 }
