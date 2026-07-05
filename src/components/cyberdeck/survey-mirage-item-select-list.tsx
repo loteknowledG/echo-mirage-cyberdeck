@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   applyMirageQueueControl,
   getMirageQueueSnapshot,
+  subscribeMirageQueueStorage,
   SURVEY_MIRAGE_ITEM_CHANGED_EVENT,
   type SurveyMirageQueueControlSource,
   type SurveyMirageQueueItem,
@@ -34,7 +35,11 @@ export function useMirageItemQueue(): {
       refresh();
     };
     window.addEventListener(SURVEY_MIRAGE_ITEM_CHANGED_EVENT, onChanged);
-    return () => window.removeEventListener(SURVEY_MIRAGE_ITEM_CHANGED_EVENT, onChanged);
+    const unsubscribeStorage = subscribeMirageQueueStorage(refresh);
+    return () => {
+      window.removeEventListener(SURVEY_MIRAGE_ITEM_CHANGED_EVENT, onChanged);
+      unsubscribeStorage();
+    };
   }, [refresh]);
 
   return {
@@ -55,7 +60,7 @@ type SurveyMirageItemSelectListProps = {
 function formatItemLabel(item: SurveyMirageQueueItem, position: number): string {
   const bits = [`${position}. ${item.title}`];
   if (item.transcript?.trim()) bits.push("STT");
-  if (item.imageDataUrl) bits.push("img");
+  if (item.imageDataUrl || item.imageRef) bits.push("img");
   return bits.join(" · ");
 }
 

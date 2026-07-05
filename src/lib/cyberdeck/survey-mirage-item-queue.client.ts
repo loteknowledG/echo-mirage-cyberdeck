@@ -14,7 +14,10 @@ export type SurveyMirageQueueItem = {
   id: string;
   title: string;
   prompt: string;
+  /** Runtime-only — hydrated from `imageRef` when loaded from storage. */
   imageDataUrl?: string;
+  /** Persisted pointer to a capture blob in localStorage (keeps queue JSON small). */
+  imageRef?: string;
   answer?: string;
   transcript?: string;
   source: SurveyMirageQueueItemSource;
@@ -35,6 +38,11 @@ export const SURVEY_MIRAGE_QUEUE_SYNC_CHANNEL = "echo-mirage-survey-mirage-queue
 
 const ITEMS_STORAGE_KEY = "echo-mirage-survey-mirage-items-v1";
 const INDEX_STORAGE_KEY = "echo-mirage-survey-mirage-item-index-v1";
+const CAPTURE_IMAGE_PREFIX = "echo-mirage-survey-capture-img:";
+const LEGACY_SESSION_ITEMS_KEY = ITEMS_STORAGE_KEY;
+const LEGACY_SESSION_INDEX_KEY = INDEX_STORAGE_KEY;
+
+let migratedSessionQueue = false;
 
 type SpeechRecognitionResultLike = {
   results: ArrayLike<{ 0: { transcript: string } }>;
@@ -60,47 +68,106 @@ function emitChanged(source?: SurveyMirageQueueControlSource): void {
   );
 }
 
-function broadcastQueueIngest(item: SurveyMirageQueueItem): void {
+function broadcastQueueRefresh(): void {
   if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
   const channel = new BroadcastChannel(SURVEY_MIRAGE_QUEUE_SYNC_CHANNEL);
-  channel.postMessage({ type: "ingest", item });
+  channel.postMessage({ type: "refresh" });
   channel.close();
 }
 
-function mergeRemoteQueueIngest(item: SurveyMirageQueueItem): void {
-  const items = readItems();
-  if (items.some((entry) => entry.id === item.id)) return;
-  const next = [...items, item];
-  writeItems(next);
-  writeIndex(next.length - 1, "powerfist");
+function persistCaptureImage(itemId: string, imageDataUrl: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    window.localStorage.setItem(`${CAPTURE_IMAGE_PREFIX}${itemId}`, imageDataUrl);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadCaptureImage(itemId: string): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.localStorage.getItem(`${CAPTURE_IMAGE_PREFIX}${itemId}`) ?? undefined;
+}
+
+function hydrateQueueItem(item: SurveyMirageQueueItem): SurveyMirageQueueItem {
+  if (item.imageDataUrl) return item;
+  const ref = item.imageRef ?? item.id;
+  const imageDataUrl = loadCaptureImage(ref);
+  return imageDataUrl ? { ...item, imageDataUrl } : item;
+}
+
+function serializeQueueItem(item: SurveyMirageQueueItem): SurveyMirageQueueItem {
+  if (!item.imageDataUrl) {
+    const { imageDataUrl: _drop, ...rest } = item;
+    return rest;
+  }
+  const stored = persistCaptureImage(item.id, item.imageDataUrl);
+  if (!stored) {
+    notifySurveyMuthurArchive(
+      "SURVEY // Mirage queue · capture image too large for local storage — try Display Item on Mirage after freeing space.",
+    );
+    const { imageDataUrl: _drop, ...rest } = item;
+    return rest;
+  }
+  const { imageDataUrl: _drop, ...rest } = item;
+  return { ...rest, imageRef: item.id };
+}
+
+function migrateSessionQueueToLocalStorage(): void {
+  if (typeof window === "undefined" || migratedSessionQueue) return;
+  migratedSessionQueue = true;
+  try {
+    const legacyItems = window.sessionStorage.getItem(LEGACY_SESSION_ITEMS_KEY);
+    const legacyIndex = window.sessionStorage.getItem(LEGACY_SESSION_INDEX_KEY);
+    if (!legacyItems && !legacyIndex) return;
+    if (!window.localStorage.getItem(ITEMS_STORAGE_KEY) && legacyItems) {
+      window.localStorage.setItem(ITEMS_STORAGE_KEY, legacyItems);
+    }
+    if (!window.localStorage.getItem(INDEX_STORAGE_KEY) && legacyIndex) {
+      window.localStorage.setItem(INDEX_STORAGE_KEY, legacyIndex);
+    }
+    window.sessionStorage.removeItem(LEGACY_SESSION_ITEMS_KEY);
+    window.sessionStorage.removeItem(LEGACY_SESSION_INDEX_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 function readItems(): SurveyMirageQueueItem[] {
   if (typeof window === "undefined") return [];
+  migrateSessionQueueToLocalStorage();
   try {
-    const raw = window.sessionStorage.getItem(ITEMS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(ITEMS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as SurveyMirageQueueItem[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(hydrateQueueItem);
   } catch {
     return [];
   }
 }
 
-function writeItems(items: SurveyMirageQueueItem[]): void {
+function writeItems(items: SurveyMirageQueueItem[], options?: { sync?: boolean }): void {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(ITEMS_STORAGE_KEY, JSON.stringify(items));
+    const serialized = items.map(serializeQueueItem);
+    window.localStorage.setItem(ITEMS_STORAGE_KEY, JSON.stringify(serialized));
   } catch {
-    /* ignore */
+    notifySurveyMuthurArchive("SURVEY // Mirage queue · could not save item list (storage full).");
+    return;
   }
   emitChanged();
+  if (options?.sync !== false) {
+    broadcastQueueRefresh();
+  }
 }
 
 function readIndex(): number {
   if (typeof window === "undefined") return 0;
+  migrateSessionQueueToLocalStorage();
   try {
-    const raw = window.sessionStorage.getItem(INDEX_STORAGE_KEY);
+    const raw = window.localStorage.getItem(INDEX_STORAGE_KEY);
     const value = Number(raw);
     return Number.isFinite(value) && value >= 0 ? value : 0;
   } catch {
@@ -111,11 +178,36 @@ function readIndex(): number {
 function writeIndex(index: number, source?: SurveyMirageQueueControlSource): void {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(INDEX_STORAGE_KEY, String(index));
+    window.localStorage.setItem(INDEX_STORAGE_KEY, String(index));
   } catch {
-    /* ignore */
+    return;
   }
   emitChanged(source);
+  broadcastQueueRefresh();
+}
+
+/** Listen on Survey panes so Mirage + PowerFist windows stay in sync. */
+export function subscribeMirageQueueStorage(onChange: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== ITEMS_STORAGE_KEY && event.key !== INDEX_STORAGE_KEY) return;
+    onChange();
+  };
+
+  let syncChannel: BroadcastChannel | null = null;
+  if ("BroadcastChannel" in window) {
+    syncChannel = new BroadcastChannel(SURVEY_MIRAGE_QUEUE_SYNC_CHANNEL);
+    syncChannel.onmessage = (event: MessageEvent<{ type?: string }>) => {
+      if (event.data?.type === "refresh") onChange();
+    };
+  }
+
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    syncChannel?.close();
+  };
 }
 
 function clampIndex(index: number, total: number): number {
@@ -126,7 +218,7 @@ function clampIndex(index: number, total: number): number {
 function summarizeItem(item: SurveyMirageQueueItem): string {
   const bits = [item.title];
   if (item.transcript?.trim()) bits.push("transcript");
-  if (item.imageDataUrl) bits.push("image");
+  if (item.imageDataUrl || item.imageRef) bits.push("image");
   return bits.join(" · ");
 }
 
@@ -146,7 +238,6 @@ export function ingestMirageQueueItem(input: {
   imageDataUrl?: string;
   source?: SurveyMirageQueueItemSource;
   select?: boolean;
-  sync?: boolean;
 }): SurveyMirageQueueItem {
   const items = readItems();
   const item: SurveyMirageQueueItem = {
@@ -161,9 +252,6 @@ export function ingestMirageQueueItem(input: {
   writeItems(next);
   if (input.select !== false) {
     writeIndex(next.length - 1);
-  }
-  if (input.sync !== false) {
-    broadcastQueueIngest(item);
   }
   notifySurveyMuthurArchive(
     `SURVEY // Mirage item queue · ${next.length} total · ${summarizeItem(item)}`,
@@ -281,8 +369,14 @@ export function answerCurrentMirageItem(): { ok: boolean; message: string } {
   if (!current) {
     return { ok: false, message: "No item to answer — queue is empty." };
   }
-  if (!current.imageDataUrl) {
+  if (!current.imageDataUrl && !current.imageRef) {
     return { ok: false, message: "Current item has no image — capture or copy from Echo first." };
+  }
+
+  const imageDataUrl =
+    current.imageDataUrl ?? loadCaptureImage(current.imageRef ?? current.id);
+  if (!imageDataUrl) {
+    return { ok: false, message: "Current item image missing from storage — capture again." };
   }
 
   const prompt =
@@ -295,7 +389,7 @@ export function answerCurrentMirageItem(): { ok: boolean; message: string } {
       detail: {
         missionId: current.id,
         kind: "silent-capture-solve" satisfies SurveyMissionKind,
-        imageDataUrl: current.imageDataUrl,
+        imageDataUrl,
         prompt,
       },
     }),
@@ -391,17 +485,7 @@ export function installMirageQueueListeners(): () => void {
 
   window.addEventListener(SURVEY_LAST_CAPTURE_EVENT, onCapture);
 
-  let syncChannel: BroadcastChannel | null = null;
-  if ("BroadcastChannel" in window) {
-    syncChannel = new BroadcastChannel(SURVEY_MIRAGE_QUEUE_SYNC_CHANNEL);
-    syncChannel.onmessage = (event: MessageEvent<{ type?: string; item?: SurveyMirageQueueItem }>) => {
-      if (event.data?.type !== "ingest" || !event.data.item) return;
-      mergeRemoteQueueIngest(event.data.item);
-    };
-  }
-
   return () => {
     window.removeEventListener(SURVEY_LAST_CAPTURE_EVENT, onCapture);
-    syncChannel?.close();
   };
 }
