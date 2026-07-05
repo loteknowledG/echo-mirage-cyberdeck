@@ -1,8 +1,12 @@
 // SERVER ONLY — vision analysis for Survey captures.
 
+import { SURVEY_SELECTED_TEXT_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
 import { isCodexCliAvailable } from "@/lib/server/cadre/adapters/codex-runtime-adapter.server";
 import { resolveServerProviderCredentials } from "@/lib/server/provider-credentials.server";
-import { analyzeSurveyCaptureViaCodex } from "@/lib/server/survey-analyze-codex.server";
+import {
+  analyzeSurveyCaptureViaCodex,
+  analyzeSurveyTextViaCodex,
+} from "@/lib/server/survey-analyze-codex.server";
 
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -39,7 +43,8 @@ function resolveChatEndpoint(provider: string): string | null {
 }
 
 export type SurveyAnalyzeInput = {
-  pngBase64: string;
+  pngBase64?: string;
+  selectionText?: string;
   prompt?: string;
   provider?: string;
   apiKey?: string;
@@ -53,8 +58,8 @@ export type SurveyAnalyzeResult =
 async function analyzeSurveyCaptureViaApi(
   input: SurveyAnalyzeInput,
   provider: "openai" | "openrouter",
+  pngBase64: string,
 ): Promise<SurveyAnalyzeResult> {
-  const pngBase64 = input.pngBase64.trim();
   const endpoint = resolveChatEndpoint(provider);
   if (!endpoint) {
     return {
@@ -133,10 +138,94 @@ async function analyzeSurveyCaptureViaApi(
   }
 }
 
+async function analyzeSurveySelectionViaApi(
+  input: SurveyAnalyzeInput,
+  provider: "openai" | "openrouter",
+  prompt: string,
+): Promise<SurveyAnalyzeResult> {
+  const endpoint = resolveChatEndpoint(provider);
+  if (!endpoint) {
+    return {
+      ok: false,
+      error: `Provider "${provider}" does not support Survey text analyze yet.`,
+    };
+  }
+
+  const { apiKey } = resolveServerProviderCredentials(provider, input.apiKey);
+  if (!apiKey) {
+    return { ok: false, error: `No API key for ${provider}. Add credentials in Settings or use provider codex.` };
+  }
+
+  const model = input.model?.trim() || (provider === "openrouter" ? "openai/gpt-4o" : "gpt-4o");
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 2048,
+        temperature: 0.2,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const payload = (await res.json()) as { error?: { message?: string } };
+        detail = payload.error?.message ?? "";
+      } catch {
+        detail = await res.text().catch(() => "");
+      }
+      return { ok: false, error: detail || `Text API failed (${res.status}).` };
+    }
+
+    const payload = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const text = payload.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!text) {
+      return { ok: false, error: "Text model returned empty response." };
+    }
+
+    return { ok: true, text, model, provider };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Text request failed.",
+    };
+  }
+}
+
+async function analyzeSurveySelection(
+  input: SurveyAnalyzeInput,
+  selectionText: string,
+): Promise<SurveyAnalyzeResult> {
+  const instruction = input.prompt?.trim() || SURVEY_SELECTED_TEXT_PROMPT;
+  const prompt = `${instruction}\n\n---\n\n${selectionText}`;
+  const requested = resolveVisionProvider(input);
+  const provider = requested === "auto" ? resolveAutoVisionProvider() : requested;
+
+  if (provider === "codex") {
+    return analyzeSurveyTextViaCodex({ prompt });
+  }
+
+  return analyzeSurveySelectionViaApi(input, provider, prompt);
+}
+
 export async function analyzeSurveyCapture(input: SurveyAnalyzeInput): Promise<SurveyAnalyzeResult> {
-  const pngBase64 = input.pngBase64.trim();
+  const selectionText = input.selectionText?.trim();
+  if (selectionText) {
+    return analyzeSurveySelection(input, selectionText);
+  }
+
+  const pngBase64 = input.pngBase64?.trim() ?? "";
   if (!pngBase64) {
-    return { ok: false, error: "pngBase64 is required." };
+    return { ok: false, error: "pngBase64 or selectionText is required." };
   }
 
   const prompt = input.prompt?.trim() || DEFAULT_SURVEY_PROMPT;
@@ -147,5 +236,5 @@ export async function analyzeSurveyCapture(input: SurveyAnalyzeInput): Promise<S
     return analyzeSurveyCaptureViaCodex({ pngBase64, prompt });
   }
 
-  return analyzeSurveyCaptureViaApi(input, provider);
+  return analyzeSurveyCaptureViaApi(input, provider, pngBase64);
 }

@@ -6,6 +6,7 @@ export const SURVEY_ECHO_COMMAND = {
   STOP_LISTENING: "echo.stop-listening",
   SAVE_RECORDING: "echo.save-recording",
   COPY_SELECTED: "echo.copy-selected",
+  SOLVE_SELECTED_TEXT: "echo.solve-selected-text",
 } as const;
 
 export const SURVEY_MIRAGE_COMMAND = {
@@ -61,6 +62,14 @@ export const SURVEY_TRIFORCE_DECKS: PreviewDeckWithTarget[] = [
         purpose: "Copy the frontmost selection on Echo — text, images, or PDF snippets.",
         risk: "safe",
         surveyCommand: SURVEY_ECHO_COMMAND.COPY_SELECTED,
+      },
+      {
+        type: "echo",
+        title: "Solve Selected Text",
+        purpose:
+          "Copy Echo's frontmost selection and run Codex on the text — ideal for HackerRank prompts without a screenshot.",
+        risk: "caution",
+        surveyCommand: SURVEY_ECHO_COMMAND.SOLVE_SELECTED_TEXT,
       },
     ],
   },

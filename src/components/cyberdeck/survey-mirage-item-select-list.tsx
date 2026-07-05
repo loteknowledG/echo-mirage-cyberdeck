@@ -61,6 +61,7 @@ function formatItemLabel(item: SurveyMirageQueueItem, position: number): string 
   const bits = [`${position}. ${item.title}`];
   if (item.transcript?.trim()) bits.push("STT");
   if (item.imageDataUrl || item.imageRef) bits.push("img");
+  else if (item.prompt?.trim()) bits.push("txt");
   return bits.join(" · ");
 }
 

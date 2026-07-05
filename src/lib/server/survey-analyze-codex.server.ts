@@ -52,9 +52,9 @@ function runCodexExec(args: string[], timeoutMs: number): Promise<number> {
   });
 }
 
-export async function analyzeSurveyCaptureViaCodex(input: {
-  pngBase64: string;
+async function runCodexExecToOutput(input: {
   prompt: string;
+  imagePath?: string;
 }): Promise<SurveyAnalyzeResult> {
   if (!isCodexCliAvailable()) {
     return {
@@ -64,32 +64,19 @@ export async function analyzeSurveyCaptureViaCodex(input: {
     };
   }
 
-  const pngBase64 = input.pngBase64.trim();
-  if (!pngBase64) {
-    return { ok: false, error: "pngBase64 is required." };
-  }
-
   const prompt = input.prompt.trim();
   if (!prompt) {
     return { ok: false, error: "prompt is required." };
   }
 
   const tmpDir = await mkdtemp(join(tmpdir(), "survey-codex-"));
-  const imagePath = join(tmpDir, "capture.png");
   const outputPath = join(tmpDir, "answer.txt");
 
   try {
-    await writeFile(imagePath, Buffer.from(pngBase64, "base64"));
-
-    const execArgs = [
-      "exec",
-      "--skip-git-repo-check",
-      "--ephemeral",
-      "-i",
-      imagePath,
-      "-o",
-      outputPath,
-    ];
+    const execArgs = ["exec", "--skip-git-repo-check", "--ephemeral", "-o", outputPath];
+    if (input.imagePath) {
+      execArgs.push("-i", input.imagePath);
+    }
     const model = process.env.SURVEY_CODEX_MODEL?.trim();
     if (model) {
       execArgs.push("-m", model);
@@ -132,4 +119,35 @@ export async function analyzeSurveyCaptureViaCodex(input: {
       /* best effort */
     });
   }
+}
+
+export async function analyzeSurveyCaptureViaCodex(input: {
+  pngBase64: string;
+  prompt: string;
+}): Promise<SurveyAnalyzeResult> {
+  const pngBase64 = input.pngBase64.trim();
+  if (!pngBase64) {
+    return { ok: false, error: "pngBase64 is required." };
+  }
+
+  const tmpDir = await mkdtemp(join(tmpdir(), "survey-codex-"));
+  const imagePath = join(tmpDir, "capture.png");
+
+  try {
+    await writeFile(imagePath, Buffer.from(pngBase64, "base64"));
+    return await runCodexExecToOutput({
+      prompt: input.prompt,
+      imagePath,
+    });
+  } finally {
+    await rm(tmpDir, { recursive: true, force: true }).catch(() => {
+      /* best effort */
+    });
+  }
+}
+
+export async function analyzeSurveyTextViaCodex(input: {
+  prompt: string;
+}): Promise<SurveyAnalyzeResult> {
+  return runCodexExecToOutput({ prompt: input.prompt });
 }

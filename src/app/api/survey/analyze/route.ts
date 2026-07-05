@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 type AnalyzeBody = {
   pngBase64?: string;
+  selectionText?: string;
   prompt?: string;
   provider?: string;
   apiKey?: string;
@@ -27,7 +28,8 @@ export async function POST(request: Request) {
   }
 
   const result = await analyzeSurveyCapture({
-    pngBase64: body.pngBase64 ?? "",
+    pngBase64: body.pngBase64,
+    selectionText: body.selectionText,
     prompt: body.prompt,
     provider: body.provider,
     apiKey: body.apiKey,

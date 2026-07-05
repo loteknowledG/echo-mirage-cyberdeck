@@ -105,6 +105,18 @@ async function copySelected() {
         'tell application "System Events" to keystroke "c" using command down',
       ]);
       await new Promise((resolve) => setTimeout(resolve, 180));
+    } else if (process.platform === "win32") {
+      execFileSync(
+        "powershell.exe",
+        [
+          "-NoProfile",
+          "-STA",
+          "-Command",
+          "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^c'); Start-Sleep -Milliseconds 250",
+        ],
+        { stdio: "ignore", timeout: 5000 },
+      );
+      await new Promise((resolve) => setTimeout(resolve, 250));
     }
 
     const text = clipboard.readText()?.trim() ?? "";
@@ -116,9 +128,9 @@ async function copySelected() {
       return {
         ok: false,
         reason:
-          process.platform === "darwin"
-            ? "Nothing on Echo clipboard — select content on the Echo Mac, then retry."
-            : "Copy Selected is fully supported on Echo Mac (macOS) today.",
+          process.platform === "darwin" || process.platform === "win32"
+            ? "Nothing on Echo clipboard — select content on the Echo machine, then retry."
+            : "Copy Selected is supported on Echo macOS and Windows today.",
       };
     }
 

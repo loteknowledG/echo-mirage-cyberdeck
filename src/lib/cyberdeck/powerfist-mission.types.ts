@@ -36,5 +36,8 @@ export const POWERFIST_MISSION_SOLVE_EVENT = SURVEY_MISSION_SOLVE_EVENT;
 export const SURVEY_SILENT_CAPTURE_PROMPT =
   "Analyze the coding question in the attached screenshot from Echo. Provide a clear explanation and working code solution. Be concise and interview-ready.";
 
+export const SURVEY_SELECTED_TEXT_PROMPT =
+  "Analyze this coding problem or selected text from Echo. Provide a clear explanation and working code solution. Be concise and interview-ready.";
+
 /** @deprecated use SURVEY_SILENT_CAPTURE_PROMPT */
 export const SILENT_CAPTURE_SOLVE_PROMPT = SURVEY_SILENT_CAPTURE_PROMPT;

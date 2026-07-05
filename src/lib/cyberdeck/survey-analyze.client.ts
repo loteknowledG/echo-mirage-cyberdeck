@@ -16,11 +16,38 @@ export async function analyzeSurveyCaptureClient(input: {
   prompt?: string;
   provider?: string;
 }): Promise<SurveyAnalyzeClientResult> {
+  return analyzeSurveyRequestClient({
+    pngBase64: input.pngBase64,
+    prompt: input.prompt,
+    provider: input.provider,
+  });
+}
+
+/** Text-only analyze for Echo selected text — Codex or API key. */
+export async function analyzeSurveySelectionClient(input: {
+  selectionText: string;
+  prompt?: string;
+  provider?: string;
+}): Promise<SurveyAnalyzeClientResult> {
+  return analyzeSurveyRequestClient({
+    selectionText: input.selectionText,
+    prompt: input.prompt,
+    provider: input.provider,
+  });
+}
+
+async function analyzeSurveyRequestClient(input: {
+  pngBase64?: string;
+  selectionText?: string;
+  prompt?: string;
+  provider?: string;
+}): Promise<SurveyAnalyzeClientResult> {
   const res = await fetch("/api/survey/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       pngBase64: input.pngBase64,
+      selectionText: input.selectionText,
       prompt: input.prompt,
       provider: input.provider ?? "auto",
     }),

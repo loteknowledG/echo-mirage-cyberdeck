@@ -1,10 +1,12 @@
 "use client";
 
 import {
+  SURVEY_SELECTED_TEXT_PROMPT,
   SURVEY_SILENT_CAPTURE_PROMPT,
 } from "@/lib/cyberdeck/powerfist-mission.types";
 import {
   analyzeSurveyCaptureClient,
+  analyzeSurveySelectionClient,
   surveyImageDataUrlToBase64,
 } from "@/lib/cyberdeck/survey-analyze.client";
 import {
@@ -14,9 +16,17 @@ import {
 import { appendSurveyChatMessage, notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
 import {
   readLastSurveyCapture,
+  readLastSurveySelection,
+  storeLastSurveySelection,
   SURVEY_LAST_CAPTURE_EVENT,
   SURVEY_LAST_CAPTURE_STORAGE_KEY,
+  SURVEY_LAST_SELECTION_EVENT,
+  SURVEY_LAST_SELECTION_STORAGE_KEY,
 } from "@/lib/cyberdeck/survey-deck-command.client";
+import {
+  appendMirageItemChatLines,
+  formatMirageItemDisplayLine,
+} from "@/lib/cyberdeck/survey-muthur-mission.client";
 
 export type SurveyMirageQueueItemSource = "capture" | "clipboard" | "mission" | "manual";
 
@@ -430,37 +440,86 @@ function attachImageToMirageQueueItem(
   return next[index] ?? null;
 }
 
-export function resolveMiragePreviewCapture(): {
-  imageDataUrl: string;
-  prompt: string;
-  item: SurveyMirageQueueItem | null;
-} | null {
+export type MiragePreviewContent =
+  | {
+      kind: "image";
+      imageDataUrl: string;
+      prompt: string;
+      item: SurveyMirageQueueItem | null;
+    }
+  | {
+      kind: "text";
+      selectionText: string;
+      prompt: string;
+      item: SurveyMirageQueueItem | null;
+    };
+
+function resolveItemPrompt(item: SurveyMirageQueueItem): string {
+  return item.transcript?.trim() || item.prompt?.trim() || SURVEY_SILENT_CAPTURE_PROMPT;
+}
+
+function resolveTextOnlyItem(item: SurveyMirageQueueItem): string | null {
+  if (resolveMirageQueueItemImage(item)) return null;
+  const text = resolveItemPrompt(item);
+  if (text === SURVEY_SILENT_CAPTURE_PROMPT && item.source !== "clipboard") return null;
+  return text;
+}
+
+export function resolveMiragePreviewContent(): MiragePreviewContent | null {
   const { current } = getMirageQueueSnapshot();
 
   if (current) {
     const imageDataUrl = resolveMirageQueueItemImage(current);
     if (imageDataUrl) {
       return {
+        kind: "image",
         imageDataUrl,
-        prompt:
-          current.transcript?.trim() ||
-          current.prompt ||
-          SURVEY_SILENT_CAPTURE_PROMPT,
+        prompt: resolveItemPrompt(current),
+        item: current,
+      };
+    }
+    const selectionText = resolveTextOnlyItem(current);
+    if (selectionText) {
+      return {
+        kind: "text",
+        selectionText,
+        prompt: selectionText,
         item: current,
       };
     }
   }
 
+  const lastSelection = readLastSurveySelection();
+  if (lastSelection?.text) {
+    return {
+      kind: "text",
+      selectionText: lastSelection.text,
+      prompt: lastSelection.text,
+      item: current,
+    };
+  }
+
   const last = readLastSurveyCapture();
   if (last?.pngBase64) {
     return {
+      kind: "image",
       imageDataUrl: `data:image/png;base64,${last.pngBase64}`,
-      prompt: current?.prompt || SURVEY_SILENT_CAPTURE_PROMPT,
+      prompt: current ? resolveItemPrompt(current) : SURVEY_SILENT_CAPTURE_PROMPT,
       item: current,
     };
   }
 
   return null;
+}
+
+export function resolveMiragePreviewCapture(): {
+  imageDataUrl: string;
+  prompt: string;
+  item: SurveyMirageQueueItem | null;
+} | null {
+  const preview = resolveMiragePreviewContent();
+  if (!preview || preview.kind !== "image") return null;
+  return preview;
 }
 
 function ensureMirageQueueItemForCapture(capture: {
@@ -552,6 +611,90 @@ export async function solveMirageCaptureAsync(): Promise<{ ok: boolean; message:
   };
 }
 
+/** Run Codex on Echo selected text (no screenshot). */
+export async function solveMirageSelectedTextAsync(
+  selectedText: string,
+): Promise<{ ok: boolean; message: string }> {
+  const text = selectedText.trim();
+  if (!text) {
+    return { ok: false, message: "No selected text to solve." };
+  }
+
+  const item = ingestMirageQueueItem({
+    title: "Echo selection",
+    prompt: text,
+    source: "clipboard",
+    select: true,
+  });
+
+  storeLastSurveySelection(text);
+
+  const { index, items } = getMirageQueueSnapshot();
+  const itemIndex = items.findIndex((entry) => entry.id === item.id);
+  const displayIndex = itemIndex >= 0 ? itemIndex : index;
+
+  const displayLine = formatMirageItemDisplayLine({ ...item, prompt: text });
+  appendMirageItemChatLines({ ...item, prompt: text }, displayLine);
+  window.dispatchEvent(
+    new CustomEvent(SURVEY_MIRAGE_ITEM_DISPLAY_EVENT, {
+      detail: { ...item, prompt: text },
+    }),
+  );
+
+  appendSurveyChatMessage({
+    role: "system",
+    text: `SURVEY // STAGED TEXT // item ${displayIndex + 1}/${items.length} · ${text.length} chars from Echo`,
+  });
+  appendSurveyChatMessage({ role: "user", text });
+
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+
+  appendSurveyChatMessage({
+    role: "system",
+    text: `SURVEY // ANALYZE TEXT // item ${displayIndex + 1}/${items.length} via Codex CLI…`,
+  });
+
+  beginSurveyAnalyzeStatus({
+    itemId: item.id,
+    itemIndex: displayIndex,
+    itemTotal: items.length,
+    provider: "codex",
+  });
+
+  const result = await analyzeSurveySelectionClient({
+    selectionText: text,
+    prompt: SURVEY_SELECTED_TEXT_PROMPT,
+    provider: "auto",
+  });
+
+  if (!result.ok) {
+    completeSurveyAnalyzeStatus({ ok: false, error: result.error });
+    appendSurveyChatMessage({
+      role: "system",
+      text: `SURVEY // ANALYZE FAILED // ${result.error}`,
+    });
+    return { ok: false, message: result.error };
+  }
+
+  setMirageQueueItemAnswer(item.id, result.text);
+  completeSurveyAnalyzeStatus({
+    ok: true,
+    resultText: result.text,
+    provider: result.provider,
+  });
+  appendSurveyChatMessage({ role: "assistant", text: result.text });
+  notifySurveyMuthurArchive(
+    `SURVEY // SOLVED TEXT // item ${displayIndex + 1}/${items.length} (${result.provider})`,
+  );
+
+  return {
+    ok: true,
+    message: `Solved selected text (${text.length} chars) via ${result.provider}.`,
+  };
+}
+
 export async function runMirageSpeechToTextItem(): Promise<{ ok: boolean; message: string }> {
   const { current, index, items } = getMirageQueueSnapshot();
   if (!current) {
@@ -628,11 +771,18 @@ export function installMirageQueueListeners(): () => void {
   };
 
   window.addEventListener(SURVEY_LAST_CAPTURE_EVENT, onCapture);
+  window.addEventListener(SURVEY_LAST_SELECTION_EVENT, onCapture);
   window.addEventListener("storage", (event) => {
-    if (event.key === SURVEY_LAST_CAPTURE_STORAGE_KEY) emitChanged();
+    if (
+      event.key === SURVEY_LAST_CAPTURE_STORAGE_KEY ||
+      event.key === SURVEY_LAST_SELECTION_STORAGE_KEY
+    ) {
+      emitChanged();
+    }
   });
 
   return () => {
     window.removeEventListener(SURVEY_LAST_CAPTURE_EVENT, onCapture);
+    window.removeEventListener(SURVEY_LAST_SELECTION_EVENT, onCapture);
   };
 }

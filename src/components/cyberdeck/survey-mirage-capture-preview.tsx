@@ -5,14 +5,16 @@ import { SurveyAnalyzeSolvingBanner } from "@/components/cyberdeck/survey-analyz
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { useMirageItemQueue } from "@/components/cyberdeck/survey-mirage-item-select-list";
 import {
-  readLastSurveyCapture,
   resolveSurveyEchoDeckContext,
+  solveSurveySelectedText,
   SURVEY_LAST_CAPTURE_EVENT,
   SURVEY_LAST_CAPTURE_STORAGE_KEY,
+  SURVEY_LAST_SELECTION_EVENT,
+  SURVEY_LAST_SELECTION_STORAGE_KEY,
   takeSurveyScreenshot,
 } from "@/lib/cyberdeck/survey-deck-command.client";
 import {
-  resolveMiragePreviewCapture,
+  resolveMiragePreviewContent,
   resolveMirageQueueItemImage,
   solveMirageCaptureAsync,
   SURVEY_MIRAGE_ITEM_CHANGED_EVENT,
@@ -36,19 +38,27 @@ export function SurveyMirageCapturePreview() {
   const [captureTick, setCaptureTick] = useState(0);
   const [captureBusy, setCaptureBusy] = useState(false);
   const [solveBusy, setSolveBusy] = useState(false);
+  const [textSolveBusy, setTextSolveBusy] = useState(false);
   const [deckMessage, setDeckMessage] = useState<string | null>(null);
 
   const bumpCapture = useCallback(() => setCaptureTick((value) => value + 1), []);
 
   useEffect(() => {
     window.addEventListener(SURVEY_LAST_CAPTURE_EVENT, bumpCapture);
+    window.addEventListener(SURVEY_LAST_SELECTION_EVENT, bumpCapture);
     window.addEventListener(SURVEY_MIRAGE_ITEM_CHANGED_EVENT, bumpCapture);
     const onStorage = (event: StorageEvent) => {
-      if (event.key === SURVEY_LAST_CAPTURE_STORAGE_KEY) bumpCapture();
+      if (
+        event.key === SURVEY_LAST_CAPTURE_STORAGE_KEY ||
+        event.key === SURVEY_LAST_SELECTION_STORAGE_KEY
+      ) {
+        bumpCapture();
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener(SURVEY_LAST_CAPTURE_EVENT, bumpCapture);
+      window.removeEventListener(SURVEY_LAST_SELECTION_EVENT, bumpCapture);
       window.removeEventListener(SURVEY_MIRAGE_ITEM_CHANGED_EVENT, bumpCapture);
       window.removeEventListener("storage", onStorage);
     };
@@ -57,25 +67,26 @@ export function SurveyMirageCapturePreview() {
   useEffect(() => {
     if (analyzeStatus.phase !== "running") {
       setSolveBusy(false);
+      setTextSolveBusy(false);
     }
   }, [analyzeStatus.phase]);
 
-  const previewCapture = useMemo(() => {
+  const previewContent = useMemo(() => {
     void captureTick;
-    return resolveMiragePreviewCapture();
+    return resolveMiragePreviewContent();
   }, [captureTick, current, index, items.length]);
 
-  const imageSrc = previewCapture?.imageDataUrl ?? null;
+  const imageSrc = previewContent?.kind === "image" ? previewContent.imageDataUrl : null;
+  const selectionText = previewContent?.kind === "text" ? previewContent.selectionText : null;
 
-  const solving =
-    analyzeStatus.phase === "running" &&
-    Boolean(previewCapture?.item?.id && analyzeStatus.itemId === previewCapture.item.id);
+  const solving = analyzeStatus.phase === "running";
 
   const echoCtx = useMemo(
     () => resolveSurveyEchoDeckContext(team.echoHost),
     [team.echoHost],
   );
-  const canSolve = Boolean(imageSrc);
+  const canSolveImage = Boolean(imageSrc);
+  const canSolveText = Boolean(selectionText);
   const echoReady = Boolean(echoCtx.echoHost);
   const echoTargetLabel = echoCtx.echoHost
     ? `${echoCtx.echoHost}:${echoCtx.echoHttpPort}`
@@ -92,21 +103,35 @@ export function SurveyMirageCapturePreview() {
   }, [bumpCapture, captureBusy, echoCtx, solving]);
 
   const handleSolve = useCallback(async () => {
-    if (!canSolve || solveBusy || solving) return;
+    if (!canSolveImage || solveBusy || solving) return;
     setSolveBusy(true);
     setDeckMessage(null);
     const result = await solveMirageCaptureAsync();
     setDeckMessage(result.message);
     setSolveBusy(false);
-  }, [canSolve, solveBusy, solving]);
+  }, [canSolveImage, solveBusy, solving]);
+
+  const handleSolveSelectedText = useCallback(async () => {
+    if (!echoReady || textSolveBusy || solving || captureBusy) return;
+    setTextSolveBusy(true);
+    setDeckMessage(null);
+    const result = await solveSurveySelectedText(echoCtx);
+    setDeckMessage(result.message);
+    if (result.ok) bumpCapture();
+    setTextSolveBusy(false);
+  }, [bumpCapture, captureBusy, echoCtx, echoReady, solving, textSolveBusy]);
 
   const sourceLabel = current
     ? resolveMirageQueueItemImage(current)
       ? `queue item ${index + 1}/${items.length}`
-      : `queue item ${index + 1}/${items.length} · image re-linked from capture`
-    : imageSrc
-      ? "last Echo capture"
-      : null;
+      : selectionText
+        ? `queue item ${index + 1}/${items.length} · Echo selected text`
+        : `queue item ${index + 1}/${items.length} · image re-linked from capture`
+    : selectionText
+      ? "last Echo selected text"
+      : imageSrc
+        ? "last Echo capture"
+        : null;
 
   return (
     <section
@@ -115,10 +140,13 @@ export function SurveyMirageCapturePreview() {
       data-testid="survey-mirage-capture-preview"
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[9px] tracking-[0.1em] text-fuchsia-300/90">CAPTURE PREVIEW</p>
-        {imageSrc ? (
+        <p className="text-[9px] tracking-[0.1em] text-fuchsia-300/90">
+          {selectionText ? "SELECTED TEXT PREVIEW" : "CAPTURE PREVIEW"}
+        </p>
+        {previewContent ? (
           <p className="text-[8px] text-[#6a6a6a]">
-            {sourceLabel} · {formatCaptureSize(imageSrc)}
+            {sourceLabel}
+            {imageSrc ? ` · ${formatCaptureSize(imageSrc)}` : selectionText ? ` · ${selectionText.length} chars` : ""}
           </p>
         ) : null}
       </div>
@@ -134,11 +162,19 @@ export function SurveyMirageCapturePreview() {
         </CyberdeckActionButton>
         <CyberdeckActionButton
           variant="accent"
-          disabled={!canSolve || solveBusy || solving}
+          disabled={!canSolveImage || solveBusy || solving}
           onClick={() => void handleSolve()}
           data-testid="survey-mirage-solve-capture"
         >
-          {solving || solveBusy ? "SOLVING…" : "SOLVE"}
+          {solving && canSolveImage ? "SOLVING…" : "SOLVE"}
+        </CyberdeckActionButton>
+        <CyberdeckActionButton
+          variant="neutral"
+          disabled={!echoReady || textSolveBusy || solving || captureBusy}
+          onClick={() => void handleSolveSelectedText()}
+          data-testid="survey-mirage-solve-selected-text"
+        >
+          {textSolveBusy || (solving && !canSolveImage) ? "SOLVING…" : "SOLVE SELECTED TEXT"}
         </CyberdeckActionButton>
       </div>
 
@@ -149,24 +185,34 @@ export function SurveyMirageCapturePreview() {
         </p>
       ) : echoTargetLabel ? (
         <p className="mb-2 text-[8px] text-[#6a6a6a]">
-          {SURVEY_ECHO_DISPLAY} target · {echoTargetLabel} — screenshot is taken on the interview
-          machine and streamed here.
+          {SURVEY_ECHO_DISPLAY} target · {echoTargetLabel} — highlight problem text on the interview
+          machine, then use SOLVE SELECTED TEXT.
         </p>
       ) : null}
 
       {solving ? <SurveyAnalyzeSolvingBanner status={analyzeStatus} compact /> : null}
 
-      {!imageSrc ? (
+      {!previewContent ? (
         <p className="text-[9px] leading-relaxed text-[#6a6a6a]">
-          No capture yet — click{" "}
-          <span className="text-fuchsia-300/80">{SURVEY_ECHO_DISPLAY} · SCREENSHOT</span>, then{" "}
-          <span className="text-fuchsia-300/80">SOLVE</span> to run Codex on the interview screen.
+          No capture yet — use <span className="text-fuchsia-300/80">{SURVEY_ECHO_DISPLAY} · SCREENSHOT</span>{" "}
+          for the full screen, or{" "}
+          <span className="text-fuchsia-300/80">SOLVE SELECTED TEXT</span> after highlighting a
+          problem on the interview machine.
         </p>
+      ) : selectionText ? (
+        <div
+          className="custom-scrollbar max-h-[min(42vh,420px)] overflow-y-auto rounded border border-[#1c1c1c] bg-black px-3 py-3"
+          data-testid="survey-mirage-selected-text-preview"
+        >
+          <pre className="whitespace-pre-wrap text-[10px] leading-relaxed text-[#d4d4d4]">
+            {selectionText}
+          </pre>
+        </div>
       ) : (
         <div className="relative overflow-hidden rounded border border-[#1c1c1c] bg-black">
           {/* eslint-disable-next-line @next/next/no-img-element -- data URL / local capture blob */}
           <img
-            src={imageSrc}
+            src={imageSrc ?? ""}
             alt={current?.title ?? "Echo capture preview"}
             className={`max-h-[min(42vh,420px)] w-full object-contain object-left-top ${solving ? "opacity-60" : ""}`}
           />
@@ -179,13 +225,15 @@ export function SurveyMirageCapturePreview() {
         </div>
       )}
 
-      {previewCapture?.prompt && imageSrc ? (
-        <p className="mt-2 line-clamp-2 text-[8px] text-[#5f5f5f]">{previewCapture.prompt}</p>
-      ) : null}
-
-      {canSolve && !solving ? (
+      {canSolveImage && !solving ? (
         <p className="mt-2 text-[8px] text-[#5f5f5f]">
           Codex reads this screenshot via your login — no OpenAI API key required.
+        </p>
+      ) : null}
+
+      {canSolveText && !solving ? (
+        <p className="mt-2 text-[8px] text-[#5f5f5f]">
+          Selected text is staged above before Codex runs — verify it matches the interview prompt.
         </p>
       ) : null}
 
