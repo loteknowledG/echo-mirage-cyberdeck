@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isLocalhostRequest } from "@/lib/server/is-localhost-request.server";
 import { analyzeSurveyCapture } from "@/lib/server/survey-analyze.server";
 
 export const runtime = "nodejs";
@@ -12,8 +13,12 @@ type AnalyzeBody = {
   model?: string;
 };
 
-/** Spy Mirage — vision LLM reads a captured screenshot. */
+/** Survey Mirage — vision analyze for captured screenshots (Codex CLI or API key). */
 export async function POST(request: Request) {
+  if (!isLocalhostRequest(request)) {
+    return NextResponse.json({ ok: false, error: "Localhost only." }, { status: 403 });
+  }
+
   let body: AnalyzeBody;
   try {
     body = (await request.json()) as AnalyzeBody;

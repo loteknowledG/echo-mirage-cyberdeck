@@ -1,6 +1,7 @@
 "use client";
 
 import { SurveyMirageHubPanel } from "@/components/cyberdeck/survey-mirage-hub-panel";
+import { SurveyMirageCapturePreview } from "@/components/cyberdeck/survey-mirage-capture-preview";
 import { SurveyMirageItemSelectList } from "@/components/cyberdeck/survey-mirage-item-select-list";
 import { SurveyMirageQueueTeamHost } from "@/components/cyberdeck/survey-mirage-queue-sync";
 import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-panel";
@@ -43,6 +44,7 @@ export function SurveyMiragePane() {
       {mirageLinked ? (
         <>
           <SurveyMirageItemSelectList surface="mirage" className="-mx-4 rounded-none border-x-0" />
+          <SurveyMirageCapturePreview />
           <div className="border-t border-[#1c1c1c] pt-4">
             <SurveySolutionsPanel />
           </div>

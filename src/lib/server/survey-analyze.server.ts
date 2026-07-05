@@ -1,12 +1,29 @@
 // SERVER ONLY — vision analysis for Survey captures.
 
+import { isCodexCliAvailable } from "@/lib/server/cadre/adapters/codex-runtime-adapter.server";
 import { resolveServerProviderCredentials } from "@/lib/server/provider-credentials.server";
+import { analyzeSurveyCaptureViaCodex } from "@/lib/server/survey-analyze-codex.server";
 
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-const DEFAULT_SURVEY_PROMPT =
+export const DEFAULT_SURVEY_PROMPT =
   "Describe what is on this screen. If it shows a coding interview question or LeetCode-style problem, summarize the problem statement and constraints clearly.";
+
+type SurveyVisionProvider = "auto" | "codex" | "openai" | "openrouter";
+
+function resolveVisionProvider(input: SurveyAnalyzeInput): SurveyVisionProvider {
+  const raw = input.provider?.trim().toLowerCase();
+  if (raw === "codex" || raw === "openai" || raw === "openrouter") return raw;
+  return "auto";
+}
+
+function resolveAutoVisionProvider(): "codex" | "openai" | "openrouter" {
+  if (isCodexCliAvailable()) return "codex";
+  if (resolveServerProviderCredentials("openai", undefined).apiKey) return "openai";
+  if (resolveServerProviderCredentials("openrouter", undefined).apiKey) return "openrouter";
+  return "codex";
+}
 
 function resolveVisionModel(provider: string): string {
   const fromEnv = process.env.SURVEY_VISION_MODEL?.trim();
@@ -33,21 +50,22 @@ export type SurveyAnalyzeResult =
   | { ok: true; text: string; model: string; provider: string }
   | { ok: false; error: string };
 
-export async function analyzeSurveyCapture(input: SurveyAnalyzeInput): Promise<SurveyAnalyzeResult> {
+async function analyzeSurveyCaptureViaApi(
+  input: SurveyAnalyzeInput,
+  provider: "openai" | "openrouter",
+): Promise<SurveyAnalyzeResult> {
   const pngBase64 = input.pngBase64.trim();
-  if (!pngBase64) {
-    return { ok: false, error: "pngBase64 is required." };
-  }
-
-  const provider = input.provider?.trim() || "openai";
   const endpoint = resolveChatEndpoint(provider);
   if (!endpoint) {
-    return { ok: false, error: `Provider "${provider}" does not support Survey vision yet. Use openai or openrouter.` };
+    return {
+      ok: false,
+      error: `Provider "${provider}" does not support Survey vision yet. Use codex, openai, or openrouter.`,
+    };
   }
 
   const { apiKey } = resolveServerProviderCredentials(provider, input.apiKey);
   if (!apiKey) {
-    return { ok: false, error: `No API key for ${provider}. Add credentials in Settings.` };
+    return { ok: false, error: `No API key for ${provider}. Add credentials in Settings or use provider codex.` };
   }
 
   const model = input.model?.trim() || resolveVisionModel(provider);
@@ -113,4 +131,21 @@ export async function analyzeSurveyCapture(input: SurveyAnalyzeInput): Promise<S
       error: error instanceof Error ? error.message : "Vision request failed.",
     };
   }
+}
+
+export async function analyzeSurveyCapture(input: SurveyAnalyzeInput): Promise<SurveyAnalyzeResult> {
+  const pngBase64 = input.pngBase64.trim();
+  if (!pngBase64) {
+    return { ok: false, error: "pngBase64 is required." };
+  }
+
+  const prompt = input.prompt?.trim() || DEFAULT_SURVEY_PROMPT;
+  const requested = resolveVisionProvider(input);
+  const provider = requested === "auto" ? resolveAutoVisionProvider() : requested;
+
+  if (provider === "codex") {
+    return analyzeSurveyCaptureViaCodex({ pngBase64, prompt });
+  }
+
+  return analyzeSurveyCaptureViaApi(input, provider);
 }

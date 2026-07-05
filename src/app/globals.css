@@ -1316,6 +1316,155 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   }
 }
 
+.survey-analyze-solving {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  border: 1px solid rgba(52, 211, 153, 0.22);
+  border-radius: 0.25rem;
+  background: linear-gradient(180deg, rgba(6, 24, 18, 0.85), rgba(0, 0, 0, 0.55));
+  padding: 0.65rem 0.75rem;
+}
+
+.survey-analyze-solving--compact {
+  margin-bottom: 0.65rem;
+  padding: 0.55rem 0.65rem;
+}
+
+.survey-analyze-solving--failed {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: linear-gradient(180deg, rgba(40, 8, 8, 0.75), rgba(0, 0, 0, 0.55));
+}
+
+.survey-analyze-solving--complete {
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.survey-analyze-solving-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.survey-analyze-solving-glyph {
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.survey-analyze-solving-title {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.5625rem;
+  letter-spacing: 0.12em;
+  color: rgba(110, 231, 183, 0.92);
+}
+
+.survey-analyze-solving-message {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.5625rem;
+  line-height: 1.45;
+  color: rgba(189, 189, 189, 0.92);
+}
+
+.survey-analyze-solving-bar {
+  width: 100%;
+  max-width: none;
+}
+
+.survey-analyze-solving-error {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.5625rem;
+  line-height: 1.45;
+  color: rgba(252, 165, 165, 0.92);
+}
+
+.survey-analyze-solving-result {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.625rem;
+  line-height: 1.5;
+  color: rgba(189, 189, 189, 0.95);
+}
+
+.survey-analyze-solving {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  rounded: 0.25rem;
+  border: 1px solid rgba(217, 70, 239, 0.28);
+  background: linear-gradient(180deg, rgba(217, 70, 239, 0.08), rgba(0, 0, 0, 0.55));
+  padding: 0.65rem 0.75rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.survey-analyze-solving--compact {
+  padding: 0.5rem 0.65rem;
+  gap: 0.35rem;
+}
+
+.survey-analyze-solving-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.survey-analyze-solving-glyph {
+  font-size: 0.55rem;
+  line-height: 1;
+}
+
+.survey-analyze-solving-title {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: rgba(240, 171, 252, 0.92);
+}
+
+.survey-analyze-solving-message {
+  font-size: 10px;
+  line-height: 1.45;
+  color: rgba(167, 243, 208, 0.88);
+}
+
+.survey-analyze-solving-bar {
+  width: 100%;
+  max-width: none;
+}
+
+.survey-analyze-solving--failed {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.08), rgba(0, 0, 0, 0.55));
+}
+
+.survey-analyze-solving-error {
+  font-size: 10px;
+  line-height: 1.45;
+  color: rgba(252, 165, 165, 0.92);
+}
+
+.survey-analyze-solving--complete {
+  border-color: rgba(52, 211, 153, 0.32);
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.07), rgba(0, 0, 0, 0.55));
+}
+
+.survey-analyze-solving-result {
+  font-size: 10px;
+  line-height: 1.55;
+  color: rgba(209, 250, 229, 0.92);
+  max-height: min(36vh, 320px);
+  overflow-y: auto;
+}
+
+.survey-analyze-preview-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  background: linear-gradient(180deg, transparent 35%, rgba(0, 0, 0, 0.82) 100%);
+  padding: 0.65rem;
+  pointer-events: none;
+}
+
+
 /* Match weyland-yutani `index.css` .nav-row (green hover band + lift). */
 .nav-row {
   color: var(--nav-color, inherit);

@@ -6,7 +6,7 @@ import {
   type SurveyDeckCommandId,
 } from "@/lib/cyberdeck/survey-deck-data";
 import {
-  answerCurrentMirageItem,
+  answerCurrentMirageItemAsync,
   applyMirageQueueControl,
   displayCurrentMirageItem,
   ingestMirageQueueItem,
@@ -65,25 +65,36 @@ function logDeck(line: string): void {
 
 function storeLastCapture(pngBase64: string): void {
   if (typeof window === "undefined") return;
+  const payload = { pngBase64, at: new Date().toISOString() };
   try {
-    window.sessionStorage.setItem(
-      SURVEY_LAST_CAPTURE_STORAGE_KEY,
-      JSON.stringify({ pngBase64, at: new Date().toISOString() }),
-    );
-    window.dispatchEvent(
-      new CustomEvent(SURVEY_LAST_CAPTURE_EVENT, {
-        detail: { pngBase64 },
-      }),
-    );
+    window.localStorage.setItem(SURVEY_LAST_CAPTURE_STORAGE_KEY, JSON.stringify(payload));
   } catch {
     /* ignore */
   }
+  try {
+    window.sessionStorage.setItem(SURVEY_LAST_CAPTURE_STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(
+    new CustomEvent(SURVEY_LAST_CAPTURE_EVENT, {
+      detail: { pngBase64 },
+    }),
+  );
+  ingestMirageQueueItem({
+    title: "Echo capture",
+    prompt: SURVEY_SILENT_CAPTURE_PROMPT,
+    imageDataUrl: `data:image/png;base64,${pngBase64}`,
+    source: "capture",
+  });
 }
 
 export function readLastSurveyCapture(): { pngBase64: string; at: string } | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(SURVEY_LAST_CAPTURE_STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(SURVEY_LAST_CAPTURE_STORAGE_KEY) ??
+      window.sessionStorage.getItem(SURVEY_LAST_CAPTURE_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { pngBase64?: string; at?: string };
     if (!parsed.pngBase64?.trim()) return null;
@@ -91,6 +102,13 @@ export function readLastSurveyCapture(): { pngBase64: string; at: string } | nul
   } catch {
     return null;
   }
+}
+
+/** Echo deck screenshot — usable from Mirage or PowerFist. */
+export async function takeSurveyScreenshot(
+  ctx: SurveyDeckCommandContext,
+): Promise<SurveyDeckCommandResult> {
+  return executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.SCREENSHOT, ctx);
 }
 
 async function sendEchoRemoteCommand(
@@ -187,7 +205,7 @@ export async function executeSurveyDeckCommand(
       return { ok: result.ok, message: result.message };
     }
     case SURVEY_MIRAGE_COMMAND.ANSWER_ITEM: {
-      const result = answerCurrentMirageItem();
+      const result = await answerCurrentMirageItemAsync();
       return { ok: result.ok, message: result.message };
     }
     case SURVEY_MIRAGE_COMMAND.DISPLAY_ITEM: {

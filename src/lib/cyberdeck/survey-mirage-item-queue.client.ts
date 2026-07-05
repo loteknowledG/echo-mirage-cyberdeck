@@ -1,12 +1,22 @@
 "use client";
 
 import {
-  SURVEY_MISSION_SOLVE_EVENT,
   SURVEY_SILENT_CAPTURE_PROMPT,
-  type SurveyMissionKind,
 } from "@/lib/cyberdeck/powerfist-mission.types";
+import {
+  analyzeSurveyCaptureClient,
+  surveyImageDataUrlToBase64,
+} from "@/lib/cyberdeck/survey-analyze.client";
+import {
+  beginSurveyAnalyzeStatus,
+  completeSurveyAnalyzeStatus,
+} from "@/lib/cyberdeck/survey-analyze-status.client";
 import { appendSurveyChatMessage, notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
-import { SURVEY_LAST_CAPTURE_EVENT } from "@/lib/cyberdeck/survey-deck-command.client";
+import {
+  readLastSurveyCapture,
+  SURVEY_LAST_CAPTURE_EVENT,
+  SURVEY_LAST_CAPTURE_STORAGE_KEY,
+} from "@/lib/cyberdeck/survey-deck-command.client";
 
 export type SurveyMirageQueueItemSource = "capture" | "clipboard" | "mission" | "manual";
 
@@ -222,6 +232,40 @@ function summarizeItem(item: SurveyMirageQueueItem): string {
   return bits.join(" · ");
 }
 
+export function resolveMirageQueueItemImage(item: SurveyMirageQueueItem): string | null {
+  if (item.imageDataUrl?.trim()) return item.imageDataUrl;
+  const ref = item.imageRef ?? item.id;
+  return loadCaptureImage(ref) ?? null;
+}
+
+export function getMirageQueueDebugSnapshot(): {
+  itemCount: number;
+  index: number;
+  items: Array<{ id: string; title: string; hasImage: boolean; imageBytes: number | null }>;
+  captureBlobKeys: number;
+} {
+  const { items, index } = getMirageQueueSnapshot();
+  const captureBlobKeys =
+    typeof window === "undefined"
+      ? 0
+      : Object.keys(window.localStorage).filter((key) => key.startsWith(CAPTURE_IMAGE_PREFIX))
+          .length;
+  return {
+    itemCount: items.length,
+    index,
+    items: items.map((item) => {
+      const image = resolveMirageQueueItemImage(item);
+      return {
+        id: item.id.slice(0, 8),
+        title: item.title,
+        hasImage: Boolean(image),
+        imageBytes: image ? Math.round((image.length * 3) / 4) : null,
+      };
+    }),
+    captureBlobKeys,
+  };
+}
+
 export function getMirageQueueSnapshot(): {
   items: SurveyMirageQueueItem[];
   index: number;
@@ -364,40 +408,147 @@ export function displayCurrentMirageItem(): { ok: boolean; message: string } {
   };
 }
 
-export function answerCurrentMirageItem(): { ok: boolean; message: string } {
-  const { current, index, items } = getMirageQueueSnapshot();
-  if (!current) {
-    return { ok: false, message: "No item to answer — queue is empty." };
-  }
-  if (!current.imageDataUrl && !current.imageRef) {
-    return { ok: false, message: "Current item has no image — capture or copy from Echo first." };
-  }
+function setMirageQueueItemAnswer(itemId: string, answer: string): void {
+  const items = readItems();
+  const index = items.findIndex((item) => item.id === itemId);
+  if (index < 0) return;
+  const next = [...items];
+  next[index] = { ...next[index], answer: answer.trim() };
+  writeItems(next);
+}
 
-  const imageDataUrl =
-    current.imageDataUrl ?? loadCaptureImage(current.imageRef ?? current.id);
-  if (!imageDataUrl) {
-    return { ok: false, message: "Current item image missing from storage — capture again." };
-  }
+function attachImageToMirageQueueItem(
+  itemId: string,
+  imageDataUrl: string,
+): SurveyMirageQueueItem | null {
+  const items = readItems();
+  const index = items.findIndex((entry) => entry.id === itemId);
+  if (index < 0) return null;
+  const next = [...items];
+  next[index] = { ...next[index], imageDataUrl };
+  writeItems(next);
+  return next[index] ?? null;
+}
 
-  const prompt =
-    current.transcript?.trim() ||
-    current.prompt ||
-    SURVEY_SILENT_CAPTURE_PROMPT;
+export function resolveMiragePreviewCapture(): {
+  imageDataUrl: string;
+  prompt: string;
+  item: SurveyMirageQueueItem | null;
+} | null {
+  const { current } = getMirageQueueSnapshot();
 
-  window.dispatchEvent(
-    new CustomEvent(SURVEY_MISSION_SOLVE_EVENT, {
-      detail: {
-        missionId: current.id,
-        kind: "silent-capture-solve" satisfies SurveyMissionKind,
+  if (current) {
+    const imageDataUrl = resolveMirageQueueItemImage(current);
+    if (imageDataUrl) {
+      return {
         imageDataUrl,
-        prompt,
-      },
-    }),
+        prompt:
+          current.transcript?.trim() ||
+          current.prompt ||
+          SURVEY_SILENT_CAPTURE_PROMPT,
+        item: current,
+      };
+    }
+  }
+
+  const last = readLastSurveyCapture();
+  if (last?.pngBase64) {
+    return {
+      imageDataUrl: `data:image/png;base64,${last.pngBase64}`,
+      prompt: current?.prompt || SURVEY_SILENT_CAPTURE_PROMPT,
+      item: current,
+    };
+  }
+
+  return null;
+}
+
+function ensureMirageQueueItemForCapture(capture: {
+  imageDataUrl: string;
+  prompt: string;
+  item: SurveyMirageQueueItem | null;
+}): SurveyMirageQueueItem {
+  if (capture.item) {
+    const existing = resolveMirageQueueItemImage(capture.item);
+    if (existing) return capture.item;
+    const attached = attachImageToMirageQueueItem(capture.item.id, capture.imageDataUrl);
+    if (attached) return attached;
+  }
+
+  return ingestMirageQueueItem({
+    title: "Echo capture",
+    prompt: capture.prompt,
+    imageDataUrl: capture.imageDataUrl,
+    source: "capture",
+  });
+}
+
+export function answerCurrentMirageItem(): { ok: boolean; message: string } {
+  void answerCurrentMirageItemAsync();
+  return { ok: true, message: "Analyzing current item via Codex…" };
+}
+
+export async function answerCurrentMirageItemAsync(): Promise<{ ok: boolean; message: string }> {
+  return solveMirageCaptureAsync();
+}
+
+/** Run Codex vision on the current preview capture (queue item or last Echo screenshot). */
+export async function solveMirageCaptureAsync(): Promise<{ ok: boolean; message: string }> {
+  const capture = resolveMiragePreviewCapture();
+  if (!capture) {
+    return {
+      ok: false,
+      message: "No capture to solve — take a screenshot first.",
+    };
+  }
+
+  const item = ensureMirageQueueItemForCapture(capture);
+  const { index, items } = getMirageQueueSnapshot();
+  const itemIndex = items.findIndex((entry) => entry.id === item.id);
+  const displayIndex = itemIndex >= 0 ? itemIndex : index;
+
+  appendSurveyChatMessage({
+    role: "system",
+    text: `SURVEY // ANALYZE // item ${displayIndex + 1}/${items.length} via Codex CLI…`,
+  });
+  appendSurveyChatMessage({ role: "user", text: capture.prompt });
+
+  beginSurveyAnalyzeStatus({
+    itemId: item.id,
+    itemIndex: displayIndex,
+    itemTotal: items.length,
+    provider: "codex",
+  });
+
+  const result = await analyzeSurveyCaptureClient({
+    pngBase64: surveyImageDataUrlToBase64(capture.imageDataUrl),
+    prompt: capture.prompt,
+    provider: "auto",
+  });
+
+  if (!result.ok) {
+    completeSurveyAnalyzeStatus({ ok: false, error: result.error });
+    appendSurveyChatMessage({
+      role: "system",
+      text: `SURVEY // ANALYZE FAILED // ${result.error}`,
+    });
+    return { ok: false, message: result.error };
+  }
+
+  setMirageQueueItemAnswer(item.id, result.text);
+  completeSurveyAnalyzeStatus({
+    ok: true,
+    resultText: result.text,
+    provider: result.provider,
+  });
+  appendSurveyChatMessage({ role: "assistant", text: result.text });
+  notifySurveyMuthurArchive(
+    `SURVEY // SOLVED // item ${displayIndex + 1}/${items.length} (${result.provider})`,
   );
 
   return {
     ok: true,
-    message: `Answering item ${index + 1}/${items.length} via MUTHUR…`,
+    message: `Answered item ${displayIndex + 1}/${items.length} via ${result.provider}.`,
   };
 }
 
@@ -472,18 +623,14 @@ export async function runMirageSpeechToTextItem(): Promise<{ ok: boolean; messag
 export function installMirageQueueListeners(): () => void {
   if (typeof window === "undefined") return () => undefined;
 
-  const onCapture = (event: Event) => {
-    const pngBase64 = (event as CustomEvent<{ pngBase64?: string }>).detail?.pngBase64;
-    if (!pngBase64) return;
-    ingestMirageQueueItem({
-      title: "Echo capture",
-      prompt: SURVEY_SILENT_CAPTURE_PROMPT,
-      imageDataUrl: `data:image/png;base64,${pngBase64}`,
-      source: "capture",
-    });
+  const onCapture = () => {
+    emitChanged();
   };
 
   window.addEventListener(SURVEY_LAST_CAPTURE_EVENT, onCapture);
+  window.addEventListener("storage", (event) => {
+    if (event.key === SURVEY_LAST_CAPTURE_STORAGE_KEY) emitChanged();
+  });
 
   return () => {
     window.removeEventListener(SURVEY_LAST_CAPTURE_EVENT, onCapture);

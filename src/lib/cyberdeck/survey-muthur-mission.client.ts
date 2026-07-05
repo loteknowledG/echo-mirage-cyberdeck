@@ -1,5 +1,6 @@
 import type { SurveyMissionSolveDetail } from "@/lib/cyberdeck/powerfist-mission.types";
 import type { SurveyMirageQueueItem } from "@/lib/cyberdeck/survey-mirage-item-queue.client";
+import { resolveMirageQueueItemImage } from "@/lib/cyberdeck/survey-mirage-item-queue.client";
 import { appendSurveyChatMessage } from "@/lib/cyberdeck/survey-chat";
 import { SURVEY_ECHO_DISPLAY, SURVEY_MIRAGE_DISPLAY } from "@/lib/cyberdeck/survey-mode";
 
@@ -44,14 +45,15 @@ export function appendSurveyMissionChatLines(
 export function buildMirageItemPreviewAsset(
   item: SurveyMirageQueueItem,
 ): SurveyOperatorImageAsset | null {
-  if (!item.imageDataUrl) return null;
+  const imageSrc = resolveMirageQueueItemImage(item);
+  if (!imageSrc) return null;
   return {
     kind: "image",
     name: `mirage-${item.id.slice(0, 8)}.png`,
     mimeType: "image/png",
     size: 0,
     surface: "image",
-    imageSrc: item.imageDataUrl,
+    imageSrc,
   };
 }
 
