@@ -55,6 +55,49 @@ for (const stream of [process.stdout, process.stderr]) {
   });
 }
 
+function isBrokenPipeError(error) {
+  return Boolean(error && typeof error === 'object' && error.code === 'EPIPE');
+}
+
+function patchConsoleForBrokenPipe() {
+  for (const method of ['log', 'info', 'warn', 'error', 'debug']) {
+    const original = console[method]?.bind(console);
+    if (!original) continue;
+    console[method] = (...args) => {
+      try {
+        original(...args);
+      } catch (error) {
+        if (isBrokenPipeError(error)) return;
+        throw error;
+      }
+    };
+  }
+}
+
+patchConsoleForBrokenPipe();
+
+process.on('uncaughtException', (error) => {
+  if (isBrokenPipeError(error)) return;
+});
+
+function safeWebContentsCanGoBack(win) {
+  try {
+    return Boolean(win?.webContents?.canGoBack?.());
+  } catch (error) {
+    if (isBrokenPipeError(error)) return false;
+    return false;
+  }
+}
+
+function safeWebContentsCanGoForward(win) {
+  try {
+    return Boolean(win?.webContents?.canGoForward?.());
+  } catch (error) {
+    if (isBrokenPipeError(error)) return false;
+    return false;
+  }
+}
+
 const DESKTOP_PROTOCOL = 'echomirage';
 /** @type {string | null} */
 let pendingProtocolPath = null;
@@ -597,8 +640,8 @@ function buildContextMenu(win, params) {
     template.push({ type: 'separator' });
   }
 
-  template.push({ role: 'back', enabled: win.webContents.canGoBack() });
-  template.push({ role: 'forward', enabled: win.webContents.canGoForward() });
+  template.push({ role: 'back', enabled: safeWebContentsCanGoBack(win) });
+  template.push({ role: 'forward', enabled: safeWebContentsCanGoForward(win) });
   template.push({ type: 'separator' });
   template.push({ role: 'reload' });
   template.push({ role: 'forceReload' });
