@@ -26,6 +26,8 @@ export async function executeEchoSatelliteCommand(action, deps = {}) {
       return saveRecording(deps.app);
     case "echo.copy-selected":
       return copySelected();
+    case "echo.read-clipboard":
+      return readClipboard();
     default:
       return { ok: false, reason: `Unknown Echo command: ${action}` };
   }
@@ -97,15 +99,63 @@ function saveRecording(app) {
   };
 }
 
+async function readClipboardPayload() {
+  const text = clipboard.readText()?.trim() ?? "";
+  const image = clipboard.readImage();
+  const hasImage = image && !image.isEmpty();
+  const formats = clipboard.availableFormats();
+
+  if (!text && !hasImage) {
+    return {
+      ok: false,
+      reason: "Nothing on Echo clipboard — Ctrl+C the problem text on the interview machine, then retry.",
+    };
+  }
+
+  let pngBase64;
+  if (hasImage) {
+    pngBase64 = image.toPNG().toString("base64");
+  }
+
+  return {
+    ok: true,
+    message: hasImage
+      ? `Read Echo clipboard (${text ? "text + image" : "image"}).`
+      : `Read ${text.length} characters from Echo clipboard.`,
+    clipboard: {
+      text: text || undefined,
+      hasImage,
+      formats,
+    },
+    pngBase64,
+  };
+}
+
+async function readClipboard() {
+  try {
+    return await readClipboardPayload();
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "Read clipboard failed.",
+    };
+  }
+}
+
 async function copySelected() {
   try {
-    if (process.platform === "darwin") {
+    let text = clipboard.readText()?.trim() ?? "";
+    const fromExistingClipboard = Boolean(text);
+
+    // If the operator already copied, use clipboard as-is — more reliable than synthetic Ctrl+C.
+    if (!text && process.platform === "darwin") {
       execFileSync("osascript", [
         "-e",
         'tell application "System Events" to keystroke "c" using command down',
       ]);
       await new Promise((resolve) => setTimeout(resolve, 180));
-    } else if (process.platform === "win32") {
+      text = clipboard.readText()?.trim() ?? "";
+    } else if (!text && process.platform === "win32") {
       execFileSync(
         "powershell.exe",
         [
@@ -117,9 +167,9 @@ async function copySelected() {
         { stdio: "ignore", timeout: 5000 },
       );
       await new Promise((resolve) => setTimeout(resolve, 250));
+      text = clipboard.readText()?.trim() ?? "";
     }
 
-    const text = clipboard.readText()?.trim() ?? "";
     const image = clipboard.readImage();
     const hasImage = image && !image.isEmpty();
     const formats = clipboard.availableFormats();
@@ -143,7 +193,9 @@ async function copySelected() {
       ok: true,
       message: hasImage
         ? `Copied selection from Echo (${text ? "text + image" : "image"}).`
-        : `Copied ${text.length} characters from Echo selection.`,
+        : fromExistingClipboard
+          ? `Using ${text.length} characters already on Echo clipboard.`
+          : `Copied ${text.length} characters from Echo selection.`,
       clipboard: {
         text: text || undefined,
         hasImage,

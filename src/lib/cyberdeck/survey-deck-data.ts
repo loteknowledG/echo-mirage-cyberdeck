@@ -7,7 +7,11 @@ export const SURVEY_ECHO_COMMAND = {
   SAVE_RECORDING: "echo.save-recording",
   COPY_SELECTED: "echo.copy-selected",
   SOLVE_SELECTED_TEXT: "echo.solve-selected-text",
+  SOLVE_CLIPBOARD: "echo.solve-clipboard",
 } as const;
+
+/** Echo HTTP action — read clipboard only (not a deck card). */
+export const SURVEY_ECHO_READ_CLIPBOARD_ACTION = "echo.read-clipboard";
 
 export const SURVEY_MIRAGE_COMMAND = {
   NEXT_ITEM: "mirage.next-item",
@@ -70,6 +74,14 @@ export const SURVEY_TRIFORCE_DECKS: PreviewDeckWithTarget[] = [
           "Copy Echo's frontmost selection and run Codex on the text — ideal for HackerRank prompts without a screenshot.",
         risk: "caution",
         surveyCommand: SURVEY_ECHO_COMMAND.SOLVE_SELECTED_TEXT,
+      },
+      {
+        type: "echo",
+        title: "Solve Clipboard",
+        purpose:
+          "Read Echo clipboard as-is (after you Ctrl+C) and run Codex — most reliable for highlighted problem text.",
+        risk: "caution",
+        surveyCommand: SURVEY_ECHO_COMMAND.SOLVE_CLIPBOARD,
       },
     ],
   },

@@ -6,6 +6,7 @@ import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-
 import { useMirageItemQueue } from "@/components/cyberdeck/survey-mirage-item-select-list";
 import {
   resolveSurveyEchoDeckContext,
+  solveSurveyClipboard,
   solveSurveySelectedText,
   SURVEY_LAST_CAPTURE_EVENT,
   SURVEY_LAST_CAPTURE_STORAGE_KEY,
@@ -39,6 +40,7 @@ export function SurveyMirageCapturePreview() {
   const [captureBusy, setCaptureBusy] = useState(false);
   const [solveBusy, setSolveBusy] = useState(false);
   const [textSolveBusy, setTextSolveBusy] = useState(false);
+  const [clipboardSolveBusy, setClipboardSolveBusy] = useState(false);
   const [deckMessage, setDeckMessage] = useState<string | null>(null);
 
   const bumpCapture = useCallback(() => setCaptureTick((value) => value + 1), []);
@@ -68,6 +70,7 @@ export function SurveyMirageCapturePreview() {
     if (analyzeStatus.phase !== "running") {
       setSolveBusy(false);
       setTextSolveBusy(false);
+      setClipboardSolveBusy(false);
     }
   }, [analyzeStatus.phase]);
 
@@ -121,6 +124,16 @@ export function SurveyMirageCapturePreview() {
     setTextSolveBusy(false);
   }, [bumpCapture, captureBusy, echoCtx, echoReady, solving, textSolveBusy]);
 
+  const handleSolveClipboard = useCallback(async () => {
+    if (!echoReady || clipboardSolveBusy || solving || captureBusy) return;
+    setClipboardSolveBusy(true);
+    setDeckMessage(null);
+    const result = await solveSurveyClipboard(echoCtx);
+    setDeckMessage(result.message);
+    if (result.ok) bumpCapture();
+    setClipboardSolveBusy(false);
+  }, [bumpCapture, captureBusy, clipboardSolveBusy, echoCtx, echoReady, solving]);
+
   const sourceLabel = current
     ? resolveMirageQueueItemImage(current)
       ? `queue item ${index + 1}/${items.length}`
@@ -169,12 +182,20 @@ export function SurveyMirageCapturePreview() {
           {solving && canSolveImage ? "SOLVING…" : "SOLVE"}
         </CyberdeckActionButton>
         <CyberdeckActionButton
+          variant="accent"
+          disabled={!echoReady || clipboardSolveBusy || solving || captureBusy}
+          onClick={() => void handleSolveClipboard()}
+          data-testid="survey-mirage-solve-clipboard"
+        >
+          {clipboardSolveBusy ? "SOLVING…" : "SOLVE CLIPBOARD"}
+        </CyberdeckActionButton>
+        <CyberdeckActionButton
           variant="neutral"
           disabled={!echoReady || textSolveBusy || solving || captureBusy}
           onClick={() => void handleSolveSelectedText()}
           data-testid="survey-mirage-solve-selected-text"
         >
-          {textSolveBusy || (solving && !canSolveImage) ? "SOLVING…" : "SOLVE SELECTED TEXT"}
+          {textSolveBusy ? "SOLVING…" : "SOLVE SELECTED TEXT"}
         </CyberdeckActionButton>
       </div>
 
@@ -185,8 +206,8 @@ export function SurveyMirageCapturePreview() {
         </p>
       ) : echoTargetLabel ? (
         <p className="mb-2 text-[8px] text-[#6a6a6a]">
-          {SURVEY_ECHO_DISPLAY} target · {echoTargetLabel} — highlight problem text on the interview
-          machine, then use SOLVE SELECTED TEXT.
+          {SURVEY_ECHO_DISPLAY} target · {echoTargetLabel} — Ctrl+C the problem on the interview
+          machine, then <span className="text-fuchsia-300/80">SOLVE CLIPBOARD</span>.
         </p>
       ) : null}
 
@@ -195,9 +216,8 @@ export function SurveyMirageCapturePreview() {
       {!previewContent ? (
         <p className="text-[9px] leading-relaxed text-[#6a6a6a]">
           No capture yet — use <span className="text-fuchsia-300/80">{SURVEY_ECHO_DISPLAY} · SCREENSHOT</span>{" "}
-          for the full screen, or{" "}
-          <span className="text-fuchsia-300/80">SOLVE SELECTED TEXT</span> after highlighting a
-          problem on the interview machine.
+          for the full screen. For text problems: <span className="text-fuchsia-300/80">Ctrl+C</span>, then{" "}
+          <span className="text-fuchsia-300/80">SOLVE CLIPBOARD</span>.
         </p>
       ) : selectionText ? (
         <div

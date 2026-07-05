@@ -2,6 +2,7 @@
 
 import {
   SURVEY_ECHO_COMMAND,
+  SURVEY_ECHO_READ_CLIPBOARD_ACTION,
   SURVEY_MIRAGE_COMMAND,
   type SurveyDeckCommandId,
 } from "@/lib/cyberdeck/survey-deck-data";
@@ -153,6 +154,13 @@ export async function solveSurveySelectedText(
   return executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.SOLVE_SELECTED_TEXT, ctx);
 }
 
+/** Read Echo clipboard (no synthetic copy) and run Codex — use after Ctrl+C. */
+export async function solveSurveyClipboard(
+  ctx: SurveyDeckCommandContext,
+): Promise<SurveyDeckCommandResult> {
+  return executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.SOLVE_CLIPBOARD, ctx);
+}
+
 async function sendEchoRemoteCommand(
   action: string,
   ctx: SurveyDeckCommandContext,
@@ -234,10 +242,19 @@ async function fetchEchoSelectedContent(
   });
 }
 
-async function solveEchoSelectedText(
+/** Read Echo clipboard only — no synthetic Ctrl+C. */
+async function fetchEchoClipboardContent(
   ctx: SurveyDeckCommandContext,
 ): Promise<SurveyDeckCommandResult> {
-  const copy = await fetchEchoSelectedContent(ctx);
+  return sendEchoRemoteCommand(SURVEY_ECHO_READ_CLIPBOARD_ACTION, ctx, {
+    ingestClipboard: false,
+  });
+}
+
+async function solveEchoClipboardPayload(
+  copy: SurveyDeckCommandResult,
+  emptyMessage: string,
+): Promise<SurveyDeckCommandResult> {
   if (!copy.ok) {
     return copy;
   }
@@ -250,7 +267,7 @@ async function solveEchoSelectedText(
 
   if (copy.pngBase64) {
     ingestMirageQueueItem({
-      title: "Echo selection",
+      title: "Echo clipboard",
       prompt: SURVEY_SILENT_CAPTURE_PROMPT,
       imageDataUrl: `data:image/png;base64,${copy.pngBase64}`,
       source: "clipboard",
@@ -259,17 +276,33 @@ async function solveEchoSelectedText(
     return {
       ok: solved.ok,
       message: solved.ok
-        ? `Selection had no text — solved image via Codex. ${solved.message}`
+        ? `Clipboard had no text — solved image via Codex. ${solved.message}`
         : solved.message,
       pngBase64: copy.pngBase64,
     };
   }
 
-  return {
-    ok: false,
-    message:
-      "Nothing selected on Echo — highlight the problem text on the interview machine, then retry.",
-  };
+  return { ok: false, message: emptyMessage };
+}
+
+async function solveEchoSelectedText(
+  ctx: SurveyDeckCommandContext,
+): Promise<SurveyDeckCommandResult> {
+  const copy = await fetchEchoSelectedContent(ctx);
+  return solveEchoClipboardPayload(
+    copy,
+    "Nothing selected on Echo — highlight the problem text on the interview machine, then retry.",
+  );
+}
+
+async function solveEchoClipboard(
+  ctx: SurveyDeckCommandContext,
+): Promise<SurveyDeckCommandResult> {
+  const copy = await fetchEchoClipboardContent(ctx);
+  return solveEchoClipboardPayload(
+    copy,
+    "Nothing on Echo clipboard — Ctrl+C the problem text on the interview machine, then retry.",
+  );
 }
 
 /** Execute a Survey triforce deck card — Echo Satellite or Mirage hub. */
@@ -292,6 +325,8 @@ export async function executeSurveyDeckCommand(
       return sendEchoRemoteCommand(SURVEY_ECHO_COMMAND.COPY_SELECTED, ctx);
     case SURVEY_ECHO_COMMAND.SOLVE_SELECTED_TEXT:
       return solveEchoSelectedText(ctx);
+    case SURVEY_ECHO_COMMAND.SOLVE_CLIPBOARD:
+      return solveEchoClipboard(ctx);
     case SURVEY_MIRAGE_COMMAND.NEXT_ITEM: {
       const result = applyMirageQueueControl({ action: "next" }, "powerfist");
       return { ok: result.ok, message: result.message };
