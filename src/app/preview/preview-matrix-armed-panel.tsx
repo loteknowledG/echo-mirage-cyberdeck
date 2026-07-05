@@ -2,6 +2,8 @@
 
 import { FigletFontPreviewSlide } from "@/components/cyberdeck/figlet-font-preview-slide";
 import type { PreviewDeckWithTarget } from "./preview-data";
+import { SURVEY_ECHO_COMMAND } from "@/lib/cyberdeck/survey-deck-data";
+import { useSurveyContinuousScreenshotStatus } from "@/lib/cyberdeck/survey-continuous-screenshot.client";
 import {
   CARD_PLAY_TRACE_PATH,
   cardNeedsComposer,
@@ -25,7 +27,7 @@ type PreviewMatrixArmedPanelProps = {
   onArmedPanelPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
   onArmedPanelPointerMove: (event: React.PointerEvent<HTMLElement>) => void;
   onComposerTextChange: (value: string) => void;
-  onPushCard: (deckIndex: number, cardIndex: number) => void;
+  onPushCard: (deckIndex: number, cardIndex: number) => void | Promise<unknown>;
   onResetCardPlay: () => void;
 };
 
@@ -41,14 +43,33 @@ export function PreviewMatrixArmedPanel({
   onPushCard,
   onResetCardPlay,
 }: PreviewMatrixArmedPanelProps) {
+  const continuous = useSurveyContinuousScreenshotStatus();
+  const isContinuousCard =
+    armedCard.card.surveyCommand === SURVEY_ECHO_COMMAND.CONTINUOUS_SCREENSHOTS;
+  const continuousActive = isContinuousCard && continuous.running;
+
+  const handlePush = () => {
+    void Promise.resolve(onPushCard(armedCard.deckIndex, armedCard.cardIndex)).then((result) => {
+      const keepArmed =
+        result && typeof result === "object" && "keepArmed" in result
+          ? Boolean((result as { keepArmed?: boolean }).keepArmed)
+          : false;
+      if (!keepArmed) onResetCardPlay();
+    });
+  };
+
+  const handleStop = () => {
+    onResetCardPlay();
+  };
+
   return (
     <section
-      className={`cardOpenViewport${armedPanelArming === "push" ? " is-arming-push" : ""}${armedPanelArming === "cancel" ? " is-arming-cancel" : ""}`}
+      className={`cardOpenViewport${armedPanelArming === "push" ? " is-arming-push" : ""}${armedPanelArming === "cancel" ? " is-arming-cancel" : ""}${continuousActive ? " is-continuous-active" : ""}`}
       data-testid="powerfist-open-card"
-      onPointerDown={onArmedPanelPointerDown}
-      onPointerMove={onArmedPanelPointerMove}
-      onPointerUp={onCancelArmedPanelHold}
-      onPointerCancel={onCancelArmedPanelHold}
+      onPointerDown={continuousActive ? undefined : onArmedPanelPointerDown}
+      onPointerMove={continuousActive ? undefined : onArmedPanelPointerMove}
+      onPointerUp={continuousActive ? undefined : onCancelArmedPanelHold}
+      onPointerCancel={continuousActive ? undefined : onCancelArmedPanelHold}
     >
       {armedPanelArming ? (
         <svg
@@ -72,11 +93,13 @@ export function PreviewMatrixArmedPanel({
               className={`cardArmedPanelDot${armedPanelArming === "cancel" ? " is-cancel" : ""}`}
               aria-hidden
             />
-            {armedPanelArming === "cancel"
-              ? "Disarming // Red reverse ×2"
-              : armedPanelArming === "push"
-                ? "Arming push // Trace ×2"
-                : "Prepared // Locked"}
+            {continuousActive
+              ? "Live // Continuous capture"
+              : armedPanelArming === "cancel"
+                ? "Disarming // Red reverse ×2"
+                : armedPanelArming === "push"
+                  ? "Arming push // Trace ×2"
+                  : "Prepared // Locked"}
           </div>
           <h2 className="cardOpenViewportTitle">{armedCard.card.title}</h2>
         </div>
@@ -100,6 +123,25 @@ export function PreviewMatrixArmedPanel({
           </pre>
         ) : null}
         <p className="cardOpenViewportPurpose">{armedCard.card.purpose}</p>
+        {continuousActive ? (
+          <div className="survey-continuous-shot-panel" data-testid="survey-continuous-shot-panel">
+            <p className="survey-continuous-shot-label">
+              {continuous.phase === "capturing"
+                ? "CAPTURING…"
+                : continuous.countdown != null
+                  ? `NEXT SHOT IN ${continuous.countdown}`
+                  : "ARMED"}
+            </p>
+            {continuous.countdown != null ? (
+              <p className="survey-continuous-shot-countdown" aria-live="polite">
+                {continuous.countdown}
+              </p>
+            ) : null}
+            <p className="survey-continuous-shot-meta">
+              {continuous.shotCount} shot{continuous.shotCount === 1 ? "" : "s"} · {continuous.message}
+            </p>
+          </div>
+        ) : null}
         {cardNeedsComposer(armedCard.card) ? (
           <label className="cardOpenViewportComposer">
             <span className="cardOpenViewportComposerLabel">
@@ -124,22 +166,25 @@ export function PreviewMatrixArmedPanel({
         ) : null}
       </div>
       <p className="cardOpenViewportGestureHint">
-        Hold panel — clockwise trace ×2 to push · counter-clockwise red ×2 to cancel
+        {continuousActive
+          ? "Continuous mode — Stop to disarm this card."
+          : "Hold panel — clockwise trace ×2 to push · counter-clockwise red ×2 to cancel"}
       </p>
       <div className="cardOpenViewportActions">
-        <button type="button" className="cardClose" onClick={onResetCardPlay}>
-          Close
-        </button>
-        <button
-          type="button"
-          className="push"
-          onClick={() => {
-            onPushCard(armedCard.deckIndex, armedCard.cardIndex);
-            onResetCardPlay();
-          }}
-        >
-          Push
-        </button>
+        {continuousActive ? (
+          <button type="button" className="push is-stop" onClick={handleStop} data-testid="survey-continuous-stop">
+            Stop
+          </button>
+        ) : (
+          <>
+            <button type="button" className="cardClose" onClick={onResetCardPlay}>
+              Close
+            </button>
+            <button type="button" className="push" onClick={handlePush}>
+              Push
+            </button>
+          </>
+        )}
       </div>
     </section>
   );

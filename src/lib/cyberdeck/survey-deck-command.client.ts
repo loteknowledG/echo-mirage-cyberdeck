@@ -15,6 +15,11 @@ import {
   solveMirageCaptureAsync,
   solveMirageSelectedTextAsync,
 } from "@/lib/cyberdeck/survey-mirage-item-queue.client";
+import {
+  isSurveyContinuousScreenshotRunning,
+  startSurveyContinuousScreenshot,
+  stopSurveyContinuousScreenshot,
+} from "@/lib/cyberdeck/survey-continuous-screenshot.client";
 import { SURVEY_SILENT_CAPTURE_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
 import { notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
 import {
@@ -327,6 +332,12 @@ export async function executeSurveyDeckCommand(
       return solveEchoSelectedText(ctx);
     case SURVEY_ECHO_COMMAND.SOLVE_CLIPBOARD:
       return solveEchoClipboard(ctx);
+    case SURVEY_ECHO_COMMAND.CONTINUOUS_SCREENSHOTS: {
+      if (isSurveyContinuousScreenshotRunning()) {
+        return stopSurveyContinuousScreenshot();
+      }
+      return startSurveyContinuousScreenshot(ctx);
+    }
     case SURVEY_MIRAGE_COMMAND.NEXT_ITEM: {
       const result = applyMirageQueueControl({ action: "next" }, "powerfist");
       return { ok: result.ok, message: result.message };

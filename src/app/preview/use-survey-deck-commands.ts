@@ -13,6 +13,12 @@ import {
   resolveSurveyEchoDeckContext,
 } from "@/lib/cyberdeck/survey-deck-command.client";
 import type { SurveyDeckCommandId } from "@/lib/cyberdeck/survey-deck-data";
+import { SURVEY_ECHO_COMMAND } from "@/lib/cyberdeck/survey-deck-data";
+import {
+  isSurveyContinuousScreenshotRunning,
+  startSurveyContinuousScreenshot,
+  stopSurveyContinuousScreenshot,
+} from "@/lib/cyberdeck/survey-continuous-screenshot.client";
 import type { PreviewDeckWithTarget } from "./preview-data";
 import { CARD_PUSH_RECEIPT_DURATION_MS, cardChatMessage } from "./preview-matrix-play";
 
@@ -25,6 +31,12 @@ type UseSurveyDeckCommandsOptions = {
   setComposerText: (text: string) => void;
   onDeckCommand?: (command: string) => Promise<{ ok: boolean; message: string }>;
   remoteSocketRef: RemoteSocketRef;
+};
+
+type SurveyDeckPushResult = {
+  ok: boolean;
+  message: string;
+  keepArmed?: boolean;
 };
 
 export function useSurveyDeckCommands({
@@ -55,12 +67,25 @@ export function useSurveyDeckCommands({
   }, []);
 
   const handlePushCard = useCallback(
-    async (deckIndex: number, cardIndex: number) => {
+    async (deckIndex: number, cardIndex: number): Promise<SurveyDeckPushResult> => {
       applyFocus(deckIndex, cardIndex);
       const deck = activeDecks[deckIndex];
       const card = deck.cards[cardIndex];
 
       if (card.surveyCommand) {
+        if (card.surveyCommand === SURVEY_ECHO_COMMAND.CONTINUOUS_SCREENSHOTS) {
+          const echoCtx = resolveSurveyEchoDeckContext();
+          const result = isSurveyContinuousScreenshotRunning()
+            ? { ...stopSurveyContinuousScreenshot(), keepArmed: false }
+            : await startSurveyContinuousScreenshot(echoCtx);
+          showPushReceipt(
+            result.ok
+              ? `<strong>${card.title}</strong> — ${result.message}`
+              : `<strong>${card.title}</strong> failed — ${result.message}`,
+          );
+          return result;
+        }
+
         const result = onDeckCommand
           ? await onDeckCommand(card.surveyCommand)
           : await executeSurveyDeckCommand(
@@ -72,14 +97,14 @@ export function useSurveyDeckCommands({
             ? `<strong>${card.title}</strong> — ${result.message}`
             : `<strong>${card.title}</strong> failed — ${result.message}`,
         );
-        return;
+        return result;
       }
 
       if (card.title === "Survey Capture") {
         const remote = remoteSocketRef.current;
         if (!remote) {
           setPushReceiptHtml("Survey Capture requires a paired PowerFist link to Mirage.");
-          return;
+          return { ok: false, message: "Survey Capture requires a paired PowerFist link to Mirage." };
         }
         const result = await remote.sendSurveyCaptureMission();
         showPushReceipt(
@@ -87,7 +112,7 @@ export function useSurveyDeckCommands({
             ? `Survey mission <strong>${result.missionId?.slice(0, 8) ?? "—"}…</strong> — Echo captures, Mirage solves.`
             : `Survey mission failed: ${result.error ?? "unknown error"}`,
         );
-        return;
+        return { ok: result.ok, message: result.error ?? "Survey mission failed." };
       }
 
       const deckTargetLabel = CYBERDECK_PANE_REGISTRY[deck.targetPane].label;
@@ -138,6 +163,7 @@ export function useSurveyDeckCommands({
           ? `Remote push <strong>${card.title}</strong> from <strong>${deck.name}</strong> to desktop Echo Mirage.`
           : `Pushed <strong>${card.title}</strong> from <strong>${deck.name}</strong> onto the Echo Mirage command stack against <strong>${deckTargetLabel}</strong>.`,
       );
+      return { ok: true, message: `Pushed ${card.title}.` };
     },
     [
       activeDecks,

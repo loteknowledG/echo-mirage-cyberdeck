@@ -9,7 +9,9 @@ import {
   formatDiagnosticLabel,
   formatMuthurStreamBody,
   groupMuthurChatTurns,
+  inhabitantChannelClass,
   isLongMuthurResponse,
+  resolveMuthurAssistantLabel,
   toolTraceToDiagnostic,
   type MuthurChatMessage,
 } from "@/lib/muthur-core/muthur-command-console";
@@ -19,6 +21,11 @@ import {
   type MuthurDiagnosticsState,
   type MuthurResponseStall,
 } from "@/lib/muthur-core/muthur-diagnostics-channel";
+import {
+  formatInhabitantChannelLabel,
+  normalizeMuthurInhabitant,
+  type MuthurInhabitant,
+} from "@/lib/muthur/muthur-inhabitant";
 import {
   getMuthurNotifyAsciiClass,
   getMuthurNotifyAsciiLine,
@@ -42,6 +49,7 @@ type MuthurCommandConsoleLogProps = {
   renderDiagnosticText?: (text: string) => ReactNode;
   cognitionStatusLine?: string | null;
   delegationPanel?: ReactNode;
+  streamInhabitant?: MuthurInhabitant;
 };
 
 function DiagnosticLine({
@@ -87,9 +95,12 @@ export function MuthurCommandConsoleLog({
   renderDiagnosticText,
   cognitionStatusLine,
   delegationPanel,
+  streamInhabitant = "muthur",
 }: MuthurCommandConsoleLogProps) {
   const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
   const turns = useMemo(() => groupMuthurChatTurns(messages), [messages]);
+  const streamLabel = formatInhabitantChannelLabel(normalizeMuthurInhabitant(streamInhabitant));
+  const streamLabelClass = inhabitantChannelClass(streamInhabitant);
   const diagnosticsPresentation = useMemo(
     () => presentMuthurDiagnostics(diagnosticsState),
     [diagnosticsState],
@@ -146,10 +157,13 @@ export function MuthurCommandConsoleLog({
               >
                 {isLongMuthurResponse(turn.assistant.text) ? (
                   <div className="sticky top-0 z-10 -mx-1 mb-1 border-b border-green-900/50 bg-black/95 px-1 py-0.5 text-[10px] text-green-400/90">
-                    MUTHUR response · {countMuthurWords(turn.assistant.text)} words
+                    {resolveMuthurAssistantLabel(turn.assistant)} response ·{" "}
+                    {countMuthurWords(turn.assistant.text)} words
                   </div>
                 ) : null}
-                <span className="text-green-400">[MUTHUR] </span>
+                <span className={inhabitantChannelClass(turn.assistant.inhabitant)}>
+                  [{resolveMuthurAssistantLabel(turn.assistant)}]{" "}
+                </span>
                 <span className="whitespace-pre-wrap text-gray-300">{turn.assistant.text}</span>
               </div>
             ) : null}
@@ -175,10 +189,10 @@ export function MuthurCommandConsoleLog({
           >
             {isLongMuthurResponse(streamBody) ? (
               <div className="sticky top-0 z-10 -mx-1 mb-1 border-b border-green-900/50 bg-black/95 px-1 py-0.5 text-[10px] text-green-400/90">
-                MUTHUR composing · {countMuthurWords(streamBody)} words
+                {streamLabel} composing · {countMuthurWords(streamBody)} words
               </div>
             ) : null}
-            <span className="text-green-400">[MUTHUR] </span>
+            <span className={streamLabelClass}>[{streamLabel}] </span>
             <span className="text-gray-300">
               {streamBody ? (
                 <span className="whitespace-pre-wrap">{streamBody}</span>

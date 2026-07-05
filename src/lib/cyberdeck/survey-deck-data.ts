@@ -8,6 +8,7 @@ export const SURVEY_ECHO_COMMAND = {
   COPY_SELECTED: "echo.copy-selected",
   SOLVE_SELECTED_TEXT: "echo.solve-selected-text",
   SOLVE_CLIPBOARD: "echo.solve-clipboard",
+  CONTINUOUS_SCREENSHOTS: "echo.continuous-screenshots",
 } as const;
 
 /** Echo HTTP action — read clipboard only (not a deck card). */
@@ -38,6 +39,14 @@ export const SURVEY_TRIFORCE_DECKS: PreviewDeckWithTarget[] = [
         purpose: "Capture the Echo Mac primary display and stage it on Mirage.",
         risk: "safe",
         surveyCommand: SURVEY_ECHO_COMMAND.SCREENSHOT,
+      },
+      {
+        type: "echo",
+        title: "Take Continuous Screenshots",
+        purpose:
+          "Burst capture on Echo — one shot immediately, then 3·2·1 countdown between each repeat until Stop.",
+        risk: "caution",
+        surveyCommand: SURVEY_ECHO_COMMAND.CONTINUOUS_SCREENSHOTS,
       },
       {
         type: "echo",

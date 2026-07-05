@@ -107,9 +107,7 @@ export function usePreviewMatrixCardPlay({
       if (mode === "push") {
         onArmedPanelPush?.(deckIndex, cardIndex);
         cancelCardHold();
-        setArmedCardKey(null);
         setComposerText("");
-        requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
         return;
       }
       cancelCardHold();

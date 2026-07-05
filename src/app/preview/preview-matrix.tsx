@@ -5,12 +5,13 @@ import { PowerfistRemoteLinkBanner } from "@/components/cyberdeck/powerfist-remo
 import { ALL_PREVIEW_DECKS, type PreviewDeckWithTarget } from "./preview-data";
 import { PreviewMatrixArmedPanel } from "./preview-matrix-armed-panel";
 import { PreviewMatrixDeckCarousel } from "./preview-matrix-deck-carousel";
+import { PowerfistJoystickControls } from "./powerfist-joystick-controls";
 import { CARD_PLAY_TRAIL_DURATION_MS } from "./preview-matrix-play";
 import { usePowerfistMatrixRemote } from "./use-powerfist-matrix-remote";
 import { usePreviewMatrixCarousels } from "./use-preview-matrix-carousels";
 import { usePreviewMatrixCardPlay } from "./use-preview-matrix-card-play";
 import { useSurveyDeckCommands } from "./use-survey-deck-commands";
-import { PowerfistJoystickControls } from "./powerfist-joystick-controls";
+import { stopSurveyContinuousScreenshot } from "@/lib/cyberdeck/survey-continuous-screenshot.client";
 import "./preview-matrix.css";
 
 export function PreviewMatrix({
@@ -79,7 +80,11 @@ export function PreviewMatrix({
   });
 
   handlePushCardRef.current = (deckIndex, cardIndex) => {
-    void handlePushCard(deckIndex, cardIndex);
+    void handlePushCard(deckIndex, cardIndex).then((result) => {
+      if (!result?.keepArmed) {
+        resetCardPlay();
+      }
+    });
   };
 
   return (
@@ -124,7 +129,10 @@ export function PreviewMatrix({
                   onArmedPanelPointerMove={handleArmedPanelPointerMove}
                   onComposerTextChange={setComposerText}
                   onPushCard={handlePushCard}
-                  onResetCardPlay={resetCardPlay}
+                  onResetCardPlay={() => {
+                    stopSurveyContinuousScreenshot();
+                    resetCardPlay();
+                  }}
                 />
               ) : null}
               {pushReceiptHtml ? (

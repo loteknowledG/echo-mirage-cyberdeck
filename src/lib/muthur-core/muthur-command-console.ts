@@ -1,9 +1,15 @@
 import { formatMuthurLiveStreamDisplay } from "@/lib/muthur-core/muthur-stream-payload";
+import {
+  formatInhabitantChannelLabel,
+  normalizeMuthurInhabitant,
+  type MuthurInhabitant,
+} from "@/lib/muthur/muthur-inhabitant";
 
 export type MuthurChatMessage = {
   role: string;
   text: string;
   toolTrace?: string;
+  inhabitant?: MuthurInhabitant;
 };
 
 export type MuthurChatTurn = {
@@ -24,6 +30,26 @@ export function isMuthurChannelMessage(message: MuthurChatMessage): boolean {
 
 export function isDiagnosticMessage(message: MuthurChatMessage): boolean {
   return !isMuthurChannelMessage(message);
+}
+
+export function resolveMuthurAssistantLabel(message: MuthurChatMessage): string {
+  return formatInhabitantChannelLabel(normalizeMuthurInhabitant(message.inhabitant ?? "muthur"));
+}
+
+export function inhabitantChannelClass(inhabitant?: MuthurInhabitant | null): string {
+  const resolved = normalizeMuthurInhabitant(inhabitant ?? "muthur");
+  switch (resolved) {
+    case "codex":
+      return "text-amber-300";
+    case "pi":
+      return "text-cyan-300";
+    case "muthur":
+      return "text-green-400";
+    default: {
+      const _exhaustive: never = resolved;
+      return _exhaustive;
+    }
+  }
 }
 
 export function formatDiagnosticLabel(text: string): string {

@@ -30,6 +30,31 @@ const { initializeAutoUpdater } = require('./auto-updater');
 
 initializeSilentMode({ app, Tray, Menu, nativeImage });
 
+function safeProcessWrite(stream, text) {
+  try {
+    if (stream.writable && !stream.destroyed) {
+      stream.write(text);
+    }
+  } catch (error) {
+    if (error && typeof error === 'object' && error.code === 'EPIPE') return;
+    throw error;
+  }
+}
+
+function logEchoMirageErr(text) {
+  safeProcessWrite(process.stderr, text.endsWith('\n') ? text : `${text}\n`);
+}
+
+function logEchoMirageOut(text) {
+  safeProcessWrite(process.stdout, text.endsWith('\n') ? text : `${text}\n`);
+}
+
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on('error', (error) => {
+    if (error && error.code === 'EPIPE') return;
+  });
+}
+
 const DESKTOP_PROTOCOL = 'echomirage';
 /** @type {string | null} */
 let pendingProtocolPath = null;
@@ -70,7 +95,7 @@ async function navigateMainWindowToPath(deepPath) {
     await win.loadURL(`${origin}${deepPath}`);
     showMainWindow();
   } catch (error) {
-    process.stderr.write(`[echo-mirage] protocol navigation failed: ${error}\n`);
+    logEchoMirageErr(`[echo-mirage] protocol navigation failed: ${error}`);
   }
 }
 
@@ -207,8 +232,8 @@ async function loadUrlWithRetry(win, url, attempts = 8) {
       if (!refused || attempt >= attempts) {
         throw error;
       }
-      process.stderr.write(
-        `[echo-mirage] load retry ${attempt}/${attempts} for ${url} (${message})\n`,
+      logEchoMirageErr(
+        `[echo-mirage] load retry ${attempt}/${attempts} for ${url} (${message})`,
       );
       await new Promise((resolve) => setTimeout(resolve, 1_500 * attempt));
     }
@@ -616,8 +641,8 @@ function createCyberdeckBrowserWindow(options = {}) {
 
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
     if (validatedURL.startsWith('data:')) return;
-    process.stderr.write(
-      `[echo-mirage] did-fail-load code=${errorCode} url=${validatedURL} ${errorDescription}\n`,
+    logEchoMirageErr(
+      `[echo-mirage] did-fail-load code=${errorCode} url=${validatedURL} ${errorDescription}`,
     );
   });
 
@@ -634,10 +659,10 @@ async function createEmpSquadPowerfistWindow(origin) {
   try {
     await loadUrlWithRetry(win, `${origin}${launchPath}`);
     win.show();
-    process.stdout.write(`[echo-mirage] EMP PowerFist window ready (${launchPath})\n`);
+    logEchoMirageOut(`[echo-mirage] EMP PowerFist window ready (${launchPath})`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`[echo-mirage:powerfist] startup error: ${message}\n`);
+    logEchoMirageErr(`[echo-mirage:powerfist] startup error: ${message}`);
     await loadStartupErrorPage(win, message);
     win.show();
   }
@@ -668,7 +693,7 @@ async function createWindow() {
     await createEmpSquadPowerfistWindow(origin);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`[echo-mirage] startup error: ${message}\n`);
+    logEchoMirageErr(`[echo-mirage] startup error: ${message}`);
     await loadStartupErrorPage(win, message);
     if (app.isPackaged) {
       dialog.showErrorBox('Echo Mirage Cyberdeck', message.slice(0, 2000));

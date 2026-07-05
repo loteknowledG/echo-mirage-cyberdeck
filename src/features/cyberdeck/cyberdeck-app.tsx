@@ -219,6 +219,7 @@ import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shel
 import { MuthurCommanderStatus } from "@/components/cyberdeck/muthur-commander-status";
 import { MuthurDelegationPanel } from "@/components/cyberdeck/muthur-delegation-panel";
 import { MuthurPostureRoller } from "@/components/cyberdeck/muthur-posture-roller";
+import { MuthurInhabitantRoller } from "@/components/cyberdeck/muthur-inhabitant-roller";
 import {
   formatDelegationCancelledLine,
   formatDelegationDispatchedLine,
@@ -288,6 +289,16 @@ import {
   shouldAutoCommitOperatorEdits,
   type MuthurPosture,
 } from "@/lib/muthur/muthur-posture";
+import {
+  formatInhabitantChannelLabel,
+  formatMuthurInhabitantChangedLine,
+  getMuthurInhabitantMeta,
+  loadMuthurInhabitant,
+  normalizeMuthurInhabitant,
+  saveMuthurInhabitant,
+  type MuthurInhabitant,
+} from "@/lib/muthur/muthur-inhabitant";
+import { sendMuthurInhabitantMessage } from "@/lib/muthur/muthur-inhabitant-chat.client";
 import {
   createMuthurMission,
   loadMuthurMission,
@@ -1165,7 +1176,7 @@ function parseCustomTabCommand(input: string) {
 }
 
 export default function CyberdeckApp() {
-  type ChatMessage = { role: string; text: string; toolTrace?: string };
+  type ChatMessage = { role: string; text: string; toolTrace?: string; inhabitant?: MuthurInhabitant };
   // Start on the operator tab; disconnected users are redirected to MAINNET-UPLINK after hydration.
   // Tab rail + pane visibility: zustand store (page must not subscribe).
   useEffect(() => {
@@ -1205,6 +1216,9 @@ export default function CyberdeckApp() {
   const [streamToolTrace, setStreamToolTrace] = useState("");
   const [chatPinnedToBottom, setChatPinnedToBottom] = useState(true);
   const [muthurPosture, setMuthurPosture] = useState<MuthurPosture>(() => loadMuthurPosture());
+  const [muthurInhabitant, setMuthurInhabitant] = useState<MuthurInhabitant>(() =>
+    loadMuthurInhabitant(),
+  );
   const [muthurMission, setMuthurMission] = useState<MuthurMission | null>(() => loadMuthurMission());
   const [muthurDelegations, setMuthurDelegations] = useState<MuthurDelegationAssignment[]>(() =>
     loadMuthurDelegations(),
@@ -1790,6 +1804,19 @@ export default function CyberdeckApp() {
       setMuthurPosture(resolved);
     },
     [appendMuthurCognitionStatus, archiveMuthurHistoryLine, emitMuthurCognition, muthurMission, muthurPosture],
+  );
+
+  const handleMuthurInhabitantChange = useCallback(
+    (next: MuthurInhabitant) => {
+      const resolved = normalizeMuthurInhabitant(next);
+      if (resolved === muthurInhabitant) return;
+      setMessages((prev) => [
+        ...prev,
+        { role: "system", text: formatMuthurInhabitantChangedLine(muthurInhabitant, resolved) },
+      ]);
+      setMuthurInhabitant(resolved);
+    },
+    [muthurInhabitant],
   );
 
   const handleCreateMuthurMission = useCallback(
@@ -2516,6 +2543,10 @@ export default function CyberdeckApp() {
   }, [muthurPosture, piControlLeaseRefresh, piControlLeaseRetake]);
 
   useEffect(() => {
+    saveMuthurInhabitant(muthurInhabitant);
+  }, [muthurInhabitant]);
+
+  useEffect(() => {
     const onRequestEditMode = () => setOperatorDocMode("edit");
     window.addEventListener("echo-mirage-operator-request-edit-mode", onRequestEditMode);
     return () => {
@@ -2869,7 +2900,9 @@ export default function CyberdeckApp() {
             message.role === "user"
               ? chatUserDisplayName
               : message.role === "assistant"
-                ? "MUTHUR"
+                ? message.inhabitant
+                  ? formatInhabitantChannelLabel(message.inhabitant)
+                  : "MUTHUR"
                 : message.role === "system"
                   ? "SYS"
                   : "ERR",
@@ -5413,6 +5446,66 @@ export default function CyberdeckApp() {
         if (pending) {
           void handleSend(pending.userMessage, pending.options, { skipAppendUser: true });
         }
+      }
+      return;
+    }
+
+    if (muthurInhabitant !== "muthur") {
+      setIsStreaming(true);
+      composeStartedAtRef.current = Date.now();
+      setStreamText("");
+      setStreamToolTrace("");
+      setMuthurStall(null);
+      setMuthurResponseFailed(false);
+
+      const abortCtl = new AbortController();
+      chatAbortRef.current = abortCtl;
+
+      try {
+        const result = await sendMuthurInhabitantMessage({
+          inhabitant: muthurInhabitant,
+          userMessage,
+          messages,
+          signal: abortCtl.signal,
+          onStream: setStreamText,
+        });
+
+        if (!result.ok) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "error",
+              text: `${formatInhabitantChannelLabel(muthurInhabitant)} // FAILED // ${result.error}`,
+            },
+          ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              text: result.text,
+              inhabitant: muthurInhabitant,
+            },
+          ]);
+        }
+      } catch (err) {
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "error",
+              text: `${formatInhabitantChannelLabel(muthurInhabitant)} // FAILED // ${msg.slice(0, 200)}`,
+            },
+          ]);
+        }
+      } finally {
+        chatAbortRef.current = null;
+        setStreamText("");
+        setStreamToolTrace("");
+        setIsStreaming(false);
+        composeStartedAtRef.current = null;
+        setMuthurStall(null);
       }
       return;
     }
@@ -8240,6 +8333,7 @@ ${diff}`;
                 chatKeyboardHighlightIndex={chatKeyboardHighlightIndex}
                 renderDiagnosticText={renderGatewayMessageText}
                 cognitionStatusLine={muthurCognitionStatusLine}
+                streamInhabitant={muthurInhabitant}
                 delegationPanel={
                   muthurPosture === "commander" ? (
                     <MuthurDelegationPanel
@@ -8266,7 +8360,7 @@ ${diff}`;
                     <MuthurCommandInput
                       ref={messageInputRef}
                       inputHistory={inputHistory}
-                      hasProviderAuth={hasProviderAuth}
+                      hasProviderAuth={muthurInhabitant === "muthur" ? hasProviderAuth : true}
                       glyphModeActive={glyphModeActive}
                       isStreaming={isStreaming}
                       chatHydrated={chatHydrated}
@@ -8282,21 +8376,40 @@ ${diff}`;
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleModelLabelClick("s")}
+                    onClick={() => {
+                      if (muthurInhabitant === "muthur") {
+                        handleModelLabelClick("s");
+                      }
+                    }}
                     className={`min-w-0 shrink truncate text-[10px] font-mono ${
-                      connectionState === "connected"
-                        ? "text-green-300"
-                        : connectionState === "connecting"
-                          ? "text-amber-300"
-                          : "text-gray-500"
-                    } cursor-pointer hover:underline`}
-                    title="Open provider connection panel"
+                      muthurInhabitant !== "muthur"
+                        ? "text-amber-200"
+                        : connectionState === "connected"
+                          ? "text-green-300"
+                          : connectionState === "connecting"
+                            ? "text-amber-300"
+                            : "text-gray-500"
+                    } ${muthurInhabitant === "muthur" ? "cursor-pointer hover:underline" : "cursor-default"}`}
+                    title={
+                      muthurInhabitant === "muthur"
+                        ? "Open provider connection panel"
+                        : getMuthurInhabitantMeta(muthurInhabitant).title
+                    }
                   >
-                    {modelID ? modelID.split("/").pop() : "NO_MODEL"}
+                    {muthurInhabitant === "muthur"
+                      ? modelID
+                        ? modelID.split("/").pop()
+                        : "NO_MODEL"
+                      : getMuthurInhabitantMeta(muthurInhabitant).label.toUpperCase()}
                   </button>
+                  <MuthurInhabitantRoller
+                    inhabitant={muthurInhabitant}
+                    disabled={isStreaming}
+                    onChange={handleMuthurInhabitantChange}
+                  />
                   <MuthurPostureRoller
                     posture={muthurPosture}
-                    disabled={false}
+                    disabled={muthurInhabitant !== "muthur" || isStreaming}
                     onChange={handleMuthurPostureChange}
                   />
                   </div>
