@@ -2,10 +2,10 @@ export const MUTHUR_PRESET = Object.freeze(
 {
   backend: {
     language: "en-US",
-    voiceType: "MichelleNeural",
+    voiceType: "JennyNeural",
     gender: "Female",
-    ratePercent: -28,
-    pitchHz: -10,
+    ratePercent: -9,
+    pitchHz: -4,
   },
   playback: {
     highpassHz: 260,

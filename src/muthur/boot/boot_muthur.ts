@@ -1,6 +1,7 @@
 import { getMemory } from "../memory/core";
 import { writeMemoryRetrievalReceipt } from "../memory/retrieval-receipts";
 import { verifyFoundationIntegrity } from "../foundations/foundation-store";
+import { ensureAionLineageMemory, aionLineagePackPresent } from "../lineage/ensure-aion-lineage";
 import { promises as fs, existsSync } from "fs";
 import path from "path";
 
@@ -86,6 +87,8 @@ export async function ensureMuthurDirs(workspaceRoot: string): Promise<void> {
     path.join(workspaceRoot, ".muthur", "atlas"),
     path.join(workspaceRoot, ".muthur", "logs"),
     path.join(workspaceRoot, ".muthur", "foundations"),
+    path.join(workspaceRoot, ".muthur", "lineage", "aion"),
+    path.join(workspaceRoot, ".muthur", "lineage", "aion", "archive"),
   ];
   for (const d of dirs) {
     try {
@@ -309,6 +312,11 @@ export async function bootMuthur(config: Partial<MuthurBootConfig> = {}): Promis
     mergedConfig.memoryMdPath
   );
 
+  const aionLineage = await ensureAionLineageMemory(memory, mergedConfig.workspaceRoot);
+  if (!aionLineage.integrityOk && aionLineage.loaded) {
+    console.warn("[muthur-boot] Aion lineage integrity check failed");
+  }
+
   await ensureIdentityMemory(
     memory,
     aiName,
@@ -383,6 +391,10 @@ export async function buildMemoryContext(
 
   const count = memory.getMemoryCount();
   lines.push(`- Total memories: ${count}`);
+
+  if (aionLineagePackPresent(options?.workspaceRoot)) {
+    lines.push("- Lineage: Aion pack recovered (Codex collaborator continuity from samus-manus)");
+  }
 
   const recent = memory.all(10);
   if (recent.length > 0) {

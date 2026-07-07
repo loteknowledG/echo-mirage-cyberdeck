@@ -22,6 +22,19 @@ import {
   presentMuthurDiagnostics,
   shouldFireMuthurComposeWatchdog,
 } from "../src/lib/muthur-core/muthur-diagnostics-channel";
+import {
+  extractMuthurStreamReasoning,
+  formatMuthurReasoningDiagnostic,
+  MUTHUR_REASONING_STREAM_SENTINEL,
+} from "../src/lib/muthur-core/muthur-stream-reasoning";
+import {
+  isMuthurUplinkProgressOnly,
+  parseMuthurUplinkProgressPhase,
+} from "../src/lib/muthur-core/muthur-progress-phase";
+import {
+  buildMuthurSelfModifyPrompt,
+  isMuthurSelfModifyIntent,
+} from "../src/lib/muthur/muthur-self-modify-intent";
 import { formatMuthurLiveStreamDisplay } from "../src/lib/muthur-core/muthur-stream-payload";
 
 function longText(words: number): string {
@@ -205,6 +218,37 @@ function testStreamFormatting(): void {
   console.log("  ok stream body formatting");
 }
 
+function testReasoningStream(): void {
+  const mixed = `⏳ MUTHUR // thinking...\n${MUTHUR_REASONING_STREAM_SENTINEL}Plan mkdir.⟦/R⟧${MUTHUR_REASONING_STREAM_SENTINEL}Then write.⟦/R⟧\n\nHello operator.`;
+  const extracted = extractMuthurStreamReasoning(mixed);
+  assert.equal(extracted.reasoning, "Plan mkdir.Then write.");
+  assert.match(extracted.body, /Hello operator/);
+  assert.equal(formatMuthurLiveStreamDisplay(mixed), "Hello operator.");
+  assert.match(formatMuthurReasoningDiagnostic(extracted.reasoning), /^\[REASONING\]/);
+  console.log("  ok T10 reasoning stream");
+}
+
+function testSelfModifyIntent(): void {
+  assert.ok(isMuthurSelfModifyIntent("make it so I can ask muthur to change its own code"));
+  assert.ok(isMuthurSelfModifyIntent("edit your source in src/lib/muthur-core"));
+  assert.ok(!isMuthurSelfModifyIntent("hello muthur"));
+  assert.match(buildMuthurSelfModifyPrompt("agent", "F:/dev/echo-mirage-cyberdeck"), /SELF-MODIFY/);
+  console.log("  ok T11 self-modify intent");
+}
+
+function testUplinkProgressPhase(): void {
+  const composing = "⏳ MUTHUR // composing final reply...";
+  const phase = parseMuthurUplinkProgressPhase(composing);
+  assert.equal(phase.kind, "transmit");
+  assert.equal(phase.title, "TRANSMITTING");
+  assert.ok(isMuthurUplinkProgressOnly(composing, ""), "T9: progress-only before body");
+  assert.ok(
+    !isMuthurUplinkProgressOnly(`${composing}\n\nHello`, "Hello"),
+    "T9: not progress-only once body arrives",
+  );
+  console.log("  ok T9 uplink progress phase");
+}
+
 async function main(): Promise<void> {
   console.log("probe:muthur-command-console");
   testLongResponseReadable();
@@ -214,6 +258,9 @@ async function main(): Promise<void> {
   testRendererErrorIsolation();
   testCompletionPhase();
   testStreamFormatting();
+  testReasoningStream();
+  testSelfModifyIntent();
+  testUplinkProgressPhase();
   testDiagnosticsFloodDoesNotBlockAssistantCommit();
   testFailedToolWhileComposing();
   testComposeWatchdog();

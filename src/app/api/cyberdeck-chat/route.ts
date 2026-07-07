@@ -37,6 +37,11 @@ import {
 } from "@/lib/muthur/muthur-posture";
 import { buildMuthurPiControlDoctrine } from "@/lib/muthur/control/muthur-control-doctrine";
 import { buildOperatorDevWriteScopePrompt, resolveLocalFsWriteMode, resolveOperatorDevWriteRoot } from "@/lib/muthur/execution/localfs-write-scope.server";
+import {
+  buildMuthurSelfModifyPrompt,
+  isMuthurSelfModifyIntent,
+} from "@/lib/muthur/muthur-self-modify-intent";
+import { WORKSPACE_ROOT } from "@/lib/muthur/execution/safety-policy";
 import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
 import { isCalyxMuthurToolsEnabled } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
 import { buildSamusHandsEyesDoctrine } from "@/lib/samus-manus/hands-eyes-doctrine";
@@ -99,6 +104,7 @@ function buildMuthurAvailableToolsPrompt(posture: MuthurPosture): string {
     "\n2. git_status or git_diff to review changes." +
     "\n3. After file touches, MUTHUR auto-runs `git diff --stat` + `pnpm exec tsc --noEmit` and writes a receipt under `.muthur/receipts/coding/` — report PASS/FAIL from that receipt." +
     "\n4. You may still call workspace_exec for extra checks (lint, build) when asked." +
+    "\n5. ECHO MIRAGE SELF-MODIFY: When the operator asks you to change this deck, your own code, or the Echo Mirage repo, that is authorized — use localfs on the workspace; do not refuse because the target is MUTHUR itself." +
     "\n\nIMPORTANT: When the user asks what is currently visible in the operator pane, call observe_operator_pane." +
     "\nWhen the user says open/read/show/view a specific file (e.g. L-ARCH-001.md), resolve that file — call open_operator_file with the path and localfs cat to read it. Do NOT call observe_operator_pane for document open commands." +
     "\nWhen they ask to edit a file and Monaco is not active, call open_operator_file with the path, then suggest_operator_edit (prefer replace_line_range for targeted edits). Edits apply immediately — confirm what changed; mention Ctrl+Z if they want to undo." +
@@ -287,6 +293,9 @@ function buildMuthurSystemContent(args: {
 
   systemContent += MUTHUR_COGNITION_DOCTRINE;
   systemContent += buildOperatorDevWriteScopePrompt(args.posture);
+  if (isMuthurSelfModifyIntent(args.message)) {
+    systemContent += buildMuthurSelfModifyPrompt(args.posture, WORKSPACE_ROOT);
+  }
   if (toolsEnabled) {
     systemContent += buildSamusHandsEyesDoctrine(
       args.posture === "agent" && isSamusHandsEyesEnabled(),

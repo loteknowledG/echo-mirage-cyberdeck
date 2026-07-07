@@ -16,6 +16,7 @@ import { selectMuthurFallbackVoice } from "@/voice/speakMuthur";
 import { MUTHUR_PRESET } from "@/voice/muthurPreset";
 import {
   buildMuthurVoiceMasterCopy,
+  buildMuthurVoiceTuning,
   getInitialMuthurVoiceDials,
   muthurBrowserSpeechTuning,
   muthurMasterGain,
@@ -40,6 +41,7 @@ import {
   normalizeOperatorBrowserUrl,
   parseBrowserCommand,
 } from "@/lib/browser-intents";
+import { isMuthurSelfModifyIntent } from "@/lib/muthur/muthur-self-modify-intent";
 import { useBrowserController } from "@/lib/use-browser-controller";
 import { CyberdeckCustomTabBrowserSync } from "@/components/cyberdeck/cyberdeck-custom-tab-browser-sync";
 import { CyberdeckWebTabFrame } from "@/components/cyberdeck/cyberdeck-web-tab-frame";
@@ -110,6 +112,10 @@ import {
   extractMuthurProgressStatus,
   toolTraceToDiagnostic,
 } from "@/lib/muthur-core/muthur-command-console";
+import {
+  extractMuthurStreamReasoning,
+  formatMuthurReasoningDiagnostic,
+} from "@/lib/muthur-core/muthur-stream-reasoning";
 import { useMuthurChatAutoScroll } from "@/lib/muthur-core/use-muthur-chat-auto-scroll";
 import { partitionMuthurChannelUpdate } from "@/lib/muthur-core/muthur-response-channel";
 import { CADRE_MUTHUR_ARCHIVE_EVENT } from "@/lib/cadre/cadre-event-bus";
@@ -386,6 +392,7 @@ import {
   parseMuthurHelpIntent,
 } from "@/lib/muthur-help-text";
 import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
+import { parseAionQuery } from "@/lib/muthur-aion-intent";
 import { parseMemoryAtlasQuery } from "@/lib/memory-atlas/memory-atlas-query";
 import { parseEntityAtlasQuery } from "@/lib/entity-atlas/entity-atlas-query";
 import { parseDocumentOpenIntent } from "@/lib/muthur-document-open-intent";
@@ -2155,6 +2162,10 @@ export default function CyberdeckApp() {
 
     if (isAudio) {
       lastVoiceErrorRef.current = "";
+      const voiceType = res.headers.get("x-muthur-voice-type");
+      if (voiceType) {
+        console.info("[muthur] voice backend", voiceType, res.headers.get("x-muthur-voice-source"));
+      }
       return { kind: "audio" as const, audio: await res.arrayBuffer() };
     }
 
@@ -2271,7 +2282,7 @@ export default function CyberdeckApp() {
     }
 
     try {
-      const result = await synthesizeMirageChunk(text, currentVoiceDial);
+      const result = await synthesizeMirageChunk(text, buildMuthurVoiceTuning(currentVoiceDial));
       if (speakId !== speakSequenceRef.current) return false;
       if (result.kind === "audio") {
         setVoiceHealth("backend");
@@ -2280,6 +2291,10 @@ export default function CyberdeckApp() {
         return true;
       }
       setVoiceHealth("fallback");
+      console.warn(
+        "[muthur] coderobo unavailable — browser fallback",
+        buildMuthurVoiceTuning(currentVoiceDial),
+      );
     } catch {
       /* fall through */
     }
@@ -4354,6 +4369,11 @@ export default function CyberdeckApp() {
     muthurCognitionStatusLine,
   ]);
 
+  const muthurStreamReasoning = useMemo(
+    () => extractMuthurStreamReasoning(streamText).reasoning,
+    [streamText],
+  );
+
   const { handleScroll: handleMuthurChatScroll, pinToBottom: pinMuthurChatToBottom } =
     useMuthurChatAutoScroll({
       scrollKey: muthurChatScrollKey,
@@ -5717,6 +5737,46 @@ export default function CyberdeckApp() {
       return;
     }
 
+    const aionIntent = parseAionQuery(userMessage);
+    if (aionIntent) {
+      try {
+        const res = await fetch("/api/muthur/aion-query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: userMessage }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(payload?.error || `Aion query failed (${res.status})`);
+        }
+        const payload = (await res.json()) as {
+          handled?: boolean;
+          response?: string;
+        };
+        if (payload.handled && payload.response) {
+          setMessages((prev) => [...prev, { role: "assistant", text: payload.response! }]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              text: "AION_LINEAGE // UNHANDLED // intent not recognized by server",
+            },
+          ]);
+        }
+      } catch (err) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: `AION_LINEAGE // ERROR // ${err instanceof Error ? err.message : "retrieval failed"}`,
+          },
+        ]);
+      }
+      setIsStreaming(false);
+      return;
+    }
+
     const foundationIntent = parseFoundationQuery(userMessage);
     if (foundationIntent) {
       try {
@@ -6205,6 +6265,10 @@ ${diff}`;
       messageForApi = `${messageForApi}\n\n[System: Local filesystem path referenced — use localfs ls/cat/stat on that path. Do not open the web browser.]`;
     }
 
+    if (isMuthurSelfModifyIntent(messageForApi) && muthurPosture === "plan") {
+      messageForApi = `${messageForApi}\n\n[System: Operator wants Echo Mirage / MUTHUR source edits. Plan posture is read-only — outline the change and remind them to switch to Agent (USE) to apply localfs write patches.]`;
+    }
+
     let uplinkTimedOut = false;
     try {
       const abortCtl = new AbortController();
@@ -6394,6 +6458,13 @@ ${diff}`;
       if (toolsTrace) {
         setMuthurDiagnostics((current) =>
           appendMuthurDiagnosticBatch(current, [toolTraceToDiagnostic(toolsTrace).text]),
+        );
+      }
+
+      const reasoningTrace = extractMuthurStreamReasoning(fullText).reasoning;
+      if (reasoningTrace) {
+        setMuthurDiagnostics((current) =>
+          appendMuthurDiagnosticEntry(current, formatMuthurReasoningDiagnostic(reasoningTrace)),
         );
       }
 
@@ -8302,12 +8373,13 @@ ${diff}`;
             <div
               ref={messageScrollRef}
               tabIndex={-1}
-              className="cyberdeck-chat-content custom-scrollbar flex min-h-0 flex-1 basis-0 flex-col overflow-y-auto p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
+              data-cyberdeck-scroll-y-only
+              className="cyberdeck-chat-content custom-scrollbar flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-y-auto overflow-x-hidden p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
               onScroll={(event) => {
                 handleMuthurChatScroll(event.currentTarget);
               }}
             >
-              <div ref={muthurChatScrollContentRef} className="min-h-0">
+              <div ref={muthurChatScrollContentRef} className="cyberdeck-chat-scroll-body min-h-0 min-w-0 max-w-full pb-6">
               {isMobileLayout ? (
                 <div className="mb-2">
                   <EchoHeader />
@@ -8326,6 +8398,7 @@ ${diff}`;
                 diagnosticsState={muthurDiagnostics}
                 streamText={streamText}
                 streamToolTrace={streamToolTrace}
+                streamReasoning={muthurStreamReasoning}
                 isStreaming={isStreaming}
                 responseStall={muthurStall}
                 chatUserDisplayName={chatUserDisplayName}

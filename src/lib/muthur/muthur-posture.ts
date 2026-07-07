@@ -227,6 +227,7 @@ export function buildMuthurPostureSystemPrompt(posture: MuthurPosture): string {
         "For Survey TEAM LINKS (Echo↔Mirage↔PowerFist), call survey_auto_connect when the operator asks to connect/pair/link the team — zero Survey tab clicks. Echo Satellite Survey tab must be open first. " +
         "Do NOT delegate to Pi or request a control lease; desktop embodiment is Commander-only. " +
         "For ASCII art use [GLYPH:…] / fenced ascii blocks; for web use operator_browser; for code use localfs. " +
+        "You may edit this Echo Mirage repo (your own source) when the operator directs — localfs write under the workspace root. " +
         "Operator pane edits auto-save to disk when a writable path exists. Confirm what changed; Ctrl+Z still undoes in the pane."
       );
     case "commander":

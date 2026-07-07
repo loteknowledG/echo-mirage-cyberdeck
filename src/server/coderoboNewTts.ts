@@ -114,10 +114,10 @@ export async function renderCoderoboNewTts(
   const token = getToken();
   const text = normalizeText(input.text);
   const language = normalizeText(input.language || "en-US");
-  const voiceType = normalizeText(input.voiceType || "MichelleNeural");
+  const voiceType = normalizeText(input.voiceType || "JennyNeural");
   const gender = input.gender || "Female";
-  const ratePercent = toIntegerString(input.ratePercent, -28);
-  const pitchHz = toIntegerString(input.pitchHz, -10);
+  const ratePercent = toIntegerString(input.ratePercent, -9);
+  const pitchHz = toIntegerString(input.pitchHz, -4);
   const userIp = getUserIp();
 
   const requestUrl = resolveUrl(baseUrl, endpoint);
@@ -170,6 +170,7 @@ export async function renderCoderoboNewTts(
   formData.append("text", text);
   formData.append("language", language);
   formData.append("voice", voiceType);
+  formData.append("gender", gender);
   formData.append("rate", ratePercent);
   formData.append("pitch", pitchHz);
   formData.append("user_ip", userIp);

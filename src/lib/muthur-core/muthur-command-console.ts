@@ -64,6 +64,7 @@ export function formatDiagnosticLabel(text: string): string {
     return "SYS";
   }
   if (/^\[TOOLS\]/i.test(trimmed) || /MUTHUR_TOOLS|tool/i.test(trimmed)) return "TOOLS";
+  if (/^\[REASONING\]/i.test(trimmed)) return "REASONING";
   if (/^\[COGNITION/i.test(trimmed)) return "COGNITION";
   if (/fail|error|invalid|rejected/i.test(trimmed)) return "ERR";
   if (DIAGNOSTIC_PREFIX_RE.test(trimmed)) {
@@ -123,6 +124,12 @@ export function groupMuthurChatTurns(messages: MuthurChatMessage[]): MuthurChatT
 
 export function collectAllDiagnostics(turns: MuthurChatTurn[]): MuthurChatMessage[] {
   return turns.flatMap((turn) => turn.diagnostics);
+}
+
+export function collectMuthurToolHistory(turns: MuthurChatTurn[]): MuthurChatMessage[] {
+  return collectAllDiagnostics(turns).filter(
+    (message) => formatDiagnosticLabel(message.text) === "TOOLS",
+  );
 }
 
 /** Scroll when MUTHUR response body changes — not when diagnostics append afterward. */

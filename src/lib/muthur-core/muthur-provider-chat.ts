@@ -5,6 +5,7 @@ import { executeMuthurChatTool } from "@/lib/muthur-core/execute-openai-tool";
 import { getMuthurOpenAiToolsForPosture } from "@/lib/muthur-core/openai-tool-definitions";
 import type { MuthurPosture, MuthurPostureToolContext } from "@/lib/muthur/muthur-posture";
 import { appendMuthurStreamFooters } from "@/lib/muthur-core/muthur-stream-payload";
+import { appendMuthurReasoningStreamDelta } from "@/lib/muthur-core/muthur-stream-reasoning";
 import { formatPiControlLeaseStreamMarker } from "@/lib/muthur/control/pi-control-lease-stream";
 import { isPiControlLeaseGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating";
 import {
@@ -13,7 +14,7 @@ import {
   stripInlineToolMarkup,
 } from "@/lib/muthur-core/parse-inline-tool-calls";
 import { streamOpenAiCompatibleResponse } from "@/lib/muthur-core/stream-openai-response";
-import { extractOpenAiMessageText } from "@/lib/muthur-core/extract-openai-message-text";
+import { extractOpenAiMessageText, extractOpenAiAssistantVisibleContent, extractOpenAiMessageReasoning } from "@/lib/muthur-core/extract-openai-message-text";
 import { maybeFinalizeCodingVerify } from "@/lib/muthur-core/coding-verify.server";
 import {
   createMuthurToolExecutionContext,
@@ -36,6 +37,8 @@ type CompletionMessage = {
   role?: string;
   content?: string | null;
   tool_calls?: OpenAiToolCall[];
+  reasoning_content?: string | null;
+  reasoning?: string | null;
 };
 
 type JsonMessage = Record<string, unknown>;
@@ -299,8 +302,14 @@ export async function muthurChatWithModelTools(options: {
         return;
       }
 
+      const reasoningContent = extractOpenAiMessageReasoning(msg);
+      if (reasoningContent) {
+        write(appendMuthurReasoningStreamDelta(reasoningContent));
+      }
+
       let toolCalls = msg.tool_calls;
-      const rawContent = extractOpenAiMessageText(msg);
+      const rawContent =
+        extractOpenAiAssistantVisibleContent(msg) || extractOpenAiMessageText(msg);
       if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
         const inlineCalls = parseInlineToolCalls(rawContent);
         if (inlineCalls.length > 0) {

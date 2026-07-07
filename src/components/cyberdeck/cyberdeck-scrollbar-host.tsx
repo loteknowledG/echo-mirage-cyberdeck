@@ -43,7 +43,11 @@ export function CyberdeckScrollbarHost() {
         el.style.position = "relative";
       }
 
-      const ps = new PerfectScrollbar(el, CYBERDECK_PERFECT_SCROLLBAR_OPTIONS);
+      const yOnly = el.hasAttribute("data-cyberdeck-scroll-y-only");
+      const ps = new PerfectScrollbar(el, {
+        ...CYBERDECK_PERFECT_SCROLLBAR_OPTIONS,
+        suppressScrollX: yOnly || CYBERDECK_PERFECT_SCROLLBAR_OPTIONS.suppressScrollX,
+      });
       el.setAttribute(CYBERDECK_PS_ATTR, "1");
       instances.set(el, ps);
 

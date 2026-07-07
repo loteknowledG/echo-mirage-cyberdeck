@@ -14,6 +14,10 @@ import {
   shouldEnableToolsForPosture,
   type MuthurPosture,
 } from "../src/lib/muthur/muthur-posture";
+import {
+  buildMuthurSelfModifyPrompt,
+  isMuthurSelfModifyIntent,
+} from "../src/lib/muthur/muthur-self-modify-intent";
 
 const POSTURES: MuthurPosture[] = ["plan", "agent", "commander"];
 
@@ -109,6 +113,12 @@ async function main() {
 
   const commanderGitBlocked = await executeMuthurChatTool(registry, "git_status", "{}", commanderCtx);
   assert.match(commanderGitBlocked, /\[TOOL BLOCKED\] git_status/);
+
+  assert.ok(isMuthurSelfModifyIntent("make it so I can ask muthur to change its own code"));
+  assert.ok(isMuthurSelfModifyIntent("edit your source in src/lib/muthur-core"));
+  assert.ok(!isMuthurSelfModifyIntent("hello muthur"));
+  assert.match(buildMuthurSelfModifyPrompt("agent", "/workspace"), /SELF-MODIFY/);
+  assert.match(buildMuthurSelfModifyPrompt("plan", "/workspace"), /read-only/i);
 
   console.log(
     `[probe] tool counts plan/agent/commander(active) = ${planTools.length}/${agentTools.length}/${commanderToolsActive.length}`,

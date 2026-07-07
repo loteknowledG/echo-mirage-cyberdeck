@@ -7,7 +7,6 @@ const MUTHUR_VOICE_REJECT = [
   "guy",
   "george",
   "male",
-  "jenny",
   "milena",
   "yuri",
   "katya",
@@ -18,6 +17,9 @@ const MUTHUR_VOICE_REJECT = [
 
 /** Windows + macOS English female voices for MUTHUR fallback. */
 const MUTHUR_VOICE_PREFER = [
+  "jenny",
+  "jennyneural",
+  "en-us-jennyneural",
   "zira",
   "aria",
   "hazel",

@@ -64,6 +64,8 @@
     "probe:muthur-response-visibility": "tsx scripts/probe-muthur-response-visibility.ts",
     "probe:muthur-speech-text": "tsx scripts/probe-muthur-speech-text.ts",
     "probe:muthur-foundation-001": "tsx scripts/probe-muthur-foundation-001.ts",
+    "recover:aion": "tsx scripts/recover-aion-into-muthur.ts",
+    "probe:muthur-aion-recovery": "tsx scripts/probe-muthur-aion-recovery.ts",
     "probe:foundation-server-boundary": "tsx scripts/probe-foundation-server-boundary.ts",
     "probe:muthur-document-open": "tsx scripts/probe-muthur-document-open.ts",
     "probe:provider-credentials": "tsx scripts/probe-provider-credentials.ts",

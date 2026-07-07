@@ -58,6 +58,8 @@ export async function POST(request: Request) {
         headers: {
           "Content-Type": "audio/mpeg",
           "Cache-Control": "no-store",
+          "X-Muthur-Voice-Type": voiceType,
+          "X-Muthur-Voice-Source": "coderobo",
         },
       });
     }

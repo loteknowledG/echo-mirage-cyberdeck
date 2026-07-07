@@ -12,6 +12,7 @@ import { parseOperatorOpenJson } from "@/lib/muthur-core/operator-open-file-ref"
 import { parseSurveyAutoConnectJson } from "@/lib/muthur-core/survey-auto-connect-ref";
 import { stripDsmlToolMarkup } from "@/lib/muthur-core/parse-dsml-tool-calls";
 import { stripPiControlLeaseStreamMarkers } from "@/lib/muthur/control/pi-control-lease-stream";
+import { extractMuthurStreamReasoning } from "@/lib/muthur-core/muthur-stream-reasoning";
 
 const OPERATOR_EDITS_FOOTER_RE =
   /\n\n\[MUTHUR_OPERATOR_EDITS\]([\s\S]*?)\[\/MUTHUR_OPERATOR_EDITS\]\s*$/;
@@ -45,10 +46,11 @@ function dedupeConsecutiveProgressLines(lines: string[]): string[] {
 
 /** During uplink streaming, show recent progress stages until real reply text arrives. */
 export function formatMuthurLiveStreamDisplay(text: string): string {
-  const progressLines = [...text.matchAll(/^⏳ MUTHUR[^\n]*/gm)].map((match) => match[0]);
+  const { body: withoutReasoning } = extractMuthurStreamReasoning(text);
+  const progressLines = [...withoutReasoning.matchAll(/^⏳ MUTHUR[^\n]*/gm)].map((match) => match[0]);
   const latestProgress = progressLines.at(-1) ?? "";
 
-  let body = text
+  let body = withoutReasoning
     .replace(MUTHUR_PROGRESS_LINE_RE, "")
     .replace(CODING_VERIFY_INLINE_RE, "")
     .replace(TOOLS_USED_FOOTER_RE, "")
@@ -193,11 +195,13 @@ export function splitMuthurStreamPayload(text: string): {
   }
 
   const displayText = stripPiControlLeaseStreamMarkers(
-    stripDsmlToolMarkup(body)
-      .replace(CODING_VERIFY_INLINE_RE, "")
-      .replace(UPLINK_PROGRESS_RE, "")
-      .replace(/^=+$\n?/gm, "")
-      .trim(),
+    extractMuthurStreamReasoning(
+      stripDsmlToolMarkup(body)
+        .replace(CODING_VERIFY_INLINE_RE, "")
+        .replace(UPLINK_PROGRESS_RE, "")
+        .replace(/^=+$\n?/gm, "")
+        .trim(),
+    ).body,
   );
   return { displayText, operatorEdits, operatorConversion, operatorOpenFile, operatorBrowser, surveyAutoConnect, codingVerify, toolsUsed };
 }

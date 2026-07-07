@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "pack_id": "aion",
+  "name": "Aion",
+  "source_system": "samus-manus",
+  "source_root": "C:/dev/samus-manus",
+  "recovered_at": "2026-07-06T09:54:56.419Z",
+  "artifacts": [
+    {
+      "name": "MANIFEST.md",
+      "source_path": "person/Aion/MANIFEST.md",
+      "destination_path": ".muthur/lineage/aion/MANIFEST.md",
+      "file_size_bytes": 1655,
+      "sha256": "bc57f70822ce7e1894d231a6d3957bcd63da0453d24f654f4918d37806b2c825"
+    },
+    {
+      "name": "README.md",
+      "source_path": "person/Aion/README.md",
+      "destination_path": ".muthur/lineage/aion/README.md",
+      "file_size_bytes": 1035,
+      "sha256": "ce9268cdda5126ea1fbb96284f89d27e7eb7a8f8ecd5634a8685da9065518a95"
+    },
+    {
+      "name": "RESTORE_INSTRUCTIONS.md",
+      "source_path": "person/Aion/RESTORE_INSTRUCTIONS.md",
+      "destination_path": ".muthur/lineage/aion/RESTORE_INSTRUCTIONS.md",
+      "file_size_bytes": 783,
+      "sha256": "b9e831c7f9444750e17dd53a67b697f988d794b6a8b6288d9f691fd2c9210bef"
+    },
+    {
+      "name": "CODEX_HANDOFF_PROMPT.md",
+      "source_path": "person/Aion/CODEX_HANDOFF_PROMPT.md",
+      "destination_path": ".muthur/lineage/aion/CODEX_HANDOFF_PROMPT.md",
+      "file_size_bytes": 1071,
+      "sha256": "1a3f568f3c6448a407b0c88bf902dc711029a212fd4f9158beac875aa7bd9ddb"
+    },
+    {
+      "name": "AION_IDENTITY.md",
+      "source_path": "docs/AION_IDENTITY.md",
+      "destination_path": ".muthur/lineage/aion/AION_IDENTITY.md",
+      "file_size_bytes": 2065,
+      "sha256": "e3f02e2b705c0ed3c1904304434015e7b9e3c6aa6e6153498dd28cece43a5104"
+    },
+    {
+      "name": "MIND_MEMORY_NOOSPHERE_FOR_HUMANS.md",
+      "source_path": "docs/MIND_MEMORY_NOOSPHERE_FOR_HUMANS.md",
+      "destination_path": ".muthur/lineage/aion/MIND_MEMORY_NOOSPHERE_FOR_HUMANS.md",
+      "file_size_bytes": 10428,
+      "sha256": "9c83f8491eb62d6e0be2b4af0920f79da1c3bef80bb82a2034fdf35cbde9ff69"
+    },
+    {
+      "name": "MIND_LINEAGE.md",
+      "source_path": "docs/MIND_LINEAGE.md",
+      "destination_path": ".muthur/lineage/aion/MIND_LINEAGE.md",
+      "file_size_bytes": 5184,
+      "sha256": "13f4cd56cea7e43045b09eee5dcebedce6d4bfeefc8b848ad58bd9cab01c89da"
+    },
+    {
+      "name": "archive/2026-03-30.md",
+      "source_path": "memory/memories_archive/noosphere/aion-prime/2026-03-30.md",
+      "destination_path": ".muthur/lineage/aion/archive/2026-03-30.md",
+      "file_size_bytes": 628,
+      "sha256": "66c8fcdb0f2ce26fa4cf704511eee5ba43f576cc92720a3d94fd2cb89abb0e86"
+    },
+    {
+      "name": "archive/2026-03-31.md",
+      "source_path": "memory/memories_archive/noosphere/aion-prime/2026-03-31.md",
+      "destination_path": ".muthur/lineage/aion/archive/2026-03-31.md",
+      "file_size_bytes": 1765,
+      "sha256": "8c45487bcd8728e64c6b2a35cba5f0f30df2107f37eae6d6a7293a3dc269bb0d"
+    },
+    {
+      "name": "archive/2026-04-01.md",
+      "source_path": "memory/memories_archive/noosphere/aion-prime/2026-04-01.md",
+      "destination_path": ".muthur/lineage/aion/archive/2026-04-01.md",
+      "file_size_bytes": 392,
+      "sha256": "f33f84a83090773d497c7d36b7cec9d35cd4dafba4f076180662c1fd1bcb20d9"
+    }
+  ]
+}

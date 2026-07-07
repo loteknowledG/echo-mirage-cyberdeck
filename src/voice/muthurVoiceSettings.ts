@@ -8,6 +8,9 @@ export type MuthurVoiceDialState = {
 
 export const MUTHUR_VOICE_DIALS_STORAGE_KEY = "echo-mirage-voice-dials";
 export const MUTHUR_VOICE_COPY_STORAGE_KEY = "echo-mirage-muthur-voice-copy-v1";
+/** Bump when MUTHUR_PRESET.backend voice/tuning changes — migrates stale localStorage dials. */
+export const MUTHUR_VOICE_PRESET_REVISION = 2;
+export const MUTHUR_VOICE_PRESET_REVISION_KEY = "echo-mirage-muthur-voice-preset-rev";
 
 export const MUTHUR_VOICE_DIAL_DEFAULTS: Readonly<MuthurVoiceDialState> = Object.freeze({
   ratePercent: MUTHUR_PRESET.backend.ratePercent,
@@ -36,6 +39,46 @@ function normalizeDials(raw: unknown): MuthurVoiceDialState | null {
   };
 }
 
+function readVoicePresetRevision(): number {
+  if (typeof window === "undefined") return MUTHUR_VOICE_PRESET_REVISION;
+  try {
+    const raw = window.localStorage.getItem(MUTHUR_VOICE_PRESET_REVISION_KEY);
+    const parsed = raw ? Number.parseInt(raw, 10) : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeVoicePresetRevision(revision: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(MUTHUR_VOICE_PRESET_REVISION_KEY, String(revision));
+  } catch {
+    /* ignore */
+  }
+}
+
+function migrateVoiceDialsIfPresetChanged(): MuthurVoiceDialState | null {
+  if (typeof window === "undefined") return null;
+  if (readVoicePresetRevision() >= MUTHUR_VOICE_PRESET_REVISION) return null;
+
+  const migrated = { ...MUTHUR_VOICE_DIAL_DEFAULTS };
+  saveMuthurVoiceMasterCopy(buildMuthurVoiceMasterCopy(migrated));
+  writeVoicePresetRevision(MUTHUR_VOICE_PRESET_REVISION);
+  return migrated;
+}
+
+export function buildMuthurVoiceTuning(dials: MuthurVoiceDialState) {
+  return {
+    ratePercent: dials.ratePercent,
+    pitchHz: dials.pitchHz,
+    volume: dials.volume,
+    voiceType: MUTHUR_PRESET.backend.voiceType,
+    gender: MUTHUR_PRESET.backend.gender,
+  };
+}
+
 function normalizeMuthurVoiceMasterCopy(raw: unknown): MuthurVoiceMasterCopy | null {
   if (!raw || typeof raw !== "object") return null;
   const candidate = raw as Partial<MuthurVoiceMasterCopy> & {
@@ -59,6 +102,9 @@ export function getInitialMuthurVoiceDials(): MuthurVoiceDialState {
   if (typeof window === "undefined") {
     return { ...MUTHUR_VOICE_DIAL_DEFAULTS };
   }
+
+  const migrated = migrateVoiceDialsIfPresetChanged();
+  if (migrated) return migrated;
 
   try {
     const storedCopy = window.localStorage.getItem(MUTHUR_VOICE_COPY_STORAGE_KEY);
@@ -137,6 +183,7 @@ export function restoreMuthurVoiceMasterCopy(): MuthurVoiceDialState {
   try {
     window.localStorage.removeItem(MUTHUR_VOICE_COPY_STORAGE_KEY);
     window.localStorage.setItem(MUTHUR_VOICE_DIALS_STORAGE_KEY, JSON.stringify(defaults));
+    writeVoicePresetRevision(MUTHUR_VOICE_PRESET_REVISION);
   } catch {
     /* ignore */
   }

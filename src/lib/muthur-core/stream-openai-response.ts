@@ -1,4 +1,20 @@
+import { appendMuthurReasoningStreamDelta } from "@/lib/muthur-core/muthur-stream-reasoning";
+
 const textEncoder = new TextEncoder();
+
+type OpenAiStreamDelta = {
+  content?: string;
+  reasoning_content?: string;
+  reasoning?: string;
+};
+
+function emitReasoningDelta(delta: OpenAiStreamDelta): string {
+  const reasoning =
+    (typeof delta.reasoning_content === "string" && delta.reasoning_content) ||
+    (typeof delta.reasoning === "string" && delta.reasoning) ||
+    "";
+  return appendMuthurReasoningStreamDelta(reasoning);
+}
 
 /** Adapter: OpenAI SSE or raw provider body → plain text stream for the cyberdeck client. */
 export async function streamOpenAiCompatibleResponse(response: Response): Promise<ReadableStream<Uint8Array>> {
@@ -72,8 +88,12 @@ export async function streamOpenAiCompatibleResponse(response: Response): Promis
             }
 
             try {
-              const parsed = JSON.parse(data) as { choices?: { delta?: { content?: string } }[] };
-              const content = parsed.choices?.[0]?.delta?.content || "";
+              const parsed = JSON.parse(data) as { choices?: { delta?: OpenAiStreamDelta }[] };
+              const delta = parsed.choices?.[0]?.delta;
+              if (!delta) continue;
+              const reasoning = emitReasoningDelta(delta);
+              if (reasoning) emit(reasoning);
+              const content = delta.content || "";
               emit(content);
             } catch {
               /* skip malformed JSON */
