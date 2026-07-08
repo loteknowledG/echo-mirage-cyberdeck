@@ -3,18 +3,15 @@
 **Work order:** [L-CYBERDECK-001](../work-orders/L-CYBERDECK-001-cyberdeck-app-extraction.md)  
 **Phase:** P0 — Baseline & guardrails  
 **Verify brief:** [VERIFY-L-CYBERDECK-001-P0](./VERIFY-L-CYBERDECK-001-P0.md)  
-**Status:** Awaiting independent verification  
+**Status:** Judicially verified (PASS)  
 
 ---
 
 ## Verdict
 
-> **Verifier:** Replace this block after running VERIFY-L-CYBERDECK-001-P0.  
-> Options: **PASS** | **PARTIAL PASS** | **FAIL**
+**PASS** — P0 guardrails present; probe and tsc green.
 
-**IMPLEMENTER RECORDED — NOT YET JUDICIALLY VERIFIED**
-
-Implementation claims P0 complete. A separate agent must execute the verify brief and update this section.
+Verified at `4b7d140` (HEAD includes P1.1 custom-tab-model extraction landed after P0; probe ceilings were tightened with that extraction, not raised without work).
 
 ---
 
@@ -22,10 +19,10 @@ Implementation claims P0 complete. A separate agent must execute the verify brie
 
 | Field | Value |
 |-------|-------|
-| Verifier | _agent or human name_ |
-| Date | _YYYY-MM-DD_ |
-| Git ref | _`git rev-parse --short HEAD`_ |
-| PR / branch | _optional_ |
+| Verifier | Cursor agent (independent verification) |
+| Date | 2026-07-07 |
+| Git ref | `4b7d140` |
+| PR / branch | local `main` lineage (P0 in `4e08088`, P1.1 atop) |
 
 ---
 
@@ -41,10 +38,19 @@ pnpm probe:cyberdeck-compile-scope
 
 | Command | Exit code | Result |
 |---------|-----------|--------|
-| `tsc --noEmit` | _verifier fills_ | _PASS/FAIL_ |
-| `probe:cyberdeck-compile-scope` | _verifier fills_ | _PASS/FAIL_ |
+| `tsc --noEmit` | 0 | PASS |
+| `probe:cyberdeck-compile-scope` | 0 | PASS |
 
-### Implementer probe stdout (2026-06-17)
+### Verifier probe stdout (2026-07-07)
+
+```text
+probe-cyberdeck-compile-scope: all checks passed
+  src/features/cyberdeck/cyberdeck-app.tsx: 8784 lines, 152 imports
+  ceilings: 8800 lines, 152 imports
+  dynamic() declarations in app: 4
+```
+
+### Implementer probe stdout (2026-06-17, superseded)
 
 ```text
 probe-cyberdeck-compile-scope: all checks passed
@@ -53,34 +59,39 @@ probe-cyberdeck-compile-scope: all checks passed
   dynamic() declarations in app: 4
 ```
 
+Ceilings and line count differ from implementer record because P1.1 (`4b7d140`) extracted `custom-tab-model` and tightened probe ceilings with that work.
+
 ---
 
 ## Checklist (verifier copies from VERIFY-P0)
 
 | ID | Check | Result | Evidence |
 |----|-------|--------|----------|
-| V-P0-01 | Repo root | _pending_ | |
-| V-P0-02 | Probe script exists | _pending_ | |
-| V-P0-03 | npm script wired | _pending_ | |
-| V-P0-04 | Probe passes | _pending_ | |
-| V-P0-05 | tsc passes | _pending_ | |
-| V-P0-06 | Ratchet constants sane | _pending_ | |
-| V-P0-07 | Page client dynamic + ssr:false | _pending_ | |
-| V-P0-08 | pane-chunks lazy loaders | _pending_ | |
-| V-P0-09 | No forbidden static imports | _pending_ | |
-| V-P0-10 | This JP receipt exists | _pending_ | |
-| V-P0-11 | Work order D0.1–D0.3 Done | _pending_ | |
-| V-P0-OPT-01 | Cold compile time | _optional_ | |
+| V-P0-01 | Repo root | PASS | `package.json` name `echo-mirage-cyberdeck` |
+| V-P0-02 | Probe script exists | PASS | `MAX_CYBERDECK_APP_LINES`, `FORBIDDEN_STATIC_IMPORTS` present |
+| V-P0-03 | npm script wired | PASS | `probe:cyberdeck-compile-scope` → `tsx scripts/...` |
+| V-P0-04 | Probe passes | PASS | exit 0; stdout substring match |
+| V-P0-05 | tsc passes | PASS | exit 0 |
+| V-P0-06 | Ratchet constants sane | PASS | 8800/152 ceilings ≥ current 8784/152; ≤ 9500; lowered with P1.1 extraction |
+| V-P0-07 | Page client dynamic + ssr:false | PASS | `dynamic(() => import("@/features/cyberdeck/cyberdeck-app")`, `ssr: false`, `CyberdeckErrorBoundary` |
+| V-P0-08 | pane-chunks lazy loaders | PASS | `() => import(` + `pane-loaders`; `survey: () => import(` |
+| V-P0-09 | No forbidden static imports | PASS | probe + spot-check grep: no `^import` matches |
+| V-P0-10 | This JP receipt exists | PASS | this file |
+| V-P0-11 | Work order D0.1–D0.3 Done | PASS | work order § P0 table |
+| V-P0-OPT-01 | Cold compile time | deferred | not measured |
+| V-P0-OPT-02 | No unrelated file churn | PASS | P0 commit `4e08088` did not touch `cyberdeck-app.tsx`; clean working tree |
 
 ---
 
 ## Baseline metrics (at P0 landing)
 
-| Metric | Value | P0 ceiling (probe) |
+| Metric | Value (verifier @ `4b7d140`) | P0 ceiling (probe) |
 |--------|------:|-------------------:|
-| `cyberdeck-app.tsx` lines | 9,089 | 9,100 |
-| Top-level `import` lines | 151 | 155 |
+| `cyberdeck-app.tsx` lines | 8,784 | 8,800 |
+| Top-level `import` lines | 152 | 152 |
 | `dynamic()` declarations in app | 4 | ≥ 3 |
+
+Implementer P0 landing (pre-P1.1): 9,089 lines / 9,100 ceiling, 151 imports / 155 ceiling.
 
 ---
 
@@ -97,7 +108,7 @@ probe-cyberdeck-compile-scope: all checks passed
 
 | Phase | Target lines | Target imports |
 |-------|-------------:|---------------:|
-| P0 (now) | ≤ 9,100 | ≤ 155 |
+| P0 (verified) | ≤ 8,800 | ≤ 152 |
 | P1 | ≤ 7,600 | ≤ 95 |
 | P2 | ≤ 4,800 | ≤ 60 |
 | P4 | ≤ 2,500 | ≤ 35 |
@@ -125,9 +136,9 @@ _Verifier fills if FAIL or PARTIAL PASS._
 
 ## Sign-off
 
-- [ ] Independent verifier ran VERIFY-L-CYBERDECK-001-P0
-- [ ] Verdict recorded above
-- [ ] **P1 unblocked** (only if PASS or acceptable PARTIAL PASS)
+- [x] Independent verifier ran VERIFY-L-CYBERDECK-001-P0
+- [x] Verdict recorded above
+- [x] **P1 unblocked** — PASS; P1.1 already landed on HEAD
 
 ---
 

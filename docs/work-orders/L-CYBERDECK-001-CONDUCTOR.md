@@ -7,51 +7,45 @@
 
 ---
 
-## How we run this in Cursor
+## Pipeline (manage like GitHub Desktop)
 
 ```text
-┌─────────────────┐     assigns      ┌──────────────────┐
-│  Tech lead      │ ───────────────► │  Developer agent │
-│  (conductor)    │                  │  E-CYBERDECK-001 │
-└────────┬────────┘                  └────────┬─────────┘
-         │                                   │ PR / slice done
-         │ assigns                           ▼
-         │                          ┌──────────────────┐
-         └────────────────────────► │  Tester agent    │
-                                    │  VERIFY-P* → JP  │
-                                    └────────┬─────────┘
-                                             │ PASS/FAIL
-                                             ▼
-                                    Conductor updates this file
-                                    → next phase or rework
+Developer branch  →  Tester VERIFY  →  JP receipt  →  Open PR  →  Merge  →  Next phase
+     ▲                      │                                              │
+     └──────────────── FAIL └──────────────────────────────────────────────┘
 ```
 
-**Human operator:** Start a **new Cursor chat** for developer vs tester to keep roles clean. Paste the prompt blocks from VERIFY-TESTER or E-CYBERDECK-001.
+| Step | Tool | Status |
+|------|------|--------|
+| 1. Implement | Cursor dev agent on feature branch | **P1.1 done** — `cursor/extract-custom-tab-model-p1.1` |
+| 2. Push | GitHub Desktop / `git push` | **Done** (branch published) |
+| 3. Verify | Separate Cursor tester agent | **P1.1 PENDING** — [VERIFY-P1.1](../verifications/VERIFY-L-CYBERDECK-001-P1.1.md) |
+| 4. PR | GitHub Desktop “Preview Pull Request” / `gh pr create` | **Not opened** |
+| 5. Merge | After JP-P1.1 PASS + review | Waiting |
+| 6. Next | P1.2 per E-CYBERDECK-001 | Blocked |
 
 ---
 
 ## Phase status
 
-| Phase | Implementer | Judicial | Conductor gate | Notes |
-|-------|-------------|----------|----------------|-------|
-| **P0** | Done | **PENDING** | Block P1 until JP-P0 PASS | Probe + receipts landed |
-| P1.1 | **NEXT** | — | After P0 PASS | Custom tab model extract |
-| P1.2 | Queued | — | After P1.1 PASS | Gateway + rail helpers |
-| P1.3 | Queued | — | After P1.2 PASS | Operator drop utils |
-| P2 | Blocked | — | After P1 complete | MUTHUR chat — critical path |
-| P3–P8 | Blocked | — | Per work order | |
+| Phase | Implementer | Judicial | PR | Notes |
+|-------|-------------|----------|-----|-------|
+| **P0** | Done | **PASS** | — | [JP-P0](../verifications/JP-L-CYBERDECK-001-P0.md) |
+| **P1.1** | **Done** (`4b7d140`) | **PENDING** | **None** | Custom tab model; -305 lines in app |
+| P1.2 | Queued | — | — | After P1.1 merge |
+| P1.3 | Queued | — | — | |
+| P2+ | Blocked | — | — | |
 
 ---
 
-## Metrics ratchet (live)
+## Metrics ratchet (live on branch)
 
-| Metric | At P0 land | Ceiling (probe) | After P1 target |
-|--------|----------:|----------------:|----------------:|
-| `cyberdeck-app.tsx` lines | 9,089 | 9,100 | ≤ 7,600 |
-| Import lines | 151 | 155 | ≤ 95 |
+| Metric | P0 | P1.1 (branch) | Ceiling |
+|--------|---:|--------------:|--------:|
+| `cyberdeck-app.tsx` lines | 9,089 | **8,784** | 8,800 |
+| Import lines | 151 | **152** | 152 |
 
-Source: `scripts/probe-cyberdeck-compile-scope.ts`  
-Last probe: 2026-06-17 — PASS
+Probe: **PASS** · `tsc`: **PASS**
 
 ---
 
@@ -59,10 +53,10 @@ Last probe: 2026-06-17 — PASS
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Tester agent** | Run [VERIFY-P0](../verifications/VERIFY-L-CYBERDECK-001-P0.md) → sign [JP-P0](../verifications/JP-L-CYBERDECK-001-P0.md) |
-| 2 | **Conductor** | On JP-P0 PASS → set P1.1 as active in E-CYBERDECK-001 |
-| 3 | **Developer agent** | Execute P1.1 only after #1 PASS |
-| 4 | **Human** | Optional: capture cold `HEAD /cyberdeck` compile for L-10 baseline |
+| 1 | **Tester agent** | [VERIFY-P1.1](../verifications/VERIFY-L-CYBERDECK-001-P1.1.md) → [JP-P1.1](../verifications/JP-L-CYBERDECK-001-P1.1.md) |
+| 2 | **Human / conductor** | After JP-P1.1 PASS → **Preview Pull Request** in GitHub Desktop |
+| 3 | **Human** | Merge when green |
+| 4 | **Developer agent** | Start P1.2 on new branch after merge |
 
 ---
 
@@ -70,30 +64,34 @@ Last probe: 2026-06-17 — PASS
 
 | Date | Decision |
 |------|----------|
-| 2026-06-17 | L-CYBERDECK-001 legislated; P0 implemented; judicial verify pending |
-| 2026-06-17 | Three-agent split: E- dev, VERIFY tester, conductor status board |
+| 2026-06-17 | L-CYBERDECK-001 legislated; three-agent split |
+| 2026-07-07 | P0 judicial PASS |
+| 2026-07-07 | P1.1 landed on `cursor/extract-custom-tab-model-p1.1`; verifier order issued; PR hold until JP-P1.1 |
 
 ---
 
-## Prompt for tech lead (this agent, next turn)
-
-When human says “conduct” or “what’s next”:
-
-1. Read this file + latest `JP-L-CYBERDECK-001-P*.md`
-2. Update phase table
-3. Point human to the correct agent prompt (dev vs tester)
-4. Do not implement P1 while P0 judicial status is PENDING unless human overrides
-
----
-
-## Prompt for human — spawn tester now
+## Prompt — tester (now)
 
 ```text
-Verify L-CYBERDECK-001 P0. Read docs/verifications/VERIFY-L-CYBERDECK-001-TESTER.md and VERIFY-L-CYBERDECK-001-P0.md. Update JP-L-CYBERDECK-001-P0.md and L-CYBERDECK-001-CONDUCTOR.md. No code changes.
+Verify L-CYBERDECK-001 P1.1 on branch cursor/extract-custom-tab-model-p1.1.
+
+Read docs/verifications/VERIFY-L-CYBERDECK-001-P1.1.md
+Write docs/verifications/JP-L-CYBERDECK-001-P1.1.md
+Update docs/work-orders/L-CYBERDECK-001-CONDUCTOR.md
+No code changes.
 ```
 
-## Prompt for human — spawn developer after P0 PASS
+## Prompt — open PR (after JP-P1.1 PASS)
 
 ```text
-Implement L-CYBERDECK-001 P1.1 per docs/cadre/executive-coder/E-CYBERDECK-001-extraction-execution.md. Run tsc and probe:cyberdeck-compile-scope. Stop for verification.
+Create PR for cursor/extract-custom-tab-model-p1.1 into main.
+
+Title: refactor(cyberdeck): extract custom tab model (L-CYBERDECK-001 P1.1)
+Body: link JP-L-CYBERDECK-001-P1.1, probe output, -305 lines cyberdeck-app
+```
+
+## Prompt — developer P1.2 (after merge)
+
+```text
+Implement L-CYBERDECK-001 P1.2 per E-CYBERDECK-001-extraction-execution.md on a new branch.
 ```

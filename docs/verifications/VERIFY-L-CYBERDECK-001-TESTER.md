@@ -33,8 +33,8 @@ You are the **tester / judicial agent**. You verify; you do not implement unless
 | Phase | Execute this brief | Write receipt |
 |-------|-------------------|---------------|
 | **P0** | [VERIFY-L-CYBERDECK-001-P0.md](./VERIFY-L-CYBERDECK-001-P0.md) | [JP-L-CYBERDECK-001-P0.md](./JP-L-CYBERDECK-001-P0.md) |
-| P1.1 | VERIFY-P1.1 _(create when dev opens PR — copy P0 template)_ | JP-P1.1 |
-| P1.2 | VERIFY-P1.2 | JP-P1.2 |
+| **P1.1** | [VERIFY-L-CYBERDECK-001-P1.1.md](./VERIFY-L-CYBERDECK-001-P1.1.md) | [JP-L-CYBERDECK-001-P1.1.md](./JP-L-CYBERDECK-001-P1.1.md) |
+| P1.2 | VERIFY-P1.2 _(create when dev opens PR)_ | JP-P1.2 |
 | P1.3 | VERIFY-P1.3 | JP-P1.3 |
 | P2+ | Per [L-CYBERDECK-001](../work-orders/L-CYBERDECK-001-cyberdeck-app-extraction.md) | JP-P2, etc. |
 
