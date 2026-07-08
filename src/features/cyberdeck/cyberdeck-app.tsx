@@ -119,7 +119,6 @@ import { CADRE_MUTHUR_ARCHIVE_EVENT } from "@/lib/cadre/cadre-event-bus";
 import {
   appendMuthurDiagnosticBatch,
   appendMuthurDiagnosticEntry,
-  createEmptyMuthurDiagnosticsState,
 } from "@/lib/muthur-core/muthur-diagnostics-channel";
 import { parseOperatorConversionJson } from "@/lib/muthur-core/operator-conversion-ref";
 import { parseOperatorBrowserJson } from "@/lib/muthur-core/operator-browser-ref";
@@ -131,7 +130,7 @@ import {
   pdfFilenameFromMarkdownName,
   type OperatorExportFormat,
 } from "@/lib/markdown-to-docx-intent";
-import { parseGlyphResponseActions, resolveGlyphCommand, type GlyphCommand } from "@/lib/muthur-glyph-intent";
+import { parseGlyphResponseActions, type GlyphCommand } from "@/lib/muthur-glyph-intent";
 import type { AsciiRenderRequest } from "@/lib/muthur-ascii-skill/types";
 import { applyGlyphActions, GLYPH_CHANNEL_FOCUS_EVENT } from "@/lib/glyph-channel-apply.client";
 import {
@@ -357,7 +356,6 @@ import { appendSurveyChatMessage } from "@/lib/cyberdeck/survey-chat";
 import {
   executeSurveyHubConnectForMuthur,
   surveyAutoConnectFailureMessage,
-  tryExecuteSurveyAutoConnectFromChat,
 } from "@/lib/cyberdeck/survey-muthur-connect.client";
 import {
   terminateSurveySessionWhenTabClosed,
@@ -365,11 +363,8 @@ import {
 } from "@/lib/cyberdeck/survey-tab-lifecycle.client";
 import { useSurveyMuthurArchive } from "@/features/cyberdeck/hooks/use-survey-muthur-archive";
 import { useSurveyMuthurMissionHandlers } from "@/features/cyberdeck/hooks/use-survey-muthur-mission-handlers";
-import {
-  CHAT_STORAGE_KEY,
-  CHAT_STREAM_STORAGE_KEY,
-} from "@/features/cyberdeck/muthur/muthur-chat-types";
 import { useMuthurChatState } from "@/features/cyberdeck/muthur/use-muthur-chat-state";
+import { useMuthurSendIntents } from "@/features/cyberdeck/muthur/use-muthur-send-intents";
 import {
   CUSTOM_TAB_CONTEXT_MENU_ACTIONS,
   defaultCustomTabGlyphForKind,
@@ -410,16 +405,8 @@ import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-type
 import { ENABLE_AUTOMATION, ENABLE_MODEL_PROBE } from "@/lib/cyberdeck/automation-config";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import { publishMuthurObservation, flushMuthurObservation } from "@/lib/muthur/observation/publish-observation";
-import {
-  getMuthurHelpText,
-  getMuthurHelpUnknownTopicText,
-  parseMuthurClearChatIntent,
-  parseMuthurHelpIntent,
-} from "@/lib/muthur-help-text";
 import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
 import { parseAionQuery } from "@/lib/muthur-aion-intent";
-import { parseMemoryAtlasQuery } from "@/lib/memory-atlas/memory-atlas-query";
-import { parseEntityAtlasQuery } from "@/lib/entity-atlas/entity-atlas-query";
 import { parseDocumentOpenIntent } from "@/lib/muthur-document-open-intent";
 import {
   CLIENT_BAKED_PROVIDER_KEYS,
@@ -4732,6 +4719,31 @@ export default function CyberdeckApp() {
     });
   }, []);
 
+  const {
+    isClearChatIntent,
+    handleClearChatIntent,
+    tryHandleSurveyAndGlyphIntents,
+    tryHandleHelpAndAtlasIntents,
+  } = useMuthurSendIntents({
+    handleGlyphOperatorCommand,
+    abortMotherSpeech,
+    chatAbortRef,
+    steerPendingRef,
+    steerAbortRef,
+    setMuthurResponseFailed,
+    setChatKeyboardHighlightIndex,
+    setGeneratedUI,
+    screenshotRef,
+    messageInputRef,
+    setMessages,
+    setMuthurDiagnostics,
+    setIsStreaming,
+    setStreamText,
+    setStreamToolTrace,
+    setMuthurStall,
+    composeStartedAtRef,
+  });
+
   const handleSend = async (
     messageText?: string,
     options?: { preserveSelectedSurface?: boolean; surveyMission?: boolean },
@@ -4740,32 +4752,8 @@ export default function CyberdeckApp() {
     const userMessage = (messageText ?? messageInputRef.current?.getValue() ?? "").trim();
     if (!userMessage) return;
 
-    if (parseMuthurClearChatIntent(userMessage)) {
-      steerPendingRef.current = null;
-      steerAbortRef.current = false;
-      abortMotherSpeech();
-      if (chatAbortRef.current) {
-        chatAbortRef.current.abort();
-        chatAbortRef.current = null;
-      }
-      setIsStreaming(false);
-      setStreamText("");
-      setStreamToolTrace("");
-      setMessages([]);
-      setMuthurDiagnostics(createEmptyMuthurDiagnosticsState());
-      setMuthurStall(null);
-      setMuthurResponseFailed(false);
-      composeStartedAtRef.current = null;
-      setChatKeyboardHighlightIndex(null);
-      setGeneratedUI(null);
-      screenshotRef.current = null;
-      messageInputRef.current?.clear();
-      try {
-        window.localStorage.removeItem(CHAT_STORAGE_KEY);
-        window.localStorage.removeItem(CHAT_STREAM_STORAGE_KEY);
-      } catch {
-        // ignore storage errors
-      }
+    if (isClearChatIntent(userMessage)) {
+      handleClearChatIntent();
       return;
     }
 
@@ -4930,36 +4918,7 @@ export default function CyberdeckApp() {
     setMuthurStall(null);
     setGeneratedUI(null);
 
-    const glyphCommand = resolveGlyphCommand(userMessage);
-    try {
-      const surveyConnectLine = await tryExecuteSurveyAutoConnectFromChat(userMessage);
-      if (surveyConnectLine) {
-        setMessages((prev) => [...prev, { role: "system", text: surveyConnectLine }]);
-        setIsStreaming(false);
-        return;
-      }
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "system", text: surveyAutoConnectFailureMessage(err) },
-      ]);
-      setIsStreaming(false);
-      return;
-    }
-
-    if (glyphCommand) {
-      try {
-        await handleGlyphOperatorCommand(glyphCommand);
-      } catch (err) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: `GLYPH // FAILED // ${err instanceof Error ? err.message : "Glyph command failed"}`,
-          },
-        ]);
-      }
-      setIsStreaming(false);
+    if (await tryHandleSurveyAndGlyphIntents(userMessage)) {
       return;
     }
 
@@ -5051,14 +5010,7 @@ export default function CyberdeckApp() {
       return;
     }
 
-    const helpIntent = parseMuthurHelpIntent(userMessage);
-    if (helpIntent) {
-      const helpText =
-        helpIntent.kind === "unknown"
-          ? getMuthurHelpUnknownTopicText(helpIntent.topic)
-          : getMuthurHelpText(helpIntent.topic);
-      setMessages((prev) => [...prev, { role: "assistant", text: helpText }]);
-      setIsStreaming(false);
+    if (await tryHandleHelpAndAtlasIntents(userMessage)) {
       return;
     }
 
@@ -5135,119 +5087,6 @@ export default function CyberdeckApp() {
           {
             role: "system",
             text: `FOUNDATION_RETRIEVAL // FAILED // ${err instanceof Error ? err.message : "unknown error"}`,
-          },
-        ]);
-      }
-      setStreamText("");
-      setStreamToolTrace("");
-      setIsStreaming(false);
-      composeStartedAtRef.current = null;
-      setMuthurStall(null);
-      return;
-    }
-
-    const entityAtlasIntent = parseEntityAtlasQuery(userMessage);
-    if (entityAtlasIntent) {
-      try {
-        const res = await fetch("/api/muthur/entity-query", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: userMessage }),
-        });
-        if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(payload?.error || `Entity query failed (${res.status})`);
-        }
-        const payload = (await res.json()) as {
-          handled?: boolean;
-          response?: string;
-          entity_type?: string;
-          result?: Record<string, unknown>;
-        };
-        if (payload.handled && payload.response) {
-          setMessages((prev) => [...prev, { role: "assistant", text: payload.response! }]);
-          const resultId =
-            typeof payload.result?.id === "string"
-              ? payload.result.id
-              : typeof payload.result?.anchor_id === "string"
-                ? payload.result.anchor_id
-                : Array.isArray(payload.result?.related)
-                  ? (payload.result.related as Array<{ id?: string }>)
-                      .map((entry) => entry.id)
-                      .filter(Boolean)
-                      .join(", ")
-                  : "none";
-          const receiptLine = `ENTITY_ATLAS // type=${payload.entity_type ?? "unknown"} // id=${resultId}`;
-          setMuthurDiagnostics((current) => appendMuthurDiagnosticEntry(current, receiptLine));
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "system",
-              text: "ENTITY_ATLAS // UNHANDLED // intent not recognized by server",
-            },
-          ]);
-        }
-      } catch (err) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: `ENTITY_ATLAS // FAILED // ${err instanceof Error ? err.message : "unknown error"}`,
-          },
-        ]);
-      }
-      setStreamText("");
-      setStreamToolTrace("");
-      setIsStreaming(false);
-      composeStartedAtRef.current = null;
-      setMuthurStall(null);
-      return;
-    }
-
-    const memoryAtlasIntent = parseMemoryAtlasQuery(userMessage);
-    if (memoryAtlasIntent) {
-      try {
-        const res = await fetch("/api/muthur/memory-query", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: userMessage }),
-        });
-        if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(payload?.error || `Memory query failed (${res.status})`);
-        }
-        const payload = (await res.json()) as {
-          handled?: boolean;
-          response?: string;
-          memory_type?: string;
-          result?: Record<string, unknown>;
-        };
-        if (payload.handled && payload.response) {
-          setMessages((prev) => [...prev, { role: "assistant", text: payload.response! }]);
-          const resultId =
-            typeof payload.result?.id === "string"
-              ? payload.result.id
-              : Array.isArray(payload.result?.threads)
-                ? (payload.result.threads as Array<{ id?: string }>).map((t) => t.id).filter(Boolean).join(", ")
-                : "none";
-          const receiptLine = `MEMORY_ATLAS // type=${payload.memory_type ?? "unknown"} // id=${resultId}`;
-          setMuthurDiagnostics((current) => appendMuthurDiagnosticEntry(current, receiptLine));
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "system",
-              text: "MEMORY_ATLAS // UNHANDLED // intent not recognized by server",
-            },
-          ]);
-        }
-      } catch (err) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: `MEMORY_ATLAS // FAILED // ${err instanceof Error ? err.message : "unknown error"}`,
           },
         ]);
       }
