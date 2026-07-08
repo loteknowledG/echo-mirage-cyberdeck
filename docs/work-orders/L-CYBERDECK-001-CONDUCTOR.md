@@ -17,7 +17,7 @@
 | **P2.3** | Done | **PASS** | merged `6d7bc27` — 7,066 lines |
 | **P2.4** | Done | **PASS** | [JP-P2.4](../verifications/JP-L-CYBERDECK-001-P2.4.md) — [PR #45](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/45) **MERGED** `40c6473` — **6,766 lines** |
 | **P2.5** | Done | **PASS** | [JP-P2.5](../verifications/JP-L-CYBERDECK-001-P2.5.md) — [PR #47](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/47) **MERGED** `f084b5f` — **6,445 lines** — **P2 complete** |
-| **P3.1** | **HEAD** | — | Gateway column — branch from `main` @ `f084b5f` |
+| **P3.1** | **HEAD** | — | D3.1 provider connection hook — [E-P3.1](../cadre/executive-coder/E-CYBERDECK-001-P3.1-provider-connection.md) |
 
 ---
 
@@ -43,7 +43,7 @@ Probe: **PASS** · `tsc`: **PASS** · MUTHUR probes: **PASS** · `main` @ `f084b
 | — | P2.3 | [#44](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/44) | **MERGED** `6d7bc27` |
 | — | P2.4 | [#45](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/45) | **MERGED** `40c6473` |
 | — | P2.5 | [#47](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/47) | **MERGED** `f084b5f` |
-| **1** | **P3.1** | — | gateway column — **HEAD** |
+| **1** | **P3.1** | — | provider connection hook (D3.1) — **HEAD** |
 | 4 | P4.1 | — | layout shell |
 | 5 | P5.1 | — | operator pane |
 | 6 | P6.1 | — | survey hub |
@@ -56,8 +56,8 @@ Probe: **PASS** · `tsc`: **PASS** · MUTHUR probes: **PASS** · `main` @ `f084b
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Developer agent** | Implement P3.1 gateway column — branch from `main` @ `f084b5f` |
-| 2 | **Tech lead** | Prep P3.1 verify brief + developer work order |
+| 1 | **Developer agent** | [E-P3.1](../cadre/executive-coder/E-CYBERDECK-001-P3.1-provider-connection.md) — branch from `main` @ `f084b5f` |
+| 2 | **Tech lead** | Prep P3.1 verify brief + tester orders |
 | 3 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
