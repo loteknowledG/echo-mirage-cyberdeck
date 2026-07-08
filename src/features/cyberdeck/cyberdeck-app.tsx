@@ -49,7 +49,6 @@ import { RegistryShowroom } from "@/app/registry/registry-showroom";
 import { RegistryKitScrollFrame } from "@/app/registry/registry-kit-scroll-frame";
 import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
 import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
-import { textForMuthurSpeech } from "@/lib/muthur-speech-text";
 import type { CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
 import {
   loadComputerUse,
@@ -395,11 +394,18 @@ import {
   type ServerRailButton,
 } from "@/features/cyberdeck/workspace/custom-tab-model";
 import {
+  buildCyberdeckChatHistory,
   formatCodingVerifySystemLine,
   gatewayKeySysMessage,
+  getOperatorFileKind,
+  isEditableOperatorFile,
   isGatewayKeySysTip,
   parseCodingVerifyHeader,
+  readFileAsDataUrl,
   renderGatewayMessageText,
+  textForSpeech,
+  contextMenuTargetIsTextField,
+  type DroppedOperatorAsset,
 } from "@/features/cyberdeck/muthur/coding-verify-format";
 import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
@@ -476,12 +482,6 @@ const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 /** @deprecated use CLIENT_BAKED_PROVIDER_KEYS */
 const DEFAULT_CLIENT_PROVIDER_KEYS = CLIENT_BAKED_PROVIDER_KEYS;
 
-function contextMenuTargetIsTextField(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  return Boolean(target.closest("input, textarea, select"));
-}
-
 const fixedServers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
@@ -525,38 +525,6 @@ function hasAnyProviderClientKey(
   );
 }
 
-type DroppedOperatorAsset = {
-  kind:
-    | "css"
-    | "html"
-    | "javascript"
-    | "json"
-    | "markdown"
-    | "pdf"
-    | "docx"
-    | "python"
-    | "text"
-    | "typescript"
-    | "code"
-    | "image"
-    | "video"
-    | "file";
-  name: string;
-  mimeType: string;
-  size: number;
-  text?: string;
-  imageSrc?: string;
-  pdfSrc?: string;
-  docxSrc?: string;
-  localFilePath?: string;
-  surface?: OperatorAssetSurface;
-};
-
-type CyberdeckChatHistoryMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
-
 type HeapEntry = {
   id: string;
   name: string;
@@ -592,58 +560,6 @@ type EchoMirageSaveApi = {
   }): Promise<{ canceled: boolean; filePath?: string; error?: string }>;
 };
 
-const EDITABLE_TEXT_EXTENSIONS = [
-  ".md",
-  ".markdown",
-  ".txt",
-  ".json",
-  ".jsonc",
-  ".js",
-  ".jsx",
-  ".ts",
-  ".tsx",
-  ".mjs",
-  ".cjs",
-  ".css",
-  ".html",
-  ".htm",
-  ".xml",
-  ".yaml",
-  ".yml",
-  ".toml",
-  ".ini",
-  ".env",
-  ".sh",
-  ".bash",
-  ".zsh",
-  ".py",
-  ".go",
-  ".rs",
-  ".java",
-  ".c",
-  ".cpp",
-  ".h",
-  ".hpp",
-  ".sql",
-  ".csv",
-  ".tsv",
-  ".log",
-];
-
-function isEditableOperatorFile(file: File) {
-  const lowerName = file.name.toLowerCase();
-  const lowerType = (file.type || "").toLowerCase();
-  return (
-    lowerType.startsWith("text/") ||
-    lowerType === "application/json" ||
-    lowerType === "application/xml" ||
-    lowerType === "application/javascript" ||
-    lowerType === "application/typescript" ||
-    lowerType === "application/x-yaml" ||
-    EDITABLE_TEXT_EXTENSIONS.some((ext) => lowerName.endsWith(ext))
-  );
-}
-
 async function readEchoMirageClipboardText() {
   const bridge = (window as Window & { echoMirageClipboard?: EchoMirageClipboardApi })
     .echoMirageClipboard;
@@ -660,39 +576,6 @@ async function readEchoMirageClipboardText() {
   }
 
   return "";
-}
-
-function getOperatorFileKind(file: File): DroppedOperatorAsset["kind"] {
-  const lowerName = file.name.toLowerCase();
-  if (lowerName.endsWith(".md") || lowerName.endsWith(".markdown") || file.type === "text/markdown") {
-    return "markdown";
-  }
-  if (
-    lowerName.endsWith(".json") ||
-    lowerName.endsWith(".jsonc") ||
-    file.type === "application/json"
-  ) {
-    return "json";
-  }
-  if (isEditableOperatorFile(file)) {
-    return "code";
-  }
-  if (file.type.startsWith("image/")) return "image";
-  if (file.type.startsWith("video/")) return "video";
-  return "file";
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      resolve(typeof reader.result === "string" ? reader.result : "");
-    };
-    reader.onerror = () => {
-      reject(reader.error || new Error("Failed to read file."));
-    };
-    reader.readAsDataURL(file);
-  });
 }
 
 class MotherTerminal {
@@ -752,21 +635,6 @@ class MotherTerminal {
   shouldBurst(text: string) {
     return text.length >= this.burstThreshold;
   }
-}
-
-function textForSpeech(value: string) {
-  return textForMuthurSpeech(value);
-}
-
-function buildCyberdeckChatHistory(messages: Array<{ role: string; text: string }>, limit = 8) {
-  return messages
-    .filter((message) => message.role === "user" || message.role === "assistant")
-    .map((message) => ({
-      role: message.role,
-      content: message.text.trim(),
-    }))
-    .filter((message) => Boolean(message.content))
-    .slice(-limit);
 }
 
 export default function CyberdeckApp() {

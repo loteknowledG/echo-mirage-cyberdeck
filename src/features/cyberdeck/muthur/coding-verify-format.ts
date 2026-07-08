@@ -31,3 +31,20 @@ export {
   isGatewayKeySysTip,
   renderGatewayMessageText,
 } from "@/features/cyberdeck/gateway/gateway-message-render";
+
+export {
+  buildCyberdeckChatHistory,
+  type CyberdeckChatHistoryMessage,
+} from "@/features/cyberdeck/muthur/build-chat-history";
+
+export {
+  contextMenuTargetIsTextField,
+  textForSpeech,
+} from "@/features/cyberdeck/shared/cyberdeck-ui-utils";
+
+export {
+  getOperatorFileKind,
+  isEditableOperatorFile,
+  readFileAsDataUrl,
+  type DroppedOperatorAsset,
+} from "@/features/cyberdeck/operator/operator-drop-utils";
