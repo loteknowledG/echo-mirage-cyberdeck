@@ -108,7 +108,6 @@ import {
 } from "@/lib/muthur-core/muthur-stream-payload";
 import {
   buildMuthurChatScrollKey,
-  extractMuthurProgressStatus,
   toolTraceToDiagnostic,
 } from "@/lib/muthur-core/muthur-command-console";
 import {
@@ -116,15 +115,11 @@ import {
   formatMuthurReasoningDiagnostic,
 } from "@/lib/muthur-core/muthur-stream-reasoning";
 import { useMuthurChatAutoScroll } from "@/lib/muthur-core/use-muthur-chat-auto-scroll";
-import { partitionMuthurChannelUpdate } from "@/lib/muthur-core/muthur-response-channel";
 import { CADRE_MUTHUR_ARCHIVE_EVENT } from "@/lib/cadre/cadre-event-bus";
 import {
   appendMuthurDiagnosticBatch,
   appendMuthurDiagnosticEntry,
   createEmptyMuthurDiagnosticsState,
-  MUTHUR_RESPONSE_STALL_MS,
-  type MuthurDiagnosticsState,
-  type MuthurResponseStall,
 } from "@/lib/muthur-core/muthur-diagnostics-channel";
 import { parseOperatorConversionJson } from "@/lib/muthur-core/operator-conversion-ref";
 import { parseOperatorBrowserJson } from "@/lib/muthur-core/operator-browser-ref";
@@ -268,11 +263,6 @@ import {
   type MuthurCommandInputHandle,
 } from "@/components/cyberdeck/muthur-command-input";
 import { MuthurCommandConsoleLog } from "@/components/cyberdeck/muthur-command-console-log";
-import {
-  DEFAULT_CHAT_USER_DISPLAY_NAME,
-  readChatUserDisplayName,
-  writeChatUserDisplayName,
-} from "@/lib/chat-user-display-name";
 import { setMuthurScreenSnapshot } from "@/lib/muthur-screen-context";
 import { formatPiScreenContextForMuthur, readPiScreenSnapshot } from "@/lib/pi-screen-context";
 import { setMUTHURMode } from "@/lib/computer-use/control-lease";
@@ -375,6 +365,11 @@ import {
 } from "@/lib/cyberdeck/survey-tab-lifecycle.client";
 import { useSurveyMuthurArchive } from "@/features/cyberdeck/hooks/use-survey-muthur-archive";
 import { useSurveyMuthurMissionHandlers } from "@/features/cyberdeck/hooks/use-survey-muthur-mission-handlers";
+import {
+  CHAT_STORAGE_KEY,
+  CHAT_STREAM_STORAGE_KEY,
+} from "@/features/cyberdeck/muthur/muthur-chat-types";
+import { useMuthurChatState } from "@/features/cyberdeck/muthur/use-muthur-chat-state";
 import {
   CUSTOM_TAB_CONTEXT_MENU_ACTIONS,
   defaultCustomTabGlyphForKind,
@@ -490,12 +485,9 @@ const fixedServers = [
 ];
 
 const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
-const CHAT_STORAGE_KEY = "echo-mirage-chat-messages-v1";
-const CHAT_STREAM_STORAGE_KEY = "echo-mirage-chat-stream-text-v1";
 const CHAT_UPLINK_TIMEOUT_MS = 300_000;
 const MODEL_PROBE_MIN_INTERVAL_MS = 15_000;
 const PROVIDER_RATE_LIMIT_COOLDOWN_MS = 90_000;
-const INPUT_HISTORY_KEY = "echo-mirage-chat-history-v1";
 const UI_STATE_STORAGE_KEY = "echo-mirage-ui-state-v1";
 
 type CyberdeckUiState = {
@@ -638,45 +630,45 @@ class MotherTerminal {
 }
 
 export default function CyberdeckApp() {
-  type ChatMessage = { role: string; text: string; toolTrace?: string; inhabitant?: MuthurInhabitant };
   // Start on the operator tab; disconnected users are redirected to MAINNET-UPLINK after hydration.
   // Tab rail + pane visibility: zustand store (page must not subscribe).
   useEffect(() => {
     registerCyberdeckRailTab();
   }, []);
 
+  const {
+    inputHistory,
+    setInputHistory,
+    canSendInput,
+    handleCanSendInputChange,
+    messages,
+    setMessages,
+    setMessagesRaw,
+    muthurDiagnostics,
+    setMuthurDiagnostics,
+    muthurStall,
+    setMuthurStall,
+    muthurResponseFailed,
+    setMuthurResponseFailed,
+    composeStartedAtRef,
+    chatUserDisplayName,
+    setChatUserDisplayName,
+    chatHydrated,
+    isStreaming,
+    setIsStreaming,
+    streamText,
+    setStreamText,
+    streamToolTrace,
+    setStreamToolTrace,
+    chatPinnedToBottom,
+    setChatPinnedToBottom,
+    generatedUI,
+    setGeneratedUI,
+  } = useMuthurChatState();
 
-  const [inputHistory, setInputHistory] = useState<string[]>([]);
-  const [canSendInput, setCanSendInput] = useState(false);
-  const [messages, setMessagesRaw] = useState<ChatMessage[]>([]);
-  const [muthurDiagnostics, setMuthurDiagnostics] = useState<MuthurDiagnosticsState>(() =>
-    createEmptyMuthurDiagnosticsState(),
-  );
   const piControlLease = usePiControlLease();
   const piControlLeaseRefresh = piControlLease.refresh;
   const piControlLeaseRetake = piControlLease.retake;
-  const [muthurStall, setMuthurStall] = useState<MuthurResponseStall | null>(null);
-  const [muthurResponseFailed, setMuthurResponseFailed] = useState(false);
-  const composeStartedAtRef = useRef<number | null>(null);
-  const setMessages = useCallback((updater: React.SetStateAction<ChatMessage[]>) => {
-    setMessagesRaw((prev) => {
-      const rawNext = typeof updater === "function" ? updater(prev) : updater;
-      if (!Array.isArray(rawNext)) return prev;
-
-      const { channel, newDiagnostics } = partitionMuthurChannelUpdate(prev, rawNext);
-      if (newDiagnostics.length > 0) {
-        setMuthurDiagnostics((current) => appendMuthurDiagnosticBatch(current, newDiagnostics));
-      }
-
-      return channel;
-    });
-  }, []);
-  const [chatUserDisplayName, setChatUserDisplayName] = useState(DEFAULT_CHAT_USER_DISPLAY_NAME);
-  const [chatHydrated, setChatHydrated] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamText, setStreamText] = useState("");
-  const [streamToolTrace, setStreamToolTrace] = useState("");
-  const [chatPinnedToBottom, setChatPinnedToBottom] = useState(true);
   const [muthurPosture, setMuthurPosture] = useState<MuthurPosture>(() => loadMuthurPosture());
   const [muthurInhabitant, setMuthurInhabitant] = useState<MuthurInhabitant>(() =>
     loadMuthurInhabitant(),
@@ -686,7 +678,6 @@ export default function CyberdeckApp() {
     loadMuthurDelegations(),
   );
   const [, setMuthurCognition] = useState<MuthurCognitionState>(() => loadMuthurCognition());
-  const [generatedUI, setGeneratedUI] = useState<string | null>(null);
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
   const [operatorDroppedAsset, setOperatorDroppedAsset] = useState<DroppedOperatorAsset | null>(() =>
@@ -897,10 +888,6 @@ export default function CyberdeckApp() {
   const providerClickTrackerRef = useRef({ providerId: "", count: 0, lastClickAt: 0 });
   const providerRefreshAtRef = useRef<Record<string, number>>({});
   const providerBootstrapRef = useRef(false);
-
-  const handleCanSendInputChange = useCallback((canSend: boolean) => {
-    setCanSendInput((prev) => (prev === canSend ? prev : canSend));
-  }, []);
 
   const syncGlyphChannelTabGlyphs = useCallback(() => {
     useCyberdeckTabStore.getState().setCustomTabs((prev) =>
@@ -1168,7 +1155,7 @@ export default function CyberdeckApp() {
 
     window.addEventListener(CADRE_MUTHUR_ARCHIVE_EVENT, onCadreArchive);
     return () => window.removeEventListener(CADRE_MUTHUR_ARCHIVE_EVENT, onCadreArchive);
-  }, []);
+  }, [setMessagesRaw, setMuthurDiagnostics]);
 
   useEffect(() => {
     if (!ENABLE_AUTOMATION) return;
@@ -2051,95 +2038,6 @@ export default function CyberdeckApp() {
     window.addEventListener(GLYPH_MODE_UPDATE_EVENT, handler);
     return () => window.removeEventListener(GLYPH_MODE_UPDATE_EVENT, handler);
   }, [syncGlyphChannelTabGlyphs]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const stored = window.localStorage.getItem(CHAT_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as unknown;
-        if (Array.isArray(parsed)) {
-          const restored = parsed
-            .filter((item): item is ChatMessage => {
-              if (!item || typeof item !== "object") return false;
-              const candidate = item as Partial<ChatMessage>;
-              return typeof candidate.role === "string" && typeof candidate.text === "string";
-            })
-            .map((item) => ({
-              role: item.role,
-              text: item.text,
-              ...(typeof item.toolTrace === "string" && item.toolTrace.trim()
-                ? { toolTrace: item.toolTrace.trim() }
-                : {}),
-            }));
-          const legacySystemLines = restored
-            .filter((item) => item.role === "system")
-            .map((item) => item.text);
-          const channel = restored.filter((item) => item.role !== "system");
-          setMessagesRaw(channel);
-          if (legacySystemLines.length > 0) {
-            setMuthurDiagnostics((current) => appendMuthurDiagnosticBatch(current, legacySystemLines));
-          }
-        }
-      }
-      const storedStreamText = window.localStorage.getItem(CHAT_STREAM_STORAGE_KEY);
-      if (typeof storedStreamText === "string") {
-        setStreamText(storedStreamText);
-      }
-      const storedHistory = window.localStorage.getItem(INPUT_HISTORY_KEY);
-      if (storedHistory) {
-        try {
-          const parsed = JSON.parse(storedHistory);
-          if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
-            setInputHistory(parsed);
-          }
-        } catch { /* ignore */ }
-      }
-      setChatUserDisplayName(readChatUserDisplayName());
-    } catch {
-      /* ignore chat restore errors */
-    } finally {
-      setChatHydrated(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!chatHydrated) return;
-    writeChatUserDisplayName(chatUserDisplayName);
-  }, [chatHydrated, chatUserDisplayName]);
-
-  useEffect(() => {
-    if (!chatHydrated) return;
-    try {
-      window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
-    } catch {
-      /* ignore */
-    }
-  }, [messages, chatHydrated]);
-
-  useEffect(() => {
-    if (!chatHydrated) return;
-    try {
-      window.localStorage.setItem(CHAT_STREAM_STORAGE_KEY, streamText);
-    } catch {
-      /* ignore */
-    }
-  }, [streamText, chatHydrated]);
-
-  useEffect(() => {
-    if (!chatHydrated) return;
-    if (inputHistory.length === 0) {
-      try {
-        window.localStorage.removeItem(INPUT_HISTORY_KEY);
-      } catch { /* ignore */ }
-      return;
-    }
-    try {
-      window.localStorage.setItem(INPUT_HISTORY_KEY, JSON.stringify(inputHistory.slice(-50)));
-    } catch {
-      /* ignore */
-    }
-  }, [inputHistory, chatHydrated]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -3773,34 +3671,6 @@ export default function CyberdeckApp() {
     setDidHydrateProviderState(true);
   }, []);
 
-  useEffect(() => {
-    if (isStreaming || streamText.trim()) {
-      if (composeStartedAtRef.current == null) {
-        composeStartedAtRef.current = Date.now();
-      }
-      return;
-    }
-    composeStartedAtRef.current = null;
-    setMuthurStall(null);
-  }, [isStreaming, streamText]);
-
-  useEffect(() => {
-    if (!isStreaming && !streamText.trim()) return;
-
-    const timer = window.setInterval(() => {
-      const started = composeStartedAtRef.current;
-      if (started == null) return;
-      const elapsedMs = Date.now() - started;
-      if (elapsedMs < MUTHUR_RESPONSE_STALL_MS) return;
-      setMuthurStall({
-        phase: extractMuthurProgressStatus(streamText) || "MUTHUR uplink active",
-        elapsedMs,
-      });
-    }, 2_000);
-
-    return () => window.clearInterval(timer);
-  }, [isStreaming, streamText]);
-
   const muthurChatScrollKey = useMemo(() => {
     const lastDiag = muthurDiagnostics.entries.at(-1);
     return buildMuthurChatScrollKey({
@@ -3841,7 +3711,7 @@ export default function CyberdeckApp() {
 
   const appendMuthurAssistantMessage = useCallback((text: string) => {
     setMessagesRaw((prev) => [...prev, { role: "assistant", text }]);
-  }, []);
+  }, [setMessagesRaw]);
 
   useSurveyMuthurArchive({
     archiveMuthurHistoryLine,
