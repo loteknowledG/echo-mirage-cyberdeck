@@ -6,7 +6,9 @@
 **Output receipt:** [JP-L-CYBERDECK-001-P2.3](./JP-L-CYBERDECK-001-P2.3.md)  
 **PR body:** [docs/pr-queue/P2.3-pr-body.md](../pr-queue/P2.3-pr-body.md)
 
-**Prerequisites:** [JP-P2.2 PASS](./JP-L-CYBERDECK-001-P2.2.md); `main` @ `e8e9185`
+**Prerequisites:** [JP-P2.2 PASS](./JP-L-CYBERDECK-001-P2.2.md); `main` @ `8690231`
+
+**Tester orders (paste):** [TESTER-L-CYBERDECK-001-P2.3](./TESTER-L-CYBERDECK-001-P2.3.md)
 
 ---
 
@@ -123,3 +125,9 @@ Warm `pnpm dev`, `/cyberdeck`:
 ## Verdict template
 
 Write `JP-L-CYBERDECK-001-P2.3.md`, comment on GitHub PR, update [CONDUCTOR](../work-orders/L-CYBERDECK-001-CONDUCTOR.md).
+
+---
+
+## Tester prompt (copy-paste)
+
+Full judicial agent orders: [TESTER-L-CYBERDECK-001-P2.3](./TESTER-L-CYBERDECK-001-P2.3.md)
