@@ -15,7 +15,7 @@
 | **P2.1** | Done | **PASS** | [JP-P2.1](../verifications/JP-L-CYBERDECK-001-P2.1.md) — merged `02414ce` — 8,414 lines |
 | **P2.2** | Done | **PASS** | [JP-P2.2](../verifications/JP-L-CYBERDECK-001-P2.2.md) — merged `a2b14a0` — 8,253 lines |
 | **P2.3** | Done | **PASS** | [JP-P2.3](../verifications/JP-L-CYBERDECK-001-P2.3.md) — [PR #44](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/44) merged `6d7bc27` — **7,066 lines** |
-| **P2.4** | **HEAD** | — | Chat column component — branch from `main` @ `6d7bc27` |
+| **P2.4** | **HEAD** | — | Chat column — branch from `main` @ `95bbc8d` |
 
 ---
 
@@ -54,8 +54,8 @@ P2 cumulative: 8,544 (P1 complete) → 7,066 (−1,478 lines). P2 target ~4,800 
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Developer agent** | Start P2.4 — `muthur-chat-column.tsx` from `main` @ `6d7bc27`; open GitHub PR |
-| 2 | **Tester agent** | VERIFY-P2.4 when PR lands |
+| 1 | **Developer agent** | Start P2.4 — `muthur-chat-column.tsx` from `main` @ `95bbc8d`; [P2.4-pr-body](../pr-queue/P2.4-pr-body.md) |
+| 2 | **Tester agent** | [TESTER-P2.4](../verifications/TESTER-L-CYBERDECK-001-P2.4.md) → [VERIFY-P2.4](../verifications/VERIFY-L-CYBERDECK-001-P2.4.md) |
 | 3 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
@@ -78,3 +78,4 @@ P2 cumulative: 8,544 (P1 complete) → 7,066 (−1,478 lines). P2 target ~4,800 
 |------|----------|
 | 2026-07-08 | P2.3 judicial PASS — PR #44 merged `6d7bc27`; queue pops to P2.4 |
 | 2026-07-08 | **L-MUTHUR-HEALTH-001** spec written — model health monitor queued post-P2 |
+| 2026-07-08 | P2.4 verify brief + PR body + tester orders prepped |
