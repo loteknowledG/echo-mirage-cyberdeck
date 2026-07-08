@@ -132,7 +132,6 @@ import { parseOperatorBrowserJson } from "@/lib/muthur-core/operator-browser-ref
 import { parseSurveyAutoConnectJson } from "@/lib/muthur-core/survey-auto-connect-ref";
 import { parseOperatorOpenJson } from "@/lib/muthur-core/operator-open-file-ref";
 import type { MuthurOperatorOpenFileRef } from "@/lib/muthur-core/types";
-import type { MuthurCodingVerifyReceipt } from "@/lib/muthur-core/types";
 import {
   docxFilenameFromMarkdownName,
   pdfFilenameFromMarkdownName,
@@ -387,7 +386,21 @@ import {
   type CustomTab,
   type CustomTabContextMenuAction,
   type CustomTabKind,
+  ENABLE_CARD_TABLE,
+  isFixedServerTabId,
+  safeServerId,
+  SERVER_IDS,
+  servers,
+  type ServerId,
+  type ServerRailButton,
 } from "@/features/cyberdeck/workspace/custom-tab-model";
+import {
+  formatCodingVerifySystemLine,
+  gatewayKeySysMessage,
+  isGatewayKeySysTip,
+  parseCodingVerifyHeader,
+  renderGatewayMessageText,
+} from "@/features/cyberdeck/muthur/coding-verify-format";
 import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
@@ -463,39 +476,6 @@ const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 /** @deprecated use CLIENT_BAKED_PROVIDER_KEYS */
 const DEFAULT_CLIENT_PROVIDER_KEYS = CLIENT_BAKED_PROVIDER_KEYS;
 
-const ENABLE_CARD_TABLE =
-  process.env.NEXT_PUBLIC_ENABLE_CARD_TABLE === "true";
-
-const DEFAULT_SERVER_ID = "s";
-
-function safeServerId(id: string): string {
-  if (id === "p") {
-    return DEFAULT_SERVER_ID;
-  }
-  if (id === "ct" && !ENABLE_CARD_TABLE) {
-    return DEFAULT_SERVER_ID;
-  }
-  return id;
-}
-
-const servers = [
-  { id: "m", glyph: "Ø", label: "ØPERATOR" },
-  { id: "w", glyph: "W", label: "WEB" },
-  { id: "c", glyph: "C", label: "CONNECTION" },
-  { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
-  ...(ENABLE_CARD_TABLE ? [{ id: "ct", glyph: "◈", label: "CARD TABLE" }] : []),
-  { id: "h", glyph: "π", label: "DIAGNOSTIC" },
-  { id: "b", glyph: "§", label: "SETTINGS" },
-] as const;
-
-const SERVER_IDS = ENABLE_CARD_TABLE
-  ? (["m", "s", "ct", "b"] as const)
-  : (["m", "s", "b"] as const);
-
-function isFixedServerTabId(id: string): id is (typeof SERVER_IDS)[number] {
-  return (SERVER_IDS as readonly string[]).includes(id);
-}
-
 function contextMenuTargetIsTextField(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
@@ -519,34 +499,14 @@ const INPUT_HISTORY_KEY = "echo-mirage-chat-history-v1";
 const UI_STATE_STORAGE_KEY = "echo-mirage-ui-state-v1";
 
 type CyberdeckUiState = {
-  server: (typeof SERVER_IDS)[number];
+  server: ServerId;
   navRailContext: "gateway" | "tabs";
-  serverKeyboardHighlightId: (typeof SERVER_IDS)[number] | null;
+  serverKeyboardHighlightId: ServerId | null;
   operatorSurfaceMode?: "workspace" | "browser";
   operatorBrowserUrl?: string;
   customTabs?: CustomTab[];
   activeCustomTabId?: string | null;
 };
-
-/** Gateway SYS lines; link phrases must match `renderGatewayMessageText` splits. */
-function gatewayKeySysMessage(providerId: string): string {
-  if (providerId === "openai") {
-    return "ENTER OPENAI KEY BELOW. create one by visiting Open AI console.";
-  }
-  if (providerId === "openrouter") {
-    return "ENTER OPENROUTER KEY BELOW. create one by visiting OpenRouter console.";
-  }
-  if (providerId === "opencode") {
-    return "ENTER OPENCODE KEY BELOW. create one by visiting OpenCode console.";
-  }
-  return `ENTER ${providerId.toUpperCase()} KEY BELOW.`;
-}
-
-const GATEWAY_KEY_SYS_TIPS = new Set(PROVIDER_IDS.map((id) => gatewayKeySysMessage(id)));
-
-function isGatewayKeySysTip(text: string): boolean {
-  return GATEWAY_KEY_SYS_TIPS.has(text.trim());
-}
 
 function providerHasClientKey(
   providerId: string,
@@ -564,15 +524,6 @@ function hasAnyProviderClientKey(
     providerHasClientKey(id, providerKeys, defaultKeyAvailableByProvider),
   );
 }
-
-const GATEWAY_LINK_PARTS =
-  /(Open AI console|OpenRouter console|OpenCode console)/g;
-
-const GATEWAY_LINK_HREF: Record<string, string> = {
-  "Open AI console": "https://platform.openai.com/settings/api-keys",
-  "OpenRouter console": "https://openrouter.ai/workspaces/default/keys",
-  "OpenCode console": "https://opencode.ai",
-};
 
 type DroppedOperatorAsset = {
   kind:
@@ -803,39 +754,6 @@ class MotherTerminal {
   }
 }
 
-function renderGatewayMessageText(text: string) {
-  const hasGatewayLink =
-    typeof text === "string" &&
-    (text.includes("Open AI console") ||
-      text.includes("OpenRouter console") ||
-      text.includes("OpenCode console"));
-  if (hasGatewayLink) {
-    const parts = text.split(GATEWAY_LINK_PARTS);
-    return (
-      <>
-        {parts.map((part, idx) => {
-          const href = GATEWAY_LINK_HREF[part];
-          if (href) {
-            return (
-              <a
-                key={idx}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sky-400 underline"
-              >
-                {part}
-              </a>
-            );
-          }
-          return <span key={idx}>{part}</span>;
-        })}
-      </>
-    );
-  }
-  return text;
-}
-
 function textForSpeech(value: string) {
   return textForMuthurSpeech(value);
 }
@@ -849,32 +767,6 @@ function buildCyberdeckChatHistory(messages: Array<{ role: string; text: string 
     }))
     .filter((message) => Boolean(message.content))
     .slice(-limit);
-}
-
-function parseCodingVerifyHeader(raw: string | null): MuthurCodingVerifyReceipt | null {
-  if (!raw?.trim()) return null;
-  try {
-    const parsed = JSON.parse(raw) as MuthurCodingVerifyReceipt;
-    if (typeof parsed.passed === "boolean" && Array.isArray(parsed.touched_paths)) {
-      return parsed;
-    }
-  } catch {
-    /* ignore malformed header */
-  }
-  return null;
-}
-
-function formatCodingVerifySystemLine(receipt: MuthurCodingVerifyReceipt): string {
-  const status = receipt.passed ? "PASS" : "FAIL";
-  const touched = receipt.touched_paths.join(", ") || "(none)";
-  let line = `CODING_VERIFY // ${status} // tsc exit ${receipt.tsc_exit_code} // touched: ${touched}`;
-  if (receipt.receipt_path) {
-    line += ` // receipt: ${receipt.receipt_path}`;
-  }
-  if (!receipt.passed && receipt.tsc_stderr_tail.trim()) {
-    line += ` // ${receipt.tsc_stderr_tail.trim().slice(0, 240)}`;
-  }
-  return line;
 }
 
 export default function CyberdeckApp() {
@@ -1169,7 +1061,7 @@ export default function CyberdeckApp() {
   }, [syncGlyphChannelTabGlyphs]);
 
   const railGlyphForServer = useCallback(
-    (btn: (typeof servers)[number]) => {
+    (btn: ServerRailButton) => {
       if (glyphModeActive && btn.id === "s") return "⟁";
       return btn.glyph;
     },

@@ -336,3 +336,13 @@ export function parseCustomTabCommand(input: string) {
 
   return null;
 }
+
+export {
+  ENABLE_CARD_TABLE,
+  isFixedServerTabId,
+  safeServerId,
+  SERVER_IDS,
+  servers,
+  type ServerId,
+  type ServerRailButton,
+} from "./server-rail-config";
