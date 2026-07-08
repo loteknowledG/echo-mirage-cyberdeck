@@ -16,20 +16,21 @@
 | **P2.2** | Done | **PASS** | merged `a2b14a0` — 8,253 lines |
 | **P2.3** | Done | **PASS** | merged `6d7bc27` — 7,066 lines |
 | **P2.4** | Done | **PASS** | [JP-P2.4](../verifications/JP-L-CYBERDECK-001-P2.4.md) — [PR #45](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/45) **MERGED** `40c6473` — **6,766 lines** |
-| **P2.5** | **HEAD** | — | Commander handlers — branch from `main` @ `40c6473` |
+| **P2.5** | Done | **PASS** | [JP-P2.5](../verifications/JP-L-CYBERDECK-001-P2.5.md) — [PR #47](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/47) **MERGED** `f084b5f` — **6,445 lines** — **P2 complete** |
+| **P3.1** | **HEAD** | — | Gateway column — branch from `main` @ `f084b5f` |
 
 ---
 
 ## Metrics ratchet (live)
 
-| Metric | P2.3 merged | P2.4 merged | Ceiling |
-|--------|------------:|------------:|--------:|
-| `cyberdeck-app.tsx` lines | 7,066 | **6,766** | 6,766 |
-| Import lines | 150 | **142** | 152 |
+| Metric | P2.4 merged | P2.5 verified | Ceiling |
+|--------|------------:|--------------:|--------:|
+| `cyberdeck-app.tsx` lines | 6,766 | **6,445** | 6,445 |
+| Import lines | 142 | **126** | 152 |
 
-Probe: **PASS** · `tsc`: **PASS** · MUTHUR probes: **PASS** · `main` @ `40c6473`
+Probe: **PASS** · `tsc`: **PASS** · MUTHUR probes: **PASS** · `main` @ `f084b5f` (PR #47 merged)
 
-P2 cumulative: 8,544 (P1 complete) → 6,766 (−1,778 lines). P2 target ~4,800 — ~1,966 lines still to shed in P2.5.
+**P2 tranche complete:** 8,544 (P1 complete) → 6,445 (−2,099 lines). Legislator aspirational ~4,800 not reached; further wins in P3+.
 
 ---
 
@@ -41,8 +42,8 @@ P2 cumulative: 8,544 (P1 complete) → 6,766 (−1,778 lines). P2 target ~4,800 
 | — | P2.2 | [#43](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/43) | **MERGED** `a2b14a0` |
 | — | P2.3 | [#44](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/44) | **MERGED** `6d7bc27` |
 | — | P2.4 | [#45](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/45) | **MERGED** `40c6473` |
-| **1** | **P2.5** | — | commander handlers (D2.8, D2.9) — **HEAD** |
-| 3 | P3.1 | — | gateway column |
+| — | P2.5 | [#47](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/47) | **MERGED** `f084b5f` |
+| **1** | **P3.1** | — | gateway column — **HEAD** |
 | 4 | P4.1 | — | layout shell |
 | 5 | P5.1 | — | operator pane |
 | 6 | P6.1 | — | survey hub |
@@ -55,15 +56,15 @@ P2 cumulative: 8,544 (P1 complete) → 6,766 (−1,778 lines). P2 target ~4,800 
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Developer agent** | Start P2.5 — `use-muthur-commander-handlers` from `main` @ `40c6473` |
-| 2 | **Tester agent** | VERIFY-P2.5 when P2.5 lands |
-| 4 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
+| 1 | **Developer agent** | Implement P3.1 gateway column — branch from `main` @ `f084b5f` |
+| 2 | **Tech lead** | Prep P3.1 verify brief + developer work order |
+| 3 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
 
 ## Post-P2 program queue
 
-**Start after P2.5 merged.**
+**Unblocked — P2.5 merged `f084b5f`.**
 
 | Order | Work order | Summary |
 |------:|------------|---------|
@@ -80,3 +81,6 @@ P2 cumulative: 8,544 (P1 complete) → 6,766 (−1,778 lines). P2 target ~4,800 
 | 2026-07-08 | P2.3 judicial PASS — PR #44 merged `6d7bc27` |
 | 2026-07-08 | P2.4 verify brief + PR body + tester orders prepped |
 | 2026-07-08 | P2.4 judicial PASS — PR #45 merged `40c6473`; queue pops to P2.5 |
+| 2026-07-08 | P2.5 developer work order + PR body prepped — [E-P2.5](../cadre/executive-coder/E-CYBERDECK-001-P2.5-commander-handlers.md) |
+| 2026-07-08 | P2.5 judicial PASS — [JP-P2.5](../verifications/JP-L-CYBERDECK-001-P2.5.md) — PR #47 `6b37236` — **P2 complete**; queue → P3.1 |
+| 2026-07-08 | P2.5 merged — PR #47 `f084b5f` on `main`; queue pops to **P3.1 HEAD** |

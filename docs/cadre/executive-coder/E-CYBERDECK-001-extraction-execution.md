@@ -1,8 +1,9 @@
 # E-CYBERDECK-001 — Cyberdeck Extraction Execution Thread
 
-**Status:** ACTIVE — P0 landed, P1 next  
+**Status:** ACTIVE — P3.1 queue HEAD  
 **Legislator:** [L-CYBERDECK-001](../../work-orders/L-CYBERDECK-001-cyberdeck-app-extraction.md)  
 **Conductor:** [L-CYBERDECK-001-CONDUCTOR](../../work-orders/L-CYBERDECK-001-CONDUCTOR.md)  
+**Current slice:** P3.1 gateway column (per legislator D3.1+)  
 **Verifier protocol:** [VERIFY-L-CYBERDECK-001](../../verifications/VERIFY-L-CYBERDECK-001.md)  
 
 ---
@@ -21,9 +22,11 @@ You are the **implementer** (Executive). You ship small PRs against this thread.
 
 ## Current sprint
 
-**Phase P1.1** — Extract custom tab model (first code-moving PR after P0).
+**Phase P3.1** — Gateway column extraction (queue HEAD).
 
-Do **not** start P2 until P1 tranche is verifier-approved and conductor updates status.
+**Baseline:** `main` @ `f084b5f` — 6,445 lines, 126 imports.
+
+Do **not** start P3.2 until P3.1 is verifier-approved and conductor updates status.
 
 ---
 
