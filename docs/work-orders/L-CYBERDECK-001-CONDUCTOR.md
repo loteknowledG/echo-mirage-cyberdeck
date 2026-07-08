@@ -77,7 +77,7 @@ gh pr create --title "refactor: extract handleSend (L-CYBERDECK-001 P2.3)" --bod
 | # | Owner | Action |
 |---|-------|--------|
 | 1 | **Developer agent** | Start P2.3 — `use-muthur-chat-send.ts` from `main` @ `a2b14a0`; open GitHub PR |
-| 2 | **Tester agent** | [VERIFY-P2.3](../verifications/VERIFY-L-CYBERDECK-001-P2.3.md) on PR branch; write JP-P2.3 |
+| 2 | **Tester agent** | [TESTER-P2.3](../verifications/TESTER-L-CYBERDECK-001-P2.3.md) on PR branch → [JP-P2.3](../verifications/JP-L-CYBERDECK-001-P2.3.md) |
 | 3 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
