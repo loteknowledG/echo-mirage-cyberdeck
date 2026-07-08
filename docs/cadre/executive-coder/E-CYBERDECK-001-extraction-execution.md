@@ -54,6 +54,8 @@ Do **not** start P2 until P1 tranche is verifier-approved and conductor updates 
 
 **Verifier:** Run [VERIFY-L-CYBERDECK-001-P0](../../verifications/VERIFY-L-CYBERDECK-001-P0.md) before P1 starts.
 
+**P0 judicial:** **PASS** at `4b7d140` — [JP-P0](../../verifications/JP-L-CYBERDECK-001-P0.md). P1 implementer work may proceed; each slice still needs its own JP before PR merge.
+
 ---
 
 ## P1.1 — IN PROGRESS (developer instructions)

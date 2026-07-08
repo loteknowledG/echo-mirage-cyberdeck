@@ -111,9 +111,23 @@ Same as P0: dynamic page client, pane-chunks lazy, no forbidden static pane impo
 
 ---
 
+### V-P1.1-08 — Extraction smoke (Playwright, no LLM)
+
+```powershell
+pnpm probe:cyberdeck-extraction-smoke
+```
+
+**Expected:** 4 tests pass — boot shell, custom tab create, context-menu surface, `muthur help tabs` (local, no API).
+
+**Prerequisite:** Cold `/cyberdeck` compile can take ~3 min (L-10). Start `pnpm dev` and wait for first compile for faster runs. Tests clear `localStorage` for tab isolation.
+
+**Full deck smoke** (optional, needs working MUTHUR indicate path): `pnpm e2e:smoke`
+
+---
+
 ## Optional
 
-- Manual: open `/cyberdeck`, create/rename custom tab, run a tab command from chat — should behave as before.
+- Manual: open `/cyberdeck`, create/rename custom tab, run a tab command from chat — covered by V-P1.1-08 when Playwright passes.
 
 ---
 

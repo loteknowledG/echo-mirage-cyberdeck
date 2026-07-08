@@ -19,10 +19,10 @@ Developer branch  →  Tester VERIFY  →  JP receipt  →  Open PR  →  Merge 
 |------|------|--------|
 | 1. Implement | Cursor dev agent on feature branch | **P1.1 done** — `cursor/extract-custom-tab-model-p1.1` |
 | 2. Push | GitHub Desktop / `git push` | **Done** (branch published) |
-| 3. Verify | Separate Cursor tester agent | **P1.1 PENDING** — [VERIFY-P1.1](../verifications/VERIFY-L-CYBERDECK-001-P1.1.md) |
-| 4. PR | GitHub Desktop “Preview Pull Request” / `gh pr create` | **Not opened** |
-| 5. Merge | After JP-P1.1 PASS + review | Waiting |
-| 6. Next | P1.2 per E-CYBERDECK-001 | Blocked |
+| 3. Verify | Separate Cursor tester agent | **P1.1 PASS** — [JP-P1.1](../verifications/JP-L-CYBERDECK-001-P1.1.md) |
+| 4. PR | GitHub Desktop “Preview Pull Request” / `gh pr create` | **Not opened** (P1.1 already on `main` @ `4b7d140`) |
+| 5. Merge | After JP-P1.1 PASS + review | **Local merge done**; formal PR optional |
+| 6. Next | P1.2 per E-CYBERDECK-001 | **Unblocked** |
 
 ---
 
@@ -31,8 +31,8 @@ Developer branch  →  Tester VERIFY  →  JP receipt  →  Open PR  →  Merge 
 | Phase | Implementer | Judicial | PR | Notes |
 |-------|-------------|----------|-----|-------|
 | **P0** | Done | **PASS** | — | [JP-P0](../verifications/JP-L-CYBERDECK-001-P0.md) |
-| **P1.1** | **Done** (`4b7d140`) | **PENDING** | **None** | Custom tab model; -305 lines in app |
-| P1.2 | Queued | — | — | After P1.1 merge |
+| **P1.1** | **Done** (`4b7d140`) | **PASS** | **None** | [JP-P1.1](../verifications/JP-L-CYBERDECK-001-P1.1.md); −305 lines in app |
+| P1.2 | **Ready** | — | — | Unblocked after JP-P1.1 PASS |
 | P1.3 | Queued | — | — | |
 | P2+ | Blocked | — | — | |
 
@@ -53,10 +53,9 @@ Probe: **PASS** · `tsc`: **PASS**
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Tester agent** | [VERIFY-P1.1](../verifications/VERIFY-L-CYBERDECK-001-P1.1.md) → [JP-P1.1](../verifications/JP-L-CYBERDECK-001-P1.1.md) |
-| 2 | **Human / conductor** | After JP-P1.1 PASS → **Preview Pull Request** in GitHub Desktop |
-| 3 | **Human** | Merge when green |
-| 4 | **Developer agent** | Start P1.2 on new branch after merge |
+| 1 | **Human / conductor** | Optional: open PR for `cursor/extract-custom-tab-model-p1.1` (already on `main` locally) |
+| 2 | **Developer agent** | Start P1.2 on new branch per E-CYBERDECK-001 |
+| 3 | **Tester agent** | VERIFY-P1.2 when P1.2 lands |
 
 ---
 
@@ -67,6 +66,7 @@ Probe: **PASS** · `tsc`: **PASS**
 | 2026-06-17 | L-CYBERDECK-001 legislated; three-agent split |
 | 2026-07-07 | P0 judicial PASS |
 | 2026-07-07 | P1.1 landed on `cursor/extract-custom-tab-model-p1.1`; verifier order issued; PR hold until JP-P1.1 |
+| 2026-07-07 | P1.1 judicial PASS — [JP-P1.1](../verifications/JP-L-CYBERDECK-001-P1.1.md); P1.2 unblocked |
 
 ---
 

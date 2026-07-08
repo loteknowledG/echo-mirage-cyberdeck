@@ -48,6 +48,8 @@ pnpm exec tsc --noEmit
 pnpm probe:cyberdeck-compile-scope
 ```
 
+**UI phases (P1+):** add `pnpm probe:cyberdeck-extraction-smoke` (fast, no LLM). Full indicate/surface path: `pnpm e2e:smoke`.
+
 Add phase probes from the brief (e.g. P2 adds `pnpm probe:muthur-command-console`).
 
 ---

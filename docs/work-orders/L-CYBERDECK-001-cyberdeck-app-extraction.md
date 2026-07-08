@@ -332,6 +332,22 @@ pnpm probe:cyberdeck-compile-scope    # after P0
 
 ### Manual smoke (every phase touching UI)
 
+**Automated path (preferred):**
+
+```powershell
+pnpm probe:cyberdeck-extraction-smoke   # P1+ fast smoke (boot, custom tab, help)
+pnpm e2e:smoke                          # full alpha module smoke (MUTHUR indicate, surfaces)
+pnpm e2e:layout                         # responsive split + custom tab menu
+```
+
+| Script | When | Covers |
+|--------|------|--------|
+| `probe:cyberdeck-extraction-smoke` | Every P1+ verifier run | Boot, custom tab command, surface menu, local help |
+| `e2e:smoke` | P2+ or before merge to main | MUTHUR indicate/highlight, audit surfaces |
+| `e2e:layout` | P4 layout changes | Mobile/desktop split, divider persistence |
+
+**Manual fallback:**
+
 1. Open `/cyberdeck` — boot + rail render
 2. Send MUTHUR message — stream complete, diagnostics accordion
 3. Switch operator tab — open/save document
