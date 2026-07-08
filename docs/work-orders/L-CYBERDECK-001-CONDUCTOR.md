@@ -60,8 +60,21 @@ P2 cumulative: 8,544 (P1 complete) → 7,066 (−1,478 lines). P2 target ~4,800 
 
 ---
 
+## Post-P2 program queue
+
+**Start after P2.5 merged.** Separate from extraction PR queue.
+
+| Order | Work order | Summary |
+|------:|------------|---------|
+| 1 | [L-MUTHUR-HEALTH-001](./L-MUTHUR-HEALTH-001-model-health-monitor.md) | Model health self-diagnosis in Diagnostics |
+| 2 | B1 (backlog) | Survey Hub connect-wait must not block chat |
+| 3 | B2 (backlog) | E2E `DECK_COMMAND_INPUT` selector fix |
+
+---
+
 ## Conductor decisions log
 
 | Date | Decision |
 |------|----------|
 | 2026-07-08 | P2.3 judicial PASS — PR #44 merged `6d7bc27`; queue pops to P2.4 |
+| 2026-07-08 | **L-MUTHUR-HEALTH-001** spec written — model health monitor queued post-P2 |
