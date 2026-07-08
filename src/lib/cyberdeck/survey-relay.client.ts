@@ -2,6 +2,7 @@
 
 import { getOrCreatePowerfistDeviceId } from "@/lib/cyberdeck/survey-pairing-client";
 import { getOrCreateSurveyNodeId } from "@/lib/cyberdeck/survey-mode";
+import { surveyRelayPath } from "@/lib/cyberdeck/survey-relay-base";
 import { traceSurveyPairing } from "@/lib/cyberdeck/survey-pairing-trace";
 import type { SurveyRelayBundleClient } from "@/lib/cyberdeck/survey-relay-types";
 
@@ -14,10 +15,13 @@ export async function fetchSurveyRelayBundle(
   }
 
   try {
-    const res = await fetch(`/api/survey/relay/bundle?echoNodeId=${encodeURIComponent(id)}`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(12_000),
-    });
+    const res = await fetch(
+      surveyRelayPath(`/api/survey/relay/bundle?echoNodeId=${encodeURIComponent(id)}`),
+      {
+        cache: "no-store",
+        signal: AbortSignal.timeout(12_000),
+      },
+    );
     const payload = (await res.json()) as
       | { ok: true; bundle: SurveyRelayBundleClient }
       | { ok: false; reason?: string };
@@ -61,7 +65,7 @@ export async function enterSurveyPairPinViaRelay(input: {
 
   let requestId: string;
   try {
-    const res = await fetch("/api/survey/relay/pair-request", {
+    const res = await fetch(surveyRelayPath("/api/survey/relay/pair-request"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -89,7 +93,7 @@ export async function enterSurveyPairPinViaRelay(input: {
   while (Date.now() < deadline) {
     try {
       const res = await fetch(
-        `/api/survey/relay/pair-request?requestId=${encodeURIComponent(requestId)}`,
+        surveyRelayPath(`/api/survey/relay/pair-request?requestId=${encodeURIComponent(requestId)}`),
         { cache: "no-store", signal: AbortSignal.timeout(12_000) },
       );
       const payload = (await res.json()) as

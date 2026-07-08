@@ -11,7 +11,9 @@ import * as logger from "./logger.mjs";
  * @param {{ onStatus?: (status: WsRuntimeStatus) => void, onMission?: (detail: { missionId: string, ok: boolean, reason?: string }) => void }} callbacks
  */
 export function startWsClient(creds, callbacks) {
-  const url = new URL(`ws://${creds.wsHost}:${creds.wsPort}`);
+  const wsHost = process.env.ECHO_MIRAGE_POWERFIST_WS_HOST?.trim() || creds.wsHost;
+  const wsPort = Number(process.env.ECHO_MIRAGE_POWERFIST_WS_PORT) || creds.wsPort;
+  const url = new URL(`ws://${wsHost}:${wsPort}`);
   url.searchParams.set("role", "capture-deck");
   url.searchParams.set("token", creds.captureToken);
   url.searchParams.set("nodeId", creds.nodeId);

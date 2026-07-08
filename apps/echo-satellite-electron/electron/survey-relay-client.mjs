@@ -21,6 +21,12 @@ function cyberdeckOrigin() {
   return DEFAULT_CYBERDECK_ORIGIN.replace(/\/$/, "");
 }
 
+function relayBaseUrl() {
+  const fromEnv = process.env.SURVEY_RELAY_BASE_URL?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  return cyberdeckOrigin();
+}
+
 /**
  * @param {object} status
  */
@@ -31,7 +37,7 @@ export async function pushSurveyRelayBundle(status) {
     return { ok: false, reason: "echoNodeId and miragePin required for relay push." };
   }
 
-  const url = `${cyberdeckOrigin()}/api/survey/relay/bundle`;
+  const url = `${relayBaseUrl()}/api/survey/relay/bundle`;
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -69,7 +75,7 @@ export async function pollSurveyRelayPairRequests(echoNodeId, completePair) {
   const id = echoNodeId?.trim();
   if (!id) return { ok: false, reason: "echoNodeId required" };
 
-  const url = `${cyberdeckOrigin()}/api/survey/relay/pair-request?echoNodeId=${encodeURIComponent(id)}`;
+  const url = `${relayBaseUrl()}/api/survey/relay/pair-request?echoNodeId=${encodeURIComponent(id)}`;
   try {
     const res = await fetch(url, {
       method: "GET",
@@ -91,7 +97,7 @@ export async function pollSurveyRelayPairRequests(echoNodeId, completePair) {
         deviceId: request.deviceId,
       });
 
-      const responseUrl = `${cyberdeckOrigin()}/api/survey/relay/pair-request`;
+      const responseUrl = `${relayBaseUrl()}/api/survey/relay/pair-request`;
       await fetch(responseUrl, {
         method: "PUT",
         headers: relayHeaders(),

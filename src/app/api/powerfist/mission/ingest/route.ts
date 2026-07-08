@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
   await storePowerfistMission({ missionId, kind, prompt, pngBase64 });
   const imageDataUrl = `data:image/png;base64,${pngBase64}`;
-  const delivered = broadcastPowerfistMissionSolve({
+  const delivered = await broadcastPowerfistMissionSolve({
     missionId,
     kind,
     imageDataUrl,

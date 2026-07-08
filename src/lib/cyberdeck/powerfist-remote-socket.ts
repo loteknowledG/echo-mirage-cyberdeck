@@ -1,5 +1,6 @@
 import type { PowerFistStackCommand } from "@/lib/cyberdeck/powerfist-events";
 import type { SurveyMissionSolveDetail } from "@/lib/cyberdeck/powerfist-mission.types";
+import { applyPowerfistWsEnvOverride, rewritePowerfistWsUrl } from "@/lib/cyberdeck/powerfist-ws-endpoint";
 
 export type PowerfistSocketStatus = "disconnected" | "connecting" | "connected" | "error" | "pairing";
 
@@ -53,7 +54,8 @@ export function buildPowerfistRemoteWsUrl(
   remoteToken: string,
   deviceId: string,
 ): string {
-  const url = new URL(`ws://${host}:${port}`);
+  const endpoint = applyPowerfistWsEnvOverride(host, port);
+  const url = new URL(`ws://${endpoint.host}:${endpoint.port}`);
   url.searchParams.set("role", "remote");
   url.searchParams.set("token", remoteToken);
   url.searchParams.set("deviceId", deviceId);
@@ -359,7 +361,7 @@ export function connectPowerfistDeckSocket(options: {
   onMissionSolve?: (detail: SurveyMissionSolveDetail) => void;
   onStatus?: (status: PowerfistSocketStatus) => void;
 }): SocketController {
-  return attachReconnectingSocket({ ...options, role: "deck" });
+  return attachReconnectingSocket({ ...options, wsUrl: rewritePowerfistWsUrl(options.wsUrl), role: "deck" });
 }
 
 export function connectPowerfistRemoteSocket(options: {
@@ -369,6 +371,7 @@ export function connectPowerfistRemoteSocket(options: {
   sendStackPush: (command: PowerFistStackCommand) => Promise<{ ok: boolean; delivered?: number; error?: string }>;
   sendSurveyCaptureMission: () => Promise<{ ok: boolean; missionId?: string; error?: string }>;
 } {
+  const wsUrl = rewritePowerfistWsUrl(options.wsUrl);
   let ws: WebSocket | null = null;
   let status: PowerfistSocketStatus = "disconnected";
   let closed = false;

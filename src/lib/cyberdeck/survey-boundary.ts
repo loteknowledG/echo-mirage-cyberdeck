@@ -60,6 +60,7 @@
  * 2. New pairing UI → gate with isSurveyHubEnabled(); Hub on = status + Retry only.
  * 3. Do not wire team socket into Hub auto-connect — it is a legacy hint channel.
  * 4. Echo Satellite /api/spy/* compat stays in Echo apps; cyberdeck uses /api/survey/*.
+ * 5. Backend flip (Next relay/hub vs Go sidecars): docs/survey-emp-backends.md
  * ────────────────────────────────────────────────────────────────────────────────
  */
 

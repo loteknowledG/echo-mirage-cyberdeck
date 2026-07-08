@@ -87,6 +87,8 @@
     "probe:survey-hub": "tsx scripts/probe-survey-hub-functional.ts && tsx scripts/probe-survey-connect-boundary.ts",
     "probe:survey-hub-functional": "tsx scripts/probe-survey-hub-functional.ts",
     "probe:survey-connect-boundary": "tsx scripts/probe-survey-connect-boundary.ts",
+    "probe:survey-go-relay": "tsx scripts/probe-survey-go-relay.ts",
+    "probe:cyberdeck-compile-scope": "tsx scripts/probe-cyberdeck-compile-scope.ts",
     "probe:property-manager-call-persistence": "tsx scripts/probe-property-manager-call-persistence.ts",
     "probe:property-manager-case-viewer": "tsx scripts/probe-property-manager-case-viewer.ts",
     "probe:property-manager-case-actions": "tsx scripts/probe-property-manager-case-actions.ts",

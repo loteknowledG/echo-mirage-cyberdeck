@@ -10,6 +10,12 @@ import type {
 } from "@/lib/cyberdeck/powerfist-mission.types";
 import { resolveHttpPort } from "@/lib/server/is-localhost-request.server";
 import {
+  broadcastPowerfistMissionSolveExternal,
+  broadcastPowerfistMissionToCaptureExternal,
+  powerfistExternalHubEnabled,
+  waitForExternalPowerfistHubHealth,
+} from "@/lib/server/powerfist-hub-bridge.server";
+import {
   buildSilentCaptureMissionEnvelope,
   loadPowerfistPairingRegistry,
   savePowerfistPairingRegistry,
@@ -111,7 +117,11 @@ function broadcastToSet(clients: Set<WebSocket>, payload: string): number {
   return delivered;
 }
 
-export function broadcastPowerfistMissionToCapture(envelope: PowerfistMissionEnvelope): number {
+export async function broadcastPowerfistMissionToCapture(
+  envelope: PowerfistMissionEnvelope,
+): Promise<number> {
+  const external = await broadcastPowerfistMissionToCaptureExternal(envelope);
+  if (external !== null) return external;
   const hub = getHub();
   if (!hub) return 0;
   let delivered = 0;
@@ -123,7 +133,13 @@ export function broadcastPowerfistMissionToCapture(envelope: PowerfistMissionEnv
   return delivered;
 }
 
-export function broadcastPowerfistMissionSolve(detail: PowerfistMissionSolveDetail): number {
+export async function broadcastPowerfistMissionSolve(
+  detail: PowerfistMissionSolveDetail,
+): Promise<number> {
+  const external = await broadcastPowerfistMissionSolveExternal(detail);
+  if (external !== null) {
+    return external;
+  }
   const hub = getHub();
   if (!hub) return 0;
   return broadcastToSet(
@@ -141,6 +157,13 @@ export async function ensurePowerfistWsServer(): Promise<PowerfistPairingState |
   }
 
   const existing = await readPowerfistPairingState();
+  if (powerfistExternalHubEnabled()) {
+    const healthy = await waitForExternalPowerfistHubHealth();
+    if (healthy && existing?.deckToken) {
+      return existing;
+    }
+  }
+
   const port = resolveWsPort();
   const bindHost = resolveBindHost();
   const deckToken = await resolveDeckToken(existing);
@@ -223,7 +246,7 @@ export async function ensurePowerfistWsServer(): Promise<PowerfistPairingState |
               ws.send(JSON.stringify({ type: "mission-ack", ok: false, reason: built.reason }));
               return;
             }
-            const delivered = broadcastPowerfistMissionToCapture(built.envelope);
+            const delivered = await broadcastPowerfistMissionToCapture(built.envelope);
             ws.send(
               JSON.stringify({
                 type: "mission-ack",

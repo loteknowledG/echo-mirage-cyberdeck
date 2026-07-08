@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json(built, { status: 503 });
   }
 
-  const delivered = broadcastPowerfistMissionToCapture(built.envelope);
+  const delivered = await broadcastPowerfistMissionToCapture(built.envelope);
   return NextResponse.json({
     ok: delivered > 0,
     missionId: built.envelope.missionId,
