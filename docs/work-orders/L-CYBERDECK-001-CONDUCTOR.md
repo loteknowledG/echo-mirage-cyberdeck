@@ -67,6 +67,9 @@ git push -u origin HEAD
 gh pr create --title "refactor: extract handleSend (L-CYBERDECK-001 P2.3)" --body-file docs/pr-queue/P2.3-pr-body.md --base main
 ```
 
+| Pre-filled PR body | [P2.3-pr-body.md](../pr-queue/P2.3-pr-body.md) |
+| Verify brief | [VERIFY-P2.3](../verifications/VERIFY-L-CYBERDECK-001-P2.3.md) |
+
 ---
 
 ## Current action items
@@ -74,7 +77,7 @@ gh pr create --title "refactor: extract handleSend (L-CYBERDECK-001 P2.3)" --bod
 | # | Owner | Action |
 |---|-------|--------|
 | 1 | **Developer agent** | Start P2.3 — `use-muthur-chat-send.ts` from `main` @ `a2b14a0`; open GitHub PR |
-| 2 | **Tester agent** | VERIFY-P2.3 when P2.3 PR lands |
+| 2 | **Tester agent** | [VERIFY-P2.3](../verifications/VERIFY-L-CYBERDECK-001-P2.3.md) on PR branch; write JP-P2.3 |
 | 3 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
