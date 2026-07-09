@@ -1,9 +1,9 @@
 # E-CYBERDECK-001 — Cyberdeck Extraction Execution Thread
 
-**Status:** ACTIVE — P3.1 queue HEAD  
+**Status:** ACTIVE — P3.2 queue HEAD  
 **Legislator:** [L-CYBERDECK-001](../../work-orders/L-CYBERDECK-001-cyberdeck-app-extraction.md)  
 **Conductor:** [L-CYBERDECK-001-CONDUCTOR](../../work-orders/L-CYBERDECK-001-CONDUCTOR.md)  
-**Current slice:** [E-CYBERDECK-001-P3.1](E-CYBERDECK-001-P3.1-provider-connection.md)  
+**Current slice:** [E-CYBERDECK-001-P3.2](E-CYBERDECK-001-P3.2-gateway-column.md)  
 **Verifier protocol:** [VERIFY-L-CYBERDECK-001](../../verifications/VERIFY-L-CYBERDECK-001.md)  
 
 ---
@@ -22,13 +22,13 @@ You are the **implementer** (Executive). You ship small PRs against this thread.
 
 ## Current sprint
 
-**Phase P3.1** — Provider connection hook (D3.1; queue HEAD).
+**Phase P3.2** — Gateway pane state + column host (D3.2, D3.3; queue HEAD — closes P3).
 
-**Developer orders:** [E-CYBERDECK-001-P3.1-provider-connection.md](E-CYBERDECK-001-P3.1-provider-connection.md)  
-**PR body:** [P3.1-pr-body.md](../../pr-queue/P3.1-pr-body.md)  
-**Branch:** `cursor/extract-p3.1-provider-connection` from `main` @ `f084b5f`
+**Developer orders:** [E-CYBERDECK-001-P3.2-gateway-column.md](E-CYBERDECK-001-P3.2-gateway-column.md)  
+**PR body:** [P3.2-pr-body.md](../../pr-queue/P3.2-pr-body.md)  
+**Branch:** `cursor/extract-p3.2-gateway-column` from `main` @ `dcae63c`
 
-Do **not** start P3.2 until P3.1 is verifier-approved and conductor updates status.
+Do **not** start P4 until P3.2 is verifier-approved and conductor updates status.
 
 ---
 

@@ -18,7 +18,7 @@
 | **P2.4** | Done | **PASS** | [JP-P2.4](../verifications/JP-L-CYBERDECK-001-P2.4.md) — [PR #45](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/45) **MERGED** `40c6473` — **6,766 lines** |
 | **P2.5** | Done | **PASS** | [JP-P2.5](../verifications/JP-L-CYBERDECK-001-P2.5.md) — [PR #47](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/47) **MERGED** `f084b5f` — **6,445 lines** — **P2 complete** |
 | **P3.1** | Done | **PASS** | [JP-P3.1](../verifications/JP-L-CYBERDECK-001-P3.1.md) — [PR #48](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/48) **MERGED** `dcae63c` — **5,878 lines** |
-| **P3.2** | **HEAD** | — | gateway column host + pane state (D3.2, D3.3) |
+| **P3.2** | **HEAD** | — | [E-P3.2](../cadre/executive-coder/E-CYBERDECK-001-P3.2-gateway-column.md) — gateway column host (D3.2, D3.3) |
 
 ---
 
@@ -54,7 +54,7 @@ Probe: **PASS** · `main` @ `dcae63c` (PR #48 merged)
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Developer** | Prep P3.2 work order — branch from `main` @ `dcae63c` |
+| 1 | **Developer agent** | [E-P3.2](../cadre/executive-coder/E-CYBERDECK-001-P3.2-gateway-column.md) — branch from `main` @ `dcae63c` |
 | 2 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
