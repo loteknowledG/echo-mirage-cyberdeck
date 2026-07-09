@@ -261,8 +261,12 @@ import { useMuthurChatState } from "@/features/cyberdeck/muthur/use-muthur-chat-
 import { useMuthurSendIntents } from "@/features/cyberdeck/muthur/use-muthur-send-intents";
 import { useMuthurChatSend } from "@/features/cyberdeck/muthur/use-muthur-chat-send";
 import { useMuthurCommanderHandlers } from "@/features/cyberdeck/muthur/use-muthur-commander-handlers";
+import {
+  CYBERDECK_PROVIDER_IDS,
+  hasAnyProviderClientKey,
+  useProviderConnection,
+} from "@/features/cyberdeck/gateway/use-provider-connection";
 import { MuthurChatColumn } from "@/features/cyberdeck/muthur/muthur-chat-column";
-import { probeCyberdeckModel } from "@/lib/muthur-core/muthur-chat-client";
 import {
   CUSTOM_TAB_CONTEXT_MENU_ACTIONS,
   defaultCustomTabGlyphForKind,
@@ -284,10 +288,8 @@ import {
 import {
   buildCyberdeckChatHistory,
   formatCodingVerifySystemLine,
-  gatewayKeySysMessage,
   getOperatorFileKind,
   isEditableOperatorFile,
-  isGatewayKeySysTip,
   parseCodingVerifyHeader,
   readFileAsDataUrl,
   textForSpeech,
@@ -299,29 +301,13 @@ import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
 import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration";
 import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
-import { ENABLE_AUTOMATION, ENABLE_MODEL_PROBE } from "@/lib/cyberdeck/automation-config";
+import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import { publishMuthurObservation, flushMuthurObservation } from "@/lib/muthur/observation/publish-observation";
 import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
 import { parseAionQuery } from "@/lib/muthur-aion-intent";
 import { parseDocumentOpenIntent } from "@/lib/muthur-document-open-intent";
-import {
-  CLIENT_BAKED_PROVIDER_KEYS,
-  formatProviderReceiptDiagnostic,
-  providerHasUsableCredentials,
-  resolveOutboundProviderCredentials,
-  resolveProviderConnectionLabel,
-} from "@/lib/provider-credentials";
-import {
-  PROVIDER_CLICK_ESCALATION_MS,
-  PROVIDER_LINK_REFRESH_COOLDOWN_MS,
-  loadProviderModelsCache,
-  providerModelsCacheKey,
-  providerToneColors,
-  resolveProviderVisualTone,
-  saveProviderModelsCache,
-  type ProviderModelRow,
-} from "@/lib/cyberdeck/provider-connection";
+import { providerToneColors, resolveProviderVisualTone } from "@/lib/cyberdeck/provider-connection";
 
 const ActivatedCyberdeckPane = dynamic(
   () =>
@@ -357,10 +343,6 @@ const CyberdeckMarkdownPreview = dynamic(
   },
 );
 
-const PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
-/** @deprecated use CLIENT_BAKED_PROVIDER_KEYS */
-const DEFAULT_CLIENT_PROVIDER_KEYS = CLIENT_BAKED_PROVIDER_KEYS;
-
 const fixedServers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
@@ -369,8 +351,6 @@ const fixedServers = [
 ];
 
 const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
-const MODEL_PROBE_MIN_INTERVAL_MS = 15_000;
-const PROVIDER_RATE_LIMIT_COOLDOWN_MS = 90_000;
 const UI_STATE_STORAGE_KEY = "echo-mirage-ui-state-v1";
 
 type CyberdeckUiState = {
@@ -382,23 +362,6 @@ type CyberdeckUiState = {
   customTabs?: CustomTab[];
   activeCustomTabId?: string | null;
 };
-
-function providerHasClientKey(
-  providerId: string,
-  providerKeys: Record<string, string>,
-  defaultKeyAvailableByProvider: Record<string, boolean>,
-): boolean {
-  return providerHasUsableCredentials(providerId, providerKeys, defaultKeyAvailableByProvider);
-}
-
-function hasAnyProviderClientKey(
-  providerKeys: Record<string, string>,
-  defaultKeyAvailableByProvider: Record<string, boolean>,
-): boolean {
-  return PROVIDER_IDS.some((id) =>
-    providerHasClientKey(id, providerKeys, defaultKeyAvailableByProvider),
-  );
-}
 
 type HeapEntry = {
   id: string;
@@ -574,6 +537,74 @@ export default function CyberdeckApp() {
     piControlLeaseRefresh,
     piControlLeaseRetake,
   });
+
+  const playModelTestErrorSound = useCallback((line: string) => {
+    if (line.includes("VALID_RESPONSE")) {
+      playDeckRaceReadySetGo();
+      return;
+    }
+    if (line.includes("HTTP_401")) {
+      playDeckDroidDizzy401();
+      return;
+    }
+    if (line.includes("HTTP_400")) {
+      playDeckDroidDizzy400();
+      return;
+    }
+    if (line.includes("HTTP_429")) {
+      playDeckOutOfGas429();
+      return;
+    }
+    if (line.includes("EMPTY_PROBE")) {
+      playDeckDeclined();
+      return;
+    }
+    if (line.includes("FAILURE")) {
+      playDeckWrongDoorShut();
+    }
+  }, []);
+
+  const {
+    activeProvider,
+    providerKeys,
+    setProviderKeys,
+    modelID,
+    modelList,
+    providers,
+    hasProviderAuth,
+    isConnected,
+    connectionState,
+    providerConnectionLabel,
+    providerModelFetchStatus,
+    scanActivityActive,
+    credentialReplaceProvider,
+    setCredentialReplaceProvider,
+    gatewayKeyDraft,
+    setGatewayKeyDraft,
+    modelFetchStatusByProvider,
+    rateLimitedProviders,
+    modelHealthByProvider,
+    probeInFlightByProvider,
+    defaultKeyAvailableByProvider,
+    didHydrateProviderState,
+    providerConfigHydrated,
+    handleProviderClick,
+    submitGatewayKey,
+    activateModelById,
+    fetchModelsForProvider,
+    providerHasKey,
+    setModelHealth,
+    setVerifiedProviders,
+    setModelFetchStatusByProvider,
+    setRateLimitedProviders,
+    providerRateLimitUntilRef,
+  } = useProviderConnection({
+    setMessages,
+    setMuthurDiagnostics,
+    playModelTestErrorSound,
+  });
+
+  const networkActivityActive = scanActivityActive || isStreaming;
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
   const [operatorDroppedAsset, setOperatorDroppedAsset] = useState<DroppedOperatorAsset | null>(() =>
@@ -656,7 +687,6 @@ export default function CyberdeckApp() {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [orchestration, setOrchestration] = useState<OrchestrationBundle | null>(null);
 
-  const [activeProvider, setActiveProvider] = useState<string>("opencode");
   /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
   const [providerKeyboardHighlightId, setProviderKeyboardHighlightId] = useState<string | null>(null);
   /** Escape from gateway → tab rail; Escape from tab rail → gateway. Arrows move highlight while on rail. */
@@ -664,42 +694,7 @@ export default function CyberdeckApp() {
   const [serverKeyboardHighlightId, setServerKeyboardHighlightId] = useState<(typeof SERVER_IDS)[number] | null>(null);
   /** Gateway column: keyboard highlight on model rows (arrows move providers + models as one column). */
   const [modelKeyboardHighlightId, setModelKeyboardHighlightId] = useState<string | null>(null);
-  const [providerKeys, setProviderKeys] = useState<Record<string, string>>({});
-  const [didHydrateProviderState, setDidHydrateProviderState] = useState(false);
-  const [providerConfigHydrated, setProviderConfigHydrated] = useState(false);
-  const [defaultKeyAvailableByProvider, setDefaultKeyAvailableByProvider] = useState<Record<string, boolean>>({
-    opencode: false,
-    openrouter: false,
-    openai: false,
-  });
-  const [modelList, setModelList] = useState<{ id: string }[]>([]);
-  const [modelCacheByProvider, setModelCacheByProvider] = useState<Record<string, ProviderModelRow[]>>({});
-  const [credentialReplaceProvider, setCredentialReplaceProvider] = useState<string | null>(null);
-  const [gatewayKeyDraft, setGatewayKeyDraft] = useState("");
   const [deckUiHydrated, setDeckUiHydrated] = useState(false);
-  const [modelByProvider, setModelByProvider] = useState<Record<string, string>>({});
-  const [modelFetchStatusByProvider, setModelFetchStatusByProvider] = useState<
-    Record<string, "idle" | "retrieving" | "invalid-key" | "error" | "ready">
-  >(() => ({
-    opencode: "idle",
-    openrouter: "idle",
-    openai: "idle",
-  }));
-  const [rateLimitedProviders, setRateLimitedProviders] = useState<Set<string>>(new Set());
-  const [modelHealthByProvider, setModelHealthByProvider] = useState<
-    Record<string, Record<string, string>>
-  >({ opencode: {}, openrouter: {}, openai: {} });
-  const [verifiedProviders, setVerifiedProviders] = useState<Record<string, boolean>>({
-    opencode: false,
-    openrouter: false,
-    openai: false,
-  });
-  const [probeInFlightByProvider, setProbeInFlightByProvider] = useState<Record<string, string>>({
-    opencode: "",
-    openrouter: "",
-    openai: "",
-  });
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<MuthurCommandInputHandle>(null);
   const messageScrollRef = useRef<HTMLDivElement>(null);
@@ -716,10 +711,6 @@ export default function CyberdeckApp() {
     userMessage: string;
     options?: { preserveSelectedSurface?: boolean; surveyMission?: boolean };
   } | null>(null);
-  const modelProbeAbortRef = useRef<AbortController | null>(null);
-  const modelProbeCacheRef = useRef<Record<string, { status: string; at: number }>>({});
-  const modelProbeLastAtRef = useRef<Record<string, number>>({});
-  const providerRateLimitUntilRef = useRef<Record<string, number>>({});
   const lastSpokenAssistantTextRef = useRef<string>("");
   const assistantVoiceBlocksRef = useRef<string[]>([]);
   const speakQueueActiveRef = useRef(false);
@@ -781,9 +772,6 @@ export default function CyberdeckApp() {
   const deckTabNextRef = useRef<"gateway" | "rail" | "chatlog">("gateway");
   const prevNavRailRef = useRef<"gateway" | "tabs">("gateway");
   const uiFocusRestoredRef = useRef(false);
-  const providerClickTrackerRef = useRef({ providerId: "", count: 0, lastClickAt: 0 });
-  const providerRefreshAtRef = useRef<Record<string, number>>({});
-  const providerBootstrapRef = useRef(false);
 
   const syncGlyphChannelTabGlyphs = useCallback(() => {
     useCyberdeckTabStore.getState().setCustomTabs((prev) =>
@@ -1001,36 +989,6 @@ export default function CyberdeckApp() {
     [focusGlyphChannelTab, renderAsciiSkillToChannel, renderGlyphToChannel, setRawGlyphChannelText, syncGlyphChannelTabGlyphs],
   );
 
-  const providers = [
-    { id: "opencode" as const, name: "OPENCODE" },
-    { id: "openrouter" as const, name: "OPENROUTER" },
-    { id: "openai" as const, name: "OPENAI" },
-  ] as const;
-  const modelID = modelByProvider[activeProvider] || "";
-  const providerModelFetchStatus = modelFetchStatusByProvider[activeProvider] || "idle";
-  const scanActivityActive =
-    Boolean(probeInFlightByProvider[activeProvider]) || providerModelFetchStatus === "retrieving";
-  const networkActivityActive =
-    Boolean(probeInFlightByProvider[activeProvider]) ||
-    providerModelFetchStatus === "retrieving" ||
-    isStreaming;
-  const hasProviderAuth = providerHasClientKey(
-    activeProvider,
-    providerKeys,
-    defaultKeyAvailableByProvider,
-  );
-  const providerLinkReady = providerModelFetchStatus === "ready";
-  const isConnected = hasProviderAuth && providerLinkReady && Boolean(modelID);
-  const connectionState: "offline" | "connecting" | "connected" = scanActivityActive
-    ? "connecting"
-      : isConnected
-        ? "connected"
-        : "offline";
-  const providerConnectionLabel = resolveProviderConnectionLabel({
-    hasAuth: hasProviderAuth,
-    rateLimited: rateLimitedProviders.has(activeProvider),
-    fetchStatus: providerModelFetchStatus,
-  });
   const inactiveTextColor = "#7a7a7a";
   const inactiveSubtleTextColor = "#6a6a6a";
   const activeTextGlow = "0 0 8px rgba(0, 255, 0, 0.22)";
@@ -1087,32 +1045,6 @@ export default function CyberdeckApp() {
       payload: { key: "deck_sfx_volume", value: volume },
       severity: "info",
     });
-  }, []);
-
-  const playModelTestErrorSound = useCallback((line: string) => {
-    if (line.includes("VALID_RESPONSE")) {
-      playDeckRaceReadySetGo();
-      return;
-    }
-    if (line.includes("HTTP_401")) {
-      playDeckDroidDizzy401();
-      return;
-    }
-    if (line.includes("HTTP_400")) {
-      playDeckDroidDizzy400();
-      return;
-    }
-    if (line.includes("HTTP_429")) {
-      playDeckOutOfGas429();
-      return;
-    }
-    if (line.includes("EMPTY_PROBE")) {
-      playDeckDeclined();
-      return;
-    }
-    if (line.includes("FAILURE")) {
-      playDeckWrongDoorShut();
-    }
   }, []);
 
   const splitMiragePhrases = useCallback((text: string) => {
@@ -2981,16 +2913,6 @@ export default function CyberdeckApp() {
     return () => window.removeEventListener("echo-mirage-context-action", onContextAction);
   }, [copyOperatorDocToClipboard, pasteClipboardToOperator, saveOperatorDocument]);
 
-  const selectProvider = useCallback((id: string) => {
-    setActiveProvider(id);
-    try {
-      localStorage.setItem("active_provider", id);
-    } catch {
-      /* ignore */
-    }
-    playDeckSystemSound("chirp", 0.05);
-  }, []);
-
   const closeRailTabContextMenu = useCallback(() => {
     setRailTabContextMenu(null);
     emitSignal({ source: "ui", type: "cancel", payload: { target: "rail_tab_menu" }, severity: "info" });
@@ -3249,78 +3171,6 @@ export default function CyberdeckApp() {
     return () => document.removeEventListener("focusin", onFocusIn, true);
   }, []);
 
-  // Hydrate keys / models / active provider from localStorage (weyland-compatible keys)
-  useEffect(() => {
-    const nextKeys: Record<string, string> = {};
-    const caches: Record<string, ProviderModelRow[]> = {};
-    const statusUpdates: Record<string, "idle" | "retrieving" | "invalid-key" | "error" | "ready"> =
-      {};
-    const verifiedUpdates: Record<string, boolean> = {};
-    for (const id of PROVIDER_IDS) {
-      const stored = localStorage.getItem(`key_${id}`);
-      const fallback = DEFAULT_CLIENT_PROVIDER_KEYS[id] || "";
-      const value = (stored || fallback || "").trim();
-      if (value) nextKeys[id] = value;
-      const cached = loadProviderModelsCache(id);
-      if (cached.length > 0) {
-        caches[id] = cached;
-        if (value) {
-          statusUpdates[id] = "ready";
-          verifiedUpdates[id] = true;
-        }
-      }
-    }
-    setProviderKeys(nextKeys);
-    setModelCacheByProvider(caches);
-    if (Object.keys(statusUpdates).length > 0) {
-      setModelFetchStatusByProvider((prev) => ({ ...prev, ...statusUpdates }));
-      setVerifiedProviders((prev) => ({ ...prev, ...verifiedUpdates }));
-    }
-    const ap = localStorage.getItem("active_provider");
-    const resolvedActive =
-      ap && (PROVIDER_IDS as readonly string[]).includes(ap) ? ap : "opencode";
-    if (ap && (PROVIDER_IDS as readonly string[]).includes(ap)) setActiveProvider(ap);
-    setModelByProvider((prev) => {
-      const n = { ...prev };
-      for (const id of PROVIDER_IDS) {
-        const m = localStorage.getItem(`ascii_model_${id}`);
-        if (m) n[id] = m;
-      }
-      return n;
-    });
-    const bootModels = caches[resolvedActive];
-    if (bootModels?.length) setModelList(bootModels);
-
-    const bakedAvailable: Partial<Record<(typeof PROVIDER_IDS)[number], boolean>> = {};
-    for (const id of PROVIDER_IDS) {
-      if (DEFAULT_CLIENT_PROVIDER_KEYS[id]) bakedAvailable[id] = true;
-    }
-    if (Object.keys(bakedAvailable).length > 0) {
-      setDefaultKeyAvailableByProvider((prev) => ({ ...prev, ...bakedAvailable }));
-    }
-
-    void fetch("/api/provider-config")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { configured?: Record<string, boolean> } | null) => {
-        if (!data?.configured) return;
-        setDefaultKeyAvailableByProvider((prev) => {
-          const next = { ...prev };
-          for (const id of PROVIDER_IDS) {
-            if (data.configured?.[id]) next[id] = true;
-          }
-          return next;
-        });
-      })
-      .catch(() => {
-        /* offline / dev without route */
-      })
-      .finally(() => {
-        setProviderConfigHydrated(true);
-      });
-
-    setDidHydrateProviderState(true);
-  }, []);
-
   const muthurChatScrollKey = useMemo(() => {
     const lastDiag = muthurDiagnostics.entries.at(-1);
     return buildMuthurChatScrollKey({
@@ -3394,404 +3244,6 @@ export default function CyberdeckApp() {
     };
   }, [clearNetworkFeedbackAudio, isStreaming]);
 
-  // After keys hydrate: prompt only when this provider truly has no client key (gateway field handles entry).
-  useEffect(() => {
-    if (!didHydrateProviderState || !providerConfigHydrated) return;
-    if (providerHasClientKey(activeProvider, providerKeys, defaultKeyAvailableByProvider)) return;
-    const tip = gatewayKeySysMessage(activeProvider);
-    setMessages((prev) => {
-      const last = prev[prev.length - 1];
-      if (last?.role === "system" && last.text === tip) return prev;
-      return [...prev, { role: "system", text: tip }];
-    });
-  }, [activeProvider, defaultKeyAvailableByProvider, didHydrateProviderState, providerConfigHydrated, providerKeys]);
-
-  // Drop stale key prompts from saved chat once a key is present.
-  useEffect(() => {
-    if (!didHydrateProviderState || !hasProviderAuth) return;
-    setMessages((prev) => {
-      const next = prev.filter((m) => !(m.role === "system" && isGatewayKeySysTip(m.text)));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [didHydrateProviderState, hasProviderAuth]);
-
-  const setModelHealth = useCallback((provider: string, model: string, status: string) => {
-    setModelHealthByProvider((prev) => ({
-      ...prev,
-      [provider]: { ...(prev[provider] || {}), [model]: status },
-    }));
-  }, []);
-
-  const probeSelectedModel = useCallback(
-    async (provider: string, model: string, key: string) => {
-      if (!provider || !model || !ENABLE_MODEL_PROBE) return;
-
-      const cacheKey = `${provider}::${model}`;
-      const cached = modelProbeCacheRef.current[cacheKey];
-      if (cached && Date.now() - cached.at < 120_000) {
-        setModelHealth(provider, model, cached.status);
-        return;
-      }
-
-      const lastProbeAt = modelProbeLastAtRef.current[provider] || 0;
-      if (Date.now() - lastProbeAt < MODEL_PROBE_MIN_INTERVAL_MS) {
-        return;
-      }
-      modelProbeLastAtRef.current[provider] = Date.now();
-
-      if (modelProbeAbortRef.current) {
-        modelProbeAbortRef.current.abort();
-      }
-      const abortCtl = new AbortController();
-      modelProbeAbortRef.current = abortCtl;
-
-      setProbeInFlightByProvider((prev) => ({ ...prev, [provider]: model }));
-      setModelHealth(provider, model, "testing");
-      try {
-        const probe = await probeCyberdeckModel({ provider, apiKey: key, model }, abortCtl.signal);
-        const data = probe.data;
-        const httpStatus = data.status ?? probe.status;
-        const modelRateLimited = httpStatus === 429;
-
-        if (!probe.ok || data.ok === false) {
-          const failHealth = modelRateLimited ? "amber" : "grey";
-          if (modelRateLimited) {
-            providerRateLimitUntilRef.current[provider] = Date.now() + PROVIDER_RATE_LIMIT_COOLDOWN_MS;
-          } else if (httpStatus === 502 || httpStatus === 503) {
-            setRateLimitedProviders((prev) => new Set(prev).add(provider));
-          }
-          const line = `MODEL_TEST ${provider.toUpperCase()}/${model}: HTTP_${httpStatus}${
-            modelRateLimited
-              ? " // MODEL_RATE_LIMIT"
-              : httpStatus === 502 || httpStatus === 503
-                ? " // OPERATOR_ACTION_REQUIRED"
-                : " // FAILURE"
-          }`;
-          playModelTestErrorSound(line);
-          setModelHealth(provider, model, failHealth);
-          modelProbeCacheRef.current[cacheKey] = { status: failHealth, at: Date.now() };
-          if (!modelRateLimited) {
-            setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
-          }
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "system",
-              text: line,
-            },
-          ]);
-          return;
-        }
-
-        const valid = Boolean(data.valid);
-        const health = valid ? "green" : "amber";
-        setModelHealth(provider, model, health);
-        modelProbeCacheRef.current[cacheKey] = { status: health, at: Date.now() };
-        setRateLimitedProviders((prev) => {
-          const next = new Set(prev);
-          next.delete(provider);
-          return next;
-        });
-        delete providerRateLimitUntilRef.current[provider];
-        const isVerified = valid || provider === "opencode";
-        setVerifiedProviders((prev) => ({ ...prev, [provider]: isVerified }));
-        const line = valid
-          ? `MODEL_TEST ${provider.toUpperCase()}/${model}: VALID_RESPONSE`
-          : `MODEL_TEST ${provider.toUpperCase()}/${model}: EMPTY_PROBE // transport OK, content empty`;
-        playModelTestErrorSound(line);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: line,
-          },
-        ]);
-      } catch (err) {
-        if (abortCtl.signal.aborted) return;
-        playModelTestErrorSound(`MODEL_TEST ${provider.toUpperCase()}/${model}: FAILURE`);
-        setModelHealth(provider, model, "grey");
-        setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: `MODEL_TEST ${provider.toUpperCase()}/${model}: ${String((err as Error)?.message || err)}`,
-          },
-        ]);
-      } finally {
-        if (modelProbeAbortRef.current === abortCtl) {
-          modelProbeAbortRef.current = null;
-        }
-        setProbeInFlightByProvider((prev) => {
-          if (prev[provider] !== model) return prev;
-          return { ...prev, [provider]: "" };
-        });
-      }
-    },
-    [playModelTestErrorSound, setModelHealth, setRateLimitedProviders, setVerifiedProviders],
-  );
-
-  const fetchModelsForProvider = useCallback(
-    async (provider: string, options?: { force?: boolean }) => {
-      const force = options?.force === true;
-      if (rateLimitedProviders.has(provider)) return;
-      const outbound = resolveOutboundProviderCredentials(provider, providerKeys);
-
-      const cachedFromState = modelCacheByProvider[provider];
-      const cached =
-        cachedFromState && cachedFromState.length > 0
-          ? cachedFromState
-          : loadProviderModelsCache(provider);
-
-      if (!force && cached.length > 0) {
-        setModelCacheByProvider((prev) => ({ ...prev, [provider]: cached }));
-        setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "ready" }));
-        setVerifiedProviders((prev) => ({ ...prev, [provider]: true }));
-        setModelList((prevList) => (activeProvider === provider ? cached : prevList));
-        return;
-      }
-
-      setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "retrieving" }));
-
-      try {
-        const res = await fetch("/api/cyberdeck-models", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            provider,
-            apiKey: outbound.apiKey || undefined,
-          }),
-        });
-        const receiptHeader = res.headers.get("x-muthur-provider-receipt");
-        if (receiptHeader) {
-          try {
-            const receipt = JSON.parse(receiptHeader) as {
-              provider: string;
-              credential_source: string;
-              auth: string;
-              reason?: string;
-              model?: string;
-            };
-            setMuthurDiagnostics((current) =>
-              appendMuthurDiagnosticEntry(current, formatProviderReceiptDiagnostic(receipt)),
-            );
-          } catch {
-            /* ignore malformed receipt */
-          }
-        }
-        if (!res.ok) {
-          const errJson = (await res.json().catch(() => ({}))) as {
-            authSource?: "user" | "default" | "none";
-            credential_source?: string;
-            code?: string;
-            reason?: string;
-          };
-          if (
-            errJson.credential_source === "none" ||
-            errJson.authSource === "none" ||
-            errJson.code === "NO_PROVIDER_KEY" ||
-            errJson.reason === "no_key"
-          ) {
-            setDefaultKeyAvailableByProvider((prev) => ({ ...prev, [provider]: false }));
-            setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "idle" }));
-            return;
-          }
-          if (res.status === 429 || res.status === 502 || res.status === 503) {
-            if (res.status === 429) {
-              providerRateLimitUntilRef.current[provider] = Date.now() + PROVIDER_RATE_LIMIT_COOLDOWN_MS;
-            } else {
-              setRateLimitedProviders((prev) => new Set(prev).add(provider));
-            }
-            setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "error" }));
-            setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "system",
-                text: `UPLINK_HALTED // ${provider.toUpperCase()} // HTTP_${res.status} // OPERATOR_ACTION_REQUIRED`,
-              },
-            ]);
-            return;
-          }
-          const invalid = res.status === 401 || res.status === 403;
-          setModelFetchStatusByProvider((prev) => ({
-            ...prev,
-            [provider]: invalid ? "invalid-key" : "error",
-          }));
-          setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
-          if (invalid && providerKeys[provider]) {
-            setProviderKeys((prev) => {
-              const next = { ...prev };
-              delete next[provider];
-              return next;
-            });
-            localStorage.removeItem(`key_${provider}`);
-            setModelCacheByProvider((prev) => {
-              const next = { ...prev };
-              delete next[provider];
-              return next;
-            });
-            localStorage.removeItem(providerModelsCacheKey(provider));
-            setMessages((prev) => [
-              ...prev,
-              { role: "system", text: `INVALID_KEY // ${provider.toUpperCase()} AUTH_REJECTED` },
-            ]);
-          }
-          return;
-        }
-        const json = (await res.json()) as {
-          data?: { id: string }[];
-          authSource?: "user" | "default";
-          credential_source?: string;
-        };
-        const raw = Array.isArray(json.data) ? json.data : [];
-        const credentialSource = json.credential_source ?? json.authSource;
-        setDefaultKeyAvailableByProvider((prev) => ({
-          ...prev,
-          [provider]: credentialSource === "env" || credentialSource === "session_key" || credentialSource === "default",
-        }));
-        setModelCacheByProvider((prev) => ({ ...prev, [provider]: raw }));
-        saveProviderModelsCache(provider, raw);
-        setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "ready" }));
-        setVerifiedProviders((prev) => ({ ...prev, [provider]: true }));
-        setModelList((prevList) => (activeProvider === provider ? raw : prevList));
-        setModelByProvider((prev) => {
-          const current = prev[provider] || "";
-          const hasCurrent = current && raw.some((m) => m.id === current);
-          const nextModel = hasCurrent ? current : raw[0]?.id || "";
-          if (nextModel) {
-            localStorage.setItem(`ascii_model_${provider}`, nextModel);
-          }
-          return { ...prev, [provider]: nextModel };
-        });
-      } catch {
-        setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "error" }));
-        setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
-        setModelList((prevList) => (activeProvider === provider ? [] : prevList));
-      }
-    },
-    [activeProvider, modelCacheByProvider, providerKeys, rateLimitedProviders],
-  );
-
-  const providerHasKey = useCallback(
-    (providerId: string) =>
-      providerHasClientKey(providerId, providerKeys, defaultKeyAvailableByProvider),
-    [defaultKeyAvailableByProvider, providerKeys],
-  );
-
-  const syncModelListFromCache = useCallback(
-    (providerId: string) => {
-      const cached =
-        modelCacheByProvider[providerId]?.length
-          ? modelCacheByProvider[providerId]
-          : loadProviderModelsCache(providerId);
-      if (cached.length > 0) {
-        setModelList(cached);
-        setModelCacheByProvider((prev) =>
-          prev[providerId]?.length ? prev : { ...prev, [providerId]: cached },
-        );
-        return;
-      }
-      setModelList([]);
-      if (!rateLimitedProviders.has(providerId)) {
-        void fetchModelsForProvider(providerId);
-      }
-    },
-    [fetchModelsForProvider, modelCacheByProvider, rateLimitedProviders],
-  );
-
-  const refreshProviderModelsDebounced = useCallback(
-    (providerId: string) => {
-      const now = Date.now();
-      const last = providerRefreshAtRef.current[providerId] || 0;
-      if (now - last < PROVIDER_LINK_REFRESH_COOLDOWN_MS) {
-        toast.info("Refresh cooldown — wait before refreshing again.");
-        return;
-      }
-      providerRefreshAtRef.current[providerId] = now;
-      if (!providerHasKey(providerId)) return;
-      void fetchModelsForProvider(providerId, { force: true });
-    },
-    [fetchModelsForProvider, providerHasKey],
-  );
-
-  const handleProviderClick = useCallback(
-    (id: string) => {
-      const now = Date.now();
-      const tracker = providerClickTrackerRef.current;
-      const sameBurst =
-        tracker.providerId === id && now - tracker.lastClickAt < PROVIDER_CLICK_ESCALATION_MS;
-
-      if (id !== activeProvider) {
-        tracker.providerId = id;
-        tracker.count = 1;
-        tracker.lastClickAt = now;
-        setCredentialReplaceProvider(null);
-        selectProvider(id);
-        syncModelListFromCache(id);
-        return;
-      }
-
-      if (!sameBurst) {
-        tracker.providerId = id;
-        tracker.count = 1;
-        tracker.lastClickAt = now;
-        return;
-      }
-
-      tracker.count += 1;
-      tracker.lastClickAt = now;
-
-      if (tracker.count === 2) {
-        refreshProviderModelsDebounced(id);
-        return;
-      }
-      if (tracker.count >= 3) {
-        setCredentialReplaceProvider(id);
-        setGatewayKeyDraft("");
-      }
-    },
-    [activeProvider, refreshProviderModelsDebounced, selectProvider, syncModelListFromCache],
-  );
-
-  const submitGatewayKey = useCallback(async () => {
-    const trimmed = gatewayKeyDraft.trim();
-    if (!trimmed) return;
-    const provider = credentialReplaceProvider ?? activeProvider;
-    setProviderKeys((prev) => ({ ...prev, [provider]: trimmed }));
-    try {
-      localStorage.setItem(`key_${provider}`, trimmed);
-    } catch {
-      /* ignore */
-    }
-    setCredentialReplaceProvider(null);
-    setGatewayKeyDraft("");
-    setRateLimitedProviders((prev) => {
-      if (!prev.has(provider)) return prev;
-      const next = new Set(prev);
-      next.delete(provider);
-      return next;
-    });
-    await fetchModelsForProvider(provider, { force: true });
-  }, [activeProvider, credentialReplaceProvider, fetchModelsForProvider, gatewayKeyDraft]);
-
-  const activateModelById = useCallback(
-    (modelId: string) => {
-      const key = providerKeys[activeProvider];
-      if (!modelId) return;
-      setModelByProvider((prev) => ({ ...prev, [activeProvider]: modelId }));
-      try {
-        localStorage.setItem(`ascii_model_${activeProvider}`, modelId);
-      } catch {
-        /* ignore */
-      }
-      playDeckSystemSound("click", 0.02);
-      if (ENABLE_MODEL_PROBE) {
-        void probeSelectedModel(activeProvider, modelId, key || "");
-      }
-    },
-    [activeProvider, probeSelectedModel, providerKeys],
-  );
 
   // Column-scoped arrows: rail / chat scroll / gateway (providers + models). Tab rail: Escape; Enter on rail → gateway + provider hover.
   useEffect(() => {
@@ -4030,7 +3482,7 @@ export default function CyberdeckApp() {
               setServerKeyboardHighlightId(null);
               setModelKeyboardHighlightId(null);
               const pid =
-                (PROVIDER_IDS as readonly string[]).includes(activeProvider) ? activeProvider : PROVIDER_IDS[0];
+                (CYBERDECK_PROVIDER_IDS as readonly string[]).includes(activeProvider) ? activeProvider : CYBERDECK_PROVIDER_IDS[0];
               setProviderKeyboardHighlightId(pid);
             }
             return;
@@ -4086,11 +3538,11 @@ export default function CyberdeckApp() {
       // Pi composer and gateway key fields handle Enter/arrows locally.
       if (isEditableTarget) return;
 
-      const ids = [...PROVIDER_IDS];
+      const ids = [...CYBERDECK_PROVIDER_IDS];
       const pivot =
         providerKeyboardHighlightId ??
-        (ids.includes(activeProvider as (typeof PROVIDER_IDS)[number]) ? activeProvider : ids[0]);
-      let idx = ids.indexOf(pivot as (typeof PROVIDER_IDS)[number]);
+        (ids.includes(activeProvider as (typeof CYBERDECK_PROVIDER_IDS)[number]) ? activeProvider : ids[0]);
+      let idx = ids.indexOf(pivot as (typeof CYBERDECK_PROVIDER_IDS)[number]);
       if (idx < 0) idx = 0;
 
       const models = modelList;
@@ -4251,25 +3703,6 @@ export default function CyberdeckApp() {
     });
   }, [activeProvider, modelList]);
 
-  // Bootstrap active provider link once after hydrate (cache-first; fetch only if missing).
-  useEffect(() => {
-    if (!didHydrateProviderState || providerBootstrapRef.current) return;
-    providerBootstrapRef.current = true;
-    const cached =
-      modelCacheByProvider[activeProvider]?.length
-        ? modelCacheByProvider[activeProvider]
-        : loadProviderModelsCache(activeProvider);
-    if (cached.length > 0) {
-      setModelList(cached);
-      return;
-    }
-    void fetchModelsForProvider(activeProvider);
-  }, [
-    activeProvider,
-    didHydrateProviderState,
-    fetchModelsForProvider,
-    modelCacheByProvider,
-  ]);
 
   useEffect(() => {
     const latest = messages[messages.length - 1];
