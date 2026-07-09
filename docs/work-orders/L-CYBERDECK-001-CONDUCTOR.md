@@ -44,7 +44,7 @@ Probe: **PASS** · branch `cursor/extract-p5.1b-operator-workspace-state`
 | Pos | Slice | PR | Status |
 |----:|-------|-----|--------|
 | — | P5.1 | [#52](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/52) | **MERGED** `454b3f6` |
-| **1** | **P5.1b** | — | `use-operator-workspace-state` — **MERGE** |
+| **1** | **P5.1b** | [#53](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/53) | **MERGE** |
 | 2 | P6.1 | — | survey hub — **HEAD** |
 | 3 | P7.1 | — | chat route split |
 | 4 | P8.1 | — | rename cleanup |

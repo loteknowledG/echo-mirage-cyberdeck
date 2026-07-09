@@ -3,7 +3,7 @@
 **Work order:** [L-CYBERDECK-001](../work-orders/L-CYBERDECK-001-cyberdeck-app-extraction.md)  
 **Phase:** P5.1b — Operator workspace state hook (D5.1)  
 **Branch:** `cursor/extract-p5.1b-operator-workspace-state`  
-**PR:** _(pending)_  
+**PR:** [#53](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/53)  
 **Base:** `main` @ P5.1 merge `454b3f6`
 
 ---
