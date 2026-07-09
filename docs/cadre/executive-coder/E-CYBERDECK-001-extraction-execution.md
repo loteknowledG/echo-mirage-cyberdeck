@@ -1,9 +1,9 @@
 # E-CYBERDECK-001 — Cyberdeck Extraction Execution Thread
 
-**Status:** ACTIVE — P3.2 queue HEAD  
+**Status:** ACTIVE — P4.1 queue HEAD  
 **Legislator:** [L-CYBERDECK-001](../../work-orders/L-CYBERDECK-001-cyberdeck-app-extraction.md)  
 **Conductor:** [L-CYBERDECK-001-CONDUCTOR](../../work-orders/L-CYBERDECK-001-CONDUCTOR.md)  
-**Current slice:** [E-CYBERDECK-001-P3.2](E-CYBERDECK-001-P3.2-gateway-column.md)  
+**Current slice:** [E-CYBERDECK-001-P4.1](E-CYBERDECK-001-P4.1-layout-shell.md)  
 **Verifier protocol:** [VERIFY-L-CYBERDECK-001](../../verifications/VERIFY-L-CYBERDECK-001.md)  
 
 ---
@@ -22,13 +22,13 @@ You are the **implementer** (Executive). You ship small PRs against this thread.
 
 ## Current sprint
 
-**Phase P3.2** — Gateway pane state + column host (D3.2, D3.3; queue HEAD — closes P3).
+**Phase P4.1** — Layout shell + mobile layout hook (D4.1, D4.2; queue HEAD — opens P4).
 
-**Developer orders:** [E-CYBERDECK-001-P3.2-gateway-column.md](E-CYBERDECK-001-P3.2-gateway-column.md)  
-**PR body:** [P3.2-pr-body.md](../../pr-queue/P3.2-pr-body.md)  
-**Branch:** `cursor/extract-p3.2-gateway-column` from `main` @ `dcae63c`
+**Developer orders:** [E-CYBERDECK-001-P4.1-layout-shell.md](E-CYBERDECK-001-P4.1-layout-shell.md)  
+**PR body:** [P4.1-pr-body.md](../../pr-queue/P4.1-pr-body.md)  
+**Branch:** `cursor/extract-p4.1-layout-shell` from `main` @ `f99923c`
 
-Do **not** start P4 until P3.2 is verifier-approved and conductor updates status.
+Do **not** start P4.2 until P4.1 is verifier-approved and conductor updates status.
 
 ---
 

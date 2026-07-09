@@ -54,7 +54,7 @@ Probe: **PASS** · `main` @ `624f7d8` (PR #49 merged)
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Developer agent** | Prep **P4.1** layout shell — branch from `main` @ `624f7d8` |
+| 1 | **Developer agent** | [E-P4.1](../cadre/executive-coder/E-CYBERDECK-001-P4.1-layout-shell.md) — branch from `main` @ `f99923c` |
 | 2 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
