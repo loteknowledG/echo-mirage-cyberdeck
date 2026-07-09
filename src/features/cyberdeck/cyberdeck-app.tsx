@@ -84,7 +84,6 @@ import {
   type GlyphRenderEngine,
 } from "@/lib/glyph-channel";
 import { readOperatorPaneSaveText } from "@/lib/operator-workbench";
-import { get, set } from "idb-keyval";
 import dynamic from "next/dynamic";
 import { PanelLoader } from "@/features/cyberdeck/panel-loader";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
@@ -97,18 +96,20 @@ import { SurveyHubHost } from "@/features/cyberdeck/survey/survey-hub-host";
 import { usePowerfistDeckSocket } from "@/features/cyberdeck/survey/use-powerfist-deck-socket";
 import {
   notifySurveyTabClosed,
-  notifySurveyTabsCleared,
 } from "@/features/cyberdeck/survey/survey-tab-lifecycle";
 import { CyberdeckLayoutShell } from "@/features/cyberdeck/layout/cyberdeck-layout-shell";
 import { useMobileCyberdeckLayout } from "@/features/cyberdeck/layout/use-mobile-cyberdeck-layout";
 import { CustomTabPaneRenderer } from "@/features/cyberdeck/workspace/custom-tab-pane-renderer";
+import {
+  UI_STATE_STORAGE_KEY,
+  useCyberdeckWorkspaceHydration,
+} from "@/features/cyberdeck/workspace/use-cyberdeck-workspace-hydration";
+import { useCyberdeckHeap } from "@/features/cyberdeck/heap/use-cyberdeck-heap";
 import { CyberdeckContextMenus } from "@/features/cyberdeck/workspace/cyberdeck-context-menus";
 import { useCustomTabBrowser } from "@/features/cyberdeck/workspace/use-custom-tab-browser";
 import { useRailTabContextMenu } from "@/features/cyberdeck/workspace/use-rail-tab-context-menu";
 import { OperatorPaneHost } from "@/features/cyberdeck/operator/operator-pane-host";
 import { useOperatorWorkspaceState } from "@/features/cyberdeck/operator/use-operator-workspace-state";
-import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
-import { useDebouncedEffect } from "@/lib/use-debounced-effect";
 import { cn } from "@/lib/utils";
 import { useCyberdeckTabStore, getCyberdeckSelectedRailTabId, type CyberdeckServerId } from "@/lib/cyberdeck-tab-store";
 import { CyberdeckServerRail } from "@/components/cyberdeck/cyberdeck-server-rail";
@@ -133,7 +134,6 @@ import { summarizeMuthurOperatorEdits } from "@/lib/muthur-operator-edit-summary
 import { formatInhabitantChannelLabel } from "@/lib/muthur/muthur-inhabitant";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 import { useSilentModeAudioGateSync } from "@/lib/cyberdeck/use-silent-mode-audio-gate-sync";
-import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
 import { useSurveyMuthurMissionHandlers } from "@/features/cyberdeck/hooks/use-survey-muthur-mission-handlers";
 import { useMuthurChatState } from "@/features/cyberdeck/muthur/use-muthur-chat-state";
 import { useMuthurSendIntents } from "@/features/cyberdeck/muthur/use-muthur-send-intents";
@@ -157,7 +157,6 @@ import {
   type CustomTab,
   type CustomTabKind,
   ENABLE_CARD_TABLE,
-  isFixedServerTabId,
   safeServerId,
   SERVER_IDS,
   servers,
@@ -211,72 +210,6 @@ const fixedServers = [
   ...(ENABLE_CARD_TABLE ? [{ id: "ct", glyph: "◈", label: "CARD TABLE" }] : []),
   { id: "b", glyph: "§", label: "SETTINGS" },
 ];
-
-const HEAP_STORAGE_KEY = "echo-mirage-heap-items";
-const UI_STATE_STORAGE_KEY = "echo-mirage-ui-state-v1";
-
-type CyberdeckUiState = {
-  server: ServerId;
-  navRailContext: "gateway" | "tabs";
-  serverKeyboardHighlightId: ServerId | null;
-  operatorSurfaceMode?: "workspace" | "browser";
-  operatorBrowserUrl?: string;
-  customTabs?: CustomTab[];
-  activeCustomTabId?: string | null;
-};
-
-type HeapEntry = {
-  id: string;
-  name: string;
-  text: string;
-  createdAt: number;
-};
-
-type SaveFilePickerHandle = {
-  createWritable(): Promise<{
-    write(data: Blob | string): Promise<void>;
-    close(): Promise<void>;
-  }>;
-};
-
-type SaveFilePickerOptions = {
-  suggestedName?: string;
-  types?: Array<{
-    description?: string;
-    accept: Record<string, string[]>;
-  }>;
-  excludeAcceptAllOption?: boolean;
-};
-
-type EchoMirageClipboardApi = {
-  readText(): string;
-  writeText(text: string): void;
-};
-
-type EchoMirageSaveApi = {
-  showDialog(options: {
-    defaultRelativePath: string;
-    content: string;
-  }): Promise<{ canceled: boolean; filePath?: string; error?: string }>;
-};
-
-async function readEchoMirageClipboardText() {
-  const bridge = (window as Window & { echoMirageClipboard?: EchoMirageClipboardApi })
-    .echoMirageClipboard;
-  if (bridge?.readText) {
-    try {
-      return bridge.readText();
-    } catch {
-      /* fall through */
-    }
-  }
-
-  if (typeof navigator !== "undefined" && navigator.clipboard?.readText) {
-    return navigator.clipboard.readText();
-  }
-
-  return "";
-}
 
 export default function CyberdeckApp() {
   // Start on the operator tab; disconnected users are redirected to MAINNET-UPLINK after hydration.
@@ -476,19 +409,13 @@ export default function CyberdeckApp() {
   const [muthurMemory, setMuthurMemory] = useState<MuthurMemoryState>(() => createEmptyMuthurMemory());
   const [muthurMemoryHydrated, setMuthurMemoryHydrated] = useState(false);
   const [muthurMemoryLoadError, setMuthurMemoryLoadError] = useState<string | null>(null);
-  const [heapEntries, setHeapEntries] = useState<HeapEntry[]>([]);
-  const [heapNameDraft, setHeapNameDraft] = useState("");
-  const [heapTextDraft, setHeapTextDraft] = useState("");
-  const [heapHydrated, setHeapHydrated] = useState(false);
   const [deckMode, setDeckMode] = useState<DeckMode>(() => loadDeckMode());
-  const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [orchestration, setOrchestration] = useState<OrchestrationBundle | null>(null);
 
   /** Escape from gateway → tab rail; Escape from tab rail → gateway. Arrows move highlight while on rail. */
   const [navRailContext, setNavRailContext] = useState<"gateway" | "tabs">("gateway");
   const [serverKeyboardHighlightId, setServerKeyboardHighlightId] = useState<(typeof SERVER_IDS)[number] | null>(null);
-  const [deckUiHydrated, setDeckUiHydrated] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<MuthurCommandInputHandle>(null);
   const messageScrollRef = useRef<HTMLDivElement>(null);
@@ -508,6 +435,13 @@ export default function CyberdeckApp() {
   const startupRailResolvedRef = useRef(false);
   const prevConnectionStateRef = useRef<"offline" | "connecting" | "connected">("offline");
   const serverRef = useRef<CyberdeckServerId>("m");
+  const restoreOperatorUiRef = useRef<
+    (ui: { operatorSurfaceMode?: "workspace" | "browser"; operatorBrowserUrl?: string }) => void
+  >(() => undefined);
+  const operatorSurfaceModeRef = useRef<"workspace" | "browser">("workspace");
+  const operatorBrowserUrlRef = useRef("");
+  const getOperatorSurfaceMode = useCallback(() => operatorSurfaceModeRef.current, []);
+  const getOperatorBrowserUrl = useCallback(() => operatorBrowserUrlRef.current, []);
 
   useEffect(() => {
     const unsub = useCyberdeckTabStore.subscribe((state) => {
@@ -516,6 +450,26 @@ export default function CyberdeckApp() {
     serverRef.current = useCyberdeckTabStore.getState().server;
     return unsub;
   }, []);
+
+  const {
+    workspaceHydrated,
+    deckUiHydrated,
+    buildCyberdeckUiPayload,
+    clearSavedCustomTabState,
+  } = useCyberdeckWorkspaceHydration({
+    restoreOperatorUiFromDeck: (ui) => restoreOperatorUiRef.current(ui),
+    getOperatorSurfaceMode,
+    getOperatorBrowserUrl,
+    navRailContext,
+    setNavRailContext,
+    serverKeyboardHighlightId,
+    setServerKeyboardHighlightId,
+    providerConfigHydrated,
+    gatewayColumnRef,
+    serverRailRef,
+    startupRailResolvedRef,
+    setMessages,
+  });
 
 const operatorWorkspace = useOperatorWorkspaceState({
     deckUiHydrated,
@@ -577,10 +531,21 @@ const operatorWorkspace = useOperatorWorkspaceState({
     setOperatorTextAsset,
     assignOperatorAsset,
   } = operatorWorkspace;
+  restoreOperatorUiRef.current = restoreOperatorUiFromDeck;
+  operatorSurfaceModeRef.current = operatorSurfaceMode;
+  operatorBrowserUrlRef.current = operatorBrowserUrl;
+
+  const { heapEntries, pasteClipboardToHeap } = useCyberdeckHeap({
+    openOperatorFile,
+    setOperatorTextAsset,
+    setOperatorSurfaceMode,
+    setOperatorDocMode,
+    setNavRailContext,
+  });
+
   /** Forward Tab from message box cycles: gateway (right) → rail (left) → chat log (col2) → … */
   const deckTabNextRef = useRef<"gateway" | "rail" | "chatlog">("gateway");
   const prevNavRailRef = useRef<"gateway" | "tabs">("gateway");
-  const uiFocusRestoredRef = useRef(false);
 
   const syncGlyphChannelTabGlyphs = useCallback(() => {
     useCyberdeckTabStore.getState().setCustomTabs((prev) =>
@@ -902,138 +867,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
     return () => window.removeEventListener(GLYPH_MODE_UPDATE_EVENT, handler);
   }, [syncGlyphChannelTabGlyphs]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    let restored = false;
-    try {
-      const workspaceState = loadWorkspaceState();
-      if (workspaceState) {
-        const restoredWorkspaceTabs = sanitizeCustomTabs(workspaceState.customTabs);
-        useCyberdeckTabStore.getState().setCustomTabs(restoredWorkspaceTabs);
-        if (
-          typeof workspaceState.activeCustomTabId === "string" &&
-          restoredWorkspaceTabs.some((tab) => tab.id === workspaceState.activeCustomTabId)
-        ) {
-          useCyberdeckTabStore.getState().setActiveCustomTabId(workspaceState.activeCustomTabId);
-          restored = true;
-        } else if (
-          typeof workspaceState.activeModuleId === "string" &&
-          isFixedServerTabId(workspaceState.activeModuleId)
-        ) {
-          useCyberdeckTabStore.getState().setServer(workspaceState.activeModuleId);
-          useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-          restored = true;
-        } else {
-          useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-        }
-      }
-      const stored = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as Partial<CyberdeckUiState> | null;
-        const allFixedIds = ["m", "s", "ct", "b"] as const;
-        const savedServer = parsed?.server;
-        if (savedServer && allFixedIds.includes(savedServer as (typeof allFixedIds)[number])) {
-          useCyberdeckTabStore.getState().setServer(safeServerId(savedServer) as (typeof SERVER_IDS)[number]);
-          restored = true;
-        }
-        if (parsed?.navRailContext === "gateway" || parsed?.navRailContext === "tabs") {
-          setNavRailContext(parsed.navRailContext);
-          restored = true;
-        }
-        const highlightId = parsed?.serverKeyboardHighlightId;
-        if (highlightId && allFixedIds.includes(highlightId as (typeof allFixedIds)[number])) {
-          setServerKeyboardHighlightId(safeServerId(highlightId) as (typeof SERVER_IDS)[number] | null);
-          restored = true;
-        }
-        if (
-          parsed?.operatorSurfaceMode === "workspace" ||
-          parsed?.operatorSurfaceMode === "browser" ||
-          (typeof parsed?.operatorBrowserUrl === "string" && parsed.operatorBrowserUrl.trim())
-        ) {
-          restoreOperatorUiFromDeck({
-            operatorSurfaceMode: parsed?.operatorSurfaceMode,
-            operatorBrowserUrl: parsed?.operatorBrowserUrl,
-          });
-          restored = true;
-        }
-        const restoredCustomTabs = sanitizeCustomTabs(parsed?.customTabs);
-        useCyberdeckTabStore.getState().setCustomTabs(restoredCustomTabs);
-        if (
-          typeof parsed?.activeCustomTabId === "string" &&
-          restoredCustomTabs.some((tab) => tab.id === parsed.activeCustomTabId)
-        ) {
-          useCyberdeckTabStore.getState().setActiveCustomTabId(parsed.activeCustomTabId);
-        } else {
-          useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-        }
-        if (restoredCustomTabs.length > 0) {
-          restored = true;
-        }
-      }
-    } catch {
-      /* ignore ui restore errors */
-    } finally {
-      if (restored) {
-        startupRailResolvedRef.current = true;
-      }
-      setWorkspaceHydrated(true);
-      setDeckUiHydrated(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!deckUiHydrated) return;
-    if (isEchoMirageDesktopShell()) {
-      useCyberdeckTabStore.getState().setCustomTabs((prev) =>
-        prev.filter((tab) => tab.kind !== "install"),
-      );
-      return;
-    }
-    useCyberdeckTabStore.getState().setCustomTabs((prev) => {
-      if (prev.some((tab) => tab.kind === "install")) return prev;
-      return [
-        {
-          id: "echo-install-pane",
-          label: "INSTALL",
-          glyph: "I",
-          kind: "install",
-        },
-        ...prev,
-      ];
-    });
-  }, [deckUiHydrated]);
-
-  const buildCyberdeckUiPayload = useCallback(
-    (): CyberdeckUiState => {
-      const { server, customTabs, activeCustomTabId } = useCyberdeckTabStore.getState();
-      return {
-        server,
-        navRailContext,
-        serverKeyboardHighlightId,
-        operatorSurfaceMode,
-        operatorBrowserUrl,
-        customTabs: customTabs as CustomTab[],
-        activeCustomTabId,
-      };
-    },
-    [navRailContext, operatorBrowserUrl, operatorSurfaceMode, serverKeyboardHighlightId],
-  );
-
-  useEffect(() => {
-    if (!deckUiHydrated || uiFocusRestoredRef.current) return;
-    if (ENABLE_AUTOMATION && !providerConfigHydrated) return;
-    if (ENABLE_AUTOMATION && !startupRailResolvedRef.current) return;
-    const id = window.requestAnimationFrame(() => {
-      if (navRailContext === "tabs") {
-        serverRailRef.current?.focus({ preventScroll: true });
-      } else {
-        gatewayColumnRef.current?.focus({ preventScroll: true });
-      }
-      uiFocusRestoredRef.current = true;
-    });
-    return () => window.cancelAnimationFrame(id);
-  }, [deckUiHydrated, navRailContext, providerConfigHydrated]);
-
   const publishOperatorObservation = useCallback(() => {
     if (!deckUiHydrated) return;
     const { server, customTabs, activeCustomTabId } = useCyberdeckTabStore.getState();
@@ -1131,107 +964,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
     streamText,
   ]);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const saved = (await get<HeapEntry[]>(HEAP_STORAGE_KEY)) || [];
-        if (!mounted) return;
-        setHeapEntries(Array.isArray(saved) ? saved : []);
-      } catch {
-        if (!mounted) return;
-        setHeapEntries([]);
-      } finally {
-        if (mounted) setHeapHydrated(true);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!heapHydrated) return;
-    void set(HEAP_STORAGE_KEY, heapEntries).catch(() => {
-      toast.error("Heap save failed.");
-    });
-  }, [heapEntries, heapHydrated]);
-
-  const saveHeapDraft = useCallback(
-    async (sourceText?: string) => {
-      const text = (sourceText ?? heapTextDraft).trim();
-      if (!text) {
-        toast.error("Heap entry is empty.");
-        return;
-      }
-
-      const nextName = heapNameDraft.trim() || `entry-${heapEntries.length + 1}`;
-      const entry: HeapEntry = {
-        id: crypto.randomUUID(),
-        name: nextName,
-        text: sourceText ?? heapTextDraft,
-        createdAt: Date.now(),
-      };
-
-      setHeapEntries((prev) => [entry, ...prev]);
-      setHeapNameDraft("");
-      setHeapTextDraft("");
-      toast.success(`Saved "${nextName}" to Heap.`);
-    },
-    [heapEntries.length, heapNameDraft, heapTextDraft],
-  );
-
-  const pasteClipboardToHeap = useCallback(async () => {
-    try {
-      const clipboardText = await readEchoMirageClipboardText();
-
-      if (!clipboardText.trim()) {
-        toast.error("Clipboard has no text.");
-        return;
-      }
-
-      setHeapTextDraft(clipboardText);
-      await saveHeapDraft(clipboardText);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not paste clipboard text.");
-    }
-  }, [saveHeapDraft]);
-
-  const copyHeapEntry = useCallback(async (entry: HeapEntry) => {
-    try {
-      await copyTextToClipboard(entry.text);
-      toast.success(`Copied "${entry.name}" to clipboard.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not copy heap entry.");
-    }
-  }, []);
-
-  const openHeapEntryInOperator = useCallback(
-    (entry: HeapEntry) => {
-      const filePath = `heap://${entry.id}`;
-      void openOperatorFile(filePath, async () => {
-        const text = entry.text || "";
-        setOperatorTextAsset({
-          kind: "text",
-          name: entry.name,
-          mimeType: "text/plain",
-          size: new Blob([text]).size,
-          text,
-        });
-        setOperatorSurfaceMode("workspace");
-        setOperatorDocMode("edit");
-        useCyberdeckTabStore.getState().setServer("m");
-        setNavRailContext("gateway");
-      });
-    },
-    [openOperatorFile, setOperatorDocMode, setOperatorSurfaceMode, setOperatorTextAsset, setNavRailContext],
-  );
-
-  const deleteHeapEntry = useCallback((id: string) => {
-    setHeapEntries((prev) => prev.filter((entry) => entry.id !== id));
-  }, []);
-
   const closeMirageContextMenu = useCallback(() => {
     setMirageContextMenu(null);
     emitSignal({ source: "ui", type: "cancel", payload: { target: "mirage_menu" }, severity: "info" });
@@ -1240,45 +972,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
   const closeGatewayPaneContextMenu = useCallback(() => {
     setGatewayPaneContextMenu(null);
     emitSignal({ source: "ui", type: "cancel", payload: { target: "gateway_menu" }, severity: "info" });
-  }, []);
-
-  const clearSavedCustomTabState = useCallback(() => {
-    const tabs = useCyberdeckTabStore.getState().customTabs;
-    const removedCount = tabs.length;
-    notifySurveyTabsCleared(tabs);
-    useCyberdeckTabStore.getState().setCustomTabs([]);
-    useCyberdeckTabStore.setState({ mountedCustomTabIds: [] });
-    useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-
-    try {
-      const raw = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Partial<CyberdeckUiState> | null;
-      if (!parsed || typeof parsed !== "object") return;
-      const nextState = { ...parsed };
-      delete nextState.customTabs;
-      delete nextState.activeCustomTabId;
-      window.localStorage.setItem(UI_STATE_STORAGE_KEY, JSON.stringify(nextState));
-    } catch {
-      /* ignore */
-    }
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "system",
-        text:
-          removedCount > 0
-            ? `TAB_STATE_CLEARED // REMOVED ${removedCount} CUSTOM TAB${removedCount === 1 ? "" : "S"}`
-            : "TAB_STATE_CLEARED // NO_CUSTOM_TABS_FOUND",
-      },
-    ]);
-    playDeckSystemSound("chirp", 0.05);
-    if (removedCount > 0) {
-      toast.success(`Cleared ${removedCount} custom tab${removedCount === 1 ? "" : "s"}.`);
-    } else {
-      toast.info("No custom tabs were saved.");
-    }
   }, []);
 
   /** Move real focus onto the rail when leaving gateway so Enter/arrows are not captured by chat/key inputs. */
