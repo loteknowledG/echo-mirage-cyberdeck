@@ -1,6 +1,6 @@
 // SERVER ONLY — HTTP bridge to external Go PowerFist hub.
 
-import type { PowerfistMissionEnvelope, PowerfistMissionSolveDetail } from "@/lib/cyberdeck/powerfist-mission.types";
+import type { SurveyMissionEnvelope, SurveyMissionSolveDetail } from "@/lib/cyberdeck/powerfist-mission.types";
 
 export function powerfistExternalHubHttp(): string | null {
   const raw = process.env.ECHO_MIRAGE_POWERFIST_HUB_HTTP?.trim();
@@ -14,7 +14,7 @@ export function powerfistExternalHubEnabled(): boolean {
 }
 
 export async function broadcastPowerfistMissionSolveExternal(
-  detail: PowerfistMissionSolveDetail,
+  detail: SurveyMissionSolveDetail,
 ): Promise<number | null> {
   const hub = powerfistExternalHubHttp();
   if (!hub) return null;
@@ -34,7 +34,7 @@ export async function broadcastPowerfistMissionSolveExternal(
 }
 
 export async function broadcastPowerfistMissionToCaptureExternal(
-  envelope: PowerfistMissionEnvelope,
+  envelope: SurveyMissionEnvelope,
 ): Promise<number | null> {
   const hub = powerfistExternalHubHttp();
   if (!hub) return null;

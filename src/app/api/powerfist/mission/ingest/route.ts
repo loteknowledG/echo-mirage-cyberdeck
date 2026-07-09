@@ -5,14 +5,14 @@ import {
   loadPowerfistPairingRegistry,
 } from "@/lib/server/powerfist-pairing-registry.server";
 import { storePowerfistMission } from "@/lib/server/powerfist-mission-store.server";
-import type { PowerfistMissionKind } from "@/lib/cyberdeck/powerfist-mission.types";
+import type { SurveyMissionKind } from "@/lib/cyberdeck/powerfist-mission.types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type IngestBody = {
   missionId?: string;
-  kind?: PowerfistMissionKind;
+  kind?: SurveyMissionKind;
   missionSecret?: string;
   prompt?: string;
   pngBase64?: string;

@@ -5,8 +5,8 @@ import os from "os";
 import { WebSocket, WebSocketServer } from "ws";
 import type { PowerFistStackCommand } from "@/lib/cyberdeck/powerfist-events";
 import type {
-  PowerfistMissionEnvelope,
-  PowerfistMissionSolveDetail,
+  SurveyMissionEnvelope,
+  SurveyMissionSolveDetail,
 } from "@/lib/cyberdeck/powerfist-mission.types";
 import { resolveHttpPort } from "@/lib/server/is-localhost-request.server";
 import {
@@ -118,7 +118,7 @@ function broadcastToSet(clients: Set<WebSocket>, payload: string): number {
 }
 
 export async function broadcastPowerfistMissionToCapture(
-  envelope: PowerfistMissionEnvelope,
+  envelope: SurveyMissionEnvelope,
 ): Promise<number> {
   const external = await broadcastPowerfistMissionToCaptureExternal(envelope);
   if (external !== null) return external;
@@ -134,7 +134,7 @@ export async function broadcastPowerfistMissionToCapture(
 }
 
 export async function broadcastPowerfistMissionSolve(
-  detail: PowerfistMissionSolveDetail,
+  detail: SurveyMissionSolveDetail,
 ): Promise<number> {
   const external = await broadcastPowerfistMissionSolveExternal(detail);
   if (external !== null) {
