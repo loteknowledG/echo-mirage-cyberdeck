@@ -20,7 +20,6 @@ import {
   type MuthurVoiceDialState,
 } from "@/voice/muthurVoiceSettings";
 import {
-  buildMuthurMemoryContext,
   clearMuthurMemory,
   createEmptyMuthurMemory,
   loadMuthurMemoryWithResult,
@@ -33,15 +32,11 @@ import {
   OPERATOR_BROWSER_HOME_URL,
   looksLikeCaptchaBlock,
   messageReferencesLocalPath,
-  normalizeOperatorBrowserUrl,
   parseBrowserCommand,
 } from "@/lib/browser-intents";
 import { isMuthurSelfModifyIntent } from "@/lib/muthur/muthur-self-modify-intent";
 import { useBrowserController } from "@/lib/use-browser-controller";
 import { CyberdeckCustomTabBrowserSync } from "@/components/cyberdeck/cyberdeck-custom-tab-browser-sync";
-import { CyberdeckWebTabFrame } from "@/components/cyberdeck/cyberdeck-web-tab-frame";
-import { RegistryShowroom } from "@/app/registry/registry-showroom";
-import { RegistryKitScrollFrame } from "@/app/registry/registry-kit-scroll-frame";
 import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
 import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import type { CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
@@ -171,12 +166,6 @@ import {
 import { OPERATOR_FILE_SAVED_EVENT } from "@/lib/workspace-create-folder";
 import { pasteIntoOperatorTextDocument, readOperatorPaneSaveText } from "@/lib/operator-workbench";
 import { get, set } from "idb-keyval";
-import {
-  CyberdeckPaneHeader,
-  CyberdeckPaneHeaderSubtitle,
-  CyberdeckPaneHeaderTitle,
-  CyberdeckPaneHeaderValue,
-} from "@/components/cyberdeck/pane-header";
 import dynamic from "next/dynamic";
 import { PanelLoader } from "@/features/cyberdeck/panel-loader";
 import { MiragePaneLayer } from "@/components/cyberdeck/mirage-pane-layer";
@@ -189,9 +178,10 @@ import { CyberdeckScrollbarHost } from "@/components/cyberdeck/cyberdeck-scrollb
 import { SurveyAutoPairHost } from "@/components/cyberdeck/survey-auto-pair-host";
 import { CyberdeckLayoutShell } from "@/features/cyberdeck/layout/cyberdeck-layout-shell";
 import { useMobileCyberdeckLayout } from "@/features/cyberdeck/layout/use-mobile-cyberdeck-layout";
-import {
-  CyberdeckMenuButton,
-} from "@/components/cyberdeck/cyberdeck-control-button";
+import { CustomTabPaneRenderer } from "@/features/cyberdeck/workspace/custom-tab-pane-renderer";
+import { CyberdeckContextMenus } from "@/features/cyberdeck/workspace/cyberdeck-context-menus";
+import { useCustomTabBrowser } from "@/features/cyberdeck/workspace/use-custom-tab-browser";
+import { useRailTabContextMenu } from "@/features/cyberdeck/workspace/use-rail-tab-context-menu";
 import {
   getInitialUplinkSonarVolume,
   saveUplinkSonarVolume,
@@ -263,14 +253,12 @@ import { GatewayColumn } from "@/features/cyberdeck/gateway/gateway-column";
 import { useGatewayPaneState } from "@/features/cyberdeck/gateway/use-gateway-pane-state";
 import { MuthurChatColumn } from "@/features/cyberdeck/muthur/muthur-chat-column";
 import {
-  CUSTOM_TAB_CONTEXT_MENU_ACTIONS,
   defaultCustomTabGlyphForKind,
   defaultCustomTabLabelForKind,
   isUnassignedCustomTab,
   parseCustomTabCommand,
   sanitizeCustomTabs,
   type CustomTab,
-  type CustomTabContextMenuAction,
   type CustomTabKind,
   ENABLE_CARD_TABLE,
   isFixedServerTabId,
@@ -615,12 +603,16 @@ export default function CyberdeckApp() {
   const [operatorBrowserSnapshot, setOperatorBrowserSnapshot] = useState("");
   const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
   const [isOperatorDragOver, setIsOperatorDragOver] = useState(false);
-  const [railTabContextMenu, setRailTabContextMenu] = useState<
-    | { variant: "custom"; tabId: string; x: number; y: number }
-    | { variant: "fixed"; serverId: (typeof SERVER_IDS)[number]; x: number; y: number }
-    | { variant: "new"; x: number; y: number }
-    | null
-  >(null);
+  const openRealmorphismKitTabRef = useRef<(tabId?: string) => void>(() => undefined);
+  const handleTabClickRef = useRef<
+    (
+      id: string,
+      anchor?: {
+        clientX: number;
+        clientY: number;
+      },
+    ) => boolean
+  >(() => false);
 
   const [showCardTablePane, setShowCardTablePane] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
@@ -2854,11 +2846,6 @@ export default function CyberdeckApp() {
     return () => window.removeEventListener("echo-mirage-context-action", onContextAction);
   }, [copyOperatorDocToClipboard, pasteClipboardToOperator, saveOperatorDocument]);
 
-  const closeRailTabContextMenu = useCallback(() => {
-    setRailTabContextMenu(null);
-    emitSignal({ source: "ui", type: "cancel", payload: { target: "rail_tab_menu" }, severity: "info" });
-  }, []);
-
   const closeMirageContextMenu = useCallback(() => {
     setMirageContextMenu(null);
     emitSignal({ source: "ui", type: "cancel", payload: { target: "mirage_menu" }, severity: "info" });
@@ -2868,176 +2855,6 @@ export default function CyberdeckApp() {
     setGatewayPaneContextMenu(null);
     emitSignal({ source: "ui", type: "cancel", payload: { target: "gateway_menu" }, severity: "info" });
   }, []);
-
-  const openRailTabContextMenu = useCallback(
-    (tabId: string, clientX: number, clientY: number) => {
-      if (getCyberdeckSelectedRailTabId() !== tabId || typeof window === "undefined") return;
-      closeMirageContextMenu();
-      closeGatewayPaneContextMenu();
-
-      const menuWidth = 140;
-      const tab =
-        !isFixedServerTabId(tabId)
-          ? useCyberdeckTabStore.getState().customTabs.find((entry) => entry.id === tabId)
-          : null;
-      const menuHeight = isFixedServerTabId(tabId)
-        ? 132
-        : isUnassignedCustomTab(tab)
-          ? 520
-          : 56;
-      const padding = 8;
-      const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
-      const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
-
-      setRailTabContextMenu(
-        isFixedServerTabId(tabId)
-          ? { variant: "fixed", serverId: tabId, x, y }
-          : { variant: "custom", tabId, x, y },
-      );
-    },
-    [closeGatewayPaneContextMenu, closeMirageContextMenu],
-  );
-
-  const handleTabClick = useCallback(
-    (
-      id: string,
-      anchor?: {
-        clientX: number;
-        clientY: number;
-      },
-    ): boolean => {
-      const { customTabs, activeCustomTabId, server } = useCyberdeckTabStore.getState();
-      const isCustomTab = customTabs.some((tab) => tab.id === id);
-      const willChange = isCustomTab
-        ? activeCustomTabId !== id
-        : activeCustomTabId !== null || server !== id;
-
-      // Paint rail + panes in the same frame as the click (before audio / page setState).
-      flushSync(() => {
-        if (willChange) {
-          if (isCustomTab) {
-            useCyberdeckTabStore.getState().selectTab(id, true);
-          } else {
-            useCyberdeckTabStore.getState().selectTab(id, false);
-          }
-        }
-      });
-
-      if (willChange) {
-        playDeckSystemSound("chirp", 0.03);
-        emitSignal({
-          source: "ui",
-          type: "select",
-          payload: { tabId: id, kind: isCustomTab ? "custom" : "fixed" },
-          severity: "info",
-        });
-        startTransition(() => {
-          closeRailTabContextMenu();
-          closeMirageContextMenu();
-          closeGatewayPaneContextMenu();
-          setNavRailContext("gateway");
-          setServerKeyboardHighlightId(null);
-          if (!isCustomTab && id === "s") {
-            focusGatewayConnectionPanel();
-          }
-        });
-        return true;
-      }
-
-      playDeckSystemSound("click", 0.02);
-      startTransition(() => {
-        closeMirageContextMenu();
-        closeGatewayPaneContextMenu();
-        setServerKeyboardHighlightId(null);
-
-        const tabEl = document.querySelector<HTMLElement>(`[data-server-tab="${CSS.escape(id)}"]`);
-        const rect = tabEl?.getBoundingClientRect();
-        const clientX = anchor?.clientX ?? (rect ? rect.left + rect.width / 2 : window.innerWidth / 2);
-        const clientY = anchor?.clientY ?? (rect ? rect.bottom : window.innerHeight / 2);
-        openRailTabContextMenu(id, clientX, clientY);
-      });
-      return false;
-    },
-    [
-      closeGatewayPaneContextMenu,
-      closeMirageContextMenu,
-      closeRailTabContextMenu,
-      focusGatewayConnectionPanel,
-      openRailTabContextMenu,
-    ],
-  );
-
-  const openRealmorphismKitTab = useCallback(
-    (tabId?: string) => {
-      closeRailTabContextMenu();
-      closeMirageContextMenu();
-      closeGatewayPaneContextMenu();
-
-      const targetTabId = tabId || `tab-${crypto.randomUUID()}`;
-
-      flushSync(() => {
-        const store = useCyberdeckTabStore.getState();
-        const existing = store.customTabs.some((tab) => tab.id === targetTabId);
-
-        if (existing) {
-          store.setCustomTabs((prev) =>
-            prev.map((tab) =>
-              tab.id === targetTabId
-                ? {
-                    ...tab,
-                    label: "REALMORPHISM KIT",
-                    glyph: "K",
-                    kind: "realmorphism-kit",
-                    browserUrl: undefined,
-                    asset: null,
-                  }
-                : tab,
-            ),
-          );
-        } else {
-          store.setCustomTabs((prev) => [
-            ...prev,
-            {
-              id: targetTabId,
-              label: "REALMORPHISM KIT",
-              glyph: "K",
-              kind: "realmorphism-kit",
-              asset: null,
-            },
-          ]);
-        }
-
-        store.setActiveCustomTabId(targetTabId);
-        store.mountCustomTab(targetTabId);
-      });
-
-      setNavRailContext("tabs");
-      setMessages((prev) => [
-        ...prev,
-        { role: "system", text: "TAB_KIT // REALMORPHISM REGISTRY OPENED" },
-      ]);
-      playDeckSystemSound("chirp", 0.05);
-    },
-    [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu],
-  );
-
-  const deleteActiveTab = useCallback(() => {
-    closeRailTabContextMenu();
-    closeMirageContextMenu();
-    closeGatewayPaneContextMenu();
-    const activeCustomTabId = useCyberdeckTabStore.getState().activeCustomTabId;
-    if (!activeCustomTabId) return;
-    const closingTab = useCyberdeckTabStore
-      .getState()
-      .customTabs.find((tab) => tab.id === activeCustomTabId);
-    useCyberdeckTabStore.getState().setCustomTabs((prev) => prev.filter((tab) => tab.id !== activeCustomTabId));
-    useCyberdeckTabStore.setState((state) => ({
-      mountedCustomTabIds: state.mountedCustomTabIds.filter((id) => id !== activeCustomTabId),
-    }));
-    useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-    terminateSurveySessionWhenTabClosed(closingTab?.kind);
-    playDeckSystemSound("click", 0.02);
-  }, [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
 
   const clearSavedCustomTabState = useCallback(() => {
     const tabs = useCyberdeckTabStore.getState().customTabs;
@@ -3409,7 +3226,7 @@ export default function CyberdeckApp() {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             sfxNav.commit();
-            const tabChanged = handleTabClick(serverKeyboardHighlightId ?? sPivot);
+            const tabChanged = handleTabClickRef.current(serverKeyboardHighlightId ?? sPivot);
             if (tabChanged) {
               setNavRailContext("gateway");
               setServerKeyboardHighlightId(null);
@@ -3567,7 +3384,6 @@ export default function CyberdeckApp() {
   }, [
     activateModelById,
     activeProvider,
-    handleTabClick,
     modelKeyboardHighlightId,
     modelList,
     navRailContext,
@@ -4035,125 +3851,168 @@ export default function CyberdeckApp() {
   );
 
 
-  const customTabBrowserNavigate = useCallback(
-    (tabId: string, nextUrl: string) => {
-      const normalizedUrl = normalizeOperatorBrowserUrl(nextUrl);
-      updateCustomTab(tabId, (tab) => ({
-        ...tab,
-        kind: "web",
-        browserUrl: normalizedUrl,
-        asset: undefined,
-      }));
-    },
-    [updateCustomTab],
-  );
+  const { customTabBrowserNavigate, handleCustomTabDrop } = useCustomTabBrowser({
+    updateCustomTab,
+    setNavRailContext,
+    setMessages,
+  });
 
-  const loadCustomTabAssetFromFile = useCallback(
-    async (tabId: string, file: File) => {
-      const ingested = await buildOperatorIngestFromFile(file);
-      let nextAsset: DroppedOperatorAsset = {
-        kind: ingested.kind,
-        name: ingested.name,
-        mimeType: ingested.mimeType,
-        size: ingested.size,
-        surface: ingested.surface,
-        ...(ingested.text !== undefined ? { text: ingested.text } : {}),
-        ...(ingested.imageSrc ? { imageSrc: ingested.imageSrc } : {}),
-        ...(ingested.pdfSrc ? { pdfSrc: ingested.pdfSrc } : {}),
-        ...(ingested.docxSrc ? { docxSrc: ingested.docxSrc } : {}),
-      };
-      if (ingested.surface !== "markdown" && ingested.surface !== "text") {
-        const { text: _text, ...withoutText } = nextAsset;
-        nextAsset = withoutText;
-      }
+  const {
+    railTabContextMenu,
+    closeRailTabContextMenu,
+    openRailTabContextMenu,
+    openNewTabMenu,
+    applyTabMenuAction,
+  } = useRailTabContextMenu({
+    closeMirageContextMenu,
+    closeGatewayPaneContextMenu,
+    convertCustomTab,
+    openRealmorphismKitTab: (tabId) => openRealmorphismKitTabRef.current(tabId),
+    setNavRailContext,
+    setMessages,
+  });
 
-      updateCustomTab(tabId, (tab) => ({
-        ...tab,
-        kind: "document",
-        asset: nextAsset,
-        browserUrl: undefined,
-      }));
-      useCyberdeckTabStore.getState().setActiveCustomTabId(tabId);
-      setNavRailContext("tabs");
-      setMessages((prev) => [
-        ...prev,
-        { role: "system", text: `TAB_WORKSPACE // ${file.name} // DOCUMENT` },
-      ]);
-    },
-    [updateCustomTab],
-  );
-
-  const handleCustomTabDrop = useCallback(
-    async (e: ReactDragEvent<HTMLDivElement>, tabId: string) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const file = e.dataTransfer.files?.[0];
-      if (!file) return;
-      await loadCustomTabAssetFromFile(tabId, file);
-    },
-    [loadCustomTabAssetFromFile],
-  );
-
-  const openNewTabMenu = useCallback(
-    (event: ReactMouseEvent<HTMLButtonElement>) => {
-      if (typeof window === "undefined") return;
+  const openRealmorphismKitTab = useCallback(
+    (tabId?: string) => {
+      closeRailTabContextMenu();
       closeMirageContextMenu();
       closeGatewayPaneContextMenu();
 
-      const menuWidth = 140;
-      const menuHeight = 520;
-      const padding = 8;
-      const x = Math.min(event.clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
-      const y = Math.min(event.clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
-
-      setRailTabContextMenu({ variant: "new", x, y });
-    },
-    [closeGatewayPaneContextMenu, closeMirageContextMenu],
-  );
-
-  const applyTabMenuAction = useCallback(
-    (action: CustomTabContextMenuAction, existingTabId?: string) => {
-      closeRailTabContextMenu();
-      if (action.action === "kit-pane") {
-        openRealmorphismKitTab();
-        return;
-      }
-
-      const kind: CustomTabKind =
-        action.action === "convert" ? action.kind : "settings";
-
-      if (existingTabId) {
-        const tab = useCyberdeckTabStore.getState().customTabs.find((entry) => entry.id === existingTabId);
-        if (!isUnassignedCustomTab(tab)) return;
-        convertCustomTab(existingTabId, kind);
-        return;
-      }
-
-      const id = `tab-${crypto.randomUUID()}`;
-      const tab: CustomTab = {
-        id,
-        label: defaultCustomTabLabelForKind(kind),
-        glyph: defaultCustomTabGlyphForKind(kind),
-        kind,
-        browserUrl: kind === "web" ? OPERATOR_BROWSER_HOME_URL : undefined,
-        asset: null,
-      };
+      const targetTabId = tabId || `tab-${crypto.randomUUID()}`;
 
       flushSync(() => {
         const store = useCyberdeckTabStore.getState();
-        store.setCustomTabs((prev) => [...prev, tab]);
-        store.setActiveCustomTabId(id);
-        store.mountCustomTab(id);
+        const existing = store.customTabs.some((tab) => tab.id === targetTabId);
+
+        if (existing) {
+          store.setCustomTabs((prev) =>
+            prev.map((tab) =>
+              tab.id === targetTabId
+                ? {
+                    ...tab,
+                    label: "REALMORPHISM KIT",
+                    glyph: "K",
+                    kind: "realmorphism-kit",
+                    browserUrl: undefined,
+                    asset: null,
+                  }
+                : tab,
+            ),
+          );
+        } else {
+          store.setCustomTabs((prev) => [
+            ...prev,
+            {
+              id: targetTabId,
+              label: "REALMORPHISM KIT",
+              glyph: "K",
+              kind: "realmorphism-kit",
+              asset: null,
+            },
+          ]);
+        }
+
+        store.setActiveCustomTabId(targetTabId);
+        store.mountCustomTab(targetTabId);
       });
+
       setNavRailContext("tabs");
       setMessages((prev) => [
         ...prev,
-        { role: "system", text: `TAB_CREATED // ${tab.label} // ${kind.toUpperCase()}` },
+        { role: "system", text: "TAB_KIT // REALMORPHISM REGISTRY OPENED" },
       ]);
       playDeckSystemSound("chirp", 0.05);
     },
-    [closeRailTabContextMenu, convertCustomTab, openRealmorphismKitTab],
+    [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu],
   );
+  openRealmorphismKitTabRef.current = openRealmorphismKitTab;
+
+  const deleteActiveTab = useCallback(() => {
+    closeRailTabContextMenu();
+    closeMirageContextMenu();
+    closeGatewayPaneContextMenu();
+    const activeCustomTabId = useCyberdeckTabStore.getState().activeCustomTabId;
+    if (!activeCustomTabId) return;
+    const closingTab = useCyberdeckTabStore
+      .getState()
+      .customTabs.find((tab) => tab.id === activeCustomTabId);
+    useCyberdeckTabStore.getState().setCustomTabs((prev) => prev.filter((tab) => tab.id !== activeCustomTabId));
+    useCyberdeckTabStore.setState((state) => ({
+      mountedCustomTabIds: state.mountedCustomTabIds.filter((id) => id !== activeCustomTabId),
+    }));
+    useCyberdeckTabStore.getState().setActiveCustomTabId(null);
+    terminateSurveySessionWhenTabClosed(closingTab?.kind);
+    playDeckSystemSound("click", 0.02);
+  }, [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
+
+  const handleTabClick = useCallback(
+    (
+      id: string,
+      anchor?: {
+        clientX: number;
+        clientY: number;
+      },
+    ): boolean => {
+      const { customTabs, activeCustomTabId, server } = useCyberdeckTabStore.getState();
+      const isCustomTab = customTabs.some((tab) => tab.id === id);
+      const willChange = isCustomTab
+        ? activeCustomTabId !== id
+        : activeCustomTabId !== null || server !== id;
+
+      flushSync(() => {
+        if (willChange) {
+          if (isCustomTab) {
+            useCyberdeckTabStore.getState().selectTab(id, true);
+          } else {
+            useCyberdeckTabStore.getState().selectTab(id, false);
+          }
+        }
+      });
+
+      if (willChange) {
+        playDeckSystemSound("chirp", 0.03);
+        emitSignal({
+          source: "ui",
+          type: "select",
+          payload: { tabId: id, kind: isCustomTab ? "custom" : "fixed" },
+          severity: "info",
+        });
+        startTransition(() => {
+          closeRailTabContextMenu();
+          closeMirageContextMenu();
+          closeGatewayPaneContextMenu();
+          setNavRailContext("gateway");
+          setServerKeyboardHighlightId(null);
+          if (!isCustomTab && id === "s") {
+            focusGatewayConnectionPanel();
+          }
+        });
+        return true;
+      }
+
+      playDeckSystemSound("click", 0.02);
+      startTransition(() => {
+        closeMirageContextMenu();
+        closeGatewayPaneContextMenu();
+        setServerKeyboardHighlightId(null);
+
+        const tabEl = document.querySelector<HTMLElement>(`[data-server-tab="${CSS.escape(id)}"]`);
+        const rect = tabEl?.getBoundingClientRect();
+        const clientX = anchor?.clientX ?? (rect ? rect.left + rect.width / 2 : window.innerWidth / 2);
+        const clientY = anchor?.clientY ?? (rect ? rect.bottom : window.innerHeight / 2);
+        openRailTabContextMenu(id, clientX, clientY);
+      });
+      return false;
+    },
+    [
+      closeGatewayPaneContextMenu,
+      closeMirageContextMenu,
+      closeRailTabContextMenu,
+      focusGatewayConnectionPanel,
+      openRailTabContextMenu,
+    ],
+  );
+  handleTabClickRef.current = handleTabClick;
 
   const openMirageContextMenu = useCallback(
     (clientX: number, clientY: number) => {
@@ -4619,26 +4478,69 @@ export default function CyberdeckApp() {
     [cancelLongPressFromContextMenu, openRailTabContextMenu],
   );
 
-  useEffect(() => {
-    if (!railTabContextMenu) return;
-    if (railTabContextMenu.variant !== "custom") return;
-    return useCyberdeckTabStore.subscribe((state) => {
-      if (state.activeCustomTabId !== railTabContextMenu.tabId) {
-        closeRailTabContextMenu();
-      }
-    });
-  }, [closeRailTabContextMenu, railTabContextMenu]);
-
-  useEffect(() => {
-    if (!railTabContextMenu) return;
-    if (railTabContextMenu.variant !== "fixed") return;
-    return useCyberdeckTabStore.subscribe((state) => {
-      const selected = state.activeCustomTabId ?? state.server;
-      if (railTabContextMenu.serverId !== selected) {
-        closeRailTabContextMenu();
-      }
-    });
-  }, [closeRailTabContextMenu, railTabContextMenu]);
+  const renderCustomTabSurface = useCallback(
+    (tab: CustomTab) => (
+      <CustomTabPaneRenderer
+        tab={tab}
+        activeProvider={activeProvider}
+        connectionState={connectionState}
+        modelID={modelID}
+        providerModelFetchStatus={providerModelFetchStatus}
+        voiceEnabled={voiceEnabled}
+        voiceHealth={voiceHealth}
+        muthurMemory={muthurMemory}
+        muthurMemoryHydrated={muthurMemoryHydrated}
+        muthurMemoryLoadError={muthurMemoryLoadError}
+        messages={messages}
+        streamText={streamText}
+        heapEntryCount={heapEntries.length}
+        providerKeys={providerKeys}
+        operatorBrowserEngine={operatorBrowserEngine}
+        operatorBrowserRef={operatorBrowserRef}
+        identity={identity}
+        orchestration={orchestration}
+        deckSfxVolume={deckSfxVolume}
+        sonarVolume={sonarVolume}
+        voiceDialVolume={voiceDial.volume}
+        speakDeckVoiceLine={speakDeckVoiceLine}
+        onVoiceToggle={toggleVoiceEnabled}
+        onVoiceVolumeChange={handleVoiceVolumeChange}
+        onSonarVolumeChange={handleSonarVolumeChange}
+        onDeckSfxVolumeChange={handleDeckSfxVolumeChange}
+        customTabBrowserNavigate={customTabBrowserNavigate}
+        handleCustomTabDrop={handleCustomTabDrop}
+        messageInputRef={messageInputRef}
+      />
+    ),
+    [
+      activeProvider,
+      connectionState,
+      customTabBrowserNavigate,
+      deckSfxVolume,
+      handleCustomTabDrop,
+      handleDeckSfxVolumeChange,
+      handleSonarVolumeChange,
+      handleVoiceVolumeChange,
+      heapEntries.length,
+      identity,
+      messages,
+      modelID,
+      muthurMemory,
+      muthurMemoryHydrated,
+      muthurMemoryLoadError,
+      operatorBrowserEngine,
+      orchestration,
+      providerKeys,
+      providerModelFetchStatus,
+      sonarVolume,
+      speakDeckVoiceLine,
+      streamText,
+      toggleVoiceEnabled,
+      voiceDial.volume,
+      voiceEnabled,
+      voiceHealth,
+    ],
+  );
 
   useEffect(() => {
     if (operatorSurfaceMode !== "browser") return;
@@ -4660,345 +4562,6 @@ export default function CyberdeckApp() {
       view.removeEventListener("page-title-updated", syncSnapshot as EventListener);
     };
   }, [captureOperatorBrowserSnapshot, operatorSurfaceMode, operatorBrowserUrl]);
-
-  useEffect(() => {
-    if (!railTabContextMenu && !mirageContextMenu && !gatewayPaneContextMenu) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeRailTabContextMenu();
-        closeMirageContextMenu();
-        closeGatewayPaneContextMenu();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    closeGatewayPaneContextMenu,
-    closeMirageContextMenu,
-    closeRailTabContextMenu,
-    gatewayPaneContextMenu,
-    mirageContextMenu,
-    railTabContextMenu,
-  ]);
-
-  const renderCustomTabSurface = useCallback(
-    (tab: CustomTab) => {
-      const server = useCyberdeckTabStore.getState().server;
-      const shell = (
-        content: JSX.Element,
-        right?: JSX.Element,
-        opts?: { scrollContent?: boolean },
-      ) => (
-        <div
-          className={cn(
-            "custom-scrollbar flex h-full min-h-0 min-w-0 w-full flex-1 flex-col bg-black p-4",
-            opts?.scrollContent ? "overflow-hidden" : "overflow-y-auto",
-          )}
-          data-pointer-target={tab.kind}
-        >
-          <div
-            className={cn(
-              "flex min-h-0 flex-1 flex-col rounded-sm border border-[#141414] bg-black transition-colors",
-              opts?.scrollContent && "overflow-hidden",
-            )}
-          >
-            <CyberdeckPaneHeader
-              className={opts?.scrollContent ? "shrink-0" : undefined}
-              left={
-                <div className="flex flex-col">
-                  <CyberdeckPaneHeaderTitle style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}>
-                    {tab.label}
-                  </CyberdeckPaneHeaderTitle>
-                  <CyberdeckPaneHeaderSubtitle>
-                    {tab.kind.toUpperCase()} TAB // {tab.glyph}
-                  </CyberdeckPaneHeaderSubtitle>
-                </div>
-              }
-              right={
-                right ||
-                (tab.kind === "web" ? (
-                  <div className="rounded border border-[#2d2d2d] px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-                    ENGINE: {operatorBrowserEngine}
-                  </div>
-                ) : null)
-              }
-            />
-            {opts?.scrollContent ? (
-              <RegistryKitScrollFrame>{content}</RegistryKitScrollFrame>
-            ) : (
-              content
-            )}
-          </div>
-        </div>
-      );
-
-      if (tab.kind === "realmorphism-kit" || (tab.kind === "web" && tab.label === "REALMORPHISM KIT")) {
-        return shell(<RegistryShowroom variant="embedded" />, undefined, { scrollContent: true });
-      }
-
-      if (tab.kind === "web") {
-        const webUrl = tab.browserUrl || OPERATOR_BROWSER_HOME_URL;
-        return shell(
-          <div
-            className="flex min-h-0 flex-1 flex-col gap-3 p-3"
-            onDragOver={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-            onDrop={(event) => void handleCustomTabDrop(event, tab.id)}
-          >
-            <div className="flex items-center gap-2 rounded-sm border border-[#1c1c1c] bg-black/80 p-2">
-              <input
-                value={webUrl}
-                onChange={(event) => customTabBrowserNavigate(tab.id, event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
-                  event.preventDefault();
-                  customTabBrowserNavigate(tab.id, (event.currentTarget as HTMLInputElement).value);
-                }}
-                spellCheck={false}
-                autoCapitalize="off"
-                autoComplete="off"
-                autoCorrect="off"
-                className="min-w-0 flex-1 border border-[#2d2d2d] bg-black px-2 py-1 font-mono text-[9px] tracking-[0.08em] text-[#cfcfcf] outline-none"
-              />
-            </div>
-            <div className="min-h-0 flex-1 overflow-hidden rounded-sm border border-[#1c1c1c] bg-black">
-              <CyberdeckWebTabFrame
-                key={webUrl}
-                url={webUrl}
-                webviewRef={operatorBrowserRef}
-              />
-            </div>
-          </div>,
-        );
-      }
-
-      if (tab.kind === "document") {
-        return (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <ActivatedCyberdeckPane kind="document" tabId={tab.id} />
-          </div>
-        );
-      }
-
-      if (tab.kind === "settings") {
-        return shell(
-          <ActivatedCyberdeckPane
-            kind="settings"
-            voiceEnabled={voiceEnabled}
-            onVoiceToggle={toggleVoiceEnabled}
-            deckSfxVolume={deckSfxVolume}
-            onDeckSfxVolumeChange={handleDeckSfxVolumeChange}
-            identity={identity}
-            voiceVolume={voiceDial.volume}
-            onVoiceVolumeChange={handleVoiceVolumeChange}
-            sonarVolume={sonarVolume}
-            onSonarVolumeChange={handleSonarVolumeChange}
-          />,
-        );
-      }
-
-      if (tab.kind === "diagnostics") {
-        let lastUserChat = "";
-        for (let i = messages.length - 1; i >= 0; i--) {
-          const m = messages[i];
-          if (m && m.role === "user") {
-            lastUserChat = m.text;
-            break;
-          }
-        }
-        const memoryContextQuery =
-          lastUserChat.trim() || messageInputRef.current?.getValue().trim() || undefined;
-        return shell(
-          <ActivatedCyberdeckPane
-            kind="diagnostics"
-            server={server}
-            connectionState={connectionState}
-            activeProvider={activeProvider}
-            modelID={modelID}
-            providerModelFetchStatus={providerModelFetchStatus}
-            voiceEnabled={voiceEnabled}
-            voiceHealth={voiceHealth}
-            muthurMemory={muthurMemory}
-            muthurMemoryHydrated={muthurMemoryHydrated}
-            muthurMemoryLoadError={muthurMemoryLoadError}
-            memoryContext={buildMuthurMemoryContext(muthurMemory, memoryContextQuery)}
-            heapCount={heapEntries.length}
-            chatCount={messages.length + (streamText ? 1 : 0)}
-          />,
-        );
-      }
-
-      if (tab.kind === "pi") {
-        return shell(<ActivatedCyberdeckPane kind="pi" server={server} />);
-      }
-
-      if (tab.kind === "db8") {
-        return (
-          <div
-            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
-            data-pointer-target="db8"
-          >
-            <ActivatedCyberdeckPane
-              kind="db8"
-              activeProvider={activeProvider}
-              modelId={modelID}
-              apiKey={providerKeys[activeProvider] || ""}
-              onSpeakLine={speakDeckVoiceLine}
-            />
-          </div>
-        );
-      }
-
-      if (tab.kind === "catelog" || tab.kind === "catalog") {
-        return shell(<ActivatedCyberdeckPane kind="catalog" />);
-      }
-
-      if (tab.kind === "operators") {
-        return shell(<ActivatedCyberdeckPane kind="operators" orchestration={orchestration} />);
-      }
-
-      if (tab.kind === "memory-atlas") {
-        return shell(<ActivatedCyberdeckPane kind="memory-atlas" />);
-      }
-
-      if (tab.kind === "voice-lab") {
-        return shell(
-          <ActivatedCyberdeckPane
-            kind="voice-lab"
-            voiceEnabled={voiceEnabled}
-            onVoiceToggle={toggleVoiceEnabled}
-          />,
-        );
-      }
-
-      if (tab.kind === "flight-log") {
-        return shell(<ActivatedCyberdeckPane kind="flight-log" />);
-      }
-
-      if (tab.kind === "drop-bay") {
-        return shell(<ActivatedCyberdeckPane kind="drop-bay" />);
-      }
-
-      if (tab.kind === "cadre") {
-        return shell(<ActivatedCyberdeckPane kind="cadre" />);
-      }
-
-      if (tab.kind === "install") {
-        return shell(<ActivatedCyberdeckPane kind="install" />);
-      }
-
-      if (tab.kind === "glyph-channel") {
-        return (
-          <div
-            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
-            data-pointer-target="glyph-channel"
-          >
-            <ActivatedCyberdeckPane kind="glyph-channel" />
-          </div>
-        );
-      }
-
-      if (tab.kind === "rola-dex") {
-        return (
-          <div
-            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
-            data-pointer-target="rola-dex"
-          >
-            <ActivatedCyberdeckPane kind="rola-dex" />
-          </div>
-        );
-      }
-
-      if (tab.kind === "survey") {
-        return (
-          <div
-            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
-            data-pointer-target="survey"
-          >
-            <ActivatedCyberdeckPane kind="survey" />
-          </div>
-        );
-      }
-
-      if (tab.kind === "tunes" || String(tab.kind) === "sound-profile") {
-        return (
-          <div
-            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
-            data-pointer-target="tunes"
-          >
-            <ActivatedCyberdeckPane kind="tunes" />
-          </div>
-        );
-      }
-
-      if (tab.kind === "call-center") {
-        return (
-          <div
-            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
-            data-pointer-target="call-center"
-          >
-            <ActivatedCyberdeckPane
-              kind="call-center"
-              activeProvider={activeProvider}
-              modelId={modelID}
-              apiKey={providerKeys[activeProvider] || ""}
-            />
-          </div>
-        );
-      }
-
-      if (tab.kind === "photoshop") {
-        return (
-          <div
-            className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
-            data-pointer-target="photoshop"
-          >
-            <ActivatedCyberdeckPane kind="photoshop" />
-          </div>
-        );
-      }
-
-      return shell(
-        <div className="flex min-h-0 flex-1 items-center justify-center p-6 font-mono text-[10px] tracking-[0.08em] text-[#8a8a8a]">
-          BLANK TAB // RIGHT-CLICK TAB RAIL TO PICK A TYPE, OR USE CHAT /tab COMMANDS.
-        </div>,
-      );
-    },
-    [
-      activeProvider,
-      connectionState,
-      activeProvider,
-      customTabBrowserNavigate,
-      deckMode,
-      handleCustomTabDrop,
-      heapEntries.length,
-      messages,
-      messages.length,
-      modelID,
-      providerKeys,
-      muthurMemory,
-      muthurMemoryHydrated,
-      muthurMemoryLoadError,
-      operatorBrowserEngine,
-      providerModelFetchStatus,
-      streamText,
-      speakDeckVoiceLine,
-      toggleVoiceEnabled,
-      updateCustomTab,
-      voiceEnabled,
-      voiceHealth,
-      voiceDial.volume,
-      handleVoiceVolumeChange,
-      sonarVolume,
-      handleSonarVolumeChange,
-      deckSfxVolume,
-      handleDeckSfxVolumeChange,
-    ],
-  );
 
   /* Weyland: col2 = nav, col3 = terminal. Echo: flipped → col2 = terminal (chat), col3 = nav (gateway). */
   return (
@@ -5069,249 +4632,23 @@ export default function CyberdeckApp() {
           await piControlLease.reportConflict();
         }}
       />
-      {railTabContextMenu || mirageContextMenu || gatewayPaneContextMenu ? (
-        <div
-          className="fixed inset-0 z-[90]"
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            closeRailTabContextMenu();
-            closeMirageContextMenu();
-            closeGatewayPaneContextMenu();
-          }}
-          onPointerDown={() => {
-            closeRailTabContextMenu();
-            closeMirageContextMenu();
-            closeGatewayPaneContextMenu();
-          }}
-        >
-          {railTabContextMenu ? (
-          <div
-            role="menu"
-            aria-label={
-              railTabContextMenu.variant === "fixed"
-                ? "Fixed server tab actions"
-                : railTabContextMenu.variant === "new"
-                  ? "Choose new tab type"
-                  : "Tab actions"
-            }
-            className="absolute w-fit min-w-[8.75rem] max-h-[70vh] overflow-y-auto rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)] [&_[role=menuitem]]:whitespace-nowrap"
-            style={{ left: railTabContextMenu.x, top: railTabContextMenu.y }}
-            onPointerDown={(event) => event.stopPropagation()}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-          >
-            {railTabContextMenu.variant === "fixed" ? (
-              <>
-                <CyberdeckMenuButton
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    const id = railTabContextMenu.serverId;
-                    closeRailTabContextMenu();
-                    focusFixedServerPanel(id);
-                  }}
-                >
-                  {railTabContextMenu.serverId === "m"
-                    ? "Focus operator panel"
-                    : railTabContextMenu.serverId === "s"
-                      ? "Focus connection panel"
-                      : railTabContextMenu.serverId === "ct"
-                        ? "Focus card table"
-                        : "Focus settings panel"}
-                </CyberdeckMenuButton>
-                <CyberdeckMenuButton
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    const id = railTabContextMenu.serverId;
-                    closeRailTabContextMenu();
-                    void navigator.clipboard
-                      .writeText(id)
-                      .then(() => toast.success(`Copied server id: ${id}`))
-                      .catch(() => toast.error("Could not copy."));
-                  }}
-                >
-                  Copy server id
-                </CyberdeckMenuButton>
-              </>
-            ) : railTabContextMenu.variant === "new" ? (
-              <>
-                {CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
-                  <CyberdeckMenuButton
-                    key={action.label}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => applyTabMenuAction(action)}
-                  >
-                    {action.label}
-                  </CyberdeckMenuButton>
-                ))}
-              </>
-            ) : (
-              <>
-                {isUnassignedCustomTab(
-                  useCyberdeckTabStore
-                    .getState()
-                    .customTabs.find((tab) => tab.id === railTabContextMenu.tabId),
-                )
-                  ? CUSTOM_TAB_CONTEXT_MENU_ACTIONS.map((action) => (
-                      <CyberdeckMenuButton
-                        key={`convert-${action.label}`}
-                        type="button"
-                        role="menuitem"
-                        onClick={() => applyTabMenuAction(action, railTabContextMenu.tabId)}
-                      >
-                        {action.label}
-                      </CyberdeckMenuButton>
-                    ))
-                  : null}
-                <CyberdeckMenuButton
-                  type="button"
-                  role="menuitem"
-                  danger
-                  onClick={() => {
-                    deleteActiveTab();
-                    closeRailTabContextMenu();
-                  }}
-                >
-                  Close
-                </CyberdeckMenuButton>
-              </>
-            )}
-          </div>
-          ) : mirageContextMenu ? (
-            <div
-              role="menu"
-              aria-label="Mirage chat actions"
-              className="absolute min-w-44 rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
-              style={{ left: mirageContextMenu.x, top: mirageContextMenu.y }}
-              onPointerDown={(event) => event.stopPropagation()}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-            >
-              <CyberdeckMenuButton
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMirageContextMenu();
-                  openOrFocusCallCenterTab();
-                }}
-              >
-                Open Call Center
-              </CyberdeckMenuButton>
-              <CyberdeckMenuButton
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMirageContextMenu();
-                  replayFullLastAssistant();
-                }}
-              >
-                Speak last message
-              </CyberdeckMenuButton>
-              <CyberdeckMenuButton
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMirageContextMenu();
-                  void copyMirageLastAssistant();
-                }}
-              >
-                Copy last assistant message
-              </CyberdeckMenuButton>
-              <CyberdeckMenuButton
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMirageContextMenu();
-                  void copyMirageSelectionOrLastMessage();
-                }}
-              >
-                Copy selection or last message
-              </CyberdeckMenuButton>
-              <CyberdeckMenuButton
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMirageContextMenu();
-                  handleModelLabelClick("b");
-                }}
-              >
-                Open Settings
-              </CyberdeckMenuButton>
-              <CyberdeckMenuButton
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMirageContextMenu();
-                  handleModelLabelClick("s");
-                }}
-              >
-                Open connection panel
-              </CyberdeckMenuButton>
-            </div>
-          ) : gatewayPaneContextMenu ? (
-            <div
-              role="menu"
-              aria-label="Gateway pane actions"
-              className="absolute min-w-44 rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
-              style={{ left: gatewayPaneContextMenu.x, top: gatewayPaneContextMenu.y }}
-              onPointerDown={(event) => event.stopPropagation()}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-            >
-              <CyberdeckMenuButton
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeGatewayPaneContextMenu();
-                  void copyMirageSelectionOrLastMessage();
-                }}
-              >
-                Copy selection or last message
-              </CyberdeckMenuButton>
-              <CyberdeckMenuButton
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeGatewayPaneContextMenu();
-                  handleModelLabelClick("b");
-                }}
-              >
-                Open Settings
-              </CyberdeckMenuButton>
-              <CyberdeckMenuButton
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeGatewayPaneContextMenu();
-                  handleModelLabelClick("s");
-                }}
-              >
-                Open connection panel
-              </CyberdeckMenuButton>
-              <CyberdeckMenuButton
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeGatewayPaneContextMenu();
-                  openOrFocusDiagnosticsTab();
-                }}
-              >
-                Open Diagnostics tab
-              </CyberdeckMenuButton>
-            </div>
-) : null
-            }
-          </div>
-      ) : null}
+      <CyberdeckContextMenus
+        railTabContextMenu={railTabContextMenu}
+        mirageContextMenu={mirageContextMenu}
+        gatewayPaneContextMenu={gatewayPaneContextMenu}
+        closeRailTabContextMenu={closeRailTabContextMenu}
+        closeMirageContextMenu={closeMirageContextMenu}
+        closeGatewayPaneContextMenu={closeGatewayPaneContextMenu}
+        applyTabMenuAction={applyTabMenuAction}
+        focusFixedServerPanel={focusFixedServerPanel}
+        deleteActiveTab={deleteActiveTab}
+        openOrFocusCallCenterTab={openOrFocusCallCenterTab}
+        replayFullLastAssistant={replayFullLastAssistant}
+        copyMirageLastAssistant={copyMirageLastAssistant}
+        copyMirageSelectionOrLastMessage={copyMirageSelectionOrLastMessage}
+        handleModelLabelClick={handleModelLabelClick}
+        openOrFocusDiagnosticsTab={openOrFocusDiagnosticsTab}
+      />
       <CyberdeckServerRail
         railRef={serverRailRef}
         isMobileLayout={isMobileLayout}
