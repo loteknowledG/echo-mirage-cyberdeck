@@ -1,6 +1,6 @@
 # L-CYBERDECK-001 — Conductor Status Board
 
-**Updated:** 2026-07-08  
+**Updated:** 2026-07-09
 
 ---
 
@@ -17,20 +17,21 @@
 | **P2.3** | Done | **PASS** | merged `6d7bc27` — 7,066 lines |
 | **P2.4** | Done | **PASS** | [JP-P2.4](../verifications/JP-L-CYBERDECK-001-P2.4.md) — [PR #45](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/45) **MERGED** `40c6473` — **6,766 lines** |
 | **P2.5** | Done | **PASS** | [JP-P2.5](../verifications/JP-L-CYBERDECK-001-P2.5.md) — [PR #47](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/47) **MERGED** `f084b5f` — **6,445 lines** — **P2 complete** |
-| **P3.1** | **HEAD** | — | D3.1 provider connection hook — [E-P3.1](../cadre/executive-coder/E-CYBERDECK-001-P3.1-provider-connection.md) |
+| **P3.1** | Done | **PASS** | [JP-P3.1](../verifications/JP-L-CYBERDECK-001-P3.1.md) — [PR #48](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/48) **MERGED** _pending merge sha_ — **5,878 lines** |
+| **P3.2** | **HEAD** | — | gateway column host + pane state (D3.2, D3.3) |
 
 ---
 
 ## Metrics ratchet (live)
 
-| Metric | P2.4 merged | P2.5 verified | Ceiling |
+| Metric | P2.5 merged | P3.1 verified | Ceiling |
 |--------|------------:|--------------:|--------:|
-| `cyberdeck-app.tsx` lines | 6,766 | **6,445** | 6,445 |
-| Import lines | 142 | **126** | 152 |
+| `cyberdeck-app.tsx` lines | 6,445 | **5,878** | 5,878 |
+| Import lines | 126 | **125** | 152 |
 
-Probe: **PASS** · `tsc`: **PASS** · MUTHUR probes: **PASS** · `main` @ `f084b5f` (PR #47 merged)
+Probe: **PASS** · `tsc`: **PASS** · MUTHUR probes: **PASS** · provider-credentials: **PASS**
 
-**P2 tranche complete:** 8,544 (P1 complete) → 6,445 (−2,099 lines). Legislator aspirational ~4,800 not reached; further wins in P3+.
+**P3.1 win:** 6,445 → 5,878 (−567 lines). Gateway JSX retained for P3.2.
 
 ---
 
@@ -38,12 +39,9 @@ Probe: **PASS** · `tsc`: **PASS** · MUTHUR probes: **PASS** · `main` @ `f084b
 
 | Pos | Slice | PR | Status |
 |----:|-------|-----|--------|
-| — | P2.1 | merged | **MERGED** `02414ce` |
-| — | P2.2 | [#43](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/43) | **MERGED** `a2b14a0` |
-| — | P2.3 | [#44](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/44) | **MERGED** `6d7bc27` |
-| — | P2.4 | [#45](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/45) | **MERGED** `40c6473` |
-| — | P2.5 | [#47](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/47) | **MERGED** `f084b5f` |
-| **1** | **P3.1** | — | provider connection hook (D3.1) — **HEAD** |
+| — | P2.1–P2.5 | merged | **MERGED** |
+| — | P3.1 | [#48](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/48) | **judicial PASS** — await merge |
+| **1** | **P3.2** | — | gateway column host — **HEAD** |
 | 4 | P4.1 | — | layout shell |
 | 5 | P5.1 | — | operator pane |
 | 6 | P6.1 | — | survey hub |
@@ -56,8 +54,8 @@ Probe: **PASS** · `tsc`: **PASS** · MUTHUR probes: **PASS** · `main` @ `f084b
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Developer agent** | [E-P3.1](../cadre/executive-coder/E-CYBERDECK-001-P3.1-provider-connection.md) — branch from `main` @ `f084b5f` |
-| 2 | **Tech lead** | Prep P3.1 verify brief + tester orders |
+| 1 | **Tech lead** | Merge [PR #48](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/48) — judicial PASS |
+| 2 | **Developer** | Prep P3.2 work order (gateway column + pane state) |
 | 3 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
@@ -78,9 +76,5 @@ Probe: **PASS** · `tsc`: **PASS** · MUTHUR probes: **PASS** · `main` @ `f084b
 
 | Date | Decision |
 |------|----------|
-| 2026-07-08 | P2.3 judicial PASS — PR #44 merged `6d7bc27` |
-| 2026-07-08 | P2.4 verify brief + PR body + tester orders prepped |
-| 2026-07-08 | P2.4 judicial PASS — PR #45 merged `40c6473`; queue pops to P2.5 |
-| 2026-07-08 | P2.5 developer work order + PR body prepped — [E-P2.5](../cadre/executive-coder/E-CYBERDECK-001-P2.5-commander-handlers.md) |
-| 2026-07-08 | P2.5 judicial PASS — [JP-P2.5](../verifications/JP-L-CYBERDECK-001-P2.5.md) — PR #47 `6b37236` — **P2 complete**; queue → P3.1 |
 | 2026-07-08 | P2.5 merged — PR #47 `f084b5f` on `main`; queue pops to **P3.1 HEAD** |
+| 2026-07-09 | P3.1 judicial PASS — [JP-P3.1](../verifications/JP-L-CYBERDECK-001-P3.1.md) — PR #48 — queue → **P3.2 HEAD** (await merge) |
