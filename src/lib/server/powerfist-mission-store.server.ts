@@ -2,11 +2,11 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { PowerfistMissionKind } from "@/lib/cyberdeck/powerfist-mission.types";
+import type { SurveyMissionKind } from "@/lib/cyberdeck/powerfist-mission.types";
 
 export type StoredPowerfistMission = {
   missionId: string;
-  kind: PowerfistMissionKind;
+  kind: SurveyMissionKind;
   prompt: string;
   pngPath: string;
   createdAt: string;
@@ -20,7 +20,7 @@ function missionsDir(): string {
 
 export async function storePowerfistMission(input: {
   missionId: string;
-  kind: PowerfistMissionKind;
+  kind: SurveyMissionKind;
   prompt: string;
   pngBase64: string;
 }): Promise<StoredPowerfistMission> {

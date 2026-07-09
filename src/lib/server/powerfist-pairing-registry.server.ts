@@ -10,7 +10,7 @@ import {
   type PowerfistPairedCapture,
   type PowerfistPairedMirage,
 } from "@/lib/server/powerfist-pairing-state.server";
-import type { PowerfistMissionEnvelope } from "@/lib/cyberdeck/powerfist-mission.types";
+import type { SurveyMissionEnvelope } from "@/lib/cyberdeck/powerfist-mission.types";
 import { SURVEY_SILENT_CAPTURE_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
 import { SURVEY_ECHO_NODE_LABEL } from "@/lib/cyberdeck/survey-mode";
 
@@ -423,7 +423,7 @@ export function buildMissionIngestUrl(state: PowerfistPairingState): string {
 }
 
 export async function buildSilentCaptureMissionEnvelope(): Promise<
-  | { ok: true; envelope: PowerfistMissionEnvelope }
+  | { ok: true; envelope: SurveyMissionEnvelope }
   | { ok: false; reason: string }
 > {
   const state = await loadPowerfistPairingRegistry();

@@ -53,5 +53,5 @@ probe:survey-hub PASS
 ## Sign-off
 
 - [x] Judicial PASS
-- [ ] Merge to `main`
-- [ ] **P7 complete** — optional P7.5 survey analyze pipeline or P8 rename cleanup
+- [x] Merge to `main`
+- [ ] **P8.1 HEAD** (survey mission type cleanup)
