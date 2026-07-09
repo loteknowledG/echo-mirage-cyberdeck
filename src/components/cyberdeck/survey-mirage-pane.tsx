@@ -36,7 +36,7 @@ export function SurveyMiragePane() {
           <SurveyHubSubPaneHint />
         ) : (
           <p className="text-[#8a8a8a]">
-            Use the pairing box above TEAM LINKS to connect with {SURVEY_ECHO_DISPLAY}.
+            Enable Survey Hub above to connect with {SURVEY_ECHO_DISPLAY}.
           </p>
         )
       ) : null}

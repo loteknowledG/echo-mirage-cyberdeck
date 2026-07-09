@@ -4,7 +4,7 @@ import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
 import { requestSurveyHubConnect } from "@/lib/cyberdeck/survey-connect-request.client";
 import { resolveSurveyCyberdeckShell } from "@/lib/electron/desktop-install.client";
 
-/** Dev-only legacy pairing notice — hidden when Survey Hub is active. */
+/** Shown when Survey Hub is disabled — directs users to enable Hub connect. */
 export function SurveyLegacyNotice() {
   if (isSurveyHubEnabled()) {
     return null;
@@ -16,7 +16,7 @@ export function SurveyLegacyNotice() {
   return (
     <div className="shrink-0 border-b border-[#1a1a1a] bg-[#080808] px-4 py-2 font-mono">
       <p className="text-[8px] leading-relaxed tracking-[0.04em] text-[#6a6a6a]">
-        Legacy pairing mode — enable Survey Hub:{" "}
+        Survey Hub is off — enable connect:{" "}
         <code className="text-cyan-200/80">localStorage.survey-hub=&quot;1&quot;</code>
       </p>
       {shell?.canDirectPairEcho ? (

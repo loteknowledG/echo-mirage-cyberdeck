@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { SurveyPairPinForm } from "@/components/cyberdeck/survey-pair-pin-form";
 import { SurveyPairOtpInput } from "@/components/cyberdeck/survey-pair-otp-input";
 import { SurveyPairPinCopyHint } from "@/components/cyberdeck/survey-pair-pin-display";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
@@ -18,78 +17,31 @@ import {
 import { useSurveyEchoLinkWatch } from "@/lib/cyberdeck/survey-echo-link-watch";
 import { isSurveyTeamTripleLinked, notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import {
-  formatSurveyEchoPowerfistLinkedLine,
   formatSurveyMiragePowerfistLinkedLine,
   notifySurveyMuthurArchive,
 } from "@/lib/cyberdeck/survey-chat";
-import { isSurveyLegacyPairingEnabled, isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
+import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
 import { SurveyHubSubPaneHint } from "@/components/cyberdeck/survey-hub-subpane-hint";
-import {
-  readSurveyMiragePairCredentials,
-  readSurveyPowerfistPairCredentials,
-  saveSurveyPowerfistPairCredentials,
-} from "@/lib/cyberdeck/survey-pairing-client";
 import {
   completePowerfistPairFromPin,
   readPowerfistRemoteCredentials,
 } from "@/lib/cyberdeck/survey-hub-socket";
-import { useSurveyTeamSocket } from "@/lib/cyberdeck/survey-team-socket.client";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import {
-  DEFAULT_ECHO_HTTP_PORT,
   isValidSurveyPairPin,
   normalizeSurveyPairPin,
 } from "@/lib/cyberdeck/survey-pair-pin";
 
 function SurveyPowerfistPairingPanel() {
-  const { paired, terminated, terminatedMessage, resetLinkWatch } = useSurveyEchoLinkWatch("powerfist");
+  const { terminated, terminatedMessage } = useSurveyEchoLinkWatch("powerfist");
   const team = useSurveyTeamStatus();
-  const [status, setStatus] = useState<string | null>(null);
   const [hubPin, setHubPin] = useState("");
   const [hubBusy, setHubBusy] = useState(false);
   const [hubError, setHubError] = useState<string | null>(null);
   const [hubStatus, setHubStatus] = useState<string | null>(null);
   const mirageHubCreds = readPowerfistRemoteCredentials();
   const mirageHubLinked = team.miragePowerfist.state === "linked";
-  const legacyPairing = isSurveyLegacyPairingEnabled();
   const hubEnabled = isSurveyHubEnabled();
-  const savedCreds = readSurveyPowerfistPairCredentials();
-  const mirageCreds = readSurveyMiragePairCredentials();
-  const defaultEchoHost = mirageCreds?.echoHost ?? team.echoHost ?? null;
-  const defaultEchoPort = mirageCreds?.httpPort ?? DEFAULT_ECHO_HTTP_PORT;
-  const teamSocket = useSurveyTeamSocket({
-    role: "powerfist",
-    echoHost: savedCreds?.echoHost ?? null,
-    httpPort: savedCreds?.httpPort ?? 3050,
-    enabled: legacyPairing && (!paired || terminated),
-  });
-
-  const handlePaired = useCallback(
-    (result: {
-      echoHost: string;
-      httpPort: number;
-      echoNodeId: string;
-      token: string;
-      deviceId?: string;
-      sessionEpoch: number;
-    }) => {
-      const creds = {
-        echoHost: result.echoHost,
-        httpPort: result.httpPort,
-        echoNodeId: result.echoNodeId,
-        remoteToken: result.token,
-        deviceId: result.deviceId ?? "",
-        sessionEpoch: result.sessionEpoch,
-        pairedAt: new Date().toISOString(),
-      };
-      saveSurveyPowerfistPairCredentials(creds);
-      resetLinkWatch();
-      notifySurveyTeamStatusChanged();
-      notifySurveyMuthurArchive(formatSurveyEchoPowerfistLinkedLine(result.echoHost));
-      setStatus(`Paired with ${SURVEY_ECHO_DISPLAY} at ${result.echoHost}.`);
-    },
-    [resetLinkWatch],
-  );
 
   const handleMirageHubPair = useCallback(async () => {
     if (!isValidSurveyPairPin(hubPin)) {
@@ -134,9 +86,9 @@ function SurveyPowerfistPairingPanel() {
           <p className="mt-1 text-[9px] text-[#6a6a8a]">{SURVEY_POWERFIST_TAGLINE}</p>
         </div>
 
-        {paired && !terminated ? (
+        {team.echoPowerfist.state === "linked" && !terminated ? (
           <p className="text-emerald-300/80">
-            LINKED // {SURVEY_ECHO_DISPLAY} {paired.echoHost} · device {paired.deviceId.slice(0, 8)}…
+            LINKED // {SURVEY_ECHO_DISPLAY} · device linked via Survey Hub
           </p>
         ) : !terminated ? (
           <p className="text-[#8a8a8a]">Waiting for Survey Hub to link {SURVEY_ECHO_DISPLAY}.</p>
@@ -164,7 +116,7 @@ function SurveyPowerfistPairingPanel() {
             {terminatedMessage ?? ECHO_SURVEY_TERMINATED_MESSAGE}
           </p>
           <p className="mt-1 text-[9px] text-[#8a8a8a]">
-            {SURVEY_ECHO_DISPLAY} closed its Survey tab. Re-pair when it is active again.
+            {SURVEY_ECHO_DISPLAY} closed its Survey tab. Enable Survey Hub and reconnect when it is active again.
           </p>
         </div>
       ) : null}
@@ -176,59 +128,20 @@ function SurveyPowerfistPairingPanel() {
         <p className="mt-1 text-[9px] text-[#6a6a8a]">{SURVEY_POWERFIST_TAGLINE}</p>
       </div>
 
-      <p className="text-[9px] leading-relaxed text-[#5f5f5f]">
-        Enter Echo Satellite IP and port, then the 6-digit PowerFist code shown on Echo.
-        {defaultEchoHost ? (
-          <>
-            {" "}
-            Mirage is linked at{" "}
-            <code className="text-amber-200/80">
-              {defaultEchoHost}:{defaultEchoPort}
-            </code>
-            .
-          </>
-        ) : null}
+      <p className="text-[9px] text-[#8a8a8a]">
+        Enable Survey Hub above — Connect team wires {SURVEY_ECHO_DISPLAY} and {SURVEY_POWERFIST_LABEL}{" "}
+        automatically.
       </p>
 
-      {paired && !terminated ? (
-        <p className="text-emerald-300/80">
-          LINKED // {SURVEY_ECHO_DISPLAY} {paired.echoHost} · device {paired.deviceId.slice(0, 8)}…
-        </p>
-      ) : !terminated ? (
-        <p className="text-[#8a8a8a]">Not paired with {SURVEY_ECHO_DISPLAY}.</p>
-      ) : null}
-
-      {teamSocket.status === "connected" ? (
-        <p className="text-[8px] text-cyan-300/80">Team channel live with Echo Satellite.</p>
-      ) : null}
-
-      {legacyPairing ? (
-        <SurveyPairPinForm
-          role="powerfist"
-          roleLabel={SURVEY_POWERFIST_LABEL}
-          focusClassName="focus:border-amber-900/60"
-          buttonLabel={
-            terminated ? `Re-pair with ${SURVEY_ECHO_DISPLAY}` : `Pair with ${SURVEY_ECHO_DISPLAY}`
-          }
-          defaultEchoHost={defaultEchoHost}
-          pushPrefill={teamSocket.lastBundle}
-          onPaired={handlePaired}
-        />
-      ) : (
-        <p className="text-[9px] text-[#8a8a8a]">
-          Use Survey Hub above — Connect team wires Echo + PowerFist automatically.
-        </p>
-      )}
-
-      {status ? <p className="text-emerald-300/80">{status}</p> : null}
+      <SurveyHubSubPaneHint />
 
       <div className="border-t border-[#1c1c1c] pt-4">
         <p className="mb-2 text-[10px] font-semibold tracking-[0.12em] text-fuchsia-300/90">
           TRIPLE LINK // {SURVEY_MIRAGE_DISPLAY} hub
         </p>
         <p className="mb-3 text-[9px] leading-relaxed text-[#5f5f5f]">
-          After Echo pairing, enter the 6-digit code from Survey → {SURVEY_MIRAGE_DISPLAY} (m) →{" "}
-          <strong className="text-[#8a8a8a]">PowerFist QR</strong> (same machine — no second tab).
+          Enter the 6-digit code from Survey → {SURVEY_MIRAGE_DISPLAY} (m) →{" "}
+          <strong className="text-[#8a8a8a]">PowerFist QR</strong> on the same machine.
         </p>
         {mirageHubLinked ? (
           <p className="mb-3 text-emerald-300/80">
