@@ -29,7 +29,7 @@
 | Pos | Slice | PR | Status |
 |----:|-------|-----|--------|
 | — | P6.1 | [#54](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/54) | **MERGED** `6200b34` |
-| **1** | **P7.1** | — | chat posture — **MERGE** |
+| **1** | **P7.1** | [#55](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/55) | **MERGE** |
 | 2 | P7.2 | — | tool round loop — **HEAD** |
 | 3 | P7.3 | — | stream handler |
 | 4 | P8.1 | — | rename cleanup |

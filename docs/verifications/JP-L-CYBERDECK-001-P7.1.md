@@ -3,7 +3,7 @@
 **Work order:** [L-CYBERDECK-001](../work-orders/L-CYBERDECK-001-cyberdeck-app-extraction.md)  
 **Phase:** P7.1 — Posture / self-modify preamble (D7.1)  
 **Branch:** `cursor/extract-p7.1-chat-posture`  
-**PR:** _(pending)_  
+**PR:** [#55](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/55)  
 **Base:** `main` @ P6.1 merge `6200b34`
 
 ---
