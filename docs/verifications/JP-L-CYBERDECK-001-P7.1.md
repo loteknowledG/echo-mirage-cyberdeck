@@ -50,5 +50,5 @@ probe:cyberdeck-compile-scope PASS
 ## Sign-off
 
 - [x] Judicial PASS
-- [ ] Merge to `main`
+- [x] Merge to `main`
 - [ ] **P7.2 HEAD** (`muthur-chat-tool-round`)
