@@ -4,20 +4,6 @@ import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, SetSta
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, startTransition } from "react";
 import { flushSync } from "react-dom";
 import { art } from "@/lib/TerminalArt";
-import type { CyberdeckVoiceTuning } from "@/lib/cyberdeck-voice-tuning";
-import type { Db8DeckSpeakLine } from "@/lib/db8-voice";
-import { selectMuthurFallbackVoice } from "@/voice/speakMuthur";
-import { MUTHUR_PRESET } from "@/voice/muthurPreset";
-import {
-  buildMuthurVoiceMasterCopy,
-  buildMuthurVoiceTuning,
-  getInitialMuthurVoiceDials,
-  muthurBrowserSpeechTuning,
-  muthurMasterGain,
-  restoreMuthurVoiceMasterCopy,
-  saveMuthurVoiceMasterCopy,
-  type MuthurVoiceDialState,
-} from "@/voice/muthurVoiceSettings";
 import {
   clearMuthurMemory,
   createEmptyMuthurMemory,
@@ -35,14 +21,12 @@ import {
 } from "@/lib/browser-intents";
 import { CyberdeckCustomTabBrowserSync } from "@/components/cyberdeck/cyberdeck-custom-tab-browser-sync";
 import { useRailTabLongPress } from "@/lib/use-rail-tab-long-press";
-import { splitIntoSpeechBlocks } from "@/lib/muthur-voice-blocks";
 import type { CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
 import {
   loadComputerUse,
 } from "@/features/cyberdeck/runtime/defer-computer-use";
 import {
   bindDeckKeyboardSfx,
-  loadDeckAudio,
   playDeckDeclined,
   playDeckDroidDizzy400,
   playDeckDroidDizzy401,
@@ -51,9 +35,6 @@ import {
   playDeckWrongDoorShut,
   playDeckNavigationSound,
   playDeckSystemSound,
-  playDeckBleepBloop,
-  setDeckUplinkSonarVolume,
-  setDeckSfxVolume,
   unlockDeckKeyboardSfx,
 } from "@/features/cyberdeck/runtime/defer-deck-audio";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
@@ -126,15 +107,6 @@ import { useCustomTabBrowser } from "@/features/cyberdeck/workspace/use-custom-t
 import { useRailTabContextMenu } from "@/features/cyberdeck/workspace/use-rail-tab-context-menu";
 import { OperatorPaneHost } from "@/features/cyberdeck/operator/operator-pane-host";
 import { useOperatorWorkspaceState } from "@/features/cyberdeck/operator/use-operator-workspace-state";
-import {
-  getInitialUplinkSonarVolume,
-  saveUplinkSonarVolume,
-} from "@/lib/cyberdeck/uplink-sonar-volume";
-import {
-  getInitialDeckSfxVolume,
-  saveDeckSfxVolume,
-} from "@/lib/cyberdeck/deck-sfx-volume";
-import { playBeep } from "@/lib/deck-audio";
 import { loadWorkspaceState, saveWorkspaceState } from "@/lib/workspace-state";
 import { useDebouncedEffect } from "@/lib/use-debounced-effect";
 import { cn } from "@/lib/utils";
@@ -160,17 +132,13 @@ import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/sign
 import { summarizeMuthurOperatorEdits } from "@/lib/muthur-operator-edit-summary";
 import { formatInhabitantChannelLabel } from "@/lib/muthur/muthur-inhabitant";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
-import {
-  isAudioAllowed,
-  registerAudioStopHook,
-  subscribeAudioGate,
-} from "@/lib/cyberdeck/audio-gate";
 import { useSilentModeAudioGateSync } from "@/lib/cyberdeck/use-silent-mode-audio-gate-sync";
 import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
 import { useSurveyMuthurMissionHandlers } from "@/features/cyberdeck/hooks/use-survey-muthur-mission-handlers";
 import { useMuthurChatState } from "@/features/cyberdeck/muthur/use-muthur-chat-state";
 import { useMuthurSendIntents } from "@/features/cyberdeck/muthur/use-muthur-send-intents";
 import { useMuthurChatSend } from "@/features/cyberdeck/muthur/use-muthur-chat-send";
+import { useCyberdeckVoice } from "@/features/cyberdeck/voice/use-cyberdeck-voice";
 import { useMuthurCommanderHandlers } from "@/features/cyberdeck/muthur/use-muthur-commander-handlers";
 import {
   CYBERDECK_PROVIDER_IDS,
@@ -202,7 +170,6 @@ import {
   isEditableOperatorFile,
   parseCodingVerifyHeader,
   readFileAsDataUrl,
-  textForSpeech,
   contextMenuTargetIsTextField,
   type DroppedOperatorAsset,
 } from "@/features/cyberdeck/muthur/coding-verify-format";
@@ -309,65 +276,6 @@ async function readEchoMirageClipboardText() {
   }
 
   return "";
-}
-
-class MotherTerminal {
-  private ctx: AudioContext | null = null;
-  private burstThreshold: number;
-
-  constructor({ burstThreshold = 180 }: { burstThreshold?: number } = {}) {
-    this.burstThreshold = burstThreshold;
-  }
-
-  init() {
-    if (this.ctx || typeof window === "undefined") return;
-    const Ctx =
-      window.AudioContext ||
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return;
-    this.ctx = new Ctx();
-  }
-
-  async unlock() {
-    this.init();
-    if (!this.ctx) return;
-    if (this.ctx.state === "suspended") {
-      await this.ctx.resume();
-    }
-  }
-
-  beep(freq: number, time: number, duration = 0.045, gain = 0.045) {
-    if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-
-    osc.type = "square";
-    osc.frequency.setValueAtTime(freq, time);
-
-    g.gain.setValueAtTime(0.0001, time);
-    g.gain.linearRampToValueAtTime(gain, time + 0.004);
-    g.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-
-    osc.connect(g).connect(this.ctx.destination);
-    osc.start(time);
-    osc.stop(time + duration);
-  }
-
-  playBurstSound(charCount = 12) {
-    this.init();
-    if (!this.ctx) return;
-    const now = this.ctx.currentTime + 0.02;
-    const pulses = Math.min(24, Math.max(6, Math.floor(charCount / 12)));
-    for (let i = 0; i < pulses; i++) {
-      const t = now + i * 0.025;
-      const freq = 520 + Math.random() * 900;
-      this.beep(freq, t, 0.035, 0.04);
-    }
-  }
-
-  shouldBurst(text: string) {
-    return text.length >= this.burstThreshold;
-  }
 }
 
 export default function CyberdeckApp() {
@@ -499,6 +407,30 @@ export default function CyberdeckApp() {
     playModelTestErrorSound,
   });
 
+  const {
+    voiceEnabled,
+    voicePlaybackBusy,
+    voiceBlockFocusIndex,
+    voiceBlockTotal,
+    voiceDial,
+    sonarVolume,
+    deckSfxVolume,
+    voiceHealth,
+    speakDeckVoiceLine,
+    abortMotherSpeech,
+    toggleVoiceEnabled,
+    speakVoiceBlockAtIndex,
+    replayFullLastAssistant,
+    handleDeckSfxVolumeChange,
+    handleVoiceVolumeChange,
+    handleSonarVolumeChange,
+  } = useCyberdeckVoice({
+    messages,
+    isStreaming,
+    openaiApiKey: providerKeys.openai || "",
+    setMessages,
+  });
+
   const networkActivityActive = scanActivityActive || isStreaming;
   const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
   const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
@@ -541,14 +473,6 @@ export default function CyberdeckApp() {
   });
 
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
-  const [voiceBlockFocusIndex, setVoiceBlockFocusIndex] = useState(0);
-  const [voiceBlockTotal, setVoiceBlockTotal] = useState(0);
-  const [voiceDial, setVoiceDial] = useState<MuthurVoiceDialState>(getInitialMuthurVoiceDials);
-  const [sonarVolume, setSonarVolume] = useState(getInitialUplinkSonarVolume);
-  const [deckSfxVolume, setDeckSfxVolumeState] = useState(getInitialDeckSfxVolume);
-  const [voiceHealth, setVoiceHealth] = useState<"idle" | "backend" | "fallback" | "off">("idle");
   const [muthurMemory, setMuthurMemory] = useState<MuthurMemoryState>(() => createEmptyMuthurMemory());
   const [muthurMemoryHydrated, setMuthurMemoryHydrated] = useState(false);
   const [muthurMemoryLoadError, setMuthurMemoryLoadError] = useState<string | null>(null);
@@ -579,19 +503,7 @@ export default function CyberdeckApp() {
     userMessage: string;
     options?: { preserveSelectedSurface?: boolean; surveyMission?: boolean };
   } | null>(null);
-  const lastSpokenAssistantTextRef = useRef<string>("");
-  const assistantVoiceBlocksRef = useRef<string[]>([]);
-  const speakQueueActiveRef = useRef(false);
-  const speakSequenceRef = useRef(0);
-  const lastVoiceErrorRef = useRef<string>("");
-  const voiceDialRef = useRef<MuthurVoiceDialState>(getInitialMuthurVoiceDials());
   const muthurMemoryRef = useRef<MuthurMemoryState>(createEmptyMuthurMemory());
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const activeSourceNodesRef = useRef<AudioBufferSourceNode[]>([]);
-  const motherMasterGainRef = useRef<GainNode | null>(null);
-  const motherTerminalRef = useRef(new MotherTerminal({ burstThreshold: 180 }));
-  const networkFeedbackDelayRef = useRef<number | null>(null);
-  const networkFeedbackRepeatRef = useRef<number | null>(null);
   const offlineAutoOpenedRef = useRef(false);
   const startupRailResolvedRef = useRef(false);
   const prevConnectionStateRef = useRef<"offline" | "connecting" | "connected">("offline");
@@ -922,463 +834,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
     });
   }, []);
 
-  const handleDeckSfxVolumeChange = useCallback((volume: number) => {
-    setDeckSfxVolumeState((prev) => {
-      if (prev <= 0 && volume > 0) {
-        playBeep();
-      }
-      return volume;
-    });
-    saveDeckSfxVolume(volume);
-    emitSignal({
-      source: "audio",
-      type: "setting_changed",
-      payload: { key: "deck_sfx_volume", value: volume },
-      severity: "info",
-    });
-  }, []);
-
-  const splitMiragePhrases = useCallback((text: string) => {
-    return text
-      .replace(/\s+/g, " ")
-      .replace(/([,;:])\s*/g, "$1 ")
-      .trim()
-      .split(/(?<=[.!?])\s+|(?<=\u2026)\s+/)
-      .map((part) => part.trim())
-      .filter(Boolean);
-  }, []);
-
-  const stopMirageAudio = useCallback(() => {
-    activeSourceNodesRef.current.forEach((source) => {
-      try {
-        source.stop();
-      } catch {
-        /* ignore */
-      }
-    });
-    activeSourceNodesRef.current = [];
-    speakQueueActiveRef.current = false;
-  }, []);
-
-  const getBrowserVoices = useCallback(async () => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return [];
-    const synth = window.speechSynthesis;
-    let voices = synth.getVoices();
-    if (voices.length > 0) return voices;
-    await new Promise<void>((resolve) => {
-      const timeout = window.setTimeout(resolve, 350);
-      const onVoices = () => {
-        window.clearTimeout(timeout);
-        synth.removeEventListener("voiceschanged", onVoices);
-        resolve();
-      };
-      synth.addEventListener("voiceschanged", onVoices, { once: true });
-    });
-    voices = synth.getVoices();
-    return voices;
-  }, []);
-
-  const playMirageBuffer = useCallback(async (arrayBuffer: ArrayBuffer) => {
-    if (!isAudioAllowed()) return false;
-    if (typeof window === "undefined") return false;
-    const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return false;
-
-    const ctx = audioContextRef.current ?? new Ctx();
-    audioContextRef.current = ctx;
-    if (ctx.state === "suspended") {
-      await ctx.resume();
-    }
-
-    const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
-    const source = ctx.createBufferSource();
-    source.buffer = decoded;
-    const deckAudio = await loadDeckAudio();
-    const output = deckAudio.applyMuthurEffectChain(ctx, source, {
-      ...MUTHUR_PRESET.playback,
-    });
-
-    const masterOutput = motherMasterGainRef.current ?? ctx.destination;
-    output.connect(masterOutput);
-
-    activeSourceNodesRef.current.push(source);
-    source.start(0);
-
-    await new Promise<void>((resolve) => {
-      source.onended = () => {
-        activeSourceNodesRef.current = activeSourceNodesRef.current.filter((s) => s !== source);
-        resolve();
-      };
-    });
-    return true;
-  }, []);
-
-  const initMotherAudio = useCallback((): AudioContext | null => {
-    if (typeof window === "undefined") return null;
-    const Ctx =
-      window.AudioContext ||
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return null;
-
-    const ctx = audioContextRef.current ?? new Ctx();
-    audioContextRef.current = ctx;
-    if (!motherMasterGainRef.current) {
-      const master = ctx.createGain();
-      master.gain.value = muthurMasterGain(voiceDialRef.current.volume);
-      master.connect(ctx.destination);
-      motherMasterGainRef.current = master;
-    }
-    return ctx;
-  }, []);
-
-  const unlockMotherAudio = useCallback(async () => {
-    const ctx = initMotherAudio();
-    if (!ctx) return null;
-    if (ctx.state === "suspended") {
-      await ctx.resume();
-    }
-    return ctx;
-  }, [initMotherAudio]);
-
-  const motherTone = useCallback(
-    (freq: number, time: number, duration: number, gain = 0.04, type: OscillatorType = "sine") => {
-      const ctx = audioContextRef.current;
-      const master = motherMasterGainRef.current;
-      if (!ctx || !master) return;
-
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, time);
-
-      g.gain.setValueAtTime(0.0001, time);
-      g.gain.linearRampToValueAtTime(gain, time + 0.03);
-      g.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-
-      osc.connect(g);
-      g.connect(master);
-      osc.start(time);
-      osc.stop(time + duration + 0.05);
-    },
-    [],
-  );
-
-  const motherReverbTail = useCallback(
-    (time: number) => {
-      motherTone(220, time, 1.2, 0.025, "sine");
-      motherTone(330, time + 0.08, 1.4, 0.018, "sine");
-      motherTone(440, time + 0.16, 1.6, 0.012, "triangle");
-    },
-    [motherTone],
-  );
-
-  const synthesizeMirageChunk = useCallback(async (text: string, voiceTuning: CyberdeckVoiceTuning) => {
-    const res = await fetch("/api/cyberdeck-voice", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text,
-        voiceTuning: {
-          ratePercent: voiceTuning.ratePercent,
-          pitchHz: voiceTuning.pitchHz,
-          volume: voiceTuning.volume,
-          voiceType: voiceTuning.voiceType,
-          gender: voiceTuning.gender,
-        },
-        apiKey: providerKeys.openai || "",
-      }),
-    });
-
-    const contentType = res.headers.get("content-type") || "";
-    const isAudio = contentType.startsWith("audio/");
-    const isJson = contentType.includes("application/json");
-
-    if (isAudio) {
-      lastVoiceErrorRef.current = "";
-      const voiceType = res.headers.get("x-muthur-voice-type");
-      if (voiceType) {
-        console.info("[muthur] voice backend", voiceType, res.headers.get("x-muthur-voice-source"));
-      }
-      return { kind: "audio" as const, audio: await res.arrayBuffer() };
-    }
-
-    if (isJson) {
-      const diagnostic = await res.json().catch(() => null);
-      if (diagnostic && typeof diagnostic === "object") {
-        const diagnosticRecord = diagnostic as Record<string, unknown>;
-        const diagnosticKeys = Object.keys(diagnosticRecord);
-        if (diagnosticKeys.length === 0) {
-          console.warn("[muthur] render diagnostic", {
-            status: res.status,
-            note: "empty-json",
-          });
-          if (lastVoiceErrorRef.current !== `empty:${res.status}`) {
-            lastVoiceErrorRef.current = `empty:${res.status}`;
-          }
-          return { kind: "diagnostic" as const, diagnostic: null };
-        }
-
-        console.warn("[muthur] render diagnostic", diagnosticRecord);
-        const stage = typeof (diagnostic as { stage?: unknown }).stage === "string"
-          ? (diagnostic as { stage: string }).stage
-          : "unknown";
-        const message = typeof (diagnostic as { message?: unknown }).message === "string"
-          ? (diagnostic as { message: string }).message
-          : "MUTHUR backend returned a diagnostic";
-        const details = typeof (diagnostic as { details?: unknown }).details === "string"
-          ? (diagnostic as { details: string }).details
-          : "";
-        const signature = `${res.status}:${stage}:${message}`;
-        if (lastVoiceErrorRef.current !== signature) {
-          lastVoiceErrorRef.current = signature;
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "system",
-              text: `MUTHUR_BACKEND_DIAGNOSTIC // ${stage.toUpperCase()} // ${message} // ${details}`.slice(0, 240),
-            },
-          ]);
-        }
-        return { kind: "diagnostic" as const, diagnostic };
-      }
-    }
-
-    if (lastVoiceErrorRef.current !== String(res.status)) {
-      lastVoiceErrorRef.current = String(res.status);
-      setMessages((prev) => [
-        ...prev,
-        { role: "system", text: `VOICE_ENDPOINT_UNAVAILABLE // HTTP_${res.status} // USING_LOCAL_FALLBACK` },
-      ]);
-    }
-    return { kind: "diagnostic" as const, diagnostic: null };
-  }, [providerKeys.openai]);
-
-  const speakInBrowser = useCallback((text: string, profile?: string) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
-    if (!text.trim()) return false;
-    try {
-      const synth = window.speechSynthesis;
-      const utterance = new SpeechSynthesisUtterance(text);
-      const normalizedProfile = (profile || "").toLowerCase();
-      const wantsMuthur = normalizedProfile === "muthur";
-      const browserTuning = muthurBrowserSpeechTuning(voiceDialRef.current);
-      const voices = synth.getVoices().filter((voice) => voice.lang.toLowerCase().startsWith("en"));
-      const preferred = wantsMuthur
-        ? selectMuthurFallbackVoice()
-        : voices.find((voice) => voice.name.toLowerCase().includes("jenny")) ?? null;
-
-      if (wantsMuthur && !preferred) {
-        return false;
-      }
-
-      if (preferred) {
-        utterance.voice = preferred;
-        utterance.lang = preferred.lang || "en-US";
-      } else {
-        utterance.lang = "en-US";
-      }
-      utterance.rate = wantsMuthur ? browserTuning.rate : 1;
-      utterance.pitch = wantsMuthur ? browserTuning.pitch : 1;
-      utterance.volume = wantsMuthur ? browserTuning.volume : 1;
-
-      void unlockMotherAudio().then((ctx) => {
-        if (!ctx) return;
-        motherReverbTail(ctx.currentTime + 0.02);
-      });
-      utterance.addEventListener("end", () => {
-        const ctx = audioContextRef.current;
-        if (!ctx) return;
-        motherReverbTail(ctx.currentTime + 0.02);
-      });
-
-      synth.cancel();
-      synth.speak(utterance);
-      return true;
-    } catch {
-      return false;
-    }
-  }, [motherReverbTail, unlockMotherAudio]);
-
-  const speakMother = useCallback(async (text: string) => {
-    if (!isAudioAllowed()) return false;
-    const speakId = ++speakSequenceRef.current;
-    speakQueueActiveRef.current = true;
-    stopMirageAudio();
-    const currentVoiceDial = voiceDialRef.current;
-    const browserTuning = muthurBrowserSpeechTuning(currentVoiceDial);
-    try {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
-    } catch {
-      /* ignore */
-    }
-
-    try {
-      const result = await synthesizeMirageChunk(text, buildMuthurVoiceTuning(currentVoiceDial));
-      if (speakId !== speakSequenceRef.current) return false;
-      if (result.kind === "audio") {
-        setVoiceHealth("backend");
-        await playMirageBuffer(result.audio);
-        if (speakId !== speakSequenceRef.current) return false;
-        return true;
-      }
-      setVoiceHealth("fallback");
-      console.warn(
-        "[muthur] coderobo unavailable — browser fallback",
-        buildMuthurVoiceTuning(currentVoiceDial),
-      );
-    } catch {
-      /* fall through */
-    }
-    try {
-      setVoiceHealth("fallback");
-      await (await loadDeckAudio()).speakDryFallback(text, browserTuning);
-      if (speakId !== speakSequenceRef.current) return false;
-      return true;
-    } catch {
-      setVoiceHealth("off");
-      /* fall through */
-    } finally {
-      if (speakId === speakSequenceRef.current) {
-        speakQueueActiveRef.current = false;
-      }
-    }
-    return false;
-  }, [playMirageBuffer, stopMirageAudio, synthesizeMirageChunk]);
-
-  const speakDeckVoiceLine = useCallback<Db8DeckSpeakLine>(
-    async (text, profile) => {
-      if (!isAudioAllowed()) return;
-      await unlockMotherAudio();
-      stopMirageAudio();
-      try {
-        if (typeof window !== "undefined" && "speechSynthesis" in window) {
-          window.speechSynthesis.cancel();
-        }
-      } catch {
-        /* ignore */
-      }
-
-      const tuning: CyberdeckVoiceTuning = {
-        ratePercent: profile.ratePercent,
-        pitchHz: profile.pitchHz,
-        volume: profile.volume,
-        voiceType: profile.voiceType,
-        gender: profile.gender,
-      };
-
-      try {
-        const result = await synthesizeMirageChunk(text, tuning);
-        if (result.kind === "audio") {
-          await playMirageBuffer(result.audio);
-          return;
-        }
-      } catch {
-        /* fall through */
-      }
-
-      const deckAudio = await loadDeckAudio();
-      await deckAudio.speakDryFallback(text, {
-        rate: profile.browserRate,
-        pitch: profile.browserPitch,
-        volume: profile.volume,
-      });
-    },
-    [playMirageBuffer, stopMirageAudio, synthesizeMirageChunk, unlockMotherAudio],
-  );
-
-  const abortMotherSpeech = useCallback(() => {
-    speakSequenceRef.current += 1;
-    stopMirageAudio();
-    try {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
-    } catch {
-      /* ignore */
-    }
-    setVoicePlaybackBusy(false);
-  }, [stopMirageAudio]);
-
-  const clearNetworkFeedbackAudio = useCallback(() => {
-    if (networkFeedbackRepeatRef.current !== null) {
-      window.clearInterval(networkFeedbackRepeatRef.current);
-      networkFeedbackRepeatRef.current = null;
-    }
-    if (networkFeedbackDelayRef.current !== null) {
-      window.clearTimeout(networkFeedbackDelayRef.current);
-      networkFeedbackDelayRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    const unregisterMirage = registerAudioStopHook(stopMirageAudio);
-    const unregisterNetwork = registerAudioStopHook(clearNetworkFeedbackAudio);
-    const unsubscribeGate = subscribeAudioGate(() => {
-      if (!isAudioAllowed()) {
-        clearNetworkFeedbackAudio();
-      }
-    });
-    return () => {
-      unregisterMirage();
-      unregisterNetwork();
-      unsubscribeGate();
-    };
-  }, [clearNetworkFeedbackAudio, stopMirageAudio]);
-
-  const speakVoiceBlockAtIndex = useCallback(
-    (index: number) => {
-      const blocks = assistantVoiceBlocksRef.current;
-      if (!blocks.length || index < 0 || index >= blocks.length) return;
-      setVoiceBlockFocusIndex(index);
-      const line = blocks[index];
-      if (!line) return;
-      setVoicePlaybackBusy(true);
-      void speakMother(line).finally(() => setVoicePlaybackBusy(false));
-    },
-    [speakMother],
-  );
-
-  const replayFullLastAssistant = useCallback(() => {
-    const assistants = messages.filter((m) => m.role === "assistant");
-    const last = assistants[assistants.length - 1];
-    const t = last?.text ? textForSpeech(last.text) : "";
-    if (!t) return;
-    setVoicePlaybackBusy(true);
-    void speakMother(t).finally(() => setVoicePlaybackBusy(false));
-  }, [messages, speakMother]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (!voicePlaybackBusy) return;
-      e.preventDefault();
-      abortMotherSpeech();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [abortMotherSpeech, voicePlaybackBusy]);
-
-  const toggleVoiceEnabled = useCallback(() => {
-    const latestAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant");
-    setVoiceEnabled((prev) => {
-      const next = !prev;
-      if (next) {
-        setVoiceHealth("idle");
-        if (latestAssistantMessage?.text) {
-          lastSpokenAssistantTextRef.current = latestAssistantMessage.text;
-        }
-        void speakMother(MUTHUR_PRESET.testPhrase);
-      } else {
-        setVoiceHealth("off");
-        stopMirageAudio();
-      }
-      return next;
-    });
-  }, [messages, speakMother, stopMirageAudio]);
-
   const clearMuthurMemoryState = useCallback(async () => {
     if (typeof window !== "undefined") {
       const confirmed = window.confirm("Clear MUTHUR memory?");
@@ -1391,63 +846,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
     setMuthurMemory(fresh);
     setMuthurMemoryHydrated(true);
     toast.success("MUTHUR memory cleared");
-  }, []);
-
-  const saveMuthurVoiceCopyToApp = useCallback(() => {
-    saveMuthurVoiceMasterCopy(buildMuthurVoiceMasterCopy(voiceDialRef.current));
-    toast.success("Saved MUTHUR voice copy.");
-  }, []);
-
-  const restoreMuthurVoiceMaster = useCallback(() => {
-    if (typeof window !== "undefined") {
-      const confirmed = window.confirm("Restore MUTHUR voice master?");
-      if (!confirmed) return;
-    }
-
-    const restored = restoreMuthurVoiceMasterCopy();
-    setVoiceDial(restored);
-    voiceDialRef.current = restored;
-    toast.success("Restored MUTHUR master.");
-  }, []);
-
-  const playVoiceTest = useCallback(() => {
-    if (!voiceEnabled) return;
-    void speakMother(MUTHUR_PRESET.testPhrase);
-  }, [speakMother, voiceEnabled]);
-
-  useEffect(() => {
-    try {
-      saveMuthurVoiceMasterCopy(buildMuthurVoiceMasterCopy(voiceDial));
-    } catch {
-      /* ignore */
-    }
-  }, [voiceDial]);
-
-  useEffect(() => {
-    voiceDialRef.current = voiceDial;
-  }, [voiceDial]);
-
-  useEffect(() => {
-    const master = motherMasterGainRef.current;
-    if (!master) return;
-    master.gain.value = muthurMasterGain(voiceDial.volume);
-  }, [voiceDial.volume]);
-
-  useEffect(() => {
-    setDeckUplinkSonarVolume(sonarVolume);
-  }, [sonarVolume]);
-
-  useEffect(() => {
-    setDeckSfxVolume(deckSfxVolume);
-  }, [deckSfxVolume]);
-
-  const handleVoiceVolumeChange = useCallback((volume: number) => {
-    setVoiceDial((prev) => ({ ...prev, volume }));
-  }, []);
-
-  const handleSonarVolumeChange = useCallback((volume: number) => {
-    setSonarVolume(volume);
-    saveUplinkSonarVolume(volume);
   }, []);
 
   useEffect(() => {
@@ -1951,31 +1349,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
     setMessagesRaw((prev) => [...prev, { role: "assistant", text }]);
   }, [setMessagesRaw]);
 
-  useEffect(() => {
-    if (isStreaming && isAudioAllowed()) {
-      if (networkFeedbackDelayRef.current == null) {
-        networkFeedbackDelayRef.current = window.setTimeout(() => {
-          networkFeedbackDelayRef.current = null;
-          if (!isAudioAllowed()) return;
-          playDeckBleepBloop();
-          networkFeedbackRepeatRef.current = window.setInterval(() => {
-            if (!isAudioAllowed()) {
-              clearNetworkFeedbackAudio();
-              return;
-            }
-            playDeckBleepBloop();
-          }, 7000);
-        }, 2800);
-      }
-    } else {
-      clearNetworkFeedbackAudio();
-    }
-    return () => {
-      clearNetworkFeedbackAudio();
-    };
-  }, [clearNetworkFeedbackAudio, isStreaming]);
-
-
   // Column-scoped arrows: rail / chat scroll / gateway (providers + models). Tab rail: Escape; Enter on rail → gateway + provider hover.
   useEffect(() => {
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
@@ -2415,67 +1788,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
       scrollToHighlight(`[data-server-tab="${serverKeyboardHighlightId}"]`);
     }
   }, [navRailContext, serverKeyboardHighlightId]);
-
-
-  useEffect(() => {
-    const latest = messages[messages.length - 1];
-    if (!latest || latest.role !== "assistant") {
-      assistantVoiceBlocksRef.current = [];
-      setVoiceBlockTotal(0);
-      setVoiceBlockFocusIndex(0);
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    if (!voiceEnabled || isStreaming) return;
-    if (speakQueueActiveRef.current) return;
-    if (!messages || messages.length === 0) return;
-    const latest = messages[messages.length - 1];
-    if (!latest || latest.role !== "assistant") return;
-    if (latest.text === lastSpokenAssistantTextRef.current) return;
-    if (/^Working on that request\b/i.test(latest.text.trim())) return;
-    const speechText = textForSpeech(latest.text);
-    if (!speechText) return;
-    lastSpokenAssistantTextRef.current = latest.text;
-    const blocks = splitIntoSpeechBlocks(latest.text);
-    assistantVoiceBlocksRef.current = blocks;
-    setVoiceBlockTotal(blocks.length);
-    const focus = blocks.length ? blocks.length - 1 : 0;
-    setVoiceBlockFocusIndex(focus);
-    if (motherTerminalRef.current.shouldBurst(speechText)) {
-      void motherTerminalRef.current.unlock().then(() => {
-        motherTerminalRef.current.playBurstSound(speechText.length);
-      });
-    }
-    setVoicePlaybackBusy(true);
-    void speakMother(speechText).finally(() => setVoicePlaybackBusy(false));
-  }, [isStreaming, messages, speakMother, voiceEnabled]);
-
-  useEffect(() => {
-    if (!voiceEnabled) return;
-    const failureCountRef = { current: 0 };
-    let removeListener = () => {};
-    void loadComputerUse().then((cu) => {
-      removeListener = cu.addNarrationListener((narration) => {
-        if (!voiceEnabled) return;
-        void speakMother(narration.text)
-          .then(() => {
-            failureCountRef.current = 0;
-          })
-          .catch(() => {
-            failureCountRef.current += 1;
-            if (failureCountRef.current >= 3) {
-              void abortMotherSpeech();
-              failureCountRef.current = 0;
-            }
-          });
-      });
-    });
-    return () => {
-      removeListener();
-      void loadComputerUse().then((cu) => cu.resumeAfterStop());
-    };
-  }, [voiceEnabled]);
 
   useEffect(() => {
     let unlocked = false;

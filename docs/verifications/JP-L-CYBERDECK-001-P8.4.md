@@ -48,5 +48,5 @@ probe:cyberdeck-compile-scope PASS
 ## Sign-off
 
 - [x] Judicial PASS
-- [ ] Merge to `main`
+- [x] Merge to `main`
 - [x] **P8 complete** (P8.1–P8.4)
