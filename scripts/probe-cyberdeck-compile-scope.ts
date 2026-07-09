@@ -11,8 +11,8 @@ import { resolve } from "node:path";
 const ROOT = process.cwd();
 
 /** P0 baseline (2026-06). Lower in P1/P2 PRs per L-CYBERDECK-001. */
-const MAX_CYBERDECK_APP_LINES = 4_811;
-const MAX_CYBERDECK_APP_IMPORTS = 123;
+const MAX_CYBERDECK_APP_LINES = 3_781;
+const MAX_CYBERDECK_APP_IMPORTS = 113;
 
 /** Heavy pane modules must stay behind pane-chunks / dynamic(), not cyberdeck-app. */
 const FORBIDDEN_STATIC_IMPORTS = [

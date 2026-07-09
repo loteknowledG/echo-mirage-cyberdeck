@@ -104,3 +104,8 @@ export function OperatorPaneHost({
 
 export { useOperatorDragDrop } from "./use-operator-drag-drop";
 export type { UseOperatorDragDropOptions } from "./use-operator-drag-drop";
+export { useOperatorWorkspaceState } from "./use-operator-workspace-state";
+export type {
+  OperatorUiRestoreSlice,
+  UseOperatorWorkspaceStateOptions,
+} from "./use-operator-workspace-state";
