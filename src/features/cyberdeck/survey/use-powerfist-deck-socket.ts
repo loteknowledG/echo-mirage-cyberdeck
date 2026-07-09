@@ -7,7 +7,7 @@ import {
   type PowerFistStackCommand,
 } from "@/lib/cyberdeck/powerfist-events";
 import type { SurveyMissionSolveDetail } from "@/lib/cyberdeck/powerfist-mission.types";
-import { connectPowerfistDeckSocket, fetchPowerfistDeckConnect } from "@/lib/cyberdeck/powerfist-remote-socket";
+import { connectPowerfistDeckSocket, fetchPowerfistDeckConnect } from "@/lib/cyberdeck/survey-hub-socket";
 import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
 import { formatCodingVerifySystemLine } from "@/features/cyberdeck/muthur/coding-verify-format";
 import type { ChatMessage } from "@/features/cyberdeck/muthur/muthur-chat-types";

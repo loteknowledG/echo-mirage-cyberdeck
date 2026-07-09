@@ -9,7 +9,7 @@ import {
   readPowerfistPairParamsFromQuery,
   readPowerfistRemoteCredentials,
   type PowerfistSocketStatus,
-} from "@/lib/cyberdeck/powerfist-remote-socket";
+} from "@/lib/cyberdeck/survey-hub-socket";
 
 export function usePowerfistMatrixRemote(enabled: boolean) {
   const remoteSocketRef = useRef<ReturnType<typeof connectPowerfistRemoteSocket> | null>(null);

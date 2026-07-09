@@ -3,7 +3,7 @@ import {
   SURVEY_ECHO_NODE_LABEL,
   getOrCreateSurveyNodeId,
 } from "@/lib/cyberdeck/survey-mode";
-import type { PowerfistSocketStatus } from "@/lib/cyberdeck/powerfist-remote-socket";
+import type { PowerfistSocketStatus } from "@/lib/cyberdeck/survey-hub-socket";
 
 const SURVEY_CAPTURE_HOST_STORAGE_KEY = "echo-mirage-survey-capture-host";
 const SURVEY_CAPTURE_PORT_STORAGE_KEY = "echo-mirage-survey-capture-port";

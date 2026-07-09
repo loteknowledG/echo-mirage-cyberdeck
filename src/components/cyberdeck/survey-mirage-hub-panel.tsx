@@ -23,7 +23,7 @@ import {
   fetchPowerfistQrSession,
   unpairPowerfistCapture,
   unpairPowerfistRemote,
-} from "@/lib/cyberdeck/powerfist-remote-socket";
+} from "@/lib/cyberdeck/survey-hub-socket";
 
 function formatExpiry(expiresAt: string | null): string {
   if (!expiresAt) return "—";

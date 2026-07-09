@@ -32,7 +32,7 @@ import {
 import {
   completePowerfistPairFromPin,
   readPowerfistRemoteCredentials,
-} from "@/lib/cyberdeck/powerfist-remote-socket";
+} from "@/lib/cyberdeck/survey-hub-socket";
 import { useSurveyTeamSocket } from "@/lib/cyberdeck/survey-team-socket.client";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import {

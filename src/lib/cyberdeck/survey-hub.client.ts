@@ -12,7 +12,7 @@ import {
   createPowerfistQrSession,
   fetchPowerfistQrSession,
   readPowerfistRemoteCredentials,
-} from "@/lib/cyberdeck/powerfist-remote-socket";
+} from "@/lib/cyberdeck/survey-hub-socket";
 import {
   enterSurveyPairPin,
   fetchEchoRemoteSurveyStatusClient,
