@@ -29,7 +29,7 @@
 | Pos | Slice | PR | Status |
 |----:|-------|-----|--------|
 | — | P5.1b | [#53](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/53) | **MERGED** `9b97708` |
-| **1** | **P6.1** | — | survey hub — **MERGE** |
+| **1** | **P6.1** | [#54](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/54) | **MERGE** |
 | 2 | P7.1 | — | chat route split — **HEAD** |
 | 3 | P8.1 | — | rename cleanup |
 

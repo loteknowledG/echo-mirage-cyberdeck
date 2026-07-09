@@ -3,7 +3,7 @@
 **Work order:** [L-CYBERDECK-001](../work-orders/L-CYBERDECK-001-cyberdeck-app-extraction.md)  
 **Phase:** P6.1 — Survey hub host + PowerFist deck socket (D6.1–D6.3)  
 **Branch:** `cursor/extract-p6-survey-hub`  
-**PR:** _(pending)_  
+**PR:** [#54](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/54)  
 **Base:** `main` @ P5.1b merge `9b97708`
 
 ---
