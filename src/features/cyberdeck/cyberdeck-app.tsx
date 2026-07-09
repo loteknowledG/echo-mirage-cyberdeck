@@ -3,7 +3,6 @@
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, SetStateAction } from "react";
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, startTransition } from "react";
 import { flushSync } from "react-dom";
-import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { art } from "@/lib/TerminalArt";
 import type { CyberdeckVoiceTuning } from "@/lib/cyberdeck-voice-tuning";
 import type { Db8DeckSpeakLine } from "@/lib/db8-voice";
@@ -138,8 +137,6 @@ import {
   type GlyphRenderEngine,
 } from "@/lib/glyph-channel";
 import {
-  canNavigateOperatorFileBack,
-  canNavigateOperatorFileForward,
   operatorFileHistoryBackIndex,
   operatorFileHistoryForwardIndex,
   pushOperatorFileHistory,
@@ -168,7 +165,6 @@ import { pasteIntoOperatorTextDocument, readOperatorPaneSaveText } from "@/lib/o
 import { get, set } from "idb-keyval";
 import dynamic from "next/dynamic";
 import { PanelLoader } from "@/features/cyberdeck/panel-loader";
-import { MiragePaneLayer } from "@/components/cyberdeck/mirage-pane-layer";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
 import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-tab";
 import { Textarea } from "@/components/ui/textarea";
@@ -182,6 +178,7 @@ import { CustomTabPaneRenderer } from "@/features/cyberdeck/workspace/custom-tab
 import { CyberdeckContextMenus } from "@/features/cyberdeck/workspace/cyberdeck-context-menus";
 import { useCustomTabBrowser } from "@/features/cyberdeck/workspace/use-custom-tab-browser";
 import { useRailTabContextMenu } from "@/features/cyberdeck/workspace/use-rail-tab-context-menu";
+import { OperatorPaneHost, useOperatorDragDrop } from "@/features/cyberdeck/operator/operator-pane-host";
 import {
   getInitialUplinkSonarVolume,
   saveUplinkSonarVolume,
@@ -602,7 +599,6 @@ export default function CyberdeckApp() {
   const [operatorBrowserUrl, setOperatorBrowserUrl] = useState(OPERATOR_BROWSER_HOME_URL);
   const [operatorBrowserSnapshot, setOperatorBrowserSnapshot] = useState("");
   const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
-  const [isOperatorDragOver, setIsOperatorDragOver] = useState(false);
   const openRealmorphismKitTabRef = useRef<(tabId?: string) => void>(() => undefined);
   const handleTabClickRef = useRef<
     (
@@ -2791,6 +2787,17 @@ export default function CyberdeckApp() {
     setOperatorFolderRootsCount(roots.length);
   }, []);
 
+  const {
+    isOperatorDragOver,
+    handleOperatorDragOver,
+    handleOperatorDragLeave,
+    handleOperatorDrop,
+  } = useOperatorDragDrop({
+    getActiveServerId: () => serverRef.current,
+    openOperatorFile,
+    loadOperatorAssetFromFile,
+  });
+
   const copyHeapEntry = useCallback(async (entry: HeapEntry) => {
     try {
       await copyTextToClipboard(entry.text);
@@ -3699,75 +3706,6 @@ export default function CyberdeckApp() {
     if (activeServer === "m") {
       const dropPath = `drop://${file.name}#${file.lastModified}`;
       await openOperatorFile(dropPath, () => loadOperatorAssetFromFile(file));
-    }
-  }, [loadOperatorAssetFromFile, openOperatorFile]);
-
-  const handleOperatorDragOver = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
-    if (serverRef.current !== "m") return;
-    e.preventDefault();
-    setIsOperatorDragOver(true);
-  }, []);
-
-  const handleOperatorDragLeave = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-    setIsOperatorDragOver(false);
-  }, []);
-
-  const handleOperatorDrop = useCallback(async (e: ReactDragEvent<HTMLDivElement>) => {
-    const activeServer = serverRef.current;
-    if (activeServer !== "m") return;
-
-    e.preventDefault();
-    setIsOperatorDragOver(false);
-
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      const dropPath = `drop://${file.name}#${file.lastModified}`;
-      await openOperatorFile(dropPath, () => loadOperatorAssetFromFile(file));
-      return;
-    }
-
-    const uriList = e.dataTransfer.getData("text/uri-list");
-    if (uriList) {
-      const uris = uriList.split("\n").filter((u) => u.trim() && !u.startsWith("#"));
-      if (uris.length > 0) {
-        const uri = uris[0];
-        if (uri.startsWith("file://")) {
-          const filePath = uri.startsWith("file:///")
-            ? uri.slice(8)
-            : uri.startsWith("file://localhost/")
-              ? uri.slice("file://localhost".length)
-              : uri.slice(7);
-          try {
-            const response = await fetch(uri);
-            if (response.ok) {
-              const blob = await response.blob();
-              const fileName = filePath.split("/").pop() || "dropped-image";
-              const droppedFile = new File([blob], fileName, { type: blob.type || "image/png" });
-              await loadOperatorAssetFromFile(droppedFile);
-              return;
-            }
-          } catch {
-            // fallback: try reading as text path
-          }
-        }
-      }
-    }
-
-    const textPath = e.dataTransfer.getData("text/plain");
-    if (textPath && textPath.startsWith("/")) {
-      try {
-        const response = await fetch(`file://${textPath}`);
-        if (response.ok) {
-          const blob = await response.blob();
-          const fileName = textPath.split("/").pop() || "dropped-image";
-          const droppedFile = new File([blob], fileName, { type: blob.type || "image/png" });
-          await loadOperatorAssetFromFile(droppedFile);
-          return;
-        }
-      } catch {
-        // ignore
-      }
     }
   }, [loadOperatorAssetFromFile, openOperatorFile]);
 
@@ -4794,60 +4732,47 @@ export default function CyberdeckApp() {
               serverId="m"
               className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
             >
-                <ActivatedCyberdeckPane
-                  kind="operator"
-                  isOperatorDragOver={isOperatorDragOver}
-                  operatorDroppedAsset={operatorDroppedAsset}
-                  operatorSurfaceMode={operatorSurfaceMode}
-                  operatorBrowserEngine={operatorBrowserEngine}
-                  operatorSurfaceIsDocument={operatorSurfaceIsDocument}
-                  operatorBrowserUrl={operatorBrowserUrl}
-                  operatorDocMode={operatorDocMode}
-                  operatorDocNameDraft={operatorDocNameDraft}
-                  operatorActiveFilePath={operatorActiveFilePath}
-                  operatorEditorRef={operatorEditorRef}
-                  operatorNameInputRef={operatorNameInputRef}
-                  operatorBrowserRef={operatorBrowserRef}
-                  onOperatorDragOver={handleOperatorDragOver}
-                  onOperatorDragLeave={handleOperatorDragLeave}
-                  onOperatorDrop={handleOperatorDrop}
-                  onOperatorDocNameDraftChange={setOperatorDocNameDraft}
-                  onCommitOperatorDocName={commitOperatorDocName}
-                  onSetOperatorDocMode={handleSetOperatorDocMode}
-                  onOperatorBrowserNavigate={openOperatorBrowser}
-                  onOperatorBrowserUrlChange={setOperatorBrowserUrl}
-                  onSetOperatorSurfaceMode={setOperatorSurfaceMode}
-                  onPasteClipboardToOperator={pasteClipboardToOperator}
-                  onSaveOperatorDocInPlace={saveOperatorDocInPlace}
-                  onSaveOperatorDocAsFile={saveOperatorDocAsFile}
-                  operatorCanSaveInPlace={
-                    operatorFolderRootsCount >= 0 &&
-                    canSaveOperatorDocumentInPlace(
-                      operatorActiveFilePath,
-                      operatorDroppedAsset?.localFilePath,
-                      operatorFolderRootsRef.current,
-                    )
-                  }
-                  onConvertDocumentToMarkdown={openConvertedMarkdownInOperator}
-                  onExportOperatorMarkdown={exportOperatorMarkdown}
-                  onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
-                  onOperatorDocumentTextChange={handleOperatorDocumentTextChange}
-                  onClearOperatorDocument={clearOperatorDocument}
-                  onOperatorDocumentKindChange={handleOperatorDocumentKindChange}
-                  operatorDocumentKind={normalizeOperatorDocumentKind(operatorDroppedAsset?.kind)}
-                  onOpenOperatorFolderFile={openOperatorFolderFile}
-                  onOperatorFolderRootsChange={handleOperatorFolderRootsChange}
-                  operatorCanNavigateFileBack={canNavigateOperatorFileBack(
-                    operatorFileHistoryIndex,
-                  )}
-                  operatorCanNavigateFileForward={canNavigateOperatorFileForward(
-                    operatorFileHistory,
-                    operatorFileHistoryIndex,
-                  )}
-                  onOperatorFileHistoryBack={() => navigateOperatorFileHistory("back")}
-                  onOperatorFileHistoryForward={() => navigateOperatorFileHistory("forward")}
-                  onReloadOperatorFile={reloadOperatorFolderFile}
-                />
+              <OperatorPaneHost
+                isOperatorDragOver={isOperatorDragOver}
+                operatorDroppedAsset={operatorDroppedAsset}
+                operatorSurfaceMode={operatorSurfaceMode}
+                operatorBrowserEngine={operatorBrowserEngine}
+                operatorSurfaceIsDocument={operatorSurfaceIsDocument}
+                operatorBrowserUrl={operatorBrowserUrl}
+                operatorDocMode={operatorDocMode}
+                operatorDocNameDraft={operatorDocNameDraft}
+                operatorActiveFilePath={operatorActiveFilePath}
+                operatorFileHistory={operatorFileHistory}
+                operatorFileHistoryIndex={operatorFileHistoryIndex}
+                operatorFolderRootsRef={operatorFolderRootsRef}
+                operatorFolderRootsCount={operatorFolderRootsCount}
+                operatorEditorRef={operatorEditorRef}
+                operatorNameInputRef={operatorNameInputRef}
+                operatorBrowserRef={operatorBrowserRef}
+                onOperatorDragOver={handleOperatorDragOver}
+                onOperatorDragLeave={handleOperatorDragLeave}
+                onOperatorDrop={handleOperatorDrop}
+                onOperatorDocNameDraftChange={setOperatorDocNameDraft}
+                onCommitOperatorDocName={commitOperatorDocName}
+                onSetOperatorDocMode={handleSetOperatorDocMode}
+                onOperatorBrowserNavigate={openOperatorBrowser}
+                onOperatorBrowserUrlChange={setOperatorBrowserUrl}
+                onSetOperatorSurfaceMode={setOperatorSurfaceMode}
+                onPasteClipboardToOperator={pasteClipboardToOperator}
+                onSaveOperatorDocInPlace={saveOperatorDocInPlace}
+                onSaveOperatorDocAsFile={saveOperatorDocAsFile}
+                onConvertDocumentToMarkdown={openConvertedMarkdownInOperator}
+                onExportOperatorMarkdown={exportOperatorMarkdown}
+                onCopyOperatorDocToClipboard={copyOperatorDocToClipboard}
+                onOperatorDocumentTextChange={handleOperatorDocumentTextChange}
+                onClearOperatorDocument={clearOperatorDocument}
+                onOperatorDocumentKindChange={handleOperatorDocumentKindChange}
+                onOpenOperatorFolderFile={openOperatorFolderFile}
+                onOperatorFolderRootsChange={handleOperatorFolderRootsChange}
+                onOperatorFileHistoryBack={() => navigateOperatorFileHistory("back")}
+                onOperatorFileHistoryForward={() => navigateOperatorFileHistory("forward")}
+                onReloadOperatorFile={reloadOperatorFolderFile}
+              />
             </CyberdeckFixedServerPane>
             <CyberdeckFixedServerPane serverId="b" className="flex min-h-0 flex-1 flex-col">
               <div ref={gatewayBlankSettingsRef} className="flex min-h-0 flex-1 flex-col">
