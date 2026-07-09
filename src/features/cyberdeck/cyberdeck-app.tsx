@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, SetStateAction } from "react";
+import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, SetStateAction } from "react";
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, startTransition } from "react";
 import { flushSync } from "react-dom";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
@@ -186,7 +186,6 @@ import dynamic from "next/dynamic";
 import { PanelLoader } from "@/features/cyberdeck/panel-loader";
 import { MiragePaneLayer } from "@/components/cyberdeck/mirage-pane-layer";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
-import { MirageHeader } from "@/components/cyberdeck/mirage-header";
 import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-tab";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -195,7 +194,6 @@ import { CyberdeckScrollbarHost } from "@/components/cyberdeck/cyberdeck-scrollb
 import { SurveyAutoPairHost } from "@/components/cyberdeck/survey-auto-pair-host";
 import { MORPHISM_ZONE_REALMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import {
-  CyberdeckControlButton,
   CyberdeckMenuButton,
 } from "@/components/cyberdeck/cyberdeck-control-button";
 import {
@@ -217,7 +215,6 @@ import { OperatorWorkspacePersistence } from "@/components/cyberdeck/operator-wo
 import {
   CyberdeckCustomTabPanes,
   CyberdeckFixedServerPane,
-  CyberdeckGatewaySettingsPane,
 } from "@/components/cyberdeck/cyberdeck-pane-slots";
 import { type MuthurCommandInputHandle } from "@/components/cyberdeck/muthur-command-input";
 import { setMuthurScreenSnapshot } from "@/lib/muthur-screen-context";
@@ -266,6 +263,8 @@ import {
   hasAnyProviderClientKey,
   useProviderConnection,
 } from "@/features/cyberdeck/gateway/use-provider-connection";
+import { GatewayColumn } from "@/features/cyberdeck/gateway/gateway-column";
+import { useGatewayPaneState } from "@/features/cyberdeck/gateway/use-gateway-pane-state";
 import { MuthurChatColumn } from "@/features/cyberdeck/muthur/muthur-chat-column";
 import {
   CUSTOM_TAB_CONTEXT_MENU_ACTIONS,
@@ -307,7 +306,6 @@ import { publishMuthurObservation, flushMuthurObservation } from "@/lib/muthur/o
 import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
 import { parseAionQuery } from "@/lib/muthur-aion-intent";
 import { parseDocumentOpenIntent } from "@/lib/muthur-document-open-intent";
-import { providerToneColors, resolveProviderVisualTone } from "@/lib/cyberdeck/provider-connection";
 
 const ActivatedCyberdeckPane = dynamic(
   () =>
@@ -329,19 +327,6 @@ const LazyIndicateOverlay = dynamic(() => import("@/lib/computer-use/IndicateOve
   ssr: false,
   loading: () => null,
 });
-
-const CyberdeckMarkdownPreview = dynamic(
-  () =>
-    import("@/features/cyberdeck/streamdown-markdown-preview").then((m) => ({
-      default: m.StreamdownMarkdownPreview,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="font-mono text-[10px] tracking-[0.08em] text-[#707070]">MARKDOWN // LOADING</div>
-    ),
-  },
-);
 
 const fixedServers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
@@ -666,6 +651,21 @@ export default function CyberdeckApp() {
     if (gatewayFraction >= collapseEnd) return 1;
     return (gatewayFraction - collapseStart) / (collapseEnd - collapseStart);
   }, [isMobileLayout, mobileContentSplit]);
+
+  const {
+    providerKeyboardHighlightId,
+    setProviderKeyboardHighlightId,
+    modelKeyboardHighlightId,
+    setModelKeyboardHighlightId,
+    gatewayColumnRef,
+    gatewayConnectionPanelRef,
+    focusGatewayConnectionPanel,
+  } = useGatewayPaneState({
+    isMobileLayout,
+    activeProvider,
+    modelList,
+  });
+
   const [chatKeyboardHighlightIndex, setChatKeyboardHighlightIndex] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
@@ -687,13 +687,9 @@ export default function CyberdeckApp() {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [orchestration, setOrchestration] = useState<OrchestrationBundle | null>(null);
 
-  /** Keyboard focus ring for provider list; Enter commits to `activeProvider`. */
-  const [providerKeyboardHighlightId, setProviderKeyboardHighlightId] = useState<string | null>(null);
   /** Escape from gateway → tab rail; Escape from tab rail → gateway. Arrows move highlight while on rail. */
   const [navRailContext, setNavRailContext] = useState<"gateway" | "tabs">("gateway");
   const [serverKeyboardHighlightId, setServerKeyboardHighlightId] = useState<(typeof SERVER_IDS)[number] | null>(null);
-  /** Gateway column: keyboard highlight on model rows (arrows move providers + models as one column). */
-  const [modelKeyboardHighlightId, setModelKeyboardHighlightId] = useState<string | null>(null);
   const [deckUiHydrated, setDeckUiHydrated] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<MuthurCommandInputHandle>(null);
@@ -701,8 +697,6 @@ export default function CyberdeckApp() {
   const muthurChatScrollContentRef = useRef<HTMLDivElement>(null);
   const serverRailRef = useRef<HTMLElement | null>(null);
   const chatColumnRef = useRef<HTMLDivElement>(null);
-  const gatewayColumnRef = useRef<HTMLDivElement>(null);
-  const gatewayConnectionPanelRef = useRef<HTMLDivElement>(null);
   const gatewayBlankSettingsRef = useRef<HTMLDivElement>(null);
   const cyberdeckRootRef = useRef<HTMLDivElement>(null);
   const chatAbortRef = useRef<AbortController | null>(null);
@@ -732,34 +726,6 @@ export default function CyberdeckApp() {
   const startupRailResolvedRef = useRef(false);
   const prevConnectionStateRef = useRef<"offline" | "connecting" | "connected">("offline");
   const serverRef = useRef<CyberdeckServerId>("m");
-
-  const focusGatewayConnectionPanel = useCallback(() => {
-    const scrollToPanel = (panel: HTMLElement) => {
-      const scrollParent = panel.closest(".overflow-y-auto");
-      if (scrollParent && scrollParent instanceof HTMLElement) {
-        const parentRect = scrollParent.getBoundingClientRect();
-        const panelRect = panel.getBoundingClientRect();
-        const offset = panelRect.top - parentRect.top + scrollParent.scrollTop - 12;
-        scrollParent.scrollTo({ top: Math.max(0, offset), behavior: "smooth" });
-        return;
-      }
-      panel.scrollIntoView({
-        block: isMobileLayout ? "center" : "nearest",
-        behavior: "smooth",
-      });
-    };
-
-    const attempt = (triesLeft: number) => {
-      const panel = gatewayConnectionPanelRef.current;
-      if (!panel) {
-        if (triesLeft > 0) window.requestAnimationFrame(() => attempt(triesLeft - 1));
-        return;
-      }
-      window.requestAnimationFrame(() => scrollToPanel(panel));
-    };
-
-    attempt(4);
-  }, [isMobileLayout]);
 
   useEffect(() => {
     const unsub = useCyberdeckTabStore.subscribe((state) => {
@@ -988,12 +954,6 @@ export default function CyberdeckApp() {
     },
     [focusGlyphChannelTab, renderAsciiSkillToChannel, renderGlyphToChannel, setRawGlyphChannelText, syncGlyphChannelTabGlyphs],
   );
-
-  const inactiveTextColor = "#7a7a7a";
-  const inactiveSubtleTextColor = "#6a6a6a";
-  const activeTextGlow = "0 0 8px rgba(0, 255, 0, 0.22)";
-  const amberTextGlow = "0 0 8px rgba(255, 170, 0, 0.22)";
-  const inactiveTextGlow = "0 0 6px rgba(180, 180, 180, 0.14)";
 
   useDeckAudioBridge();
   useSilentModeAudioGateSync();
@@ -3683,25 +3643,8 @@ export default function CyberdeckApp() {
 
     if (navRailContext === "tabs" && serverKeyboardHighlightId) {
       scrollToHighlight(`[data-server-tab="${serverKeyboardHighlightId}"]`);
-      return;
     }
-    if (providerKeyboardHighlightId) {
-      scrollToHighlight(`[data-provider-row="${providerKeyboardHighlightId}"]`);
-      return;
-    }
-    if (modelKeyboardHighlightId) {
-      scrollToHighlight(`[data-model-row="${modelKeyboardHighlightId}"]`);
-    }
-  }, [modelKeyboardHighlightId, navRailContext, providerKeyboardHighlightId, serverKeyboardHighlightId]);
-
-
-  useEffect(() => {
-    setModelKeyboardHighlightId((prev) => {
-      if (prev == null) return null;
-      if (!modelList.some((m) => m.id === prev)) return null;
-      return prev;
-    });
-  }, [activeProvider, modelList]);
+  }, [navRailContext, serverKeyboardHighlightId]);
 
 
   useEffect(() => {
@@ -5505,281 +5448,65 @@ export default function CyberdeckApp() {
           minSize={0}
           className="h-full min-h-0 overflow-hidden"
         >
-          <div
+          <GatewayColumn
             ref={gatewayColumnRef}
-            tabIndex={-1}
-            aria-label="Gateway"
+            networkActivityActive={networkActivityActive}
+            isMarkdownDragOver={isMarkdownDragOver}
+            mirageHeaderCollapse={mirageHeaderCollapse}
+            isMobileLayout={isMobileLayout}
+            deckMode={deckMode}
+            droppedMarkdown={droppedMarkdown}
+            droppedMarkdownName={droppedMarkdownName}
+            onDroppedMarkdownClear={() => {
+              setDroppedMarkdown(null);
+              setDroppedMarkdownName("");
+            }}
             onContextMenu={handleGatewayPaneContextMenu}
             onDragOver={handleThirdColumnDragOver}
             onDragLeave={handleThirdColumnDragLeave}
             onDrop={handleThirdColumnDrop}
-            className={`cyberdeck-net-pane right flex h-full min-w-0 flex-col overflow-hidden border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
-              networkActivityActive ? "is-net-active" : ""
-            } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
+            leadingPaneContent={
+              <>
+                {ENABLE_CARD_TABLE ? (
+                  <CyberdeckFixedServerPane
+                    serverId="ct"
+                    className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+                  >
+                    <LazyCardTablePaneHost
+                      selectedCardIds={selectedCardIds}
+                      setSelectedCardIds={setSelectedCardIds}
+                    />
+                  </CyberdeckFixedServerPane>
+                ) : null}
+                <CyberdeckCustomTabPanes renderTab={(tab) => renderCustomTabSurface(tab as CustomTab)} />
+              </>
+            }
+            gatewayConnectionPanelRef={gatewayConnectionPanelRef}
+            providerKeyboardHighlightId={providerKeyboardHighlightId}
+            modelKeyboardHighlightId={modelKeyboardHighlightId}
+            onProviderKeyboardHighlightIdChange={setProviderKeyboardHighlightId}
+            onModelKeyboardHighlightIdChange={setModelKeyboardHighlightId}
+            focusGatewayConnectionPanel={focusGatewayConnectionPanel}
+            providers={providers}
+            activeProvider={activeProvider}
+            modelList={modelList}
+            modelID={modelID}
+            hasProviderAuth={hasProviderAuth}
+            providerConnectionLabel={providerConnectionLabel}
+            providerModelFetchStatus={providerModelFetchStatus}
+            credentialReplaceProvider={credentialReplaceProvider}
+            gatewayKeyDraft={gatewayKeyDraft}
+            onGatewayKeyDraftChange={setGatewayKeyDraft}
+            rateLimitedProviders={rateLimitedProviders}
+            modelFetchStatusByProvider={modelFetchStatusByProvider}
+            modelHealthByProvider={modelHealthByProvider}
+            probeInFlightByProvider={probeInFlightByProvider}
+            providerHasKey={providerHasKey}
+            handleProviderClick={handleProviderClick}
+            submitGatewayKey={submitGatewayKey}
+            activateModelById={activateModelById}
+            generatedUI={generatedUI}
           >
-            <MirageHeader collapse={mirageHeaderCollapse} />
-            <p className="sr-only">
-              Command. Catalog. Operators. Memory Atlas. Voice Lab. Flight Log. ⟁ Glyph. Settings. Craftwerk Cyberdeck
-              Corporation. ChatGPT // Lead. Cursor // Dev. Codex // Test. Samus-Manus // Memory. ASCII. REALMORPH.
-            </p>
-            <div className="mirage-pane-body relative box-border flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden ps-2 pe-3">
-            {ENABLE_CARD_TABLE ? (
-              <CyberdeckFixedServerPane
-                serverId="ct"
-                className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-              >
-                <LazyCardTablePaneHost
-                  selectedCardIds={selectedCardIds}
-                  setSelectedCardIds={setSelectedCardIds}
-                />
-              </CyberdeckFixedServerPane>
-            ) : null}
-            <CyberdeckCustomTabPanes renderTab={(tab) => renderCustomTabSurface(tab as CustomTab)} />
-            <CyberdeckGatewaySettingsPane className="custom-scrollbar flex flex-1 flex-col overflow-y-auto bg-black p-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))]">
-                  {droppedMarkdown ? (
-                    <div className="mb-4 rounded-sm border border-amber-700/70 bg-black p-3">
-                      <div className="mb-2 flex items-center justify-between">
-                        <div className="truncate font-mono text-[10px] text-amber-300">
-                          MARKDOWN: {droppedMarkdownName || "dropped.md"}
-                        </div>
-                        <CyberdeckControlButton
-                          deckMode={deckMode}
-                          control={{ size: "action", amber: true }}
-                          onClick={() => {
-                            setDroppedMarkdown(null);
-                            setDroppedMarkdownName("");
-                          }}
-                        >
-                          CLEAR
-                        </CyberdeckControlButton>
-                      </div>
-                      <CyberdeckMarkdownPreview className="prose prose-invert prose-pre:bg-black prose-pre:text-green-300 max-w-none text-[12px] leading-snug text-green-200">
-                        {droppedMarkdown}
-                      </CyberdeckMarkdownPreview>
-                    </div>
-                  ) : null}
-                  <div
-                    className="pb-2 font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
-                    style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-                  >
-                    MAINNET-UPLINK
-                  </div>
-
-                  <div
-                    className="cursor-default py-1 font-mono text-[10px] tracking-[0.04em] text-[#8a8a8a]"
-                    style={{ textShadow: "0 0 6px rgba(138,138,138,0.2)" }}
-                  >
-                    # GATEWAY
-                  </div>
-
-                  <div className="mt-1 flex select-none flex-col font-mono text-[10px] tracking-[0.04em]">
-                    {providers.map((p) => {
-                      const selected = activeProvider === p.id;
-                      const kbHover = providerKeyboardHighlightId === p.id;
-                      const linkStatus = modelFetchStatusByProvider[p.id] || "idle";
-                      const tone = resolveProviderVisualTone({
-                        hasKey: providerHasKey(p.id),
-                        status: linkStatus,
-                        rateLimited: rateLimitedProviders.has(p.id),
-                      });
-                      const toneColors = providerToneColors(tone);
-                      return (
-                        <div
-                          key={p.id}
-                          data-provider-row={p.id}
-                          className={`nav-row cursor-pointer py-[5px]${kbHover ? " nav-row-kb-hover" : ""}`}
-                          style={
-                            {
-                              "--nav-color": toneColors.color,
-                              "--nav-shadow": toneColors.shadow,
-                              "--nav-hover-color": toneColors.hoverColor,
-                              "--nav-hover-shadow": toneColors.hoverShadow,
-                              fontWeight: selected ? 600 : 400,
-                            } as CSSProperties
-                          }
-                          onClick={() => {
-                            handleProviderClick(p.id);
-                            setProviderKeyboardHighlightId(null);
-                            setModelKeyboardHighlightId(null);
-                          }}
-                        >
-                          {selected ? "[X] " : "[ ] "}
-                          {p.name}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div
-                    ref={gatewayConnectionPanelRef}
-                    className={`mt-5 border-t border-[#111] pt-2 max-md:order-first max-md:mt-0 max-md:border-t-0 max-md:pt-0${
-                      !hasProviderAuth || credentialReplaceProvider === activeProvider
-                        ? " max-md:sticky max-md:top-0 max-md:z-10 max-md:border-b max-md:border-[#111] max-md:bg-black max-md:pb-3"
-                        : ""
-                    }`}
-                    style={{
-                      pointerEvents: probeInFlightByProvider[activeProvider] ? "none" : "auto",
-                      opacity: probeInFlightByProvider[activeProvider] ? 0.7 : 1,
-                      transition: "opacity 0.2s",
-                    }}
-                  >
-                    {(!hasProviderAuth || credentialReplaceProvider === activeProvider) ? (
-                      <div className="mb-3">
-                        <label
-                          htmlFor="gateway-provider-key"
-                          className="mb-1 block font-mono text-[9px] tracking-[0.08em] text-[#8a8a8a] max-md:text-[10px]"
-                        >
-                          {credentialReplaceProvider === activeProvider
-                            ? "ENTER NEW KEY"
-                            : "ENTER GATEWAY KEY"}
-                        </label>
-                        {isMobileLayout ? (
-                          <p className="mb-2 font-mono text-[9px] leading-snug text-[#666]">
-                            Tap μ (MAINNET-UPLINK) if this panel is hidden. Paste your key, then Connect — or
-                            paste the key in chat.
-                          </p>
-                        ) : null}
-                        <div className="flex flex-col gap-2 max-md:flex-row max-md:items-stretch">
-                          <input
-                            id="gateway-provider-key"
-                            type="password"
-                            enterKeyHint="done"
-                            value={gatewayKeyDraft}
-                            onChange={(e) => setGatewayKeyDraft(e.target.value)}
-                            onFocus={focusGatewayConnectionPanel}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                void submitGatewayKey();
-                              }
-                            }}
-                            autoComplete="off"
-                            spellCheck={false}
-                            className="min-h-[44px] w-full flex-1 rounded border border-[#2d2d2d] bg-black px-3 py-2 font-mono text-base text-green-300 outline-none focus:border-green-700 max-md:text-[16px] md:min-h-0 md:px-2 md:py-1 md:text-[10px]"
-                            placeholder={`${activeProvider.toUpperCase()} API KEY`}
-                          />
-                          <CyberdeckControlButton
-                            deckMode={deckMode}
-                            control={{ size: "action", signal: true }}
-                            disabled={
-                              !gatewayKeyDraft.trim() ||
-                              providerModelFetchStatus === "retrieving"
-                            }
-                            className="min-h-[44px] shrink-0 md:min-h-0"
-                            onClick={() => void submitGatewayKey()}
-                          >
-                            {providerModelFetchStatus === "retrieving" ? "LINKING…" : "CONNECT"}
-                          </CyberdeckControlButton>
-                        </div>
-                      </div>
-                    ) : null}
-                    <div
-                      className="mb-2 font-mono text-[10px]"
-                      style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}
-                    >
-                      CONNECTION_STATUS: {providerConnectionLabel}
-                    </div>
-                    <div
-                      className="mb-2 font-mono text-[10px]"
-                      style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}
-                    >
-                      AVAILABLE_MODELS:
-                    </div>
-                    {!hasProviderAuth ? (
-                      <div className="font-mono text-[10px]" style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}>
-                        NO KEY // ENTER_KEY_ABOVE_OR_PASTE_IN_CHAT
-                      </div>
-                    ) : rateLimitedProviders.has(activeProvider) ? (
-                      <div className="font-mono text-[10px] text-amber-300" style={{ textShadow: "0 0 8px rgba(255, 170, 0, 0.28)" }}>
-                        QUOTA // RATE_LIMIT // OPERATOR_ACTION_REQUIRED
-                      </div>
-                    ) : providerModelFetchStatus === "retrieving" ? (
-                      <div className="model-probe-wave font-mono text-[10px]" style={{ color: "#ffaa00" }}>
-                        CONNECTING... RETRIEVING_MODELS
-                      </div>
-                    ) : providerModelFetchStatus === "invalid-key" ? (
-                      <div className="font-mono text-[10px] text-red-400" style={{ textShadow: "0 0 8px rgba(255, 85, 85, 0.3)" }}>
-                        AUTH FAILED // INVALID_KEY
-                      </div>
-                    ) : providerModelFetchStatus === "error" ? (
-                      <div className="font-mono text-[10px] text-red-300" style={{ textShadow: "0 0 8px rgba(255, 122, 122, 0.3)" }}>
-                        UNAVAILABLE // UPLINK_ERROR // OPERATOR_ACTION_REQUIRED
-                      </div>
-                    ) : modelList.length === 0 ? (
-                      <div className="font-mono text-[10px]" style={{ color: inactiveTextColor, textShadow: inactiveTextGlow }}>
-                        NO_MODELS_LOADED
-                      </div>
-                    ) : (
-                      modelList.map((m) => {
-                        const health = modelHealthByProvider[activeProvider]?.[m.id] || "idle";
-                        const isSel = modelID === m.id;
-                        const isFree = m.id.toLowerCase().includes("free");
-                        const wave = probeInFlightByProvider[activeProvider] === m.id;
-                        const modelKb = modelKeyboardHighlightId === m.id;
-                        return (
-                          <div
-                            key={m.id}
-                            data-model-row={m.id}
-                            className={`${wave ? "model-probe-wave nav-row" : "nav-row"}${modelKb ? " nav-row-kb-hover" : ""}`}
-                            role="button"
-                            tabIndex={-1}
-                            onClick={() => {
-                              setProviderKeyboardHighlightId(null);
-                              setModelKeyboardHighlightId(null);
-                              activateModelById(m.id);
-                            }}
-                            style={
-                              {
-                                cursor: "pointer",
-                                fontSize: "10px",
-                                paddingTop: "4px",
-                                paddingBottom: "4px",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                                "--nav-color": isSel
-                                  ? health === "green"
-                                    ? "#00ff00"
-                                    : health === "amber"
-                                      ? "#ffaa00"
-                                      : inactiveTextColor
-                                  : isFree
-                                    ? "#ffaa00"
-                                    : inactiveSubtleTextColor,
-                                "--nav-shadow": isSel
-                                  ? health === "green"
-                                    ? activeTextGlow
-                                    : health === "amber"
-                                      ? amberTextGlow
-                                      : inactiveTextGlow
-                                  : isFree
-                                    ? amberTextGlow
-                                    : inactiveTextGlow,
-                                "--nav-hover-color": isSel ? (health === "green" ? "#36ff73" : "#ffbf4d") : "#b0b0b0",
-                                "--nav-hover-shadow": isSel
-                                  ? health === "green"
-                                    ? "0 0 10px rgba(54, 255, 115, 0.30)"
-                                    : "0 0 10px rgba(255, 191, 77, 0.28)"
-                                  : inactiveTextGlow,
-                              } as CSSProperties
-                            }
-                          >
-                            {m.id.split("/").pop()}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {generatedUI ? (
-                    <div className="mt-4 rounded-sm border border-green-900/80 bg-black/60 p-3">
-                      <div className="mb-1 font-mono text-[10px] text-green-500/90">// FEED</div>
-                      <pre className="whitespace-pre-wrap font-mono text-[10px] leading-snug text-green-300/95">
-                        {generatedUI}
-                      </pre>
-                    </div>
-                  ) : null}
-            </CyberdeckGatewaySettingsPane>
             <CyberdeckFixedServerPane
               serverId="m"
               className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
@@ -5855,8 +5582,7 @@ export default function CyberdeckApp() {
                   />
               </div>
             </CyberdeckFixedServerPane>
-            </div>
-          </div>
+          </GatewayColumn>
         </ResizablePanel>
       </ResizablePanelGroup>
         </div>
