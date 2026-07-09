@@ -1,6 +1,6 @@
 # L-CYBERDECK-001 — Conductor Status Board
 
-**Updated:** 2026-07-09 (P4.2 judicial PASS)
+**Updated:** 2026-07-09 (P4.2 merged; P5.1 judicial PASS)
 
 ---
 
@@ -20,20 +20,21 @@
 | **P3.1** | Done | **PASS** | [JP-P3.1](../verifications/JP-L-CYBERDECK-001-P3.1.md) — PR #48 **MERGED** `dcae63c` — **5,878 lines** |
 | **P3.2** | Done | **PASS** | [JP-P3.2](../verifications/JP-L-CYBERDECK-001-P3.2.md) — PR #49 **MERGED** `624f7d8` — **5,604 lines** — **P3 complete** |
 | **P4.1** | Done | **PASS** | [JP-P4.1](../verifications/JP-L-CYBERDECK-001-P4.1.md) — PR #50 **MERGED** `1375ca9` — **5,549 lines** |
-| **P4.2** | Done | **PASS** | [JP-P4.2](../verifications/JP-L-CYBERDECK-001-P4.2.md) — PR #51 — **4,886 lines** — **P4 complete** |
+| **P4.2** | Done | **PASS** | [JP-P4.2](../verifications/JP-L-CYBERDECK-001-P4.2.md) — PR #51 **MERGED** `4889a69` — **4,886 lines** — **P4 complete** |
+| **P5.1** | Done | **PASS** | [JP-P5.1](../verifications/JP-L-CYBERDECK-001-P5.1.md) — PR #52 — **4,811 lines** (partial P5) |
 
 ---
 
 ## Metrics ratchet (live)
 
-| Metric | P4.1 verified | P4.2 verified | Ceiling |
-|--------|--------------:|--------------:|--------:|
-| `cyberdeck-app.tsx` lines | 5,549 | **4,886** | 4,886 |
-| Import lines | 125 | **124** | 124 |
+| Metric | P4.2 | P5.1 | Ceiling |
+|--------|-----:|-----:|--------:|
+| `cyberdeck-app.tsx` lines | 4,886 | **4,811** | 4,811 |
+| Import lines | 124 | **123** | 123 |
 
-Probe: **PASS** · PR #51 merge pending
+Probe: **PASS** · `main` @ `4889a69` + PR #52 pending
 
-**P4.2 win:** 5,549 → 4,886 (−663 lines).
+**P5.1 win:** 4,886 → 4,811 (−75 lines).
 
 ---
 
@@ -41,9 +42,9 @@ Probe: **PASS** · PR #51 merge pending
 
 | Pos | Slice | PR | Status |
 |----:|-------|-----|--------|
-| — | P4.2 | [#51](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/51) | **MERGE** |
-| **1** | **P5.1** | [#52](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/52) | rebase → `main` after #51 |
-| **2** | **P5.1b** | — | operator workspace state — **HEAD** |
+| — | P4.2 | [#51](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/51) | **MERGED** `4889a69` |
+| **1** | **P5.1** | [#52](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/52) | **MERGE** (rebased on `main`) |
+| **2** | **P5.1b** | — | `use-operator-workspace-state` — **HEAD** |
 | 3 | P6.1 | — | survey hub |
 | 4 | P7.1 | — | chat route split |
 | 5 | P8.1 | — | rename cleanup |
@@ -54,7 +55,7 @@ Probe: **PASS** · PR #51 merge pending
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Developer agent** | Merge PR #51; rebase PR #52 onto `main` |
+| 1 | **Developer agent** | Merge PR #52; start **P5.1b** workspace state hook |
 | 2 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
@@ -63,5 +64,5 @@ Probe: **PASS** · PR #51 merge pending
 
 | Date | Decision |
 |------|----------|
-| 2026-07-09 | P4.1 merged — PR #50 `1375ca9`; queue → **P4.2 HEAD** |
-| 2026-07-09 | P4.2 judicial PASS — [JP-P4.2](../verifications/JP-L-CYBERDECK-001-P4.2.md) — PR #51 merge |
+| 2026-07-09 | P4.2 merged — PR #51 `4889a69` on `main`; **P4 complete** |
+| 2026-07-09 | P5.1 judicial PASS — [JP-P5.1](../verifications/JP-L-CYBERDECK-001-P5.1.md) — PR #52 rebase → `main` |
