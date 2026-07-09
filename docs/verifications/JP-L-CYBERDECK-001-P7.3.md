@@ -51,5 +51,5 @@ probe:survey-hub PASS
 ## Sign-off
 
 - [x] Judicial PASS
-- [ ] Merge to `main`
+- [x] Merge to `main`
 - [ ] **P7.4 HEAD** (thin route delegator)
