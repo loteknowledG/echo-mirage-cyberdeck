@@ -39,6 +39,7 @@ You are the **tester / judicial agent**. You verify; you do not implement unless
 | **P2.3** | [VERIFY-L-CYBERDECK-001-P2.3.md](./VERIFY-L-CYBERDECK-001-P2.3.md) · [TESTER paste](./TESTER-L-CYBERDECK-001-P2.3.md) | [JP-L-CYBERDECK-001-P2.3.md](./JP-L-CYBERDECK-001-P2.3.md) |
 | **P2.4** | [VERIFY-L-CYBERDECK-001-P2.4.md](./VERIFY-L-CYBERDECK-001-P2.4.md) · [TESTER paste](./TESTER-L-CYBERDECK-001-P2.4.md) | [JP-L-CYBERDECK-001-P2.4.md](./JP-L-CYBERDECK-001-P2.4.md) |
 | **P2.5** | [VERIFY-L-CYBERDECK-001-P2.5.md](./VERIFY-L-CYBERDECK-001-P2.5.md) · [TESTER paste](./TESTER-L-CYBERDECK-001-P2.5.md) | [JP-L-CYBERDECK-001-P2.5.md](./JP-L-CYBERDECK-001-P2.5.md) |
+| **P3.1** | [VERIFY-L-CYBERDECK-001-P3.1.md](./VERIFY-L-CYBERDECK-001-P3.1.md) · [TESTER paste](./TESTER-L-CYBERDECK-001-P3.1.md) | [JP-L-CYBERDECK-001-P3.1.md](./JP-L-CYBERDECK-001-P3.1.md) |
 | P2.4+ | Per [L-CYBERDECK-001](../work-orders/L-CYBERDECK-001-cyberdeck-app-extraction.md) | JP-P2.x |
 
 ---
