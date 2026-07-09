@@ -38,13 +38,8 @@
  * │               fetchPowerfistQrSession · completePowerfistPairFromPin · WS to Mirage
  * │               Modules: survey-hub-socket.ts, survey-mirage-hub-panel (legacy UI)
  * │
- * └─ NO + isSurveyLegacyPairingEnabled()?
- *     → Frozen legacy UI only (survey-pair-pin-form, mirage pairing dock)
- *        ├─ Mirage on LAN: direct HTTP pair (TRANSPORT A)
- *        ├─ HTTPS blocked: relay pair form (TRANSPORT B)
- *        └─ Live hints while pairing: TRANSPORT D (auxiliary, not a link path)
- *               survey-team-socket.client.ts — Socket.IO on Echo :3050 /survey-team
- *               Echo pushes survey:pairing-bundle; does NOT replace Hub connect.
+ * └─ NO → SurveyLegacyNotice — enable Survey Hub (``localStorage.survey-hub="1"``)
+ *        Mirage hub manual pair remains on PowerFist tab for transport C only.
  * ```
  *
  * Module map:
@@ -53,7 +48,7 @@
  * | A Direct LAN/localhost HTTP | Desktop cyberdeck, Echo reachable | survey-pair-enter.client, survey-echo-status.client | cyberdeck-app core |
  * | B Cloud relay | isSurveyHttpsPairBlocked() or Hub LAN fallback | survey-relay.client, survey-cloud-relay.server | cyberdeck-app core |
  * | C Mirage hub WS | powerfist-hub step after Echo links | survey-hub-socket.ts | cyberdeck-app core |
- * | D Team socket (aux) | Legacy pairing UX only; queue sync | survey-team-socket.client.ts | cyberdeck-app core |
+ * | D Team socket (aux) | Deprecated legacy pairing hints | survey-team-socket.client.ts | cyberdeck-app core |
  *
  * Rules before adding features:
  * 1. New connect orchestration → SurveyAutoPairHost + events (survey-hub-connect-events.ts).
@@ -64,7 +59,6 @@
  * ────────────────────────────────────────────────────────────────────────────────
  */
 
-import { resolveSurveyCyberdeckShell } from "@/lib/electron/desktop-install.client";
 import { isSurveyHttpsPairBlocked } from "@/lib/cyberdeck/survey-pairing-shared.client";
 
 /** Survey transport ids — for logging/probes; Hub orchestrates A+B+C. */
@@ -74,7 +68,7 @@ export const SURVEY_TRANSPORT_LABELS: Record<SurveyTransportId, string> = {
   "direct-http": "Direct HTTP pair (Echo LAN/localhost)",
   "cloud-relay": "Cloud relay (HTTPS / cross-network)",
   "mirage-hub-ws": "Mirage hub WebSocket (PowerFist ↔ Mirage)",
-  "team-socket-aux": "Team socket (legacy pairing hints only)",
+  "team-socket-aux": "Team socket (deprecated legacy pairing hints)",
 };
 
 /**
@@ -89,23 +83,6 @@ export function resolvePreferredSurveyPairTransport(): Exclude<
     return "cloud-relay";
   }
   return isSurveyHttpsPairBlocked() ? "cloud-relay" : "direct-http";
-}
-
-/** Legacy LAN/Tailscale/relay pairing UI. Default: desktop + localhost only. */
-export function isSurveyLegacyPairingEnabled(): boolean {
-  if (typeof window === "undefined") {
-    return process.env.NEXT_PUBLIC_SURVEY_LEGACY_PAIRING === "1";
-  }
-  try {
-    const override = window.localStorage.getItem("survey-legacy-pairing");
-    if (override === "1") return true;
-    if (override === "0") return false;
-  } catch {
-    /* ignore */
-  }
-  if (process.env.NEXT_PUBLIC_SURVEY_LEGACY_PAIRING === "1") return true;
-  if (process.env.NEXT_PUBLIC_SURVEY_LEGACY_PAIRING === "0") return false;
-  return resolveSurveyCyberdeckShell().canDirectPairEcho;
 }
 
 /** When true, [SURVEY DBG] lines are mirrored into MUTHUR chat. Default off. */

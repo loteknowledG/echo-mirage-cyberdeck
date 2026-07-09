@@ -1,15 +1,13 @@
 "use client";
 
 import { fetchPowerfistQrSession, readPowerfistRemoteCredentials } from "@/lib/cyberdeck/survey-hub-socket";
-import { isSurveyLegacyPairingEnabled } from "@/lib/cyberdeck/survey-boundary";
 import {
   linkFromBool,
   type SurveyTeamStatus,
 } from "@/lib/cyberdeck/survey-team-status";
 import {
-  fetchEchoRemoteSurveyStatusClient,
   fetchEchoSurveyStatus,
-  fetchEchoSurveyLinkStatus,
+  fetchEchoRemoteSurveyStatusClient,
   normalizePairedMirages,
   readSurveyMiragePairCredentials,
   readSurveyPowerfistPairCredentials,
@@ -22,30 +20,6 @@ function formatMirageLinkDetail(mirages: { nodeId: string }[]): string {
   return `${mirages.length} linked · ${mirages.map((mirage) => mirage.nodeId.slice(0, 8)).join(", ")}…`;
 }
 
-async function isEchoRoleLinkActive(
-  role: "mirage" | "powerfist",
-  creds: {
-    echoHost: string;
-    httpPort: number;
-    echoNodeId: string;
-    sessionEpoch: number;
-    nodeId?: string;
-    deviceId?: string;
-  },
-): Promise<boolean | null> {
-  const status = await fetchEchoSurveyLinkStatus({
-    echoNodeId: creds.echoNodeId,
-    role,
-    sessionEpoch: creds.sessionEpoch ?? 0,
-    nodeId: role === "mirage" ? creds.nodeId : undefined,
-    deviceId: role === "powerfist" ? creds.deviceId : undefined,
-    echoHost: creds.echoHost,
-    httpPort: creds.httpPort,
-  });
-  if (!status.ok) return null;
-  return status.active;
-}
-
 function formatPowerfistLinkDetail(deviceId: string, echoHost?: string | null): string {
   const prefix = echoHost ? `${echoHost} · ` : "";
   return `${prefix}device ${deviceId.slice(0, 8)}…`;
@@ -54,12 +28,11 @@ function formatPowerfistLinkDetail(deviceId: string, echoHost?: string | null): 
 async function fetchAuthoritativeEchoStatus(input: {
   echoHost: string | null;
   echoHttpPort: number;
-  legacyPairing: boolean;
 }): Promise<EchoSurveyStatus | null> {
   const echoLocal = await fetchEchoSurveyStatus();
   if (echoLocal.ok) return echoLocal;
 
-  if (!input.legacyPairing || !input.echoHost) return null;
+  if (!input.echoHost) return null;
 
   const remote = await fetchEchoRemoteSurveyStatusClient(input.echoHost, input.echoHttpPort);
   return remote.ok ? remote : null;
@@ -67,14 +40,13 @@ async function fetchAuthoritativeEchoStatus(input: {
 
 /** Single probe used by team status UI and hub connect guards. */
 export async function probeSurveyTeamStatus(): Promise<SurveyTeamStatus> {
-  const legacyPairing = isSurveyLegacyPairingEnabled();
   const mirageCreds = readSurveyMiragePairCredentials();
   const powerfistCreds = readSurveyPowerfistPairCredentials();
   const echoHost = mirageCreds?.echoHost ?? powerfistCreds?.echoHost ?? null;
   const echoHttpPort = mirageCreds?.httpPort ?? powerfistCreds?.httpPort ?? 3050;
 
-  let echoMirage = linkFromBool(false, "Enter Mirage code on this machine.");
-  let echoPowerfist = linkFromBool(false, "Enter PowerFist code on the phone.");
+  let echoMirage = linkFromBool(false, "Waiting for Survey Hub to link Mirage.");
+  let echoPowerfist = linkFromBool(false, "Waiting for Survey Hub to link PowerFist.");
   let miragePowerfist = linkFromBool(
     false,
     "Enter Mirage hub code on PowerFist tab, or scan hub QR.",
@@ -83,7 +55,6 @@ export async function probeSurveyTeamStatus(): Promise<SurveyTeamStatus> {
   const authoritative = await fetchAuthoritativeEchoStatus({
     echoHost,
     echoHttpPort,
-    legacyPairing,
   });
 
   if (authoritative) {
@@ -97,30 +68,6 @@ export async function probeSurveyTeamStatus(): Promise<SurveyTeamStatus> {
           formatPowerfistLinkDetail(authoritative.pairedPowerfist.deviceId, authoritative.echoHost),
         )
       : linkFromBool(false, "Waiting for PowerFist code.");
-  }
-
-  if (legacyPairing && mirageCreds) {
-    const linkActive = await isEchoRoleLinkActive("mirage", mirageCreds);
-    if (linkActive === false) {
-      echoMirage = linkFromBool(false, "Re-enter Mirage code — Echo session may have reset.");
-    } else {
-      echoMirage = linkFromBool(
-        echoMirage.state === "linked" || linkActive === true,
-        `${mirageCreds.echoHost} · node ${mirageCreds.nodeId.slice(0, 8)}…`,
-      );
-    }
-  }
-
-  if (legacyPairing && powerfistCreds) {
-    const linkActive = await isEchoRoleLinkActive("powerfist", powerfistCreds);
-    if (linkActive === false) {
-      echoPowerfist = linkFromBool(false, "Re-enter PowerFist code on the phone.");
-    } else {
-      echoPowerfist = linkFromBool(
-        echoPowerfist.state === "linked" || linkActive === true,
-        formatPowerfistLinkDetail(powerfistCreds.deviceId, powerfistCreds.echoHost),
-      );
-    }
   }
 
   const pfSession = await fetchPowerfistQrSession();

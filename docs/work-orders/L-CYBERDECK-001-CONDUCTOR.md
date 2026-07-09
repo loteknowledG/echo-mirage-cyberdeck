@@ -1,6 +1,6 @@
 # L-CYBERDECK-001 — Conductor Status Board
 
-**Updated:** 2026-07-09 (P8.2 merged; P8.3 judicial PASS)
+**Updated:** 2026-07-09 (P8.3 merged; P8.4 judicial PASS — **P8 complete**)
 
 ---
 
@@ -8,10 +8,19 @@
 
 | Phase | Implementer | Judicial | Notes |
 |-------|-------------|----------|-------|
-| **P7** | Done | **PASS** | P7.1–P7.4 merged |
-| **P8.1** | Done | **PASS** | PR #59 **MERGED** `e1e1475` |
-| **P8.2** | Done | **PASS** | PR #60 **MERGED** `c0b548d` |
-| **P8.3** | Done | **PASS** | [JP-P8.3](../verifications/JP-L-CYBERDECK-001-P8.3.md) — PR pending — dead shims deleted |
+| **P7** | Done | **PASS** | Route **4 lines** |
+| **P8** | Done | **PASS** | P8.1–P8.4 — Survey rename cleanup **complete** |
+
+---
+
+## P8 summary
+
+| Slice | Deliverable | Status |
+|-------|-------------|--------|
+| P8.1 | `SurveyMission*` types only | **MERGED** #59 |
+| P8.2 | `survey-hub-socket.ts` canonical | **MERGED** #60 |
+| P8.3 | Dead pane/embed shims deleted | **MERGED** #61 |
+| P8.4 | Legacy pairing UI removed | PR pending |
 
 ---
 
@@ -19,9 +28,8 @@
 
 | Pos | Slice | PR | Status |
 |----:|-------|-----|--------|
-| — | P8.2 | [#60](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/60) | **MERGED** `c0b548d` |
-| **1** | **P8.3** | — | delete dead pane shims — **MERGE** |
-| 2 | P8.4 | — | legacy pairing UI removal — **HEAD** |
+| — | P8.3 | [#61](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/61) | **MERGED** `b82f480` |
+| **1** | **P8.4** | — | legacy pairing removal — **MERGE** |
 
 ---
 
@@ -29,7 +37,7 @@
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Developer agent** | Open P8.3 PR; after merge start **P8.4** legacy pairing UI removal |
+| 1 | **Developer agent** | Open P8.4 PR; after merge close L-CYBERDECK-001 P8 track |
 | 2 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
@@ -38,5 +46,5 @@
 
 | Date | Decision |
 |------|----------|
-| 2026-07-09 | P8.2 merged — PR #60 `c0b548d`; survey-hub-socket canonical |
-| 2026-07-09 | P8.3 judicial PASS — powerfist-deck-embed + load-cyberdeck-pane deleted |
+| 2026-07-09 | P8.3 merged — PR #61 `b82f480` |
+| 2026-07-09 | P8.4 judicial PASS — legacy pairing UI removed; **P8 complete** |

@@ -12,7 +12,6 @@ import {
 import { SurveyDesktopInstallPanel } from "@/components/cyberdeck/survey-desktop-install-panel";
 import { SurveyEchoPane } from "@/components/cyberdeck/survey-echo-pane";
 import { SurveyMiragePane } from "@/components/cyberdeck/survey-mirage-pane";
-import { SurveyMiragePairingDock } from "@/components/cyberdeck/survey-mirage-pairing-dock";
 import { SurveyPowerfistPane } from "@/components/cyberdeck/survey-powerfist-pane";
 import { SurveyTeamStatusPanel } from "@/components/cyberdeck/survey-team-status-panel";
 import { SurveyHubMiragePowerfistAutoRestore } from "@/components/cyberdeck/survey-hub-mirage-powerfist-auto-restore";
@@ -55,7 +54,6 @@ export function CyberdeckSurveyPaneBody() {
         {!powerfistDeckMode ? (
           <>
             {isSurveyHubEnabled() ? <SurveyHubPanel /> : <SurveyLegacyNotice />}
-            {!isSurveyHubEnabled() ? <SurveyMiragePairingDock /> : null}
           </>
         ) : null}
         {powerfistDeckMode ? null : (
