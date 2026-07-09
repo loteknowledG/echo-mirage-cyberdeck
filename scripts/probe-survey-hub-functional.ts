@@ -353,20 +353,24 @@ function probeCyberdeckAppBoundary(): void {
     "cyberdeck-app must not import survey-pairing-client",
   );
   assert.ok(
-    source.includes("survey-muthur-connect.client"),
-    "cyberdeck-app must use survey-muthur-connect.client",
+    !source.includes("powerfist-remote-socket"),
+    "cyberdeck-app must not import powerfist-remote-socket",
   );
   assert.ok(
-    source.includes("useSurveyMuthurArchive"),
-    "cyberdeck-app must use useSurveyMuthurArchive hook",
+    source.includes("survey-hub-host"),
+    "cyberdeck-app must use SurveyHubHost",
+  );
+  assert.ok(
+    source.includes("use-powerfist-deck-socket"),
+    "cyberdeck-app must use usePowerfistDeckSocket",
   );
   assert.ok(
     source.includes("useSurveyMuthurMissionHandlers"),
     "cyberdeck-app must use useSurveyMuthurMissionHandlers hook",
   );
   assert.ok(
-    source.includes("survey-tab-lifecycle.client"),
-    "cyberdeck-app must use survey-tab-lifecycle.client",
+    source.includes("survey-tab-lifecycle"),
+    "cyberdeck-app must use survey-tab-lifecycle bridge",
   );
 }
 

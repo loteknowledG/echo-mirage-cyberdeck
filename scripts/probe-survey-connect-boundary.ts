@@ -37,9 +37,14 @@ function main(): void {
   assertNoImport(cyberdeckApp, "survey-pairing-client", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "survey-connect-request.client", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "requestSurveyHubConnectAndWait", "cyberdeck-app");
-  assertHasImport(cyberdeckApp, "survey-muthur-connect.client", "cyberdeck-app");
-  assertHasImport(cyberdeckApp, "survey-tab-lifecycle.client", "cyberdeck-app");
-  assertHasImport(cyberdeckApp, "useSurveyMuthurArchive", "cyberdeck-app");
+  assertNoImport(cyberdeckApp, "powerfist-remote-socket", "cyberdeck-app");
+  assertNoImport(cyberdeckApp, "powerfist-tool-override", "cyberdeck-app");
+  assertNoImport(cyberdeckApp, "survey-tab-lifecycle.client", "cyberdeck-app");
+  assertNoImport(cyberdeckApp, "useSurveyMuthurArchive", "cyberdeck-app");
+  assertNoImport(cyberdeckApp, "SurveyAutoPairHost", "cyberdeck-app");
+  assertHasImport(cyberdeckApp, "survey-hub-host", "cyberdeck-app");
+  assertHasImport(cyberdeckApp, "use-powerfist-deck-socket", "cyberdeck-app");
+  assertHasImport(cyberdeckApp, "survey-tab-lifecycle", "cyberdeck-app");
   assertHasImport(cyberdeckApp, "useSurveyMuthurMissionHandlers", "cyberdeck-app");
 
   const connectRequest = read("src/lib/cyberdeck/survey-connect-request.client.ts");
@@ -60,6 +65,13 @@ function main(): void {
   assertHasImport(autoPairHost, "isSurveyTeamTripleLinked", "SurveyAutoPairHost");
   assertNoImport(autoPairHost, "isSurveyTripleLinked", "SurveyAutoPairHost");
   assertHasImport(autoPairHost, "runSurveyHubConnect", "SurveyAutoPairHost");
+
+  const surveyHubHost = read("src/features/cyberdeck/survey/survey-hub-host.tsx");
+  assertHasImport(surveyHubHost, "useSurveyMuthurArchive", "SurveyHubHost");
+  assertHasImport(surveyHubHost, "SurveyAutoPairHost", "SurveyHubHost");
+
+  const powerfistDeckSocket = read("src/features/cyberdeck/survey/use-powerfist-deck-socket.ts");
+  assertHasImport(powerfistDeckSocket, "powerfist-remote-socket", "use-powerfist-deck-socket");
 
   const hubPanel = read("src/components/cyberdeck/survey-hub-panel.tsx");
   assertNoImport(hubPanel, "runSurveyHubConnect", "SurveyHubPanel");
