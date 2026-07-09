@@ -48,5 +48,5 @@ probe:survey-hub PASS
 ## Sign-off
 
 - [x] Judicial PASS
-- [ ] Merge to `main`
+- [x] Merge to `main`
 - [ ] **P8.3 HEAD** (delete dead embed/pane loaders)
