@@ -62,12 +62,12 @@ export type GatewayColumnProps = {
   modelID: string;
   hasProviderAuth: boolean;
   providerConnectionLabel: string;
-  providerModelFetchStatus: string;
+  providerModelFetchStatus: ProviderLinkStatus;
   credentialReplaceProvider: string | null;
   gatewayKeyDraft: string;
   onGatewayKeyDraftChange: (value: string) => void;
   rateLimitedProviders: Set<string>;
-  modelFetchStatusByProvider: Record<string, string>;
+  modelFetchStatusByProvider: Record<string, ProviderLinkStatus>;
   modelHealthByProvider: Record<string, Record<string, string>>;
   probeInFlightByProvider: Record<string, string>;
   providerHasKey: (providerId: string) => boolean;
@@ -176,7 +176,7 @@ export const GatewayColumn = forwardRef<HTMLDivElement, GatewayColumnProps>(func
             {providers.map((p) => {
               const selected = activeProvider === p.id;
               const kbHover = providerKeyboardHighlightId === p.id;
-              const linkStatus = (modelFetchStatusByProvider[p.id] || "idle") as ProviderLinkStatus;
+              const linkStatus: ProviderLinkStatus = modelFetchStatusByProvider[p.id] ?? "idle";
               const tone = resolveProviderVisualTone({
                 hasKey: providerHasKey(p.id),
                 status: linkStatus,
