@@ -61,13 +61,6 @@ import { revokeOperatorBlobUrl } from "@/lib/operator-binary-preview";
 import { resolveOperatorAssetSurface } from "@/lib/operator-file-surface";
 import { isDocumentEditIntent, isOperatorPaneEditRequest } from "@/lib/muthur/document-edit-intent";
 import {
-  applyMuthurOperatorEdits,
-  parseOperatorEditsHeader,
-  pathsReferToSameOperatorFile,
-  reloadOperatorDocumentFromWorkspacePath,
-  waitForOperatorDocumentReady,
-} from "@/lib/operator-muthur-edit";
-import {
   formatMuthurLiveStreamDisplay,
   MUTHUR_UPLINK_PREPARING,
   resolveMuthurCommittedDisplayText,
@@ -119,7 +112,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
 import { CyberdeckScrollbarHost } from "@/components/cyberdeck/cyberdeck-scrollbar-host";
-import { SurveyAutoPairHost } from "@/components/cyberdeck/survey-auto-pair-host";
+import { SurveyHubHost } from "@/features/cyberdeck/survey/survey-hub-host";
+import { usePowerfistDeckSocket } from "@/features/cyberdeck/survey/use-powerfist-deck-socket";
+import {
+  notifySurveyTabClosed,
+  notifySurveyTabsCleared,
+} from "@/features/cyberdeck/survey/survey-tab-lifecycle";
 import { CyberdeckLayoutShell } from "@/features/cyberdeck/layout/cyberdeck-layout-shell";
 import { useMobileCyberdeckLayout } from "@/features/cyberdeck/layout/use-mobile-cyberdeck-layout";
 import { CustomTabPaneRenderer } from "@/features/cyberdeck/workspace/custom-tab-pane-renderer";
@@ -169,22 +167,6 @@ import {
 } from "@/lib/cyberdeck/audio-gate";
 import { useSilentModeAudioGateSync } from "@/lib/cyberdeck/use-silent-mode-audio-gate-sync";
 import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
-import {
-  POWERFIST_STACK_CHANNEL,
-  POWERFIST_STACK_PUSH_EVENT,
-  type PowerFistStackCommand,
-} from "@/lib/cyberdeck/powerfist-events";
-import { connectPowerfistDeckSocket, fetchPowerfistDeckConnect } from "@/lib/cyberdeck/powerfist-remote-socket";
-import { appendSurveyChatMessage } from "@/lib/cyberdeck/survey-chat";
-import {
-  executeSurveyHubConnectForMuthur,
-  surveyAutoConnectFailureMessage,
-} from "@/lib/cyberdeck/survey-muthur-connect.client";
-import {
-  terminateSurveySessionWhenTabClosed,
-  terminateSurveySessionWhenTabsCleared,
-} from "@/lib/cyberdeck/survey-tab-lifecycle.client";
-import { useSurveyMuthurArchive } from "@/features/cyberdeck/hooks/use-survey-muthur-archive";
 import { useSurveyMuthurMissionHandlers } from "@/features/cyberdeck/hooks/use-survey-muthur-mission-handlers";
 import { useMuthurChatState } from "@/features/cyberdeck/muthur/use-muthur-chat-state";
 import { useMuthurSendIntents } from "@/features/cyberdeck/muthur/use-muthur-send-intents";
@@ -216,7 +198,6 @@ import {
 } from "@/features/cyberdeck/workspace/custom-tab-model";
 import {
   buildCyberdeckChatHistory,
-  formatCodingVerifySystemLine,
   getOperatorFileKind,
   isEditableOperatorFile,
   parseCodingVerifyHeader,
@@ -225,7 +206,6 @@ import {
   contextMenuTargetIsTextField,
   type DroppedOperatorAsset,
 } from "@/features/cyberdeck/muthur/coding-verify-format";
-import { runPowerfistToolOverride } from "@/lib/cyberdeck/powerfist-tool-override";
 import { loadIdentityBundle } from "@/lib/identity/load-identity";
 import type { Identity } from "@/lib/identity/identity-types";
 import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration";
@@ -1867,7 +1847,7 @@ const operatorWorkspace = useOperatorWorkspaceState({
   const clearSavedCustomTabState = useCallback(() => {
     const tabs = useCyberdeckTabStore.getState().customTabs;
     const removedCount = tabs.length;
-    terminateSurveySessionWhenTabsCleared(tabs);
+    notifySurveyTabsCleared(tabs);
     useCyberdeckTabStore.getState().setCustomTabs([]);
     useCyberdeckTabStore.setState({ mountedCustomTabIds: [] });
     useCyberdeckTabStore.getState().setActiveCustomTabId(null);
@@ -1970,13 +1950,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
   const appendMuthurAssistantMessage = useCallback((text: string) => {
     setMessagesRaw((prev) => [...prev, { role: "assistant", text }]);
   }, [setMessagesRaw]);
-
-  useSurveyMuthurArchive({
-    archiveMuthurHistoryLine,
-    appendAssistantMessage: appendMuthurAssistantMessage,
-    pinMuthurChatToBottom,
-    focusMessageScroll: () => messageScrollRef.current?.focus({ preventScroll: true }),
-  });
 
   useEffect(() => {
     if (isStreaming && isAudioAllowed()) {
@@ -2876,7 +2849,7 @@ const operatorWorkspace = useOperatorWorkspaceState({
       mountedCustomTabIds: state.mountedCustomTabIds.filter((id) => id !== activeCustomTabId),
     }));
     useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-    terminateSurveySessionWhenTabClosed(closingTab?.kind);
+    notifySurveyTabClosed(closingTab?.kind);
     playDeckSystemSound("click", 0.02);
   }, [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
 
@@ -3170,111 +3143,12 @@ const operatorWorkspace = useOperatorWorkspaceState({
     sendMuthurPrompt: sendSurveyMuthurPrompt,
   });
 
-  useEffect(() => {
-    const pushToChat = async (detail: PowerFistStackCommand | undefined) => {
-      if (!detail) return;
-
-      const toolOverride = detail.toolOverride;
-      if (toolOverride) {
-        const cardLine = detail.message.trim() || `POWERFIST OVERRIDE // ${detail.card.title}`;
-        setMessages((prev) => [...prev, { role: "user", text: cardLine }]);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: `POWERFIST OVERRIDE // ${detail.card.title} // ${toolOverride.name}`,
-          },
-        ]);
-
-        const result = await runPowerfistToolOverride(toolOverride, detail.composerSupplement);
-        if (!result.ok) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "system",
-              text: `TOOL FAILURE // ${result.error || result.text || toolOverride.name}`,
-            },
-          ]);
-          return;
-        }
-
-        setMessages((prev) => [...prev, { role: "assistant", text: result.text.trim() }]);
-
-        if (result.operatorOpenFile) {
-          const opened = await openWorkspaceFileInOperator(result.operatorOpenFile);
-          if (opened) {
-            flushMuthurObservation();
-            await waitForOperatorDocumentReady(3000);
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "system",
-                text: `OPERATOR OPEN // ${result.operatorOpenFile?.fileName} // ${result.operatorOpenFile?.filePath}`,
-              },
-            ]);
-          }
-        }
-
-        if (result.operatorEdits && result.operatorEdits.length > 0) {
-          setOperatorDocMode("edit");
-          const editResult = await applyMuthurOperatorEdits(result.operatorEdits);
-          if (editResult === "applied") {
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "system",
-                text: "OPERATOR EDIT // MUTHUR applied — Ctrl+Z to undo in the operator pane.",
-              },
-            ]);
-          }
-        }
-
-        if (result.codingVerify) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "system", text: formatCodingVerifySystemLine(result.codingVerify!) },
-          ]);
-        }
-        return;
-      }
-
-      const message = detail.message.trim();
-      if (!message) return;
-      void handleSend(message, { preserveSelectedSurface: true });
-    };
-    const handlePowerFistPush = (event: Event) => {
-      event.preventDefault();
-      void pushToChat((event as CustomEvent<PowerFistStackCommand>).detail);
-    };
-    const channel =
-      typeof BroadcastChannel === "undefined"
-        ? null
-        : new BroadcastChannel(POWERFIST_STACK_CHANNEL);
-    if (channel) {
-      channel.onmessage = (event: MessageEvent<PowerFistStackCommand>) => {
-        void pushToChat(event.data);
-      };
-    }
-    let deckSocket: ReturnType<typeof connectPowerfistDeckSocket> | null = null;
-    let cancelled = false;
-    void (async () => {
-      const pairing = await fetchPowerfistDeckConnect();
-      if (cancelled || !pairing.ok || !pairing.deckWsUrl) return;
-      deckSocket = connectPowerfistDeckSocket({
-        wsUrl: pairing.deckWsUrl,
-        onStackPush: (command) => {
-          void pushToChat(command);
-        },
-        onMissionSolve: handleSurveyMissionSolve,
-      });
-    })();
-    window.addEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(POWERFIST_STACK_PUSH_EVENT, handlePowerFistPush);
-      channel?.close();
-      deckSocket?.close();
-    };
+  usePowerfistDeckSocket({
+    setMessages,
+    setOperatorDocMode,
+    handleSend,
+    openWorkspaceFileInOperator,
+    onMissionSolve: handleSurveyMissionSolve,
   });
 
   const openOrFocusCallCenterTab = useCallback(() => {
@@ -3481,7 +3355,12 @@ const operatorWorkspace = useOperatorWorkspaceState({
       <DeckModeProvider mode={deckMode}>
       <CyberdeckScrollbarHost />
       <CyberdeckBootSequence />
-      <SurveyAutoPairHost />
+      <SurveyHubHost
+        archiveMuthurHistoryLine={archiveMuthurHistoryLine}
+        appendAssistantMessage={appendMuthurAssistantMessage}
+        pinMuthurChatToBottom={pinMuthurChatToBottom}
+        focusMessageScroll={() => messageScrollRef.current?.focus({ preventScroll: true })}
+      />
       <CyberdeckTabPersistence
         uiStateStorageKey={UI_STATE_STORAGE_KEY}
         workspaceHydrated={workspaceHydrated}
