@@ -5,11 +5,6 @@ import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, sta
 import { flushSync } from "react-dom";
 import { CopyIcon, DownloadIcon } from "@radix-ui/react-icons";
 import { art } from "@/lib/TerminalArt";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import type { CyberdeckVoiceTuning } from "@/lib/cyberdeck-voice-tuning";
 import type { Db8DeckSpeakLine } from "@/lib/db8-voice";
 import { selectMuthurFallbackVoice } from "@/voice/speakMuthur";
@@ -192,7 +187,8 @@ import { toast } from "sonner";
 import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
 import { CyberdeckScrollbarHost } from "@/components/cyberdeck/cyberdeck-scrollbar-host";
 import { SurveyAutoPairHost } from "@/components/cyberdeck/survey-auto-pair-host";
-import { MORPHISM_ZONE_REALMORPHISM } from "@/lib/cyberdeck/morphism-zones";
+import { CyberdeckLayoutShell } from "@/features/cyberdeck/layout/cyberdeck-layout-shell";
+import { useMobileCyberdeckLayout } from "@/features/cyberdeck/layout/use-mobile-cyberdeck-layout";
 import {
   CyberdeckMenuButton,
 } from "@/components/cyberdeck/cyberdeck-control-button";
@@ -634,23 +630,8 @@ export default function CyberdeckApp() {
   const [gatewayPaneContextMenu, setGatewayPaneContextMenu] = useState<{ x: number; y: number } | null>(
     null,
   );
-  const [isMobileLayout, setIsMobileLayout] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia("(max-width: 768px)").matches;
-  });
-  const [mobileContentSplit, setMobileContentSplit] = useState<number[]>([0.58, 0.42]);
-  const handleContentSplitSizesChange = useCallback((sizes: number[]) => {
-    setMobileContentSplit(sizes);
-  }, []);
-  const mirageHeaderCollapse = useMemo(() => {
-    if (!isMobileLayout || mobileContentSplit.length < 2) return 0;
-    const gatewayFraction = mobileContentSplit[1];
-    const collapseStart = 0.46;
-    const collapseEnd = 0.58;
-    if (gatewayFraction <= collapseStart) return 0;
-    if (gatewayFraction >= collapseEnd) return 1;
-    return (gatewayFraction - collapseStart) / (collapseEnd - collapseStart);
-  }, [isMobileLayout, mobileContentSplit]);
+  const { isMobileLayout, handleContentSplitSizesChange, mirageHeaderCollapse } =
+    useMobileCyberdeckLayout();
 
   const {
     providerKeyboardHighlightId,
@@ -3109,14 +3090,6 @@ export default function CyberdeckApp() {
   navRailContextRef.current = navRailContext;
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 768px)");
-    const apply = () => setIsMobileLayout(media.matches);
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
-  }, []);
-
-  useEffect(() => {
     const onFocusIn = (e: FocusEvent) => {
       if (navRailContextRef.current !== "tabs") return;
       const el = e.target as HTMLElement | null;
@@ -5358,20 +5331,10 @@ export default function CyberdeckApp() {
         }}
       />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-morphism={MORPHISM_ZONE_REALMORPHISM}>
-        <ResizablePanelGroup
-          key={isMobileLayout ? "mobile-vertical" : "desktop-horizontal"}
-          orientation={isMobileLayout ? "vertical" : "horizontal"}
-          memoryKey="cyberdeck-content-split-v2"
-          className="h-full min-h-0 min-w-0 flex-1"
-          onSizesChange={handleContentSplitSizesChange}
-        >
-          {/* COL 2 (flipped): main terminal / chat — Weyland col3 */}
-          <ResizablePanel
-            defaultSize={isMobileLayout ? 58 : 55}
-            minSize={0}
-            className="h-full min-h-0 overflow-hidden"
-          >
+        <CyberdeckLayoutShell
+          isMobileLayout={isMobileLayout}
+          onContentSplitSizesChange={handleContentSplitSizesChange}
+          chatColumn={
             <MuthurChatColumn
               ref={chatColumnRef}
               isMobileLayout={isMobileLayout}
@@ -5429,26 +5392,9 @@ export default function CyberdeckApp() {
               canSendInput={canSendInput}
               onStop={handleStop}
             />
-          </ResizablePanel>
-
-        <ResizableHandle
-          withHandle
-          stacked={isMobileLayout}
-          aria-label="Resize MUTHUR chat pane"
-          className={
-            isMobileLayout
-              ? "cyberdeck-chat-resizer !h-2 !min-h-2 !border-x-0 !border-y !border-[#141414] !bg-black hover:!border-emerald-500/50"
-              : "cyberdeck-chat-resizer !w-2 !min-w-2 !border-x-0 !border-l !border-[#141414] !bg-black hover:!border-emerald-500/50 before:absolute before:-inset-x-3 before:inset-y-0 before:content-['']"
           }
-        />
-
-        {/* COL 3 (flipped): gateway nav — Weyland col2 */}
-        <ResizablePanel
-          defaultSize={isMobileLayout ? 42 : 45}
-          minSize={0}
-          className="h-full min-h-0 overflow-hidden"
-        >
-          <GatewayColumn
+          gatewayColumn={
+            <GatewayColumn
             ref={gatewayColumnRef}
             networkActivityActive={networkActivityActive}
             isMarkdownDragOver={isMarkdownDragOver}
@@ -5583,9 +5529,8 @@ export default function CyberdeckApp() {
               </div>
             </CyberdeckFixedServerPane>
           </GatewayColumn>
-        </ResizablePanel>
-      </ResizablePanelGroup>
-        </div>
+          }
+        />
       </DeckModeProvider>
     </div>
   );
