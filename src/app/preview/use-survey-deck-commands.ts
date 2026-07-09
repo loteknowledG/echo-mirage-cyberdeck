@@ -7,7 +7,7 @@ import {
   POWERFIST_STACK_PUSH_EVENT,
   type PowerFistStackCommand,
 } from "@/lib/cyberdeck/powerfist-events";
-import type { connectPowerfistRemoteSocket } from "@/lib/cyberdeck/powerfist-remote-socket";
+import type { connectPowerfistRemoteSocket } from "@/lib/cyberdeck/survey-hub-socket";
 import {
   executeSurveyDeckCommand,
   resolveSurveyEchoDeckContext,

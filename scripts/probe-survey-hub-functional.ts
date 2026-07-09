@@ -357,6 +357,10 @@ function probeCyberdeckAppBoundary(): void {
     "cyberdeck-app must not import powerfist-remote-socket",
   );
   assert.ok(
+    !source.includes("survey-hub-socket"),
+    "cyberdeck-app must not import survey-hub-socket",
+  );
+  assert.ok(
     source.includes("survey-hub-host"),
     "cyberdeck-app must use SurveyHubHost",
   );
@@ -427,7 +431,7 @@ function probeSurveyTransportDecisionTree(): void {
   assert.ok(boundary.includes("Three transports (decision tree)"), "boundary documents transport tree");
   assert.ok(boundary.includes("cloud relay"), "boundary documents cloud relay path");
   assert.ok(boundary.includes("survey-team-socket.client.ts"), "boundary documents team socket as auxiliary");
-  assert.ok(boundary.includes("powerfist-remote-socket"), "boundary documents mirage hub WS");
+  assert.ok(boundary.includes("survey-hub-socket"), "boundary documents mirage hub WS");
   assert.ok(boundary.includes("resolvePreferredSurveyPairTransport"), "boundary exports transport resolver");
   assert.ok(boundary.includes("SurveyAutoPairHost"), "boundary ties orchestration to AutoPairHost");
 }

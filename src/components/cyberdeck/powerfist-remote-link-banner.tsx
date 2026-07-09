@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { PowerfistSocketStatus } from "@/lib/cyberdeck/powerfist-remote-socket";
+import type { PowerfistSocketStatus } from "@/lib/cyberdeck/survey-hub-socket";
 import {
   SURVEY_ECHO_DISPLAY,
   SURVEY_MIRAGE_DISPLAY,

@@ -38,6 +38,7 @@ function main(): void {
   assertNoImport(cyberdeckApp, "survey-connect-request.client", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "requestSurveyHubConnectAndWait", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "powerfist-remote-socket", "cyberdeck-app");
+  assertNoImport(cyberdeckApp, "survey-hub-socket", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "powerfist-tool-override", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "survey-tab-lifecycle.client", "cyberdeck-app");
   assertNoImport(cyberdeckApp, "useSurveyMuthurArchive", "cyberdeck-app");
@@ -71,7 +72,7 @@ function main(): void {
   assertHasImport(surveyHubHost, "SurveyAutoPairHost", "SurveyHubHost");
 
   const powerfistDeckSocket = read("src/features/cyberdeck/survey/use-powerfist-deck-socket.ts");
-  assertHasImport(powerfistDeckSocket, "powerfist-remote-socket", "use-powerfist-deck-socket");
+  assertHasImport(powerfistDeckSocket, "survey-hub-socket", "use-powerfist-deck-socket");
 
   const hubPanel = read("src/components/cyberdeck/survey-hub-panel.tsx");
   assertNoImport(hubPanel, "runSurveyHubConnect", "SurveyHubPanel");

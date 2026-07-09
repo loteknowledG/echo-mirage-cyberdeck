@@ -1,6 +1,6 @@
 "use client";
 
-import { fetchPowerfistQrSession, readPowerfistRemoteCredentials } from "@/lib/cyberdeck/powerfist-remote-socket";
+import { fetchPowerfistQrSession, readPowerfistRemoteCredentials } from "@/lib/cyberdeck/survey-hub-socket";
 import { isSurveyLegacyPairingEnabled } from "@/lib/cyberdeck/survey-boundary";
 import {
   linkFromBool,

@@ -36,7 +36,7 @@
  * │        └─ Third link (Mirage ↔ PowerFist) always:
  * │            → TRANSPORT C: Mirage hub / PowerFist remote socket
  * │               fetchPowerfistQrSession · completePowerfistPairFromPin · WS to Mirage
- * │               Modules: powerfist-remote-socket.ts, survey-mirage-hub-panel (legacy UI)
+ * │               Modules: survey-hub-socket.ts, survey-mirage-hub-panel (legacy UI)
  * │
  * └─ NO + isSurveyLegacyPairingEnabled()?
  *     → Frozen legacy UI only (survey-pair-pin-form, mirage pairing dock)
@@ -52,7 +52,7 @@
  * |-----------|------|-----------------|-------------------|
  * | A Direct LAN/localhost HTTP | Desktop cyberdeck, Echo reachable | survey-pair-enter.client, survey-echo-status.client | cyberdeck-app core |
  * | B Cloud relay | isSurveyHttpsPairBlocked() or Hub LAN fallback | survey-relay.client, survey-cloud-relay.server | cyberdeck-app core |
- * | C Mirage hub WS | powerfist-hub step after Echo links | powerfist-remote-socket.ts | cyberdeck-app core |
+ * | C Mirage hub WS | powerfist-hub step after Echo links | survey-hub-socket.ts | cyberdeck-app core |
  * | D Team socket (aux) | Legacy pairing UX only; queue sync | survey-team-socket.client.ts | cyberdeck-app core |
  *
  * Rules before adding features:
