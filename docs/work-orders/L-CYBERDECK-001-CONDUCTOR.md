@@ -55,7 +55,7 @@ Probe: **PASS** · `main` @ `dcae63c` (PR #48 merged)
 | # | Owner | Action |
 |---|-------|--------|
 | 1 | **Developer** | Prep P3.2 work order — branch from `main` @ `dcae63c` |
-| 3 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
+| 2 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
 
