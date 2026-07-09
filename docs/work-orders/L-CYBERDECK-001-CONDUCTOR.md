@@ -19,7 +19,7 @@
 | **P2.5** | Done | **PASS** | [JP-P2.5](../verifications/JP-L-CYBERDECK-001-P2.5.md) — [PR #47](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/47) **MERGED** `f084b5f` — **6,445 lines** — **P2 complete** |
 | **P3.1** | Done | **PASS** | [JP-P3.1](../verifications/JP-L-CYBERDECK-001-P3.1.md) — [PR #48](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/48) **MERGED** `dcae63c` — **5,878 lines** |
 | **P3.2** | Done | **PASS** | [JP-P3.2](../verifications/JP-L-CYBERDECK-001-P3.2.md) — [PR #49](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/49) **MERGED** `624f7d8` — **5,604 lines** — **P3 complete** |
-| **P4.1** | Done | **PASS** | [JP-P4.1](../verifications/JP-L-CYBERDECK-001-P4.1.md) — [PR #50](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/50) OPEN @ `4ddb19e` — **5,549 lines** — **P4 opened** (await merge) |
+| **P4.1** | Done | **PASS** | [JP-P4.1](../verifications/JP-L-CYBERDECK-001-P4.1.md) — [PR #50](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/50) **MERGED** `1375ca9` — **5,549 lines** — **P4 opened** |
 
 ---
 
@@ -30,7 +30,7 @@
 | `cyberdeck-app.tsx` lines | 5,604 | **5,549** | 5,549 |
 | Import lines | 125 | **125** | 125 |
 
-Probe: **PASS** · branch `cursor/extract-p4.1-layout-shell` @ `4ddb19e` (PR #50 OPEN)
+Probe: **PASS** · `main` @ `1375ca9` (PR #50 merged)
 
 **P4.1 win:** 5,604 → 5,549 (−55 lines). Pane bodies remain in app by design.
 
@@ -43,8 +43,8 @@ Probe: **PASS** · branch `cursor/extract-p4.1-layout-shell` @ `4ddb19e` (PR #50
 | — | P2.1–P2.5 | merged | **MERGED** |
 | — | P3.1 | [#48](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/48) | **MERGED** `dcae63c` |
 | **1** | **P3.2** | [#49](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/49) | **MERGED** `624f7d8` |
-| **2** | **P4.1** | [#50](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/50) | layout shell — **PASS** (await merge) |
-| **3** | **P4.2** | — | custom tab / workspace chrome — **NEXT** |
+| **2** | **P4.1** | [#50](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/50) | **MERGED** `1375ca9` |
+| **3** | **P4.2** | — | custom tab / workspace chrome — **HEAD** |
 | 5 | P5.1 | — | operator pane |
 | 6 | P6.1 | — | survey hub |
 | 7 | P7.1 | — | chat route split |
@@ -56,9 +56,8 @@ Probe: **PASS** · branch `cursor/extract-p4.1-layout-shell` @ `4ddb19e` (PR #50
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Human / conductor** | Merge [PR #50](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/50) — [JP-P4.1](../verifications/JP-L-CYBERDECK-001-P4.1.md) PASS |
-| 2 | **Developer agent** | Prep **P4.2** work order after merge |
-| 3 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
+| 1 | **Developer agent** | Prep **P4.2** work order — branch from `main` @ `1375ca9` |
+| 2 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
 
@@ -80,4 +79,4 @@ Probe: **PASS** · branch `cursor/extract-p4.1-layout-shell` @ `4ddb19e` (PR #50
 |------|----------|
 | 2026-07-08 | P2.5 merged — PR #47 `f084b5f` on `main`; queue pops to **P3.1 HEAD** |
 | 2026-07-09 | P3.1 judicial PASS — [JP-P3.1](../verifications/JP-L-CYBERDECK-001-P3.1.md) — PR #48 — queue → **P3.2 HEAD** |
-| 2026-07-09 | P4.1 judicial PASS — [JP-P4.1](../verifications/JP-L-CYBERDECK-001-P4.1.md) — PR #50 — queue → **P4.2 NEXT** (await merge) |
+| 2026-07-09 | P4.1 merged — PR #50 `1375ca9` on `main`; **P4 opened**; queue → **P4.2 HEAD** |

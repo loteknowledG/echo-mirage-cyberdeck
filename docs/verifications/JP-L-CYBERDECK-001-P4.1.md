@@ -4,7 +4,7 @@
 **Phase:** P4.1 — Layout shell + mobile layout hook (D4.1, D4.2)  
 **Branch:** `cursor/extract-p4.1-layout-shell`  
 **PR:** [#50](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/50)  
-**Implementation commit:** `4ddb19e`  
+**Merge commit:** `1375ca9`  
 **Verify brief:** [VERIFY-L-CYBERDECK-001-P4.1](./VERIFY-L-CYBERDECK-001-P4.1.md)  
 **Status:** Judicially verified (PASS)  
 
@@ -46,7 +46,7 @@ New modules: `cyberdeck-layout-shell.tsx` (65 lines), `use-mobile-cyberdeck-layo
 
 | ID | Check | Result | Evidence |
 |----|-------|--------|----------|
-| V-P4.1-01 | Branch/PR/commit | PASS | `cursor/extract-p4.1-layout-shell` @ `4ddb19e`; PR #50 OPEN, MERGEABLE |
+| V-P4.1-01 | Branch/PR/commit | PASS | PR #50 **MERGED** `1375ca9` on `main` |
 | V-P4.1-02 | New modules | PASS | `use-mobile-cyberdeck-layout.ts`, `cyberdeck-layout-shell.tsx` present |
 | V-P4.1-03 | Layout removed from app | PASS | zero `Resizable*` / `matchMedia` / `mobileContentSplit` in app; hook + shell wired |
 | V-P4.1-04 | Probes + tsc | PASS | all exit 0 (see below) |
@@ -112,5 +112,5 @@ P4.1 manual smoke: PASS
 ## Sign-off
 
 - [x] Judicial PASS
-- [ ] PR merged (queue pop → **P4.2** unblocked)
-- [ ] **P4.2 HEAD**
+- [x] PR merged (queue pop → **P4.2** unblocked)
+- [x] **P4.2 HEAD**
