@@ -23,7 +23,7 @@
 | P9.3 | Operator observation + screen snapshot | **MERGED** [#66](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/66) |
 | P9.4 | Keyboard routing / gateway effects | **MERGED** [#67](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/67) |
 | P9.5 | Glyph channel subsystem | **MERGED** [#68](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/68) |
-| P9.6 | MUTHUR memory + identity bootstrap | PR pending |
+| P9.6 | MUTHUR memory + identity bootstrap | PR [#69](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/69) |
 | P9.7 | Custom tab surface / gateway wiring | Planned |
 
 ---
