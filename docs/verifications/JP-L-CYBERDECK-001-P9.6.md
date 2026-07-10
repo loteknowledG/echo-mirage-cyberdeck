@@ -53,5 +53,5 @@ probe:muthur-command-console PASS
 ## Sign-off
 
 - [x] Judicial PASS
-- [ ] Merge to `main`
+- [x] Merge to `main`
 - [ ] **P9.7 HEAD** (custom tab surface / gateway wiring)

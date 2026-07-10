@@ -1,6 +1,6 @@
 # L-CYBERDECK-001 — Conductor Status Board
 
-**Updated:** 2026-07-09 (P9.6 memory + identity hook — judicial PASS)
+**Updated:** 2026-07-09 (P9.7 gateway tabs hook — judicial PASS)
 
 ---
 
@@ -10,7 +10,7 @@
 |-------|-------------|----------|-------|
 | **P7** | Done | **PASS** | Route **4 lines** |
 | **P8** | Done | **PASS** | P8.1–P8.4 — Survey rename cleanup **complete** |
-| **P9** | In progress | **PASS** (P9.1–P9.6) | App **1,821 lines** |
+| **P9** | In progress | **PASS** (P9.1–P9.7) | App **1,449 lines** |
 
 ---
 
@@ -23,8 +23,9 @@
 | P9.3 | Operator observation + screen snapshot | **MERGED** [#66](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/66) |
 | P9.4 | Keyboard routing / gateway effects | **MERGED** [#67](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/67) |
 | P9.5 | Glyph channel subsystem | **MERGED** [#68](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/68) |
-| P9.6 | MUTHUR memory + identity bootstrap | PR [#69](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/69) |
-| P9.7 | Custom tab surface / gateway wiring | Planned |
+| P9.6 | MUTHUR memory + identity bootstrap | **MERGED** [#69](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/69) |
+| P9.7 | Custom tab surface / gateway wiring | PR pending |
+| P9.8 | Master JP + final ratchet (≤1,200 lines) | Planned |
 
 ---
 
@@ -32,8 +33,8 @@
 
 | Pos | Slice | PR | Status |
 |----:|-------|-----|--------|
-| **1** | **P9.6** | — | memory + identity hook — **OPEN PR** |
-| 2 | P9.5 | [#68](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/68) | **MERGED** |
+| **1** | **P9.7** | — | gateway tabs hook — **OPEN PR** |
+| 2 | P9.6 | [#69](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/69) | **MERGED** |
 
 ---
 
@@ -41,7 +42,7 @@
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Developer agent** | Open P9.6 PR; continue P9.7 after merge |
+| 1 | **Developer agent** | Open P9.7 PR; continue P9.8 after merge |
 | 2 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
@@ -50,5 +51,5 @@
 
 | Date | Decision |
 |------|----------|
-| 2026-07-09 | P9.5 merged — PR #68 — app **1,873 lines** |
-| 2026-07-09 | P9.6 judicial PASS — memory + identity hook; app **1,821 lines** |
+| 2026-07-09 | P9.6 merged — PR #69 — app **1,821 lines** |
+| 2026-07-09 | P9.7 judicial PASS — gateway tabs hook; app **1,449 lines** |

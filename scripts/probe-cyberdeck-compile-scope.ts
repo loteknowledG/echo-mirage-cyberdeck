@@ -10,9 +10,9 @@ import { resolve } from "node:path";
 
 const ROOT = process.cwd();
 
-/** P9.6 memory + identity bootstrap (2026-07). Lower in subsequent P9 PRs. */
-const MAX_CYBERDECK_APP_LINES = 1_850;
-const MAX_CYBERDECK_APP_IMPORTS = 85;
+/** P9.7 custom tab surface / gateway wiring (2026-07). Lower in P9.8 final ratchet. */
+const MAX_CYBERDECK_APP_LINES = 1_500;
+const MAX_CYBERDECK_APP_IMPORTS = 82;
 
 /** Heavy pane modules must stay behind pane-chunks / dynamic(), not cyberdeck-app. */
 const FORBIDDEN_STATIC_IMPORTS = [
