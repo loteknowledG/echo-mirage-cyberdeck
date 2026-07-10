@@ -10,9 +10,9 @@ import { resolve } from "node:path";
 
 const ROOT = process.cwd();
 
-/** P9.5 glyph channel extraction (2026-07). Lower in subsequent P9 PRs. */
-const MAX_CYBERDECK_APP_LINES = 1_900;
-const MAX_CYBERDECK_APP_IMPORTS = 89;
+/** P9.6 memory + identity bootstrap (2026-07). Lower in subsequent P9 PRs. */
+const MAX_CYBERDECK_APP_LINES = 1_850;
+const MAX_CYBERDECK_APP_IMPORTS = 85;
 
 /** Heavy pane modules must stay behind pane-chunks / dynamic(), not cyberdeck-app. */
 const FORBIDDEN_STATIC_IMPORTS = [

@@ -14,15 +14,6 @@ import {
 import { flushSync } from "react-dom";
 import { art } from "@/lib/TerminalArt";
 import {
-  clearMuthurMemory,
-  createEmptyMuthurMemory,
-  loadMuthurMemoryWithResult,
-  recordMuthurMemoryTurn,
-  saveMuthurMemory,
-  type MuthurMemoryState,
-} from "@/lib/muthur-memory";
-import { persistMuthurShipMemoryTurn } from "@/lib/muthur-ship-memory";
-import {
   OPERATOR_BROWSER_HOME_URL,
   looksLikeCaptchaBlock,
   messageReferencesLocalPath,
@@ -95,6 +86,7 @@ import { useCyberdeckHeap } from "@/features/cyberdeck/heap/use-cyberdeck-heap";
 import { useCyberdeckOperatorObservation } from "@/features/cyberdeck/observation/use-cyberdeck-operator-observation";
 import { useCyberdeckKeyboardNav } from "@/features/cyberdeck/keyboard/use-cyberdeck-keyboard-nav";
 import { useCyberdeckGlyphChannel } from "@/features/cyberdeck/glyph/use-cyberdeck-glyph-channel";
+import { useCyberdeckMemoryIdentity } from "@/features/cyberdeck/memory/use-cyberdeck-memory-identity";
 import { CyberdeckContextMenus } from "@/features/cyberdeck/workspace/cyberdeck-context-menus";
 import { useCustomTabBrowser } from "@/features/cyberdeck/workspace/use-custom-tab-browser";
 import { useRailTabContextMenu } from "@/features/cyberdeck/workspace/use-rail-tab-context-menu";
@@ -159,10 +151,6 @@ import {
   contextMenuTargetIsTextField,
   type DroppedOperatorAsset,
 } from "@/features/cyberdeck/muthur/coding-verify-format";
-import { loadIdentityBundle } from "@/lib/identity/load-identity";
-import type { Identity } from "@/lib/identity/identity-types";
-import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration";
-import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
@@ -390,12 +378,17 @@ export default function CyberdeckApp() {
     modelList,
   });
 
-  const [muthurMemory, setMuthurMemory] = useState<MuthurMemoryState>(() => createEmptyMuthurMemory());
-  const [muthurMemoryHydrated, setMuthurMemoryHydrated] = useState(false);
-  const [muthurMemoryLoadError, setMuthurMemoryLoadError] = useState<string | null>(null);
+  const {
+    muthurMemory,
+    setMuthurMemory,
+    muthurMemoryHydrated,
+    muthurMemoryLoadError,
+    muthurMemoryRef,
+    identity,
+    orchestration,
+  } = useCyberdeckMemoryIdentity();
+
   const [deckMode, setDeckMode] = useState<DeckMode>(() => loadDeckMode());
-  const [identity, setIdentity] = useState<Identity | null>(null);
-  const [orchestration, setOrchestration] = useState<OrchestrationBundle | null>(null);
 
   /** Escape from gateway → tab rail; Escape from tab rail → gateway. Arrows move highlight while on rail. */
   const [navRailContext, setNavRailContext] = useState<"gateway" | "tabs">("gateway");
@@ -414,7 +407,6 @@ export default function CyberdeckApp() {
     userMessage: string;
     options?: { preserveSelectedSurface?: boolean; surveyMission?: boolean };
   } | null>(null);
-  const muthurMemoryRef = useRef<MuthurMemoryState>(createEmptyMuthurMemory());
   const offlineAutoOpenedRef = useRef(false);
   const startupRailResolvedRef = useRef(false);
   const prevConnectionStateRef = useRef<"offline" | "connecting" | "connected">("offline");
@@ -577,50 +569,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
       dispose?.();
     };
   }, []);
-
-  useEffect(() => {
-    loadIdentityBundle().then((bundle) => {
-      setIdentity(bundle.identity);
-    });
-    loadOrchestrationBundle().then((bundle) => {
-      setOrchestration(bundle);
-    });
-  }, []);
-
-  const clearMuthurMemoryState = useCallback(async () => {
-    if (typeof window !== "undefined") {
-      const confirmed = window.confirm("Clear MUTHUR memory?");
-      if (!confirmed) return;
-    }
-
-    await clearMuthurMemory();
-    const fresh = createEmptyMuthurMemory();
-    muthurMemoryRef.current = fresh;
-    setMuthurMemory(fresh);
-    setMuthurMemoryHydrated(true);
-    toast.success("MUTHUR memory cleared");
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { state: loaded, error: loadErr } = await loadMuthurMemoryWithResult();
-      if (cancelled) return;
-      muthurMemoryRef.current = loaded;
-      setMuthurMemory(loaded);
-      setMuthurMemoryLoadError(loadErr);
-      setMuthurMemoryHydrated(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!muthurMemoryHydrated) return;
-    muthurMemoryRef.current = muthurMemory;
-    void saveMuthurMemory(muthurMemory);
-  }, [muthurMemory, muthurMemoryHydrated]);
 
   useEffect(() => {
     saveDeckMode(deckMode);
