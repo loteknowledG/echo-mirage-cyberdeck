@@ -1,5 +1,6 @@
 "use client";
 
+import { SurveyMirageExtCapturePanel } from "@/components/cyberdeck/survey-mirage-ext-capture-panel";
 import { SurveyMirageHubPanel } from "@/components/cyberdeck/survey-mirage-hub-panel";
 import { SurveyMirageCapturePreview } from "@/components/cyberdeck/survey-mirage-capture-preview";
 import { SurveyMirageItemSelectList } from "@/components/cyberdeck/survey-mirage-item-select-list";
@@ -26,16 +27,24 @@ export function SurveyMiragePane() {
   const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
 
   return (
-    <div className="flex flex-col gap-3 p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]">
+    <div
+      className="flex flex-col gap-3 p-4 font-mono text-[10px] tracking-[0.04em] text-[#707070]"
+      data-survey-role="mirage"
+      data-survey-runtime="browser"
+    >
       <SurveyMirageQueueTeamHost role="mirage" />
       <div>
-        <p className="text-fuchsia-300/90">{SURVEY_MODE_TITLE} // {SURVEY_MIRAGE_DISPLAY}</p>
+        <p className="text-fuchsia-300/90">
+          {SURVEY_MODE_TITLE} // {SURVEY_MIRAGE_DISPLAY} · mirage-browser
+        </p>
         <p className="mt-1 text-[9px] text-[#6a6a8a]">{SURVEY_MIRAGE_TAGLINE}</p>
       </div>
 
+      <SurveyMirageExtCapturePanel />
+
       {extension.lastSnapshot ? (
         <p className="rounded border border-emerald-500/40 bg-emerald-950/15 px-3 py-2 text-[8px] leading-relaxed text-[#8ab89a]">
-          Survey Satellite · received{" "}
+          echo-extension · last received{" "}
           <strong className="text-emerald-300/90">
             {extension.lastSnapshot.title || extension.lastSnapshot.url}
           </strong>
@@ -46,12 +55,7 @@ export function SurveyMiragePane() {
             </span>
           ) : null}
         </p>
-      ) : (
-        <p className="rounded border border-[#1c1c1c] bg-black/40 px-3 py-2 text-[8px] leading-relaxed text-[#5f5f5f]">
-          Survey Satellite extension — send active-tab text from Chrome; a receipt toast appears on
-          cyberdeck when it lands.
-        </p>
-      )}
+      ) : null}
 
       {!mirageLinked && !terminated ? (
         hubEnabled ? (

@@ -13,3 +13,12 @@ export type SurveyExtensionPageSnapshot = {
   capturedAt: string;
   source?: string;
 };
+
+/** Chrome tab row for mirage-browser picker (from echo-extension via echo-electron). */
+export type SurveyExtensionTabOption = {
+  tabId: number;
+  title: string;
+  url: string;
+  distinguisher: string;
+  label: string;
+};

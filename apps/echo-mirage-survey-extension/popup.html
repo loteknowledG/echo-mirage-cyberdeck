@@ -3,23 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Survey Satellite</title>
+    <title>echo-extension</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <header>
-      <h1>Survey Satellite</h1>
-      <p class="tagline">Echo Mirage · page recon</p>
+      <h1>echo-extension</h1>
+      <p class="tagline">copy · Chrome tab text · via echo-electron</p>
     </header>
-    <button id="send" type="button">Send active tab to Survey</button>
+    <button id="send" type="button">Send active tab (Phase 0 fallback)</button>
     <p id="status" class="status" role="status" aria-live="polite"></p>
     <p class="hint">
-      1. Keep Echo Mirage cyberdeck open in another tab.<br />
-      2. Browse a normal web page here (not the cyberdeck tab).<br />
-      3. Click Send — then <strong>switch to the cyberdeck tab</strong>. The green
-      receipt toast appears there (bottom-right), not on this Google tab.<br />
-      4. After updating the extension, reload it on chrome://extensions (need
-      v0.1.1+) and hard-refresh cyberdeck.
+      Phase 1: keep this extension loaded in Chrome. mirage-browser (Zen) lists tabs and captures via
+      echo-electron. Phase 0 button still pushes to a same-browser mirage tab if open.
     </p>
     <script type="module" src="popup.js"></script>
   </body>

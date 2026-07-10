@@ -24,7 +24,7 @@ export function createTrayManager(deps) {
       },
       { type: "separator" },
       {
-        label: "Quit Echo Satellite",
+        label: "Quit Echo Satellite (echo-electron)",
         click: () => quitApp(),
       },
     ]);
@@ -48,7 +48,7 @@ export function createTrayManager(deps) {
     const icon = resolveIcon();
     if (!icon) return;
     tray = new Tray(icon);
-    tray.setToolTip("Echo Satellite");
+    tray.setToolTip("Echo Satellite (echo-electron)");
     tray.setContextMenu(buildMenu());
     tray.on("click", () => showMainWindow());
     trayReady = true;

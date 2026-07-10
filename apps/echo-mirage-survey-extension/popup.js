@@ -17,7 +17,7 @@ sendButton?.addEventListener("click", async () => {
     }
     const title = result.title ? ` · ${result.title.slice(0, 48)}` : "";
     setStatus(
-      `Sent to cyberdeck (${result.delivered}/${result.mirageTabs})${title}. Switch to the Echo Mirage tab — green toast is bottom-right there.`,
+      `Sent (Phase 0) to mirage-browser (${result.delivered}/${result.mirageTabs})${title}. Prefer Mirage Capture via echo-electron for spy flow.`,
     );
   } catch (err) {
     setStatus(err instanceof Error ? err.message : "Extension error.", true);
