@@ -8,7 +8,7 @@ import * as logger from "./logger.mjs";
 const DEFAULT_WAIT_MS = 12_000;
 const POLL_STALE_MS = 45_000;
 
-/** @typedef {{ id: string, kind: "list-tabs" | "capture-tab", tabId?: number, createdAt: number, settle: (value: object) => void }} PendingCommand */
+/** @typedef {{ id: string, kind: "list-tabs" | "capture-tab" | "capture-active", tabId?: number, createdAt: number, settle: (value: object) => void }} PendingCommand */
 
 /** @type {Map<string, PendingCommand>} */
 const pending = new Map();
@@ -31,7 +31,7 @@ export function getEchoExtensionBridgeStatus() {
 }
 
 /**
- * @param {"list-tabs" | "capture-tab"} kind
+ * @param {"list-tabs" | "capture-tab" | "capture-active"} kind
  * @param {{ tabId?: number, waitMs?: number }} [options]
  */
 export function enqueueEchoExtensionCommand(kind, options = {}) {

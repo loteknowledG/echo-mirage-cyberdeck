@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import {
+  captureEchoExtensionActiveTab,
   captureEchoExtensionTab,
   listEchoExtensionTabs,
   readLinkedEchoExtensionTabId,
@@ -17,9 +18,30 @@ export function SurveyMirageExtCapturePanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [echoHostHint, setEchoHostHint] = useState<string | null>(null);
 
   useEffect(() => {
     setLinkedTabId(readLinkedEchoExtensionTabId());
+    const ctx = resolveSurveyEchoDeckContext();
+    setEchoHostHint(ctx.echoHost);
+  }, []);
+
+  const captureActive = useCallback(async () => {
+    setBusy(true);
+    setError("");
+    setMessage("Capturing active Chrome tab via echo-electron…");
+    const result = await captureEchoExtensionActiveTab(resolveSurveyEchoDeckContext());
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.message);
+      setMessage("");
+      return;
+    }
+    setMessage(
+      result.snapshotIngested
+        ? `${result.message} · ingested on mirage-browser`
+        : result.message,
+    );
   }, []);
 
   const refresh = useCallback(async () => {
@@ -56,7 +78,7 @@ export function SurveyMirageExtCapturePanel() {
     setError("");
   }, [tabs]);
 
-  const capture = useCallback(async () => {
+  const captureLinked = useCallback(async () => {
     const tabId = linkedTabId ?? readLinkedEchoExtensionTabId();
     if (tabId == null) {
       setError("Link a tab by title first.");
@@ -64,7 +86,7 @@ export function SurveyMirageExtCapturePanel() {
     }
     setBusy(true);
     setError("");
-    setMessage("Capturing via echo-extension…");
+    setMessage("Capturing linked tab via echo-extension…");
     const result = await captureEchoExtensionTab(tabId, resolveSurveyEchoDeckContext());
     setBusy(false);
     if (!result.ok) {
@@ -92,16 +114,31 @@ export function SurveyMirageExtCapturePanel() {
         echo-extension · capture text
       </p>
       <p className="mb-3 text-[8px] leading-relaxed text-[#5f8f74]">
-        Lists Chrome tabs on the capture PC (via echo-electron). Duplicate titles get left→right
-        #1…#n. Link stays on tabId if you reorder — label refreshes.
+        Phase 1: Capture active tab via echo-electron on this PC. Use Mirage on{" "}
+        <span className="text-emerald-300/80">local HTTP</span> (cyberdeck-electron or
+        http://127.0.0.1/… ) — not Vercel HTTPS. Focus the target page in capture Chrome, then
+        click below.
+        {echoHostHint ? ` Echo host · ${echoHostHint}` : ""}
       </p>
 
+      <div className="mb-3 flex flex-wrap gap-2">
+        <CyberdeckActionButton disabled={busy} onClick={() => void captureActive()}>
+          Capture active tab
+        </CyberdeckActionButton>
+      </div>
+
+      <p className="mb-2 text-[8px] tracking-[0.06em] text-[#5f5f5f]">
+        Phase 1.1 · pick by title (optional)
+      </p>
       <div className="mb-2 flex flex-wrap gap-2">
         <CyberdeckActionButton disabled={busy} onClick={() => void refresh()}>
           Refresh tabs
         </CyberdeckActionButton>
-        <CyberdeckActionButton disabled={busy || linkedTabId == null} onClick={() => void capture()}>
-          Capture text
+        <CyberdeckActionButton
+          disabled={busy || linkedTabId == null}
+          onClick={() => void captureLinked()}
+        >
+          Capture linked tab
         </CyberdeckActionButton>
       </div>
 
@@ -135,8 +172,8 @@ export function SurveyMirageExtCapturePanel() {
         </ul>
       ) : (
         <p className="text-[8px] text-[#5f5f5f]">
-          Refresh to load tabs — echo-electron + echo-extension 0.2.0 must be running on the capture
-          PC.
+          Optional: Refresh to link a specific tab — echo-electron + echo-extension 0.2.1 on the
+          capture PC.
         </p>
       )}
 

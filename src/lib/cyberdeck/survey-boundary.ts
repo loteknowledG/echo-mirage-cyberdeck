@@ -5,6 +5,7 @@
  * - survey-chat.ts — mission lines, SURVEY_MUTHUR_ARCHIVE_EVENT, SURVEY_MISSION_SOLVE_EVENT
  * - survey-capture-deck / powerfist-capture-client — screenshot missions → MUTHUR handleSend
  * - survey-extension-page-context — Survey Satellite browser extension → page text (no clipboard)
+ * - Operator network tests (Phase 0/1): docs/survey-network-tests.md
  * - terminateEchoSurveySession — only when Survey tab closes on Echo-local cyberdeck
  *
  * LEGACY (frozen — do not extend; Survey Hub replaces this):
