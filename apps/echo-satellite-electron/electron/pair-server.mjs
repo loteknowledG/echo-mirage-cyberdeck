@@ -9,6 +9,7 @@ import {
 } from "./spy-echo-pairing.mjs";
 import * as logger from "./logger.mjs";
 import { attachSurveyTeamHub } from "./survey-team-hub.mjs";
+import { takeEchoExtensionPendingCommand, completeEchoExtensionCommand, getEchoExtensionBridgeStatus } from "./echo-extension-bridge.mjs";
 import { executeEchoSatelliteCommand } from "./echo-commands.mjs";
 
 function applyCors(res) {
@@ -106,10 +107,53 @@ export function startPairServer(options) {
       if (url.pathname === "/api/survey/echo/command" && req.method === "POST") {
         const body = await readJsonBody(req);
         const action = String(body.action ?? "").trim();
+        const tabIdRaw = body.tabId;
+        const tabId =
+          typeof tabIdRaw === "number"
+            ? tabIdRaw
+            : typeof tabIdRaw === "string" && tabIdRaw.trim()
+              ? Number(tabIdRaw)
+              : undefined;
         logger.log(`pair-server: echo command ${action}`);
-        const result = await executeEchoSatelliteCommand(action, { app: options.app });
+        const result = await executeEchoSatelliteCommand(action, {
+          app: options.app,
+          tabId: Number.isFinite(tabId) ? tabId : undefined,
+        });
         res.writeHead(result.ok ? 200 : 400, { "Content-Type": "application/json" });
         res.end(JSON.stringify(result));
+        return;
+      }
+
+      if (url.pathname === "/api/survey/echo/extension/poll" && req.method === "GET") {
+        const command = takeEchoExtensionPendingCommand();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            command,
+            bridge: getEchoExtensionBridgeStatus(),
+          }),
+        );
+        return;
+      }
+
+      if (url.pathname === "/api/survey/echo/extension/result" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const id = String(body.id ?? "").trim();
+        if (!id) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: "id is required." }));
+          return;
+        }
+        const result = completeEchoExtensionCommand(id, body.result ?? body);
+        res.writeHead(result.ok ? 200 : 400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
+        return;
+      }
+
+      if (url.pathname === "/api/survey/echo/extension/status" && req.method === "GET") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, ...getEchoExtensionBridgeStatus() }));
         return;
       }
 

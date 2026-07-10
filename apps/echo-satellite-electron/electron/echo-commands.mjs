@@ -1,6 +1,10 @@
 import { execFileSync } from "node:child_process";
 import { clipboard } from "electron";
 import { capturePrimaryMonitorPng } from "./capture.mjs";
+import {
+  enqueueEchoExtensionCommand,
+  getEchoExtensionBridgeStatus,
+} from "./echo-extension-bridge.mjs";
 import * as logger from "./logger.mjs";
 
 /** @type {{ listening: boolean, recordingStartedAt: number | null, chunks: Buffer[] }} */
@@ -12,7 +16,7 @@ const audioState = {
 
 /**
  * @param {string} action
- * @param {{ app?: import("electron").App }} [deps]
+ * @param {{ app?: import("electron").App, tabId?: number }} [deps]
  */
 export async function executeEchoSatelliteCommand(action, deps = {}) {
   switch (action) {
@@ -28,8 +32,66 @@ export async function executeEchoSatelliteCommand(action, deps = {}) {
       return copySelected();
     case "echo.read-clipboard":
       return readClipboard();
+    case "echo.ext-list-tabs":
+      return listExtensionTabs();
+    case "echo.ext-capture-text":
+      return captureExtensionTab(deps.tabId);
+    case "echo.ext-bridge-status":
+      return { ok: true, ...getEchoExtensionBridgeStatus(), message: "echo-extension bridge status." };
     default:
       return { ok: false, reason: `Unknown Echo command: ${action}` };
+  }
+}
+
+async function listExtensionTabs() {
+  try {
+    const result = await enqueueEchoExtensionCommand("list-tabs");
+    if (!result?.ok) {
+      return {
+        ok: false,
+        reason: result?.reason ?? "echo-extension list-tabs failed.",
+      };
+    }
+    return {
+      ok: true,
+      message: `Listed ${Array.isArray(result.tabs) ? result.tabs.length : 0} Chrome tab(s) via echo-extension.`,
+      tabs: result.tabs ?? [],
+      bridge: getEchoExtensionBridgeStatus(),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "echo-extension list-tabs failed.",
+      bridge: getEchoExtensionBridgeStatus(),
+    };
+  }
+}
+
+/** @param {number | undefined} tabId */
+async function captureExtensionTab(tabId) {
+  if (!Number.isFinite(tabId)) {
+    return { ok: false, reason: "tabId is required for echo.ext-capture-text." };
+  }
+  try {
+    const result = await enqueueEchoExtensionCommand("capture-tab", { tabId });
+    if (!result?.ok) {
+      return {
+        ok: false,
+        reason: result?.reason ?? "echo-extension capture-tab failed.",
+      };
+    }
+    return {
+      ok: true,
+      message: result.message ?? `Captured tab ${tabId} via echo-extension.`,
+      snapshot: result.snapshot,
+      bridge: getEchoExtensionBridgeStatus(),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "echo-extension capture-tab failed.",
+      bridge: getEchoExtensionBridgeStatus(),
+    };
   }
 }
 

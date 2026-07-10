@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Echo Mirage Survey Satellite",
-  "short_name": "Survey Satellite",
-  "version": "0.1.2",
-  "description": "Send active browser tab text to Echo Mirage Survey / MUTHUR without clipboard.",
-  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "name": "echo-extension",
+  "short_name": "echo-extension",
+  "version": "0.2.0",
+  "description": "echo-extension — copy Chrome tab text for Survey (via echo-electron bridge).",
+  "permissions": ["activeTab", "scripting", "storage", "tabs", "alarms"],
   "host_permissions": ["<all_urls>"],
   "action": {
-    "default_title": "Send page to Survey",
+    "default_title": "echo-extension",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",

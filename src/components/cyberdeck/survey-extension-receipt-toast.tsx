@@ -54,7 +54,7 @@ export function SurveyExtensionReceiptToast() {
     >
       <div className="pointer-events-auto rounded border border-emerald-500/60 bg-black/95 px-4 py-3 font-mono text-[11px] text-emerald-100 shadow-[0_0_28px_rgba(62,207,142,0.25)]">
         <p className="text-[9px] uppercase tracking-[0.22em] text-emerald-400">
-          Survey Satellite · received #{shown.deliveryCount}
+          echo-extension · received #{shown.deliveryCount}
         </p>
         <p className="mt-1 text-[11px] font-semibold text-emerald-200">{truncate(title, 64)}</p>
         <p className="mt-1 break-all text-[9px] text-[#6a9a7a]">{url}</p>

@@ -1,10 +1,10 @@
-/** Runs on Echo Mirage cyberdeck tabs — bridges extension → page via postMessage (CSP-safe). */
+/** Runs on mirage-browser cyberdeck tabs — bridges echo-extension → page via postMessage. */
 const SURVEY_EXTENSION_PAGE_CONTEXT_MESSAGE_TYPE = "echo-mirage:survey-extension-page-context";
 
 function deliverPayloadToPage(payload) {
   window.postMessage(
     {
-      source: "echo-mirage-survey-extension",
+      source: "echo-extension",
       type: SURVEY_EXTENSION_PAGE_CONTEXT_MESSAGE_TYPE,
       payload,
     },

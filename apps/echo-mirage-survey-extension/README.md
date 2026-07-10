@@ -1,43 +1,28 @@
-# Echo Mirage Survey Satellite (browser extension)
+# echo-extension
 
-Chrome/Edge MV3 extension that captures **active tab text** and delivers it to an open Echo Mirage cyberdeck tab — no clipboard, no Playwright. Complements **Echo Satellite** (screenshots) with DOM recon for Survey / MUTHUR.
+Chrome MV3 agent that **copies tab text** for Survey. Talks to **echo-electron** (Echo Satellite) on `127.0.0.1:3050`.
 
-## Install (developer)
+## Titles
 
-1. Generate icons (once): `pnpm survey:extension:icons`
-2. Open `chrome://extensions` → **Developer mode** → **Load unpacked**
-3. Select `apps/echo-mirage-survey-extension`
+- Chrome UI name: **echo-extension**
+- Bridge peer: **echo-electron**
+- Commander UI: **mirage-browser** (Zen) — Refresh tabs / Link / Capture text
 
-## Use
+## Install
 
-1. Open Echo Mirage cyberdeck (`http://127.0.0.1:3050/cyberdeck` or production URL).
-2. Browse the target page in another tab.
-3. Click the extension → **Send active tab to Survey**.
+1. `chrome://extensions` → Developer mode → Load unpacked
+2. Select `apps/echo-mirage-survey-extension`
+3. Confirm version **0.2.0** and name **echo-extension**
+4. Reload after pulls
 
-Page context lands in Survey chat / MUTHUR archive as `SURVEY SATELLITE // RECEIVED · browser page capture`. A green receipt toast appears on cyberdeck when ingest succeeds.
+## Phase 1 flow
 
-Delivery uses MAIN-world `chrome.scripting.executeScript` plus `window.postMessage` (CSP-safe). Inline `<script>` injection is avoided because Vercel CSP blocks it and caused false “Delivered” with no toast.
+1. Start **echo-electron** (Echo Satellite) — pair HTTP on `:3050`
+2. Keep **echo-extension** loaded in Chrome (target tabs here)
+3. Open **mirage-browser** in Zen (`http://127.0.0.1:<next-port>/cyberdeck` → Survey → Mirage)
+4. Mirage: **Refresh tabs** → link title+#n → **Capture text**
+5. MUTHUR shows `ECHO-EXTENSION // RECEIVED`
 
-## Architecture
+## Phase 0 fallback
 
-```
-[target tab] --executeScript--> [extension background]
-                                      |
-                                      v
-[mirage cyberdeck tab] <--content script-- CustomEvent
-                                      |
-                                      v
-              survey-extension-page-context.client.ts → notifySurveyMuthurArchive
-```
-
-Mirage URL patterns: `127.0.0.1:*`, `localhost:*`, `echo-mirage-cyberdeck.vercel.app`.
-
-## Files
-
-| File | Role |
-|------|------|
-| `background.js` | Capture active tab, find Mirage tabs, deliver |
-| `content-mirage.js` | Bridge to `echo-mirage:survey-extension-page-context` |
-| `popup.*` | Operator UI |
-
-Cyberdeck listener: `SurveyExtensionPageContextHost` in `cyberdeck-page-client.tsx`.
+Popup **Send active tab** still delivers to a same-browser mirage tab (dev only).

@@ -16,9 +16,9 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { action?: string };
+  let body: { action?: string; tabId?: number | string };
   try {
-    body = (await request.json()) as { action?: string };
+    body = (await request.json()) as { action?: string; tabId?: number | string };
   } catch {
     return NextResponse.json({ ok: false, reason: "Invalid JSON." }, { status: 400 });
   }
@@ -28,19 +28,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, reason: "action is required." }, { status: 400 });
   }
 
+  const tabIdRaw = body.tabId;
+  const tabId =
+    typeof tabIdRaw === "number"
+      ? tabIdRaw
+      : typeof tabIdRaw === "string" && tabIdRaw.trim()
+        ? Number(tabIdRaw)
+        : undefined;
+
   const hostsToTry = [echoHost];
   if (echoHost !== "127.0.0.1" && echoHost !== "localhost") {
     hostsToTry.push("127.0.0.1");
   }
 
-  let lastError = `Could not reach Echo Satellite at ${echoHost}:${echoHttpPort}.`;
+  const forwardBody: { action: string; tabId?: number } = { action };
+  if (Number.isFinite(tabId)) {
+    forwardBody.tabId = tabId;
+  }
+
+  let lastError = `Could not reach echo-electron at ${echoHost}:${echoHttpPort}.`;
   for (const host of hostsToTry) {
     try {
       const res = await fetch(`http://${host}:${echoHttpPort}/api/survey/echo/command`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(forwardBody),
         cache: "no-store",
+        signal: AbortSignal.timeout(20_000),
       });
       const payload = (await res.json()) as Record<string, unknown>;
       if (res.ok && payload.ok === true) {
@@ -53,7 +67,7 @@ export async function POST(request: Request) {
             ? payload.error
             : `Echo command failed at ${host}:${echoHttpPort}.`;
     } catch {
-      lastError = `Could not reach Echo Satellite at ${host}:${echoHttpPort}.`;
+      lastError = `Could not reach echo-electron at ${host}:${echoHttpPort}.`;
     }
   }
 

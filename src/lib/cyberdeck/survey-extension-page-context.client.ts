@@ -40,7 +40,7 @@ export function formatSurveyExtensionPageContextForMuthur(
   const preview = snapshot.pageText.trim().slice(0, 320);
   const suffix = snapshot.pageText.length > preview.length ? "…" : "";
   return [
-    "SURVEY SATELLITE // RECEIVED · browser page capture",
+    "ECHO-EXTENSION // RECEIVED · browser page capture",
     `URL · ${snapshot.url}`,
     `TITLE · ${title}`,
     `TEXT · ${preview}${suffix}`,
@@ -66,7 +66,7 @@ export function ingestSurveyExtensionPageContext(raw: unknown): SurveyExtensionP
       typeof input.capturedAt === "string" && input.capturedAt.trim()
         ? input.capturedAt
         : new Date().toISOString(),
-    source: typeof input.source === "string" ? input.source : "echo-mirage-survey-extension",
+    source: typeof input.source === "string" ? input.source : "echo-extension",
   };
 
   status = {
@@ -113,7 +113,9 @@ export function useSurveyExtensionPageContextListener(): void {
         type?: string;
         payload?: unknown;
       };
-      if (message.source !== "echo-mirage-survey-extension") return;
+      if (message.source !== "echo-extension" && message.source !== "echo-mirage-survey-extension") {
+        return;
+      }
       if (message.type !== SURVEY_EXTENSION_PAGE_CONTEXT_MESSAGE_TYPE) return;
       ingestSurveyExtensionPageContext(message.payload);
     };
