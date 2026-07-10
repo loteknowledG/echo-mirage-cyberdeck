@@ -764,7 +764,7 @@ export function createMuthurToolRegistry(): ToolRegistry {
       operator_browser: {
         name: "operator_browser",
         description:
-          "Control the operator web pane: goto/search returns live page text during tool rounds (Playwright locally, Firecrawl on Vercel with FIRECRAWL_API_KEY). Use for web research — not for local disk paths (use localfs). Do not call snapshot in a loop.",
+          "Control the operator web pane: goto/search returns live page text during tool rounds (Playwright locally; Firecrawl primary; TinyFish fallback). Use for web research — not for local disk paths (use localfs). Do not call snapshot in a loop.",
         run: runOperatorBrowser,
       },
       survey_auto_connect: {
