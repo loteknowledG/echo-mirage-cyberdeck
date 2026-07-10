@@ -1,16 +1,15 @@
 import { normalizeOperatorBrowserUrl } from "@/lib/browser-intents";
+import {
+  firecrawlResearchGoto,
+  isFirecrawlConfigured,
+} from "@/lib/muthur/browser/firecrawl-research.server";
+import type {
+  OperatorBrowserLiveResult,
+  OperatorBrowserLiveSnapshot,
+} from "@/lib/muthur/browser/operator-browser-live.types";
 import { loadPlaywright } from "./load-playwright.server";
 
-export type OperatorBrowserLiveSnapshot = {
-  url: string;
-  title: string;
-  pageText: string;
-  status: number;
-};
-
-export type OperatorBrowserLiveResult =
-  | { ok: true; snapshot: OperatorBrowserLiveSnapshot }
-  | { ok: false; error: string };
+export type { OperatorBrowserLiveResult, OperatorBrowserLiveSnapshot } from "./operator-browser-live.types";
 
 // Playwright is optional at runtime (see src/types/playwright-optional.d.ts).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,9 +50,56 @@ async function readLiveSnapshot(page: Page, status = 200): Promise<OperatorBrows
     title: await page.title().catch(() => ""),
     pageText: bodyText.slice(0, 6000),
     status,
+    engine: "playwright",
   };
   lastLiveSnapshot = snapshot;
   return snapshot;
+}
+
+async function gotoLivePlaywright(url: string): Promise<OperatorBrowserLiveResult> {
+  const page = await ensureResearchPage();
+  const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+  await page.waitForTimeout(1_200);
+  const snapshot = await readLiveSnapshot(page, response?.status() ?? 200);
+  if (!snapshot.pageText.trim()) {
+    return {
+      ok: false,
+      error:
+        "Page loaded but returned no readable text (CAPTCHA, JS-only shell, or blocked).",
+    };
+  }
+  return { ok: true, snapshot };
+}
+
+async function snapshotLivePlaywright(): Promise<OperatorBrowserLiveResult> {
+  const page = researchPage ?? (await ensureResearchPage());
+  const snapshot = await readLiveSnapshot(page);
+  if (!snapshot.pageText.trim()) {
+    return {
+      ok: false,
+      error: "Snapshot has no readable page text.",
+    };
+  }
+  return { ok: true, snapshot };
+}
+
+async function gotoLiveFirecrawl(url: string): Promise<OperatorBrowserLiveResult> {
+  if (!isFirecrawlConfigured()) {
+    return {
+      ok: false,
+      error:
+        "Playwright is not available on this server. Set FIRECRAWL_API_KEY (firecrawl.dev) for live web research on Vercel.",
+    };
+  }
+
+  try {
+    const snapshot = await firecrawlResearchGoto(url);
+    lastLiveSnapshot = snapshot;
+    return { ok: true, snapshot };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Firecrawl fetch failed.";
+    return { ok: false, error: message };
+  }
 }
 
 async function gotoLive(url: string): Promise<OperatorBrowserLiveResult> {
@@ -63,49 +109,35 @@ async function gotoLive(url: string): Promise<OperatorBrowserLiveResult> {
   }
 
   try {
-    const page = await ensureResearchPage();
-    const response = await page.goto(validated.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
-    await page.waitForTimeout(1_200);
-    const snapshot = await readLiveSnapshot(page, response?.status() ?? 200);
-    if (!snapshot.pageText.trim()) {
-      return {
-        ok: false,
-        error:
-          "Page loaded but returned no readable text (CAPTCHA, JS-only shell, or blocked). Answer from training knowledge; do not retry snapshot.",
-      };
+    const playwright = await gotoLivePlaywright(validated.url);
+    if (playwright.ok) {
+      return playwright;
     }
-    return { ok: true, snapshot };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Browser navigation failed.";
-    return { ok: false, error: message };
+  } catch {
+    /* Playwright unavailable — fall through to Firecrawl */
   }
+
+  return gotoLiveFirecrawl(validated.url);
 }
 
 async function snapshotLive(): Promise<OperatorBrowserLiveResult> {
-  try {
-    const page = researchPage ?? (await ensureResearchPage().catch(() => null));
-    if (!page) {
-      if (lastLiveSnapshot?.pageText.trim()) {
-        return { ok: true, snapshot: lastLiveSnapshot };
-      }
-      return {
-        ok: false,
-        error: "No browser page is open. Call operator_browser goto first, or answer without browser.",
-      };
-    }
-    const snapshot = await readLiveSnapshot(page);
-    if (!snapshot.pageText.trim()) {
-      return {
-        ok: false,
-        error:
-          "Snapshot has no readable page text. Answer from training knowledge; do not retry operator_browser snapshot.",
-      };
-    }
-    return { ok: true, snapshot };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Browser snapshot failed.";
-    return { ok: false, error: message };
+  if (lastLiveSnapshot?.pageText.trim()) {
+    return { ok: true, snapshot: lastLiveSnapshot };
   }
+
+  try {
+    if (researchPage) {
+      return await snapshotLivePlaywright();
+    }
+  } catch {
+    /* fall through */
+  }
+
+  return {
+    ok: false,
+    error:
+      "No browser page is open. Call operator_browser goto first, or answer without browser.",
+  };
 }
 
 export async function executeOperatorBrowserLiveAction(

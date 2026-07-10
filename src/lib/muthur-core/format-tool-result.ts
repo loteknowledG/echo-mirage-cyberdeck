@@ -219,7 +219,7 @@ export function formatOperatorBrowserResult(result: unknown): string {
     url?: string;
     selector?: string;
     value?: string;
-    live?: { url?: string; title?: string; pageText?: string; status?: number };
+    live?: { url?: string; title?: string; pageText?: string; status?: number; engine?: string };
     liveError?: string;
   };
 
@@ -238,6 +238,7 @@ export function formatOperatorBrowserResult(result: unknown): string {
     if (live.url) parts.push(`URL // ${live.url}`);
     if (live.title) parts.push(`TITLE // ${live.title}`);
     if (typeof live.status === "number") parts.push(`HTTP // ${live.status}`);
+    if (live.engine) parts.push(`ENGINE // ${live.engine.toUpperCase()}`);
     if (live.pageText?.trim()) {
       parts.push(`PAGE TEXT:\n${live.pageText.trim()}`);
     }

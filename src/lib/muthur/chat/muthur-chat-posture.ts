@@ -60,7 +60,7 @@ function buildMuthurAvailableToolsPrompt(posture: MuthurPosture): string {
     "\n- observe_operator_pane: Returns the current Monaco editor state in the Operator pane (file name, language, cursor, dirty, content excerpt)." +
     "\n- open_operator_file: Open a workspace text/markdown/code file in the operator Monaco editor on the operator's screen. Call before suggest_operator_edit when nothing is open." +
     "\n- suggest_operator_edit: Propose typed edits to markdown/code/text open in the operator Monaco editor. Edits auto-apply in the operator pane (Ctrl+Z to undo). Not for DOCX/PDF previews." +
-    "\n- operator_browser: Operator web pane — goto URL or search query returns LIVE PAGE TEXT during tool rounds (server fetch); snapshot reads that page. Also queues the operator web pane. Do not loop snapshot — one goto + one snapshot max; then answer. For general knowledge without a specific URL, answer directly without browser." +
+    "\n- operator_browser: Operator web pane — goto/search returns LIVE PAGE TEXT during tool rounds (Playwright locally, Firecrawl on Vercel when FIRECRAWL_API_KEY is set). Also queues the operator web pane. One goto + one snapshot max; then answer." +
     "\n- localfs: REAL disk — read anywhere; " +
     localFsWriteHint +
     " Use write to create or update source files." +
