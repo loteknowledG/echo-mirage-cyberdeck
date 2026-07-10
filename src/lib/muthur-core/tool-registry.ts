@@ -44,6 +44,12 @@ import {
 import { runSamusHandsEyes } from "@/lib/samus-manus/hands-eyes.server";
 import { isSamusHandsEyesEnabled } from "@/lib/samus-manus/samus-manus-config.server";
 import { runSurveyAutoConnect } from "@/lib/muthur/survey/survey-auto-connect.server";
+import {
+  runCallStationFindRoom,
+  runCallStationMatch,
+  runCallStationOpenRoom,
+  runCallStationWhoIsWaiting,
+} from "@/lib/muthur/call-station/call-station-tools.server";
 import type { ToolCall, ToolRegistry, ToolResult } from "./types";
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
@@ -772,6 +778,29 @@ export function createMuthurToolRegistry(): ToolRegistry {
         description:
           "Zero-click Survey TEAM LINKS: read Echo Satellite pairing codes and wire Echo↔Mirage, Echo↔PowerFist, and Mirage↔PowerFist in this cyberdeck session. Call when the operator asks to connect/pair/link Survey, team links, Echo, Mirage, or PowerFist — no Survey tab required. Echo Satellite Survey tab must be open first so codes exist.",
         run: runSurveyAutoConnect,
+      },
+      call_station_who_is_waiting: {
+        name: "call_station_who_is_waiting",
+        description:
+          "Call Station matchmaker: list who is waiting in pairing rooms (durable store). Use when the operator asks who is waiting, where the room is, or who needs a peer.",
+        run: runCallStationWhoIsWaiting,
+      },
+      call_station_open_room: {
+        name: "call_station_open_room",
+        description:
+          "Call Station: open a waiting room and get a short code. Use when the operator wants to wait for a peer (echo/mirage/powerfist).",
+        run: runCallStationOpenRoom,
+      },
+      call_station_match: {
+        name: "call_station_match",
+        description:
+          "Call Station: find a waiting peer for a role, or open a room if nobody is waiting.",
+        run: runCallStationMatch,
+      },
+      call_station_find_room: {
+        name: "call_station_find_room",
+        description: "Call Station: look up a room by short code (e.g. K7M2) or room id.",
+        run: runCallStationFindRoom,
       },
       workspace_exec: {
         name: "workspace_exec",
