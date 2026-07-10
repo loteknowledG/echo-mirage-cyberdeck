@@ -10,9 +10,9 @@ import { resolve } from "node:path";
 
 const ROOT = process.cwd();
 
-/** P9.4 keyboard routing extraction (2026-07). Lower in subsequent P9 PRs. */
-const MAX_CYBERDECK_APP_LINES = 2_150;
-const MAX_CYBERDECK_APP_IMPORTS = 92;
+/** P9.5 glyph channel extraction (2026-07). Lower in subsequent P9 PRs. */
+const MAX_CYBERDECK_APP_LINES = 1_900;
+const MAX_CYBERDECK_APP_IMPORTS = 89;
 
 /** Heavy pane modules must stay behind pane-chunks / dynamic(), not cyberdeck-app. */
 const FORBIDDEN_STATIC_IMPORTS = [
