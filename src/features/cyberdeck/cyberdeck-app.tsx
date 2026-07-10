@@ -39,7 +39,6 @@ import {
 } from "@/features/cyberdeck/runtime/defer-deck-audio";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { revokeOperatorBlobUrl } from "@/lib/operator-binary-preview";
-import { resolveOperatorAssetSurface } from "@/lib/operator-file-surface";
 import { isDocumentEditIntent, isOperatorPaneEditRequest } from "@/lib/muthur/document-edit-intent";
 import {
   formatMuthurLiveStreamDisplay,
@@ -83,7 +82,6 @@ import {
   writeGlyphPaneSettings,
   type GlyphRenderEngine,
 } from "@/lib/glyph-channel";
-import { readOperatorPaneSaveText } from "@/lib/operator-workbench";
 import dynamic from "next/dynamic";
 import { PanelLoader } from "@/features/cyberdeck/panel-loader";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
@@ -105,6 +103,7 @@ import {
   useCyberdeckWorkspaceHydration,
 } from "@/features/cyberdeck/workspace/use-cyberdeck-workspace-hydration";
 import { useCyberdeckHeap } from "@/features/cyberdeck/heap/use-cyberdeck-heap";
+import { useCyberdeckOperatorObservation } from "@/features/cyberdeck/observation/use-cyberdeck-operator-observation";
 import { CyberdeckContextMenus } from "@/features/cyberdeck/workspace/cyberdeck-context-menus";
 import { useCustomTabBrowser } from "@/features/cyberdeck/workspace/use-custom-tab-browser";
 import { useRailTabContextMenu } from "@/features/cyberdeck/workspace/use-rail-tab-context-menu";
@@ -120,7 +119,6 @@ import {
   CyberdeckFixedServerPane,
 } from "@/components/cyberdeck/cyberdeck-pane-slots";
 import { type MuthurCommandInputHandle } from "@/components/cyberdeck/muthur-command-input";
-import { setMuthurScreenSnapshot } from "@/lib/muthur-screen-context";
 import { formatPiScreenContextForMuthur, readPiScreenSnapshot } from "@/lib/pi-screen-context";
 import { detectComputerUseMission } from "@/lib/muthur/control/computer-use-intent";
 import { isPiControlLeaseUiGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating.client";
@@ -131,7 +129,6 @@ import { queuePiMission } from "@/lib/pi/pi-mission-bridge";
 import { MuthurControlLeaseHost } from "@/components/cyberdeck/muthur-control-lease-host";
 import { emitSignal, useDeckSignal, type DeckSignal } from "@/lib/cyberdeck/signal-router";
 import { summarizeMuthurOperatorEdits } from "@/lib/muthur-operator-edit-summary";
-import { formatInhabitantChannelLabel } from "@/lib/muthur/muthur-inhabitant";
 import { useDeckAudioBridge } from "@/lib/cyberdeck/audio-bridge";
 import { useSilentModeAudioGateSync } from "@/lib/cyberdeck/use-silent-mode-audio-gate-sync";
 import { useSurveyMuthurMissionHandlers } from "@/features/cyberdeck/hooks/use-survey-muthur-mission-handlers";
@@ -178,7 +175,6 @@ import { loadOrchestrationBundle } from "@/lib/orchestration/load-orchestration"
 import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
-import { publishMuthurObservation, flushMuthurObservation } from "@/lib/muthur/observation/publish-observation";
 import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
 import { parseAionQuery } from "@/lib/muthur-aion-intent";
 import { parseDocumentOpenIntent } from "@/lib/muthur-document-open-intent";
@@ -543,6 +539,19 @@ const operatorWorkspace = useOperatorWorkspaceState({
     setNavRailContext,
   });
 
+  useCyberdeckOperatorObservation({
+    deckUiHydrated,
+    operatorSurfaceMode,
+    operatorDroppedAsset,
+    operatorSurfaceIsDocument,
+    operatorActiveFilePath,
+    operatorDocMode,
+    operatorBrowserUrl,
+    messages,
+    streamText,
+    chatUserDisplayName,
+  });
+
   /** Forward Tab from message box cycles: gateway (right) → rail (left) → chat log (col2) → … */
   const deckTabNextRef = useRef<"gateway" | "rail" | "chatlog">("gateway");
   const prevNavRailRef = useRef<"gateway" | "tabs">("gateway");
@@ -866,103 +875,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
     window.addEventListener(GLYPH_MODE_UPDATE_EVENT, handler);
     return () => window.removeEventListener(GLYPH_MODE_UPDATE_EVENT, handler);
   }, [syncGlyphChannelTabGlyphs]);
-
-  const publishOperatorObservation = useCallback(() => {
-    if (!deckUiHydrated) return;
-    const { server, customTabs, activeCustomTabId } = useCyberdeckTabStore.getState();
-    const activeCustomTab = customTabs.find((tab) => tab.id === activeCustomTabId) ?? null;
-    const visibleAsset = activeCustomTab?.asset ?? (operatorSurfaceMode === "workspace" ? operatorDroppedAsset : null);
-    void publishMuthurObservation({
-      route: "/cyberdeck",
-      surface: "cyberdeck",
-      activeTab: activeCustomTab?.label ?? server,
-      activePane: activeCustomTab?.kind ?? server,
-      visibleDocument: visibleAsset?.name ?? null,
-      documentExcerpt: typeof visibleAsset?.text === "string" ? visibleAsset.text.slice(0, 800) : null,
-    });
-  }, [
-    deckUiHydrated,
-    operatorDroppedAsset,
-    operatorSurfaceMode,
-  ]);
-
-  useEffect(() => {
-    publishOperatorObservation();
-    const unsubscribe = useCyberdeckTabStore.subscribe(() => publishOperatorObservation());
-    return () => {
-      unsubscribe();
-      flushMuthurObservation();
-    };
-  }, [publishOperatorObservation]);
-
-  useEffect(() => {
-    if (!deckUiHydrated) return;
-
-    const syncMuthurScreenSnapshot = () => {
-      const { server, customTabs, activeCustomTabId } = useCyberdeckTabStore.getState();
-      const activeCustomTab = customTabs.find((tab) => tab.id === activeCustomTabId) ?? null;
-      const operatorSurface = operatorDroppedAsset
-        ? resolveOperatorAssetSurface(operatorDroppedAsset)
-        : null;
-      const operatorText =
-        operatorSurfaceIsDocument && operatorDroppedAsset
-          ? readOperatorPaneSaveText(operatorDroppedAsset.text || "")
-          : null;
-
-      setMuthurScreenSnapshot({
-        capturedAt: new Date().toISOString(),
-        activeServer: server,
-        activeCustomTab: activeCustomTab?.label ?? null,
-        chat: messages.map((message) => ({
-          role:
-            message.role === "user" || message.role === "assistant" || message.role === "system"
-              ? message.role
-              : "error",
-          label:
-            message.role === "user"
-              ? chatUserDisplayName
-              : message.role === "assistant"
-                ? message.inhabitant
-                  ? formatInhabitantChannelLabel(message.inhabitant)
-                  : "MUTHUR"
-                : message.role === "system"
-                  ? "SYS"
-                  : "ERR",
-          text: message.text,
-        })),
-        streamingMuthur: streamText || null,
-        operator: operatorDroppedAsset
-          ? {
-              surfaceMode: operatorSurfaceMode,
-              fileName: operatorDroppedAsset.name ?? null,
-              filePath:
-                operatorActiveFilePath?.trim() ||
-                operatorDroppedAsset.localFilePath?.trim() ||
-                null,
-              previewSurface: operatorSurface,
-              docMode: operatorDocMode,
-              documentText: operatorText,
-            }
-          : null,
-        browserUrl: operatorSurfaceMode === "browser" ? operatorBrowserUrl : null,
-      });
-    };
-
-    syncMuthurScreenSnapshot();
-    const unsubscribe = useCyberdeckTabStore.subscribe(syncMuthurScreenSnapshot);
-    return unsubscribe;
-  }, [
-    chatUserDisplayName,
-    deckUiHydrated,
-    messages,
-    operatorActiveFilePath,
-    operatorDocMode,
-    operatorDroppedAsset,
-    operatorBrowserUrl,
-    operatorSurfaceIsDocument,
-    operatorSurfaceMode,
-    streamText,
-  ]);
 
   const closeMirageContextMenu = useCallback(() => {
     setMirageContextMenu(null);
