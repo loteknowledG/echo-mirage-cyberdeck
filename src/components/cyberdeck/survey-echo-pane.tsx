@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import {
   SURVEY_ECHO_DISPLAY,
@@ -77,18 +77,21 @@ export function SurveyEchoPane() {
   const [notEchoMachine, setNotEchoMachine] = useState(false);
   const [captureRelayActive, setCaptureRelayActive] = useState(() => Boolean(readPowerfistCaptureCredentials()));
   const [relayBusy, setRelayBusy] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    const showLoading = !hasLoadedOnceRef.current;
+    if (showLoading) setLoading(true);
     setError(null);
     const status = await fetchEchoSurveyStatus();
-    setLoading(false);
+    if (showLoading) setLoading(false);
     if (!status.ok) {
       setNotEchoMachine(true);
       setStatusSource(null);
       setError(status.reason);
       return;
     }
+    hasLoadedOnceRef.current = true;
     setNotEchoMachine(false);
     setStatusSource(status.source);
     setEchoHost(status.echoHost);
