@@ -14,7 +14,9 @@ Chrome/Edge MV3 extension that captures **active tab text** and delivers it to a
 2. Browse the target page in another tab.
 3. Click the extension → **Send active tab to Survey**.
 
-Page context lands in Survey chat / MUTHUR archive as `SURVEY SATELLITE // browser page capture`.
+Page context lands in Survey chat / MUTHUR archive as `SURVEY SATELLITE // RECEIVED · browser page capture`. A green receipt toast appears on cyberdeck when ingest succeeds.
+
+Delivery uses MAIN-world `chrome.scripting.executeScript` plus `window.postMessage` (CSP-safe). Inline `<script>` injection is avoided because Vercel CSP blocks it and caused false “Delivered” with no toast.
 
 ## Architecture
 
