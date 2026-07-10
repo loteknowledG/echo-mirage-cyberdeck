@@ -197,6 +197,26 @@ export async function runMuthurChatToolRounds({
           content: o.content,
         });
       }
+      const operatorBrowserCalls = toolCalls.filter((tc) => tc.function?.name === "operator_browser");
+      if (operatorBrowserCalls.length > 0) {
+        const snapshotCalls = operatorBrowserCalls.filter((tc) => {
+          try {
+            const args = JSON.parse(tc.function?.arguments ?? "{}") as { action?: string };
+            return (args.action ?? "goto").toLowerCase() === "snapshot";
+          } catch {
+            return false;
+          }
+        });
+        const totalBrowserTools = toolsUsed.filter((name) => name === "operator_browser").length;
+        if (snapshotCalls.length > 0 && totalBrowserTools >= 2) {
+          messages.push({
+            role: "user",
+            content:
+              "You already received operator_browser LIVE PAGE text or a LIVE FETCH failure. " +
+              "Do not call operator_browser again. Reply with plain text now.",
+          });
+        }
+      }
       if (isPiControlLeaseGatingEnabled() && toolCtx.piControlLeaseRequest) {
         write(formatPiControlLeaseStreamMarker(toolCtx.piControlLeaseRequest));
       }

@@ -214,16 +214,43 @@ export function formatOperatorBrowserResult(result: unknown): string {
     return "[TOOL] operator_browser returned no output.";
   }
 
-  const payload = result as { kind?: string; url?: string; selector?: string; value?: string };
+  const payload = result as {
+    kind?: string;
+    url?: string;
+    selector?: string;
+    value?: string;
+    live?: { url?: string; title?: string; pageText?: string; status?: number };
+    liveError?: string;
+  };
 
   const parts = [
     "[TOOL OK] OPERATOR_BROWSER // QUEUED_FOR_OPERATOR_WEB_PANE",
-    "The deck will run this browser action in the operator web pane.",
+    "The deck will mirror this action in the operator web pane.",
     payload.kind ? `ACTION // ${payload.kind.toUpperCase()}` : null,
     payload.url ? `TARGET // ${payload.url}` : null,
     payload.selector ? `SELECTOR // ${payload.selector}` : null,
     payload.value ? `VALUE // ${payload.value}` : null,
   ].filter(Boolean);
+
+  if (payload.live) {
+    const live = payload.live;
+    parts.push("LIVE PAGE (server fetch during tool round):");
+    if (live.url) parts.push(`URL // ${live.url}`);
+    if (live.title) parts.push(`TITLE // ${live.title}`);
+    if (typeof live.status === "number") parts.push(`HTTP // ${live.status}`);
+    if (live.pageText?.trim()) {
+      parts.push(`PAGE TEXT:\n${live.pageText.trim()}`);
+    }
+  } else if (payload.liveError) {
+    parts.push(`LIVE FETCH // FAILED // ${payload.liveError}`);
+    parts.push(
+      "Do not call operator_browser snapshot again in a loop. Answer from training knowledge or explain the fetch failure.",
+    );
+  } else if (payload.kind === "snapshot") {
+    parts.push(
+      "Snapshot text is not available yet. Use goto first, or answer without browser if this was a general knowledge question.",
+    );
+  }
 
   return parts.join("\n\n");
 }
