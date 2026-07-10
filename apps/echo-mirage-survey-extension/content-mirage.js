@@ -1,15 +1,15 @@
-/** Runs on Echo Mirage cyberdeck tabs — bridges extension → page CustomEvent. */
-const SURVEY_EXTENSION_PAGE_CONTEXT_EVENT = "echo-mirage:survey-extension-page-context";
+/** Runs on Echo Mirage cyberdeck tabs — bridges extension → page via postMessage (CSP-safe). */
+const SURVEY_EXTENSION_PAGE_CONTEXT_MESSAGE_TYPE = "echo-mirage:survey-extension-page-context";
 
 function deliverPayloadToPage(payload) {
-  const script = document.createElement("script");
-  script.textContent = `(function(){
-    window.dispatchEvent(new CustomEvent(${JSON.stringify(SURVEY_EXTENSION_PAGE_CONTEXT_EVENT)}, {
-      detail: ${JSON.stringify(payload)}
-    }));
-  })();`;
-  (document.head || document.documentElement).appendChild(script);
-  script.remove();
+  window.postMessage(
+    {
+      source: "echo-mirage-survey-extension",
+      type: SURVEY_EXTENSION_PAGE_CONTEXT_MESSAGE_TYPE,
+      payload,
+    },
+    window.location.origin,
+  );
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

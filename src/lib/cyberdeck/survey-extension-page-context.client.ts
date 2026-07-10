@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   SURVEY_EXTENSION_MAX_PAGE_TEXT_CHARS,
   SURVEY_EXTENSION_PAGE_CONTEXT_EVENT,
+  SURVEY_EXTENSION_PAGE_CONTEXT_MESSAGE_TYPE,
   type SurveyExtensionPageSnapshot,
 } from "@/lib/cyberdeck/survey-extension-page-context";
 import { notifySurveyMuthurArchive, notifySurveyFocusChat } from "@/lib/cyberdeck/survey-chat";
@@ -98,11 +99,30 @@ export function useSurveyExtensionPageContextStatus(): SurveyExtensionPageContex
 
 export function useSurveyExtensionPageContextListener(): void {
   useEffect(() => {
-    const onDelivered = (event: Event) => {
+    const onCustomEvent = (event: Event) => {
       const detail = (event as CustomEvent<unknown>).detail;
       ingestSurveyExtensionPageContext(detail);
     };
-    window.addEventListener(SURVEY_EXTENSION_PAGE_CONTEXT_EVENT, onDelivered);
-    return () => window.removeEventListener(SURVEY_EXTENSION_PAGE_CONTEXT_EVENT, onDelivered);
+
+    const onWindowMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+      const message = data as {
+        source?: string;
+        type?: string;
+        payload?: unknown;
+      };
+      if (message.source !== "echo-mirage-survey-extension") return;
+      if (message.type !== SURVEY_EXTENSION_PAGE_CONTEXT_MESSAGE_TYPE) return;
+      ingestSurveyExtensionPageContext(message.payload);
+    };
+
+    window.addEventListener(SURVEY_EXTENSION_PAGE_CONTEXT_EVENT, onCustomEvent);
+    window.addEventListener("message", onWindowMessage);
+    return () => {
+      window.removeEventListener(SURVEY_EXTENSION_PAGE_CONTEXT_EVENT, onCustomEvent);
+      window.removeEventListener("message", onWindowMessage);
+    };
   }, []);
 }

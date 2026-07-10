@@ -1,6 +1,7 @@
 import { isMirageTabUrl } from "./mirage-targets.js";
 
 const DELIVER_MESSAGE = { type: "SURVEY_EXTENSION_DELIVER" };
+const PAGE_CONTEXT_EVENT = "echo-mirage:survey-extension-page-context";
 
 /** Self-contained — injected into arbitrary tabs (no closure imports). */
 function capturePageSnapshotInTab() {
@@ -15,6 +16,20 @@ function capturePageSnapshotInTab() {
     capturedAt: new Date().toISOString(),
     source: "echo-mirage-survey-extension",
   };
+}
+
+/** Runs in Mirage page MAIN world — bypasses page CSP that blocks inline <script> tags. */
+function dispatchPageContextInMainWorld(payload, eventName) {
+  window.dispatchEvent(new CustomEvent(eventName, { detail: payload }));
+  window.postMessage(
+    {
+      source: "echo-mirage-survey-extension",
+      type: eventName,
+      payload,
+    },
+    window.location.origin,
+  );
+  return true;
 }
 
 async function captureActiveTabSnapshot(tabId) {
@@ -37,6 +52,24 @@ async function findMirageTabs() {
   return tabs.filter((tab) => isMirageTabUrl(tab.url) && tab.id != null);
 }
 
+async function deliverViaMainWorld(tabId, payload) {
+  const [{ result }] = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    func: dispatchPageContextInMainWorld,
+    args: [payload, PAGE_CONTEXT_EVENT],
+  });
+  return Boolean(result);
+}
+
+async function deliverViaContentScript(tabId, payload) {
+  const response = await chrome.tabs.sendMessage(tabId, {
+    ...DELIVER_MESSAGE,
+    payload,
+  });
+  return Boolean(response?.ok);
+}
+
 async function deliverToMirageTabs(payload) {
   const mirageTabs = await findMirageTabs();
   if (mirageTabs.length === 0) {
@@ -47,12 +80,19 @@ async function deliverToMirageTabs(payload) {
   const errors = [];
   for (const tab of mirageTabs) {
     try {
-      const response = await chrome.tabs.sendMessage(tab.id, {
-        ...DELIVER_MESSAGE,
-        payload,
-      });
-      if (response?.ok) delivered += 1;
-      else errors.push(response?.reason ?? "Mirage tab rejected payload.");
+      const mainOk = await deliverViaMainWorld(tab.id, payload);
+      if (mainOk) {
+        delivered += 1;
+        continue;
+      }
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : "MAIN-world inject failed.");
+    }
+
+    try {
+      const contentOk = await deliverViaContentScript(tab.id, payload);
+      if (contentOk) delivered += 1;
+      else errors.push("Mirage tab rejected payload.");
     } catch (err) {
       errors.push(err instanceof Error ? err.message : "Mirage tab unreachable.");
     }
@@ -61,7 +101,7 @@ async function deliverToMirageTabs(payload) {
   if (delivered === 0) {
     return {
       ok: false,
-      reason: errors[0] ?? "Could not reach Mirage content script — reload the cyberdeck tab.",
+      reason: errors[0] ?? "Could not reach Mirage — reload the cyberdeck tab.",
     };
   }
 

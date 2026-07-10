@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Echo Mirage Survey Satellite",
   "short_name": "Survey Satellite",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Send active browser tab text to Echo Mirage Survey / MUTHUR without clipboard.",
   "permissions": ["activeTab", "scripting", "storage", "tabs"],
   "host_permissions": ["<all_urls>"],
