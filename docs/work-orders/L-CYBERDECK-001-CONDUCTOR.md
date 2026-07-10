@@ -24,7 +24,7 @@
 | P9.4 | Keyboard routing / gateway effects | **MERGED** [#67](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/67) |
 | P9.5 | Glyph channel subsystem | **MERGED** [#68](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/68) |
 | P9.6 | MUTHUR memory + identity bootstrap | **MERGED** [#69](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/69) |
-| P9.7 | Custom tab surface / gateway wiring | PR pending |
+| P9.7 | Custom tab surface / gateway wiring | PR [#70](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/70) |
 | P9.8 | Master JP + final ratchet (≤1,200 lines) | Planned |
 
 ---
@@ -33,7 +33,7 @@
 
 | Pos | Slice | PR | Status |
 |----:|-------|-----|--------|
-| **1** | **P9.7** | — | gateway tabs hook — **OPEN PR** |
+| **1** | **P9.7** | [#70](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/70) | gateway tabs hook — **REVIEW** |
 | 2 | P9.6 | [#69](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/69) | **MERGED** |
 
 ---
