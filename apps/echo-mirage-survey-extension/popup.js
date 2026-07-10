@@ -16,7 +16,9 @@ sendButton?.addEventListener("click", async () => {
       return;
     }
     const title = result.title ? ` · ${result.title.slice(0, 48)}` : "";
-    setStatus(`Delivered to ${result.delivered}/${result.mirageTabs} Mirage tab(s)${title}.`);
+    setStatus(
+      `Sent to cyberdeck (${result.delivered}/${result.mirageTabs})${title}. Switch to the Echo Mirage tab — green toast is bottom-right there.`,
+    );
   } catch (err) {
     setStatus(err instanceof Error ? err.message : "Extension error.", true);
   } finally {
