@@ -21,7 +21,7 @@
 | P9.1 | `use-cyberdeck-voice.ts` + `mother-terminal.ts` | **MERGED** [#63](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/63) |
 | P9.2 | Heap + workspace hydration hooks | **MERGED** [#66](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/66) |
 | P9.3 | Operator observation + screen snapshot | **MERGED** [#66](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/66) |
-| P9.4 | Keyboard routing / gateway effects | PR pending |
+| P9.4 | Keyboard routing / gateway effects | PR [#67](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/67) |
 | P9.5 | Glyph channel subsystem | Planned |
 
 ---
