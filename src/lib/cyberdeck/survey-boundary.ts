@@ -4,6 +4,7 @@
  * KEEP (stable integration with MUTHUR / operator / PowerFist):
  * - survey-chat.ts — mission lines, SURVEY_MUTHUR_ARCHIVE_EVENT, SURVEY_MISSION_SOLVE_EVENT
  * - survey-capture-deck / powerfist-capture-client — screenshot missions → MUTHUR handleSend
+ * - survey-extension-page-context — Survey Satellite browser extension → page text (no clipboard)
  * - terminateEchoSurveySession — only when Survey tab closes on Echo-local cyberdeck
  *
  * LEGACY (frozen — do not extend; Survey Hub replaces this):
