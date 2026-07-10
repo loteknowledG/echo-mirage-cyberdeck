@@ -290,6 +290,20 @@ export function formatSurveyAutoConnectResult(result: unknown): string {
   return parts.join("\n\n");
 }
 
+export function formatCallStationResult(result: unknown): string {
+  if (!result || typeof result !== "object") {
+    return "[TOOL] call_station returned no output.";
+  }
+  const payload = result as { summary?: string; count?: number; storage?: string };
+  const parts = [
+    "[TOOL OK] CALL_STATION",
+    typeof payload.summary === "string" ? payload.summary : JSON.stringify(payload, null, 2),
+    payload.storage ? `STORAGE // ${payload.storage}` : null,
+    typeof payload.count === "number" ? `WAITING // ${payload.count}` : null,
+  ].filter(Boolean);
+  return parts.join("\n\n");
+}
+
 export function formatConvertDocumentResult(result: unknown): string {
   if (!result || typeof result !== "object") {
     return "[TOOL] convert_document_to_markdown returned no output.";

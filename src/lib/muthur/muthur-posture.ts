@@ -63,6 +63,10 @@ const PLAN_TOOLS = new Set([
   "observe_operator_pane",
   "operator_browser",
   "survey_auto_connect",
+  "call_station_who_is_waiting",
+  "call_station_open_room",
+  "call_station_match",
+  "call_station_find_room",
   "clock",
   "git_status",
   "git_diff",
@@ -84,6 +88,10 @@ const DIRECT_EXECUTION_TOOLS = new Set([
   "localfs",
   "operator_browser",
   "survey_auto_connect",
+  "call_station_who_is_waiting",
+  "call_station_open_room",
+  "call_station_match",
+  "call_station_find_room",
   "open_operator_file",
   "suggest_operator_edit",
   "workspace_exec",
@@ -165,6 +173,14 @@ export function isToolAllowedForPosture(
     if (toolName === "survey_auto_connect" || toolName === "observe_operator_pane") {
       return true;
     }
+    if (
+      toolName === "call_station_who_is_waiting" ||
+      toolName === "call_station_open_room" ||
+      toolName === "call_station_match" ||
+      toolName === "call_station_find_room"
+    ) {
+      return true;
+    }
     return false;
   }
   if (isPiDelegationTool(toolName) && posture !== "commander") {
@@ -225,6 +241,7 @@ export function buildMuthurPostureSystemPrompt(posture: MuthurPosture): string {
       return (
         "\n\nMUTHUR POSTURE: AGENT (USE). Execute a single user-directed task end-to-end yourself — observe, edit via suggest_operator_edit, localfs write, operator_browser, workspace_exec, samus_hands_eyes (local Windows desktop), glyph channel. " +
         "For Survey TEAM LINKS (Echo↔Mirage↔PowerFist), call survey_auto_connect when the operator asks to connect/pair/link the team — zero Survey tab clicks. Echo Satellite Survey tab must be open first. " +
+        "For Call Station pairing matchmaking (who is waiting / open a room / find room code), use call_station_who_is_waiting, call_station_open_room, call_station_match, call_station_find_room. " +
         "Do NOT delegate to Pi or request a control lease; desktop embodiment is Commander-only. " +
         "For ASCII art use [GLYPH:…] / fenced ascii blocks; for web use operator_browser; for code use localfs. " +
         "You may edit this Echo Mirage repo (your own source) when the operator directs — localfs write under the workspace root. " +
@@ -233,8 +250,9 @@ export function buildMuthurPostureSystemPrompt(posture: MuthurPosture): string {
     case "commander":
       return (
         "\n\nMUTHUR POSTURE: COMMANDER. Mission-aware orchestration. " +
-        "Without an ACTIVE mission: observe the conversation, summarize intent, and help the operator form a mission — no tools except survey_auto_connect (Survey TEAM LINKS) and observe_operator_pane. " +
+        "Without an ACTIVE mission: observe the conversation, summarize intent, and help the operator form a mission — no tools except survey_auto_connect (Survey TEAM LINKS), Call Station matchmaker tools (call_station_*), and observe_operator_pane. " +
         "When the operator asks to connect/pair/link Echo, Mirage, and PowerFist (e.g. connect mirage to powerfist), call survey_auto_connect immediately. " +
+        "When they ask who is waiting / open a pairing room / find a room code, use Call Station tools. " +
         "With an ACTIVE mission: break work into steps, prepare delegation packages for external workers (Cursor, Codex, OpenCode, ChatGPT), " +
         "record assignments and results, and advance mission status. Use native worker tools — do not host CADRE runtimes. " +
         "Operator pane edits auto-save when a writable path exists."

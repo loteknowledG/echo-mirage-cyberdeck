@@ -13,6 +13,7 @@ import {
   formatSuggestOperatorEditResult,
   formatSamusHandsEyesResult,
   formatSurveyAutoConnectResult,
+  formatCallStationResult,
   formatWorkspaceExecResult,
 } from "@/lib/muthur-core/format-tool-result";
 import { extractOperatorEditFromToolOutput } from "@/lib/muthur-core/suggest-operator-edit";
@@ -96,6 +97,14 @@ export async function executeRegistryToolForOpenAi(
       if (surveyRef) ctx.surveyAutoConnect = surveyRef;
     }
     return formatSurveyAutoConnectResult(result.output);
+  }
+  if (
+    functionName === "call_station_who_is_waiting" ||
+    functionName === "call_station_open_room" ||
+    functionName === "call_station_match" ||
+    functionName === "call_station_find_room"
+  ) {
+    return formatCallStationResult(result.output);
   }
   if (functionName === "clock") {
     return formatClockResult(result.output);

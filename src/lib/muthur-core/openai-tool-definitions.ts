@@ -334,6 +334,88 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
   {
     type: "function",
     function: {
+      name: "call_station_who_is_waiting",
+      description:
+        "Call Station AI matchmaker: list pairing rooms where someone is waiting. Call when asked who is waiting, where the room is, or who needs a peer.",
+      parameters: {
+        type: "object",
+        properties: {
+          lookingFor: {
+            type: "string",
+            enum: ["echo", "mirage", "powerfist", "any"],
+            description: "Filter by role waiting (default any).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "call_station_open_room",
+      description:
+        "Call Station: open a waiting room with a short code so a peer can find you.",
+      parameters: {
+        type: "object",
+        properties: {
+          waitingAs: {
+            type: "string",
+            enum: ["echo", "mirage", "powerfist", "any"],
+            description: "Role you are waiting as (default any).",
+          },
+          label: {
+            type: "string",
+            description: "Optional human label (e.g. capture desk).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "call_station_match",
+      description:
+        "Call Station: match into a waiting room for a role, or open a new room if none exist.",
+      parameters: {
+        type: "object",
+        properties: {
+          lookingFor: {
+            type: "string",
+            enum: ["echo", "mirage", "powerfist", "any"],
+            description: "Role you want to find waiting (default any).",
+          },
+          label: {
+            type: "string",
+            description: "Label if a new waiting room must be opened.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "call_station_find_room",
+      description: "Call Station: look up a room by short code (e.g. K7M2).",
+      parameters: {
+        type: "object",
+        properties: {
+          code: {
+            type: "string",
+            description: "Short room code.",
+          },
+          roomId: {
+            type: "string",
+            description: "Full room id if known.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "clock",
       description: "Current date/time on the server machine.",
       parameters: {
