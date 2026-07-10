@@ -191,7 +191,8 @@ async function deliverToMirageTabs(payload) {
   };
 }
 
-export async function captureAndDeliverActiveTab() {
+/** Active tab snapshot for Phase 0 deliver or Phase 1 bridge (no Mirage tab required). */
+export async function captureActiveTabSnapshot() {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!active?.id) {
     return { ok: false, reason: "No active tab." };
@@ -203,8 +204,14 @@ export async function captureAndDeliverActiveTab() {
     };
   }
 
-  const payload = await captureTabSnapshot(active.id);
-  return deliverToMirageTabs(payload);
+  const snapshot = await captureTabSnapshot(active.id);
+  return { ok: true, snapshot };
+}
+
+export async function captureAndDeliverActiveTab() {
+  const captured = await captureActiveTabSnapshot();
+  if (!captured.ok) return captured;
+  return deliverToMirageTabs(captured.snapshot);
 }
 
 async function postExtensionResult(id, result) {
@@ -234,6 +241,23 @@ async function handleBridgeCommand(command) {
       await postExtensionResult(command.id, {
         ok: true,
         message: `echo-extension captured · ${snapshot.title || snapshot.url}`,
+        snapshot,
+      });
+      return;
+    }
+    if (command.kind === "capture-active") {
+      const captured = await captureActiveTabSnapshot();
+      if (!captured.ok) {
+        await postExtensionResult(command.id, {
+          ok: false,
+          reason: captured.reason ?? "Active tab capture failed.",
+        });
+        return;
+      }
+      const snapshot = captured.snapshot;
+      await postExtensionResult(command.id, {
+        ok: true,
+        message: `echo-extension captured active · ${snapshot.title || snapshot.url}`,
         snapshot,
       });
       return;

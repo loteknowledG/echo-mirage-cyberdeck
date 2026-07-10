@@ -5,6 +5,7 @@ How to switch between **Next.js in-process** services and **Go sidecars** for EM
 Related code:
 
 - Transport overview: [`src/lib/cyberdeck/survey-boundary.ts`](../src/lib/cyberdeck/survey-boundary.ts)
+- Phase 0/1 extension capture tests: [`docs/survey-network-tests.md`](./survey-network-tests.md)
 - Go project: [`f:\dev\survey-emp-go`](../../survey-emp-go) (sibling repo)
 - Mirage relay client: [`src/lib/cyberdeck/survey-relay-base.ts`](../src/lib/cyberdeck/survey-relay-base.ts)
 - Hub bridge: [`src/lib/server/powerfist-hub-bridge.server.ts`](../src/lib/server/powerfist-hub-bridge.server.ts)

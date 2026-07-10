@@ -36,6 +36,8 @@ export async function executeEchoSatelliteCommand(action, deps = {}) {
       return listExtensionTabs();
     case "echo.ext-capture-text":
       return captureExtensionTab(deps.tabId);
+    case "echo.ext-capture-active":
+      return captureExtensionActiveTab();
     case "echo.ext-bridge-status":
       return { ok: true, ...getEchoExtensionBridgeStatus(), message: "echo-extension bridge status." };
     default:
@@ -90,6 +92,30 @@ async function captureExtensionTab(tabId) {
     return {
       ok: false,
       reason: error instanceof Error ? error.message : "echo-extension capture-tab failed.",
+      bridge: getEchoExtensionBridgeStatus(),
+    };
+  }
+}
+
+async function captureExtensionActiveTab() {
+  try {
+    const result = await enqueueEchoExtensionCommand("capture-active");
+    if (!result?.ok) {
+      return {
+        ok: false,
+        reason: result?.reason ?? "echo-extension capture-active failed.",
+      };
+    }
+    return {
+      ok: true,
+      message: result.message ?? "Captured active tab via echo-extension.",
+      snapshot: result.snapshot,
+      bridge: getEchoExtensionBridgeStatus(),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "echo-extension capture-active failed.",
       bridge: getEchoExtensionBridgeStatus(),
     };
   }

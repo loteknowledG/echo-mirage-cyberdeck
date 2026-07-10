@@ -6,6 +6,9 @@ import {
 } from "@/lib/cyberdeck/survey-deck-command.client";
 import { ingestSurveyExtensionPageContext } from "@/lib/cyberdeck/survey-extension-page-context.client";
 import type { SurveyExtensionTabOption } from "@/lib/cyberdeck/survey-extension-page-context";
+import { isHttpsBrowserClient } from "@/lib/cyberdeck/survey-pairing-shared.client";
+import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
+import { DEFAULT_ECHO_HTTP_PORT } from "@/lib/cyberdeck/survey-pair-pin";
 
 const LINKED_TAB_STORAGE_KEY = "echo-mirage-echo-extension-linked-tab-id";
 
@@ -16,27 +19,90 @@ export type EchoExtensionRemoteResult = {
   snapshotIngested?: boolean;
 };
 
+function commandBody(action: string, extra?: { tabId?: number }) {
+  const body: { action: string; tabId?: number } = { action };
+  if (Number.isFinite(extra?.tabId)) {
+    body.tabId = extra!.tabId;
+  }
+  return body;
+}
+
+/**
+ * Same-machine Phase 1: browser → Echo Satellite directly (CORS *).
+ * Required for Zen/other browsers; cyberdeck-electron can also use the Next proxy.
+ * HTTPS Mirage (Vercel) cannot call http://127.0.0.1 (mixed content) — use local HTTP cyberdeck.
+ */
+async function postEchoCommandDirectLocal(
+  action: string,
+  port: number,
+  extra?: { tabId?: number },
+): Promise<Record<string, unknown> | null> {
+  if (typeof window === "undefined") return null;
+  if (isHttpsBrowserClient() && !isEchoMirageDesktopShell()) {
+    return null;
+  }
+
+  const body = JSON.stringify(commandBody(action, extra));
+  for (const host of ["127.0.0.1", "localhost"] as const) {
+    try {
+      const res = await fetch(`http://${host}:${port}/api/survey/echo/command`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        cache: "no-store",
+        signal: AbortSignal.timeout(20_000),
+      });
+      const payload = (await res.json()) as Record<string, unknown>;
+      if (res.ok && payload.ok === true) return payload;
+      if (payload.ok === false) return payload;
+    } catch {
+      /* try next host */
+    }
+  }
+  return null;
+}
+
 async function postEchoRemoteCommand(
   action: string,
   ctx: SurveyDeckCommandContext,
   extra?: { tabId?: number },
 ): Promise<Record<string, unknown>> {
-  const host = ctx.echoHost?.trim();
-  if (!host) {
-    return { ok: false, reason: "Echo host unknown — link echo-electron in TEAM LINKS." };
+  const port = ctx.echoHttpPort || DEFAULT_ECHO_HTTP_PORT;
+
+  const direct = await postEchoCommandDirectLocal(action, port, extra);
+  if (direct) return direct;
+
+  if (isHttpsBrowserClient() && !isEchoMirageDesktopShell()) {
+    return {
+      ok: false,
+      reason:
+        "Same-machine Phase 1 needs Mirage on local HTTP cyberdeck (e.g. http://127.0.0.1:<port>/cyberdeck) — not Vercel HTTPS. Or use cyberdeck-electron. Mixed content blocks browser → Echo :3050.",
+    };
   }
+
+  const host = ctx.echoHost?.trim() || "127.0.0.1";
 
   const params = new URLSearchParams({
     echoHost: host,
-    echoHttpPort: String(ctx.echoHttpPort),
+    echoHttpPort: String(port),
   });
 
-  const res = await fetch(`/api/survey/echo/remote-command?${params}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, tabId: extra?.tabId }),
-  });
-  return (await res.json()) as Record<string, unknown>;
+  try {
+    const res = await fetch(`/api/survey/echo/remote-command?${params}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(commandBody(action, extra)),
+    });
+    return (await res.json()) as Record<string, unknown>;
+  } catch (err) {
+    return {
+      ok: false,
+      reason:
+        err instanceof Error
+          ? err.message
+          : "Could not reach echo-electron — is Echo Satellite running on :3050?",
+    };
+  }
 }
 
 export function readLinkedEchoExtensionTabId(): number | null {
@@ -138,6 +204,40 @@ export async function captureEchoExtensionTab(
     return {
       ok: false,
       message: err instanceof Error ? err.message : "echo-extension capture failed.",
+    };
+  }
+}
+
+/** Phase 1 — current active tab on capture Chrome (via Echo Satellite bridge). */
+export async function captureEchoExtensionActiveTab(
+  ctx: SurveyDeckCommandContext = resolveSurveyEchoDeckContext(),
+): Promise<EchoExtensionRemoteResult> {
+  try {
+    const payload = await postEchoRemoteCommand("echo.ext-capture-active", ctx);
+    if (payload.ok !== true) {
+      return {
+        ok: false,
+        message:
+          typeof payload.reason === "string"
+            ? payload.reason
+            : "echo-extension active capture failed via echo-electron.",
+      };
+    }
+
+    const snapshot = payload.snapshot;
+    const ingested = ingestSurveyExtensionPageContext(snapshot);
+    return {
+      ok: true,
+      message:
+        typeof payload.message === "string"
+          ? payload.message
+          : "Captured active tab via echo-extension.",
+      snapshotIngested: Boolean(ingested),
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "echo-extension active capture failed.",
     };
   }
 }
