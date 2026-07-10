@@ -10,9 +10,9 @@ import { resolve } from "node:path";
 
 const ROOT = process.cwd();
 
-/** P0 baseline (2026-06). Lower in P1/P2 PRs per L-CYBERDECK-001. */
-const MAX_CYBERDECK_APP_LINES = 3_660;
-const MAX_CYBERDECK_APP_IMPORTS = 107;
+/** P9.1 voice extraction (2026-07). Lower in subsequent P9 PRs. */
+const MAX_CYBERDECK_APP_LINES = 3_000;
+const MAX_CYBERDECK_APP_IMPORTS = 98;
 
 /** Heavy pane modules must stay behind pane-chunks / dynamic(), not cyberdeck-app. */
 const FORBIDDEN_STATIC_IMPORTS = [

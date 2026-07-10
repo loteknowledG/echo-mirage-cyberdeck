@@ -1,6 +1,6 @@
 # L-CYBERDECK-001 — Conductor Status Board
 
-**Updated:** 2026-07-09 (P8.3 merged; P8.4 judicial PASS — **P8 complete**)
+**Updated:** 2026-07-09 (P9.1 judicial PASS — voice hook extracted)
 
 ---
 
@@ -10,6 +10,16 @@
 |-------|-------------|----------|-------|
 | **P7** | Done | **PASS** | Route **4 lines** |
 | **P8** | Done | **PASS** | P8.1–P8.4 — Survey rename cleanup **complete** |
+| **P9** | In progress | **PASS** (P9.1) | Voice hook — **−687 lines** |
+
+---
+
+## P9 summary
+
+| Slice | Deliverable | Status |
+|-------|-------------|--------|
+| P9.1 | `use-cyberdeck-voice.ts` + `mother-terminal.ts` | PR pending |
+| P9.2 | Heap / workspace hydration hooks | Planned |
 
 ---
 
@@ -20,7 +30,7 @@
 | P8.1 | `SurveyMission*` types only | **MERGED** #59 |
 | P8.2 | `survey-hub-socket.ts` canonical | **MERGED** #60 |
 | P8.3 | Dead pane/embed shims deleted | **MERGED** #61 |
-| P8.4 | Legacy pairing UI removed | PR pending |
+| P8.4 | Legacy pairing UI removed | **MERGED** #62 |
 
 ---
 
@@ -28,8 +38,7 @@
 
 | Pos | Slice | PR | Status |
 |----:|-------|-----|--------|
-| — | P8.3 | [#61](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/61) | **MERGED** `b82f480` |
-| **1** | **P8.4** | — | legacy pairing removal — **MERGE** |
+| **1** | **P9.1** | — | voice hook extraction — **MERGE** |
 
 ---
 
@@ -37,7 +46,7 @@
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Developer agent** | Open P8.4 PR; after merge close L-CYBERDECK-001 P8 track |
+| 1 | **Developer agent** | Open P9.1 PR; continue P9.2 heap/workspace slices |
 | 2 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
 
 ---
@@ -46,5 +55,5 @@
 
 | Date | Decision |
 |------|----------|
-| 2026-07-09 | P8.3 merged — PR #61 `b82f480` |
-| 2026-07-09 | P8.4 judicial PASS — legacy pairing UI removed; **P8 complete** |
+| 2026-07-09 | P8.4 merged — PR #62 `7b9a87a` — **P8 complete** |
+| 2026-07-09 | P9.1 judicial PASS — voice subsystem extracted; app **2973 lines** |
