@@ -33,6 +33,26 @@ export function SurveyMiragePane() {
         <p className="mt-1 text-[9px] text-[#6a6a8a]">{SURVEY_MIRAGE_TAGLINE}</p>
       </div>
 
+      {extension.lastSnapshot ? (
+        <p className="rounded border border-emerald-500/40 bg-emerald-950/15 px-3 py-2 text-[8px] leading-relaxed text-[#8ab89a]">
+          Survey Satellite · received{" "}
+          <strong className="text-emerald-300/90">
+            {extension.lastSnapshot.title || extension.lastSnapshot.url}
+          </strong>
+          {extension.deliveredAt ? (
+            <span className="text-[#5f8f74]">
+              {" "}
+              · {new Date(extension.deliveredAt).toLocaleTimeString()}
+            </span>
+          ) : null}
+        </p>
+      ) : (
+        <p className="rounded border border-[#1c1c1c] bg-black/40 px-3 py-2 text-[8px] leading-relaxed text-[#5f5f5f]">
+          Survey Satellite extension — send active-tab text from Chrome; a receipt toast appears on
+          cyberdeck when it lands.
+        </p>
+      )}
+
       {!mirageLinked && !terminated ? (
         hubEnabled ? (
           <SurveyHubSubPaneHint />
@@ -45,19 +65,6 @@ export function SurveyMiragePane() {
 
       {mirageLinked ? (
         <>
-          {extension.lastSnapshot ? (
-            <p className="rounded border border-emerald-950/40 bg-emerald-950/10 px-3 py-2 text-[8px] leading-relaxed text-[#7a9a8a]">
-              Survey Satellite · last page{" "}
-              <strong className="text-emerald-300/90">
-                {extension.lastSnapshot.title || extension.lastSnapshot.url}
-              </strong>
-            </p>
-          ) : (
-            <p className="rounded border border-[#1c1c1c] bg-black/40 px-3 py-2 text-[8px] leading-relaxed text-[#5f5f5f]">
-              Install the Survey Satellite browser extension to send active-tab text here without
-              clipboard.
-            </p>
-          )}
           <SurveyMirageItemSelectList surface="mirage" className="-mx-4 rounded-none border-x-0" />
           <SurveyMirageCapturePreview />
           <div className="border-t border-[#1c1c1c] pt-4">
