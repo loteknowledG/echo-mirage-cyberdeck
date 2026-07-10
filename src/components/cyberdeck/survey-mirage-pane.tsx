@@ -15,11 +15,13 @@ import { useSurveyEchoLinkWatch } from "@/lib/cyberdeck/survey-echo-link-watch";
 import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
 import { SurveyHubSubPaneHint } from "@/components/cyberdeck/survey-hub-subpane-hint";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
+import { useSurveyExtensionPageContextStatus } from "@/lib/cyberdeck/survey-extension-page-context.client";
 import { readSurveyMiragePairCredentials } from "@/lib/cyberdeck/survey-pairing-client";
 
 export function SurveyMiragePane() {
   const { paired, terminated } = useSurveyEchoLinkWatch("mirage");
   const team = useSurveyTeamStatus();
+  const extension = useSurveyExtensionPageContextStatus();
   const hubEnabled = isSurveyHubEnabled();
   const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
 
@@ -43,6 +45,19 @@ export function SurveyMiragePane() {
 
       {mirageLinked ? (
         <>
+          {extension.lastSnapshot ? (
+            <p className="rounded border border-emerald-950/40 bg-emerald-950/10 px-3 py-2 text-[8px] leading-relaxed text-[#7a9a8a]">
+              Survey Satellite · last page{" "}
+              <strong className="text-emerald-300/90">
+                {extension.lastSnapshot.title || extension.lastSnapshot.url}
+              </strong>
+            </p>
+          ) : (
+            <p className="rounded border border-[#1c1c1c] bg-black/40 px-3 py-2 text-[8px] leading-relaxed text-[#5f5f5f]">
+              Install the Survey Satellite browser extension to send active-tab text here without
+              clipboard.
+            </p>
+          )}
           <SurveyMirageItemSelectList surface="mirage" className="-mx-4 rounded-none border-x-0" />
           <SurveyMirageCapturePreview />
           <div className="border-t border-[#1c1c1c] pt-4">

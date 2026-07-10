@@ -6,6 +6,7 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { CyberdeckStartupLoader } from "@/components/cyberdeck/cyberdeck-startup-loader";
 import { SurveyCaptureDeckHost } from "@/components/cyberdeck/survey-capture-deck-host";
 import { SurveyEmpLaunchHost } from "@/components/cyberdeck/survey-emp-launch-host";
+import { SurveyExtensionPageContextHost } from "@/components/cyberdeck/survey-extension-page-context-host";
 import { GlyphCatalogPrefetch } from "@/components/providers/glyph-catalog-prefetch";
 
 const CyberdeckApp = dynamic(() => import("@/features/cyberdeck/cyberdeck-app"), {
@@ -65,6 +66,7 @@ export function CyberdeckPageClient() {
       <GlyphCatalogPrefetch />
       <SurveyCaptureDeckHost />
       <SurveyEmpLaunchHost />
+      <SurveyExtensionPageContextHost />
       <CyberdeckErrorBoundary>
         <CyberdeckApp />
       </CyberdeckErrorBoundary>
