@@ -276,7 +276,7 @@ export const MUTHUR_OPENAI_TOOLS: Array<{
     function: {
       name: "operator_browser",
       description:
-        "Operator web pane: open URLs or web search queries, capture snapshot text, navigate back/forward/reload, or interact via CSS selector. Do NOT use for local filesystem paths — use localfs instead.",
+        "Operator web pane: goto returns LIVE PAGE TEXT during tool rounds (server fetch); snapshot reads that page. Also mirrors in the operator web pane. Use at most one goto + one snapshot per question — do not loop snapshot. For general knowledge without a specific site, answer without browser. Do NOT use for local filesystem paths — use localfs instead.",
       parameters: {
         type: "object",
         properties: {

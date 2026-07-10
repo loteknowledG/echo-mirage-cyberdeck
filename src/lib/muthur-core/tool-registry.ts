@@ -458,47 +458,79 @@ async function runOpenOperatorFile(call: ToolCall): Promise<ToolResult> {
 async function runOperatorBrowser(call: ToolCall): Promise<ToolResult> {
   const action = getStringArg(call, "action").toLowerCase() || "goto";
 
+  let queueOutput: Record<string, unknown>;
+
   if (action === "goto") {
     const url = getStringArg(call, "url") || getStringArg(call, "query");
     if (!url) {
       return { ok: false, error: "operator_browser goto requires url or query." };
     }
-    return { ok: true, output: { kind: "goto", url } };
-  }
-
-  if (action === "snapshot") {
-    return { ok: true, output: { kind: "snapshot" } };
-  }
-  if (action === "back") {
-    return { ok: true, output: { kind: "back" } };
-  }
-  if (action === "forward") {
-    return { ok: true, output: { kind: "forward" } };
-  }
-  if (action === "reload") {
-    return { ok: true, output: { kind: "reload" } };
-  }
-  if (action === "click") {
+    queueOutput = { kind: "goto", url, queued: true };
+  } else if (action === "snapshot") {
+    queueOutput = { kind: "snapshot", queued: true };
+  } else if (action === "back") {
+    queueOutput = { kind: "back", queued: true };
+  } else if (action === "forward") {
+    queueOutput = { kind: "forward", queued: true };
+  } else if (action === "reload") {
+    queueOutput = { kind: "reload", queued: true };
+  } else if (action === "click") {
     const selector = getStringArg(call, "selector");
     if (!selector) return { ok: false, error: "operator_browser click requires selector." };
-    return { ok: true, output: { kind: "click", selector } };
-  }
-  if (action === "type") {
+    queueOutput = { kind: "click", selector, queued: true };
+  } else if (action === "type") {
     const selector = getStringArg(call, "selector");
     const value = getStringArg(call, "value");
     if (!selector) return { ok: false, error: "operator_browser type requires selector." };
-    return { ok: true, output: { kind: "type", selector, value } };
-  }
-  if (action === "submit") {
+    queueOutput = { kind: "type", selector, value, queued: true };
+  } else if (action === "submit") {
     const selector = getStringArg(call, "selector");
     if (!selector) return { ok: false, error: "operator_browser submit requires selector." };
-    return { ok: true, output: { kind: "submit", selector } };
+    queueOutput = { kind: "submit", selector, queued: true };
+  } else {
+    return {
+      ok: false,
+      error:
+        "operator_browser action must be goto, snapshot, back, forward, reload, click, type, or submit.",
+    };
   }
 
-  return {
-    ok: false,
-    error: "operator_browser action must be goto, snapshot, back, forward, reload, click, type, or submit.",
-  };
+  const liveKinds = new Set(["goto", "snapshot", "back", "forward", "reload"]);
+  if (!liveKinds.has(action)) {
+    return { ok: true, output: queueOutput };
+  }
+
+  try {
+    const { executeOperatorBrowserLiveAction } = await import(
+      "@/lib/muthur/browser/operator-browser-tool.server"
+    );
+    const live = await executeOperatorBrowserLiveAction(action, call.args);
+    if (live.ok) {
+      return {
+        ok: true,
+        output: {
+          ...queueOutput,
+          live: live.snapshot,
+        },
+      };
+    }
+    return {
+      ok: true,
+      output: {
+        ...queueOutput,
+        liveError: live.error,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Live browser fetch unavailable.";
+    return {
+      ok: true,
+      output: {
+        ...queueOutput,
+        liveError: message,
+      },
+    };
+  }
 }
 
 async function runSuggestOperatorEdit(call: ToolCall): Promise<ToolResult> {
@@ -732,7 +764,7 @@ export function createMuthurToolRegistry(): ToolRegistry {
       operator_browser: {
         name: "operator_browser",
         description:
-          "Control the operator web pane: goto URL or search query, snapshot page text, back/forward/reload, click/type/submit by CSS selector. Use for web research — not for local disk paths (use localfs).",
+          "Control the operator web pane: goto URL or search query returns live page text during tool rounds; snapshot reads that page. Use for web research — not for local disk paths (use localfs). Do not call snapshot in a loop.",
         run: runOperatorBrowser,
       },
       survey_auto_connect: {
