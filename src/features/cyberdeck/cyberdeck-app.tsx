@@ -72,12 +72,8 @@ import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, typ
 import { CyberdeckScrollbarHost } from "@/components/cyberdeck/cyberdeck-scrollbar-host";
 import { SurveyHubHost } from "@/features/cyberdeck/survey/survey-hub-host";
 import { usePowerfistDeckSocket } from "@/features/cyberdeck/survey/use-powerfist-deck-socket";
-import {
-  notifySurveyTabClosed,
-} from "@/features/cyberdeck/survey/survey-tab-lifecycle";
 import { CyberdeckLayoutShell } from "@/features/cyberdeck/layout/cyberdeck-layout-shell";
 import { useMobileCyberdeckLayout } from "@/features/cyberdeck/layout/use-mobile-cyberdeck-layout";
-import { CustomTabPaneRenderer } from "@/features/cyberdeck/workspace/custom-tab-pane-renderer";
 import {
   UI_STATE_STORAGE_KEY,
   useCyberdeckWorkspaceHydration,
@@ -88,8 +84,6 @@ import { useCyberdeckKeyboardNav } from "@/features/cyberdeck/keyboard/use-cyber
 import { useCyberdeckGlyphChannel } from "@/features/cyberdeck/glyph/use-cyberdeck-glyph-channel";
 import { useCyberdeckMemoryIdentity } from "@/features/cyberdeck/memory/use-cyberdeck-memory-identity";
 import { CyberdeckContextMenus } from "@/features/cyberdeck/workspace/cyberdeck-context-menus";
-import { useCustomTabBrowser } from "@/features/cyberdeck/workspace/use-custom-tab-browser";
-import { useRailTabContextMenu } from "@/features/cyberdeck/workspace/use-rail-tab-context-menu";
 import { OperatorPaneHost } from "@/features/cyberdeck/operator/operator-pane-host";
 import { useOperatorWorkspaceState } from "@/features/cyberdeck/operator/use-operator-workspace-state";
 import { cn } from "@/lib/utils";
@@ -126,20 +120,13 @@ import {
 } from "@/features/cyberdeck/gateway/use-provider-connection";
 import { GatewayColumn } from "@/features/cyberdeck/gateway/gateway-column";
 import { useGatewayPaneState } from "@/features/cyberdeck/gateway/use-gateway-pane-state";
+import { useCyberdeckGatewayTabs } from "@/features/cyberdeck/gateway/use-cyberdeck-gateway-tabs";
 import { MuthurChatColumn } from "@/features/cyberdeck/muthur/muthur-chat-column";
 import {
-  defaultCustomTabGlyphForKind,
-  defaultCustomTabLabelForKind,
-  isUnassignedCustomTab,
-  parseCustomTabCommand,
-  sanitizeCustomTabs,
   type CustomTab,
-  type CustomTabKind,
   ENABLE_CARD_TABLE,
   safeServerId,
   SERVER_IDS,
-  servers,
-  type ServerId,
   type ServerRailButton,
 } from "@/features/cyberdeck/workspace/custom-tab-model";
 import {
@@ -593,6 +580,95 @@ const operatorWorkspace = useOperatorWorkspaceState({
     setGatewayPaneContextMenu(null);
     emitSignal({ source: "ui", type: "cancel", payload: { target: "gateway_menu" }, severity: "info" });
   }, []);
+  const customTabPane = useMemo(
+    () => ({
+      activeProvider,
+      connectionState,
+      modelID,
+      providerModelFetchStatus,
+      voiceEnabled,
+      voiceHealth,
+      muthurMemory,
+      muthurMemoryHydrated,
+      muthurMemoryLoadError,
+      messages,
+      streamText,
+      heapEntryCount: heapEntries.length,
+      providerKeys,
+      operatorBrowserEngine,
+      operatorBrowserRef,
+      identity,
+      orchestration,
+      deckSfxVolume,
+      sonarVolume,
+      voiceDialVolume: voiceDial.volume,
+      speakDeckVoiceLine,
+      onVoiceToggle: toggleVoiceEnabled,
+      onVoiceVolumeChange: handleVoiceVolumeChange,
+      onSonarVolumeChange: handleSonarVolumeChange,
+      onDeckSfxVolumeChange: handleDeckSfxVolumeChange,
+      messageInputRef,
+    }),
+    [
+      activeProvider,
+      connectionState,
+      deckSfxVolume,
+      handleDeckSfxVolumeChange,
+      handleSonarVolumeChange,
+      handleVoiceVolumeChange,
+      heapEntries.length,
+      identity,
+      messages,
+      modelID,
+      muthurMemory,
+      muthurMemoryHydrated,
+      muthurMemoryLoadError,
+      operatorBrowserEngine,
+      operatorBrowserRef,
+      orchestration,
+      providerKeys,
+      providerModelFetchStatus,
+      sonarVolume,
+      speakDeckVoiceLine,
+      streamText,
+      toggleVoiceEnabled,
+      voiceDial.volume,
+      voiceEnabled,
+      voiceHealth,
+    ],
+  );
+
+  const {
+    updateCustomTab,
+    convertCustomTab,
+    railTabContextMenu,
+    closeRailTabContextMenu,
+    openRailTabContextMenu,
+    openNewTabMenu,
+    applyTabMenuAction,
+    deleteActiveTab,
+    handleTabClick,
+    openOrFocusDiagnosticsTab,
+    openOrFocusPiTab,
+    openOrFocusCallCenterTab,
+    handleModuleFocusSignal,
+    renderCustomTabSurface,
+  } = useCyberdeckGatewayTabs({
+    assignOperatorAsset,
+    setNavRailContext,
+    setMessages,
+    setServerKeyboardHighlightId,
+    closeMirageContextMenu,
+    closeGatewayPaneContextMenu,
+    focusGatewayConnectionPanel,
+    handleTabClickRef,
+    openRealmorphismKitTabRef,
+    customTabPane,
+  });
+
+  useDeckSignal(handleModuleFocusSignal);
+
+
 
 
   const muthurChatScrollKey = useMemo(() => {
@@ -844,245 +920,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
     }
   }, [loadOperatorAssetFromFile, openOperatorFile]);
 
-  const updateCustomTab = useCallback((tabId: string, updater: (tab: CustomTab) => CustomTab) => {
-    useCyberdeckTabStore.getState().setCustomTabs((prev) =>
-      prev.map((tab) => (tab.id === tabId ? updater(tab as CustomTab) : (tab as CustomTab))),
-    );
-  }, []);
-
-  const convertCustomTab = useCallback(
-    (
-      tabId: string,
-      nextKind: CustomTabKind,
-      options?: {
-        label?: string;
-        glyph?: string;
-      },
-    ) => {
-      const sourceTab = useCyberdeckTabStore.getState().customTabs.find((t) => t.id === tabId);
-      if (!sourceTab) return;
-      if (!isUnassignedCustomTab(sourceTab)) return;
-
-      if (nextKind === "document") {
-        const sourceAsset = sourceTab.asset as DroppedOperatorAsset | null | undefined;
-        flushSync(() => {
-          if (sourceAsset) {
-            assignOperatorAsset(sourceAsset);
-          }
-          const store = useCyberdeckTabStore.getState();
-          store.setActiveCustomTabId(null);
-          store.setServer("m");
-          store.mountFixedServer("m");
-        });
-        setNavRailContext("gateway");
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            text: sourceAsset
-              ? `TAB_DOCUMENT // OPENED ØPERATOR // ${sourceAsset.name}`
-              : "TAB_DOCUMENT // OPENED ØPERATOR WORKSPACE",
-          },
-        ]);
-        playDeckSystemSound("chirp", 0.05);
-        return;
-      }
-
-      flushSync(() => {
-        updateCustomTab(tabId, (tab) => {
-          const nextLabel = options?.label || tab.label || nextKind.toUpperCase();
-          const nextGlyph = options?.glyph || tab.glyph || defaultCustomTabGlyphForKind(nextKind);
-
-          return {
-            ...tab,
-            kind: nextKind,
-            label: nextLabel,
-            glyph: nextGlyph,
-            browserUrl: nextKind === "web" ? tab.browserUrl || OPERATOR_BROWSER_HOME_URL : undefined,
-            asset: null,
-          };
-        });
-        const store = useCyberdeckTabStore.getState();
-        store.setActiveCustomTabId(tabId);
-        store.mountCustomTab(tabId);
-      });
-      setNavRailContext("tabs");
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "system",
-          text: `TAB_CONVERTED // ${tabId} // ${nextKind.toUpperCase()}`,
-        },
-      ]);
-      playDeckSystemSound("chirp", 0.05);
-    },
-    [assignOperatorAsset, setMessages, setNavRailContext, updateCustomTab],
-  );
-
-
-  const { customTabBrowserNavigate, handleCustomTabDrop } = useCustomTabBrowser({
-    updateCustomTab,
-    setNavRailContext,
-    setMessages,
-  });
-
-  const {
-    railTabContextMenu,
-    closeRailTabContextMenu,
-    openRailTabContextMenu,
-    openNewTabMenu,
-    applyTabMenuAction,
-  } = useRailTabContextMenu({
-    closeMirageContextMenu,
-    closeGatewayPaneContextMenu,
-    convertCustomTab,
-    openRealmorphismKitTab: (tabId) => openRealmorphismKitTabRef.current(tabId),
-    setNavRailContext,
-    setMessages,
-  });
-
-  const openRealmorphismKitTab = useCallback(
-    (tabId?: string) => {
-      closeRailTabContextMenu();
-      closeMirageContextMenu();
-      closeGatewayPaneContextMenu();
-
-      const targetTabId = tabId || `tab-${crypto.randomUUID()}`;
-
-      flushSync(() => {
-        const store = useCyberdeckTabStore.getState();
-        const existing = store.customTabs.some((tab) => tab.id === targetTabId);
-
-        if (existing) {
-          store.setCustomTabs((prev) =>
-            prev.map((tab) =>
-              tab.id === targetTabId
-                ? {
-                    ...tab,
-                    label: "REALMORPHISM KIT",
-                    glyph: "K",
-                    kind: "realmorphism-kit",
-                    browserUrl: undefined,
-                    asset: null,
-                  }
-                : tab,
-            ),
-          );
-        } else {
-          store.setCustomTabs((prev) => [
-            ...prev,
-            {
-              id: targetTabId,
-              label: "REALMORPHISM KIT",
-              glyph: "K",
-              kind: "realmorphism-kit",
-              asset: null,
-            },
-          ]);
-        }
-
-        store.setActiveCustomTabId(targetTabId);
-        store.mountCustomTab(targetTabId);
-      });
-
-      setNavRailContext("tabs");
-      setMessages((prev) => [
-        ...prev,
-        { role: "system", text: "TAB_KIT // REALMORPHISM REGISTRY OPENED" },
-      ]);
-      playDeckSystemSound("chirp", 0.05);
-    },
-    [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu],
-  );
-  openRealmorphismKitTabRef.current = openRealmorphismKitTab;
-
-  const deleteActiveTab = useCallback(() => {
-    closeRailTabContextMenu();
-    closeMirageContextMenu();
-    closeGatewayPaneContextMenu();
-    const activeCustomTabId = useCyberdeckTabStore.getState().activeCustomTabId;
-    if (!activeCustomTabId) return;
-    const closingTab = useCyberdeckTabStore
-      .getState()
-      .customTabs.find((tab) => tab.id === activeCustomTabId);
-    useCyberdeckTabStore.getState().setCustomTabs((prev) => prev.filter((tab) => tab.id !== activeCustomTabId));
-    useCyberdeckTabStore.setState((state) => ({
-      mountedCustomTabIds: state.mountedCustomTabIds.filter((id) => id !== activeCustomTabId),
-    }));
-    useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-    notifySurveyTabClosed(closingTab?.kind);
-    playDeckSystemSound("click", 0.02);
-  }, [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
-
-  const handleTabClick = useCallback(
-    (
-      id: string,
-      anchor?: {
-        clientX: number;
-        clientY: number;
-      },
-    ): boolean => {
-      const { customTabs, activeCustomTabId, server } = useCyberdeckTabStore.getState();
-      const isCustomTab = customTabs.some((tab) => tab.id === id);
-      const willChange = isCustomTab
-        ? activeCustomTabId !== id
-        : activeCustomTabId !== null || server !== id;
-
-      flushSync(() => {
-        if (willChange) {
-          if (isCustomTab) {
-            useCyberdeckTabStore.getState().selectTab(id, true);
-          } else {
-            useCyberdeckTabStore.getState().selectTab(id, false);
-          }
-        }
-      });
-
-      if (willChange) {
-        playDeckSystemSound("chirp", 0.03);
-        emitSignal({
-          source: "ui",
-          type: "select",
-          payload: { tabId: id, kind: isCustomTab ? "custom" : "fixed" },
-          severity: "info",
-        });
-        startTransition(() => {
-          closeRailTabContextMenu();
-          closeMirageContextMenu();
-          closeGatewayPaneContextMenu();
-          setNavRailContext("gateway");
-          setServerKeyboardHighlightId(null);
-          if (!isCustomTab && id === "s") {
-            focusGatewayConnectionPanel();
-          }
-        });
-        return true;
-      }
-
-      playDeckSystemSound("click", 0.02);
-      startTransition(() => {
-        closeMirageContextMenu();
-        closeGatewayPaneContextMenu();
-        setServerKeyboardHighlightId(null);
-
-        const tabEl = document.querySelector<HTMLElement>(`[data-server-tab="${CSS.escape(id)}"]`);
-        const rect = tabEl?.getBoundingClientRect();
-        const clientX = anchor?.clientX ?? (rect ? rect.left + rect.width / 2 : window.innerWidth / 2);
-        const clientY = anchor?.clientY ?? (rect ? rect.bottom : window.innerHeight / 2);
-        openRailTabContextMenu(id, clientX, clientY);
-      });
-      return false;
-    },
-    [
-      closeGatewayPaneContextMenu,
-      closeMirageContextMenu,
-      closeRailTabContextMenu,
-      focusGatewayConnectionPanel,
-      openRailTabContextMenu,
-    ],
-  );
-  handleTabClickRef.current = handleTabClick;
-
   const openMirageContextMenu = useCallback(
     (clientX: number, clientY: number) => {
       if (typeof window === "undefined") return;
@@ -1170,50 +1007,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
       toast.error("Could not copy.");
     }
   }, [messages, streamText]);
-
-  const openOrFocusDiagnosticsTab = useCallback(() => {
-    const customTabs = useCyberdeckTabStore.getState().customTabs;
-    const existing = customTabs.find((t) => t.kind === "diagnostics");
-    if (existing) {
-      useCyberdeckTabStore.getState().setActiveCustomTabId(existing.id);
-      setNavRailContext("tabs");
-      playDeckSystemSound("chirp", 0.05);
-      return;
-    }
-    const id = `tab-${crypto.randomUUID()}`;
-    const tab: CustomTab = {
-      id,
-      label: "DIAGNOSTICS",
-      glyph: defaultCustomTabGlyphForKind("diagnostics"),
-      kind: "diagnostics",
-    };
-    useCyberdeckTabStore.getState().setCustomTabs((prev) => [...prev, tab]);
-    useCyberdeckTabStore.getState().setActiveCustomTabId(id);
-    setNavRailContext("tabs");
-    playDeckSystemSound("chirp", 0.05);
-  }, []);
-
-  const openOrFocusPiTab = useCallback(() => {
-    const customTabs = useCyberdeckTabStore.getState().customTabs;
-    const existing = customTabs.find((t) => t.kind === "pi");
-    if (existing) {
-      useCyberdeckTabStore.getState().setActiveCustomTabId(existing.id);
-      setNavRailContext("tabs");
-      playDeckSystemSound("chirp", 0.05);
-      return;
-    }
-    const id = `tab-${crypto.randomUUID()}`;
-    const tab: CustomTab = {
-      id,
-      label: defaultCustomTabLabelForKind("pi"),
-      glyph: defaultCustomTabGlyphForKind("pi"),
-      kind: "pi",
-    };
-    useCyberdeckTabStore.getState().setCustomTabs((prev) => [...prev, tab]);
-    useCyberdeckTabStore.getState().setActiveCustomTabId(id);
-    setNavRailContext("tabs");
-    playDeckSystemSound("chirp", 0.05);
-  }, []);
 
   const { handleSend, handleStop } = useMuthurChatSend({
     messages,
@@ -1312,107 +1105,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
     onMissionSolve: handleSurveyMissionSolve,
   });
 
-  const openOrFocusCallCenterTab = useCallback(() => {
-    const customTabs = useCyberdeckTabStore.getState().customTabs;
-    const existing = customTabs.find((t) => t.kind === "call-center");
-    if (existing) {
-      useCyberdeckTabStore.getState().setActiveCustomTabId(existing.id);
-      setNavRailContext("tabs");
-      playDeckSystemSound("chirp", 0.05);
-      return;
-    }
-    const id = `tab-${crypto.randomUUID()}`;
-    const tab: CustomTab = {
-      id,
-      label: defaultCustomTabLabelForKind("call-center"),
-      glyph: defaultCustomTabGlyphForKind("call-center"),
-      kind: "call-center",
-    };
-    useCyberdeckTabStore.getState().setCustomTabs((prev) => [...prev, tab]);
-    useCyberdeckTabStore.getState().setActiveCustomTabId(id);
-    setNavRailContext("tabs");
-    playDeckSystemSound("chirp", 0.05);
-  }, []);
-
-  const openOrFocusModuleTab = useCallback(
-    (target:
-      | "memory-atlas"
-      | "catalog"
-      | "operators"
-      | "flight-log"
-      | "voice-lab"
-      | "glyph-channel"
-      | "rola-dex"
-      | "tunes"
-      | "settings") => {
-      const customTabs = useCyberdeckTabStore.getState().customTabs;
-      const existing = customTabs.find((tab) => tab.kind === target);
-      if (existing) {
-        useCyberdeckTabStore.getState().setActiveCustomTabId(existing.id);
-        setNavRailContext("tabs");
-        playDeckSystemSound("chirp", 0.05);
-        emitSignal({
-          source: "system",
-          type: "focused_module",
-          payload: { target },
-          severity: "info",
-        });
-        return true;
-      }
-      const id = `tab-${crypto.randomUUID()}`;
-      const tab: CustomTab = {
-        id,
-        label: defaultCustomTabLabelForKind(target),
-        glyph: defaultCustomTabGlyphForKind(target),
-        kind: target,
-      };
-      useCyberdeckTabStore.getState().setCustomTabs((prev) => [...prev, tab]);
-      useCyberdeckTabStore.getState().setActiveCustomTabId(id);
-      setNavRailContext("tabs");
-      playDeckSystemSound("chirp", 0.05);
-      emitSignal({
-        source: "system",
-        type: "focused_module",
-        payload: { target },
-        severity: "info",
-      });
-      return true;
-    },
-    [],
-  );
-
-  const handleModuleFocusSignal = useCallback(
-    (signal: DeckSignal) => {
-      if (signal.source !== "system" || signal.type !== "module_focus_requested") return;
-      const target = signal.payload?.["target"];
-      if (typeof target !== "string") return;
-      if (
-        target !== "memory-atlas" &&
-        target !== "catalog" &&
-        target !== "operators" &&
-        target !== "flight-log" &&
-        target !== "voice-lab" &&
-        target !== "glyph-channel" &&
-        target !== "rola-dex" &&
-        target !== "tunes" &&
-        target !== "settings"
-      ) {
-        return;
-      }
-      const focused = openOrFocusModuleTab(target);
-      if (focused) return;
-      emitSignal({
-        source: "system",
-        type: "navigate_recommendation",
-        payload: { target },
-        severity: "info",
-      });
-    },
-    [openOrFocusModuleTab],
-  );
-
-  useDeckSignal(handleModuleFocusSignal);
-
   const handleOperatorConvertSignal = useCallback(
     (signal: DeckSignal) => {
       if (signal.type !== "operator-convert-document") return;
@@ -1440,70 +1132,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
       openRailTabContextMenu(tabId, event.clientX, event.clientY);
     },
     [cancelLongPressFromContextMenu, openRailTabContextMenu],
-  );
-
-  const renderCustomTabSurface = useCallback(
-    (tab: CustomTab) => (
-      <CustomTabPaneRenderer
-        tab={tab}
-        activeProvider={activeProvider}
-        connectionState={connectionState}
-        modelID={modelID}
-        providerModelFetchStatus={providerModelFetchStatus}
-        voiceEnabled={voiceEnabled}
-        voiceHealth={voiceHealth}
-        muthurMemory={muthurMemory}
-        muthurMemoryHydrated={muthurMemoryHydrated}
-        muthurMemoryLoadError={muthurMemoryLoadError}
-        messages={messages}
-        streamText={streamText}
-        heapEntryCount={heapEntries.length}
-        providerKeys={providerKeys}
-        operatorBrowserEngine={operatorBrowserEngine}
-        operatorBrowserRef={operatorBrowserRef}
-        identity={identity}
-        orchestration={orchestration}
-        deckSfxVolume={deckSfxVolume}
-        sonarVolume={sonarVolume}
-        voiceDialVolume={voiceDial.volume}
-        speakDeckVoiceLine={speakDeckVoiceLine}
-        onVoiceToggle={toggleVoiceEnabled}
-        onVoiceVolumeChange={handleVoiceVolumeChange}
-        onSonarVolumeChange={handleSonarVolumeChange}
-        onDeckSfxVolumeChange={handleDeckSfxVolumeChange}
-        customTabBrowserNavigate={customTabBrowserNavigate}
-        handleCustomTabDrop={handleCustomTabDrop}
-        messageInputRef={messageInputRef}
-      />
-    ),
-    [
-      activeProvider,
-      connectionState,
-      customTabBrowserNavigate,
-      deckSfxVolume,
-      handleCustomTabDrop,
-      handleDeckSfxVolumeChange,
-      handleSonarVolumeChange,
-      handleVoiceVolumeChange,
-      heapEntries.length,
-      identity,
-      messages,
-      modelID,
-      muthurMemory,
-      muthurMemoryHydrated,
-      muthurMemoryLoadError,
-      operatorBrowserEngine,
-      orchestration,
-      providerKeys,
-      providerModelFetchStatus,
-      sonarVolume,
-      speakDeckVoiceLine,
-      streamText,
-      toggleVoiceEnabled,
-      voiceDial.volume,
-      voiceEnabled,
-      voiceHealth,
-    ],
   );
 
   /* Weyland: col2 = nav, col3 = terminal. Echo: flipped → col2 = terminal (chat), col3 = nav (gateway). */
