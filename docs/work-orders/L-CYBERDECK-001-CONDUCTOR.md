@@ -19,7 +19,7 @@
 | Slice | Deliverable | Status |
 |-------|-------------|--------|
 | P9.1–P9.7 | See individual JPs | **MERGED** [#63](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/63), [#66](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/66)–[#70](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/70) |
-| P9.8 | Final ratchet + master JP | PR pending |
+| P9.8 | Final ratchet + master JP | PR [#71](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/71) |
 | Master JP | [JP-L-CYBERDECK-001.md](../verifications/JP-L-CYBERDECK-001.md) | **PASS** |
 
 ---
