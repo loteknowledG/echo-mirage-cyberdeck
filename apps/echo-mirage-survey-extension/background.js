@@ -26,7 +26,8 @@ async function captureActiveTabSnapshot(tabId) {
     throw new Error("Page capture returned no data.");
   }
   if (!result.pageText?.trim()) {
-    throw new Error("Page has no readable text.");
+    const fallback = [result.title, result.url].filter((part) => part?.trim()).join(" · ");
+    result.pageText = fallback || result.url;
   }
   return result;
 }

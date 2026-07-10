@@ -6,7 +6,7 @@ import {
   SURVEY_EXTENSION_PAGE_CONTEXT_EVENT,
   type SurveyExtensionPageSnapshot,
 } from "@/lib/cyberdeck/survey-extension-page-context";
-import { notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
+import { notifySurveyMuthurArchive, notifySurveyFocusChat } from "@/lib/cyberdeck/survey-chat";
 
 export type SurveyExtensionPageContextStatus = {
   lastSnapshot: SurveyExtensionPageSnapshot | null;
@@ -39,7 +39,7 @@ export function formatSurveyExtensionPageContextForMuthur(
   const preview = snapshot.pageText.trim().slice(0, 320);
   const suffix = snapshot.pageText.length > preview.length ? "…" : "";
   return [
-    "SURVEY SATELLITE // browser page capture",
+    "SURVEY SATELLITE // RECEIVED · browser page capture",
     `URL · ${snapshot.url}`,
     `TITLE · ${title}`,
     `TEXT · ${preview}${suffix}`,
@@ -50,12 +50,16 @@ export function ingestSurveyExtensionPageContext(raw: unknown): SurveyExtensionP
   if (!raw || typeof raw !== "object") return null;
   const input = raw as Partial<SurveyExtensionPageSnapshot>;
   const url = typeof input.url === "string" ? input.url.trim() : "";
-  const pageText = typeof input.pageText === "string" ? clampPageText(input.pageText) : "";
+  let pageText = typeof input.pageText === "string" ? clampPageText(input.pageText) : "";
+  const title = typeof input.title === "string" ? input.title.trim() : "";
+  if (!pageText) {
+    pageText = clampPageText([title, url].filter(Boolean).join(" · "));
+  }
   if (!url || !pageText) return null;
 
   const snapshot: SurveyExtensionPageSnapshot = {
     url,
-    title: typeof input.title === "string" ? input.title.trim() : "",
+    title,
     pageText,
     capturedAt:
       typeof input.capturedAt === "string" && input.capturedAt.trim()
@@ -70,6 +74,7 @@ export function ingestSurveyExtensionPageContext(raw: unknown): SurveyExtensionP
     deliveryCount: status.deliveryCount + 1,
   };
   notifySurveyMuthurArchive(formatSurveyExtensionPageContextForMuthur(snapshot));
+  notifySurveyFocusChat();
   emitChanged();
   return snapshot;
 }
