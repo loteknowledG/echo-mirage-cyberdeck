@@ -10,9 +10,9 @@ import { resolve } from "node:path";
 
 const ROOT = process.cwd();
 
-/** P9.7 custom tab surface / gateway wiring (2026-07). Lower in P9.8 final ratchet. */
-const MAX_CYBERDECK_APP_LINES = 1_500;
-const MAX_CYBERDECK_APP_IMPORTS = 82;
+/** P9.8 final ratchet — compose-only cyberdeck-app (2026-07). */
+const MAX_CYBERDECK_APP_LINES = 1_200;
+const MAX_CYBERDECK_APP_IMPORTS = 81;
 
 /** Heavy pane modules must stay behind pane-chunks / dynamic(), not cyberdeck-app. */
 const FORBIDDEN_STATIC_IMPORTS = [
@@ -90,9 +90,13 @@ function main(): void {
     "pane-chunks must use dynamic import() per pane loader",
   );
 
+  const bootstrapPath = "src/features/cyberdeck/bootstrap/use-cyberdeck-app-bootstrap.ts";
+  const bootstrap = read(bootstrapPath);
+
   assert.ok(
-    cyberdeckApp.includes('import("@/features/cyberdeck/pane-chunks")'),
-    "cyberdeck-app should load pane-chunks via dynamic import (not static)",
+    cyberdeckApp.includes('import("@/features/cyberdeck/pane-chunks")') ||
+      bootstrap.includes('import("@/features/cyberdeck/pane-chunks")'),
+    "cyberdeck bootstrap should load pane-chunks via dynamic import (not static in app)",
   );
   assertNoStaticImport(cyberdeckApp, "pane-chunks", "cyberdeck-app");
 

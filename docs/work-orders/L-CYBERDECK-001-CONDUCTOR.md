@@ -1,6 +1,6 @@
 # L-CYBERDECK-001 — Conductor Status Board
 
-**Updated:** 2026-07-09 (P9.7 gateway tabs hook — judicial PASS)
+**Updated:** 2026-07-09 (P9.8 final ratchet — **P9 COMPLETE**)
 
 ---
 
@@ -10,7 +10,7 @@
 |-------|-------------|----------|-------|
 | **P7** | Done | **PASS** | Route **4 lines** |
 | **P8** | Done | **PASS** | P8.1–P8.4 — Survey rename cleanup **complete** |
-| **P9** | In progress | **PASS** (P9.1–P9.7) | App **1,449 lines** |
+| **P9** | **Done** | **PASS** | App **1,179 lines** — compose ceiling met |
 
 ---
 
@@ -18,14 +18,9 @@
 
 | Slice | Deliverable | Status |
 |-------|-------------|--------|
-| P9.1 | `use-cyberdeck-voice.ts` + `mother-terminal.ts` | **MERGED** [#63](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/63) |
-| P9.2 | Heap + workspace hydration hooks | **MERGED** [#66](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/66) |
-| P9.3 | Operator observation + screen snapshot | **MERGED** [#66](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/66) |
-| P9.4 | Keyboard routing / gateway effects | **MERGED** [#67](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/67) |
-| P9.5 | Glyph channel subsystem | **MERGED** [#68](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/68) |
-| P9.6 | MUTHUR memory + identity bootstrap | **MERGED** [#69](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/69) |
-| P9.7 | Custom tab surface / gateway wiring | PR [#70](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/70) |
-| P9.8 | Master JP + final ratchet (≤1,200 lines) | Planned |
+| P9.1–P9.7 | See individual JPs | **MERGED** [#63](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/63), [#66](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/66)–[#70](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/70) |
+| P9.8 | Final ratchet + master JP | PR [#71](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/71) |
+| Master JP | [JP-L-CYBERDECK-001.md](../verifications/JP-L-CYBERDECK-001.md) | **PASS** |
 
 ---
 
@@ -33,8 +28,8 @@
 
 | Pos | Slice | PR | Status |
 |----:|-------|-----|--------|
-| **1** | **P9.7** | [#70](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/70) | gateway tabs hook — **REVIEW** |
-| 2 | P9.6 | [#69](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/69) | **MERGED** |
+| **1** | **P9.8** | — | final ratchet — **OPEN PR** |
+| 2 | P9.7 | [#70](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/70) | **MERGED** |
 
 ---
 
@@ -42,8 +37,8 @@
 
 | # | Owner | Action |
 |---|-------|--------|
-| 1 | **Developer agent** | Open P9.7 PR; continue P9.8 after merge |
-| 2 | **Human / dev** | (Backlog) Fix stale `DECK_COMMAND_INPUT` in e2e helpers |
+| 1 | **Developer agent** | Open P9.8 PR; close L-CYBERDECK-001 after merge |
+| 2 | **Human / dev** | Measure cold compile vs L-10; import-barrel follow-on (≤35) |
 
 ---
 
@@ -51,5 +46,5 @@
 
 | Date | Decision |
 |------|----------|
-| 2026-07-09 | P9.6 merged — PR #69 — app **1,821 lines** |
-| 2026-07-09 | P9.7 judicial PASS — gateway tabs hook; app **1,449 lines** |
+| 2026-07-09 | P9.7 merged — PR #70 — app **1,449 lines** |
+| 2026-07-09 | P9.8 judicial PASS — app **1,179 lines** — **P9 stack complete** |

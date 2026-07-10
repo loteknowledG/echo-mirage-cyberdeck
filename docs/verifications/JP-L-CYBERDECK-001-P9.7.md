@@ -53,5 +53,5 @@ probe:muthur-command-console PASS
 ## Sign-off
 
 - [x] Judicial PASS
-- [ ] Merge to `main`
+- [x] Merge to `main`
 - [ ] **P9.8 HEAD** (master JP compile doc + final ratchet toward ≤1,200 lines)

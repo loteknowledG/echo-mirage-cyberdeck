@@ -25,16 +25,8 @@ import type { CanonicalTarget } from "@/lib/computer-use/ui-alias-registry";
 import {
   loadComputerUse,
 } from "@/features/cyberdeck/runtime/defer-computer-use";
-import {
-  playDeckDeclined,
-  playDeckDroidDizzy400,
-  playDeckDroidDizzy401,
-  playDeckOutOfGas429,
-  playDeckRaceReadySetGo,
-  playDeckWrongDoorShut,
-  playDeckSystemSound,
-} from "@/features/cyberdeck/runtime/defer-deck-audio";
-import { copyTextToClipboard } from "@/lib/grok-image-prompt";
+import { playModelTestErrorSound } from "@/features/cyberdeck/gateway/play-model-test-error-sound";
+import { CYBERDECK_FIXED_SERVERS } from "@/features/cyberdeck/gateway/cyberdeck-fixed-servers";
 import { revokeOperatorBlobUrl } from "@/lib/operator-binary-preview";
 import { isDocumentEditIntent, isOperatorPaneEditRequest } from "@/lib/muthur/document-edit-intent";
 import {
@@ -52,9 +44,7 @@ import {
   formatMuthurReasoningDiagnostic,
 } from "@/lib/muthur-core/muthur-stream-reasoning";
 import { useMuthurChatAutoScroll } from "@/lib/muthur-core/use-muthur-chat-auto-scroll";
-import { CADRE_MUTHUR_ARCHIVE_EVENT } from "@/lib/cadre/cadre-event-bus";
 import {
-  appendMuthurDiagnosticBatch,
   appendMuthurDiagnosticEntry,
 } from "@/lib/muthur-core/muthur-diagnostics-channel";
 import { parseOperatorConversionJson } from "@/lib/muthur-core/operator-conversion-ref";
@@ -65,10 +55,9 @@ import type { MuthurOperatorOpenFileRef } from "@/lib/muthur-core/types";
 import dynamic from "next/dynamic";
 import { PanelLoader } from "@/features/cyberdeck/panel-loader";
 import { CyberdeckBootSequence } from "@/components/cyberdeck/boot-sequence";
-import { registerCyberdeckRailTab } from "@/components/cyberdeck/cyberdeck-rail-tab";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { DeckModeProvider, loadDeckMode, notifyDeckModeChange, saveDeckMode, type DeckMode } from "@/lib/deck-mode";
+import { DeckModeProvider, loadDeckMode, type DeckMode } from "@/lib/deck-mode";
 import { CyberdeckScrollbarHost } from "@/components/cyberdeck/cyberdeck-scrollbar-host";
 import { SurveyHubHost } from "@/features/cyberdeck/survey/survey-hub-host";
 import { usePowerfistDeckSocket } from "@/features/cyberdeck/survey/use-powerfist-deck-socket";
@@ -115,30 +104,28 @@ import { useMuthurChatSend } from "@/features/cyberdeck/muthur/use-muthur-chat-s
 import { useCyberdeckVoice } from "@/features/cyberdeck/voice/use-cyberdeck-voice";
 import { useMuthurCommanderHandlers } from "@/features/cyberdeck/muthur/use-muthur-commander-handlers";
 import {
-  hasAnyProviderClientKey,
   useProviderConnection,
 } from "@/features/cyberdeck/gateway/use-provider-connection";
 import { GatewayColumn } from "@/features/cyberdeck/gateway/gateway-column";
 import { useGatewayPaneState } from "@/features/cyberdeck/gateway/use-gateway-pane-state";
 import { useCyberdeckGatewayTabs } from "@/features/cyberdeck/gateway/use-cyberdeck-gateway-tabs";
+import { useCyberdeckGatewayColumn } from "@/features/cyberdeck/gateway/use-cyberdeck-gateway-column";
+import { useCyberdeckPaneContextMenus } from "@/features/cyberdeck/workspace/use-cyberdeck-pane-context-menus";
+import { useCyberdeckAppBootstrap } from "@/features/cyberdeck/bootstrap/use-cyberdeck-app-bootstrap";
 import { MuthurChatColumn } from "@/features/cyberdeck/muthur/muthur-chat-column";
 import {
   type CustomTab,
   ENABLE_CARD_TABLE,
-  safeServerId,
   SERVER_IDS,
   type ServerRailButton,
 } from "@/features/cyberdeck/workspace/custom-tab-model";
 import {
   buildCyberdeckChatHistory,
   getOperatorFileKind,
-  isEditableOperatorFile,
   parseCodingVerifyHeader,
   readFileAsDataUrl,
-  contextMenuTargetIsTextField,
   type DroppedOperatorAsset,
 } from "@/features/cyberdeck/muthur/coding-verify-format";
-import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { formatUplinkErrorDetail } from "@/lib/cyberdeck/format-uplink-error";
 import { parseFoundationQuery } from "@/lib/muthur-foundation-intent";
 import { parseAionQuery } from "@/lib/muthur-aion-intent";
@@ -165,20 +152,9 @@ const LazyIndicateOverlay = dynamic(() => import("@/lib/computer-use/IndicateOve
   loading: () => null,
 });
 
-const fixedServers = [
-  { id: "m", glyph: "Ø", label: "ØPERATOR" },
-  { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
-  ...(ENABLE_CARD_TABLE ? [{ id: "ct", glyph: "◈", label: "CARD TABLE" }] : []),
-  { id: "b", glyph: "§", label: "SETTINGS" },
-];
-
 export default function CyberdeckApp() {
   // Start on the operator tab; disconnected users are redirected to MAINNET-UPLINK after hydration.
   // Tab rail + pane visibility: zustand store (page must not subscribe).
-  useEffect(() => {
-    registerCyberdeckRailTab();
-  }, []);
-
   const {
     inputHistory,
     setInputHistory,
@@ -234,32 +210,6 @@ export default function CyberdeckApp() {
     piControlLeaseRefresh,
     piControlLeaseRetake,
   });
-
-  const playModelTestErrorSound = useCallback((line: string) => {
-    if (line.includes("VALID_RESPONSE")) {
-      playDeckRaceReadySetGo();
-      return;
-    }
-    if (line.includes("HTTP_401")) {
-      playDeckDroidDizzy401();
-      return;
-    }
-    if (line.includes("HTTP_400")) {
-      playDeckDroidDizzy400();
-      return;
-    }
-    if (line.includes("HTTP_429")) {
-      playDeckOutOfGas429();
-      return;
-    }
-    if (line.includes("EMPTY_PROBE")) {
-      playDeckDeclined();
-      return;
-    }
-    if (line.includes("FAILURE")) {
-      playDeckWrongDoorShut();
-    }
-  }, []);
 
   const {
     activeProvider,
@@ -326,9 +276,6 @@ export default function CyberdeckApp() {
   });
 
   const networkActivityActive = scanActivityActive || isStreaming;
-  const [droppedMarkdown, setDroppedMarkdown] = useState<string | null>(null);
-  const [droppedMarkdownName, setDroppedMarkdownName] = useState<string>("");
-  const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
   const openRealmorphismKitTabRef = useRef<(tabId?: string) => void>(() => undefined);
   const handleTabClickRef = useRef<
     (
@@ -342,12 +289,6 @@ export default function CyberdeckApp() {
 
   const [showCardTablePane, setShowCardTablePane] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
-  /** Right-click menu for the main chat / Echo Mirage pane (viewport-clamped like rail tabs). */
-  const [mirageContextMenu, setMirageContextMenu] = useState<{ x: number; y: number } | null>(null);
-  /** Right-click menu for gateway column surfaces (settings, operator, connection, custom tabs). */
-  const [gatewayPaneContextMenu, setGatewayPaneContextMenu] = useState<{ x: number; y: number } | null>(
-    null,
-  );
   const { isMobileLayout, handleContentSplitSizesChange, mirageHeaderCollapse } =
     useMobileCyberdeckLayout();
 
@@ -376,6 +317,12 @@ export default function CyberdeckApp() {
   } = useCyberdeckMemoryIdentity();
 
   const [deckMode, setDeckMode] = useState<DeckMode>(() => loadDeckMode());
+
+  useCyberdeckAppBootstrap({
+    deckMode,
+    setMessagesRaw,
+    setMuthurDiagnostics,
+  });
 
   /** Escape from gateway → tab rail; Escape from tab rail → gateway. Arrows move highlight while on rail. */
   const [navRailContext, setNavRailContext] = useState<"gateway" | "tabs">("gateway");
@@ -498,6 +445,43 @@ const operatorWorkspace = useOperatorWorkspaceState({
   operatorSurfaceModeRef.current = operatorSurfaceMode;
   operatorBrowserUrlRef.current = operatorBrowserUrl;
 
+  const {
+    droppedMarkdown,
+    droppedMarkdownName,
+    setDroppedMarkdown,
+    setDroppedMarkdownName,
+    isMarkdownDragOver,
+    handleModelLabelClick,
+    focusFixedServerPanel,
+    handleThirdColumnDragOver,
+    handleThirdColumnDragLeave,
+    handleThirdColumnDrop,
+  } = useCyberdeckGatewayColumn({
+    serverRef,
+    gatewayColumnRef,
+    gatewayBlankSettingsRef,
+    startupRailResolvedRef,
+    offlineAutoOpenedRef,
+    prevConnectionStateRef,
+    activeProvider,
+    modelID,
+    providerKeys,
+    defaultKeyAvailableByProvider,
+    didHydrateProviderState,
+    providerConfigHydrated,
+    connectionState,
+    setNavRailContext,
+    setServerKeyboardHighlightId,
+    setProviderKeyboardHighlightId,
+    setModelKeyboardHighlightId,
+    setOperatorSurfaceMode,
+    setOperatorDocMode,
+    setMessages,
+    focusGatewayConnectionPanel,
+    openOperatorFile,
+    loadOperatorAssetFromFile,
+  });
+
   const { heapEntries, pasteClipboardToHeap } = useCyberdeckHeap({
     openOperatorFile,
     setOperatorTextAsset,
@@ -533,53 +517,9 @@ const operatorWorkspace = useOperatorWorkspaceState({
   useDeckAudioBridge();
   useSilentModeAudioGateSync();
 
-  useEffect(() => {
-    const onCadreArchive = (event: Event) => {
-      const detail = (event as CustomEvent<{ text?: string }>).detail;
-      const text = typeof detail?.text === "string" ? detail.text.trim() : "";
-      if (!text) return;
-      setMuthurDiagnostics((current) => appendMuthurDiagnosticEntry(current, text));
-      setMessagesRaw((prev) => [...prev, { role: "assistant", text }]);
-    };
+  const closeMirageContextMenuRef = useRef<() => void>(() => undefined);
+  const closeGatewayPaneContextMenuRef = useRef<() => void>(() => undefined);
 
-    window.addEventListener(CADRE_MUTHUR_ARCHIVE_EVENT, onCadreArchive);
-    return () => window.removeEventListener(CADRE_MUTHUR_ARCHIVE_EVENT, onCadreArchive);
-  }, [setMessagesRaw, setMuthurDiagnostics]);
-
-  useEffect(() => {
-    if (!ENABLE_AUTOMATION) return;
-    let dispose: (() => void) | undefined;
-    void import("@/lib/cyberdeck/operator-orchestrator").then(({ startOperatorOrchestrator }) => {
-      dispose = startOperatorOrchestrator();
-    });
-    return () => {
-      dispose?.();
-    };
-  }, []);
-
-  useEffect(() => {
-    saveDeckMode(deckMode);
-    notifyDeckModeChange(deckMode);
-  }, [deckMode]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    void import("@/features/cyberdeck/pane-chunks").then((mod) => {
-      for (const kind of mod.PREFETCH_PANE_KINDS) {
-        mod.prefetchCyberdeckPane(kind);
-      }
-    });
-  }, []);
-
-  const closeMirageContextMenu = useCallback(() => {
-    setMirageContextMenu(null);
-    emitSignal({ source: "ui", type: "cancel", payload: { target: "mirage_menu" }, severity: "info" });
-  }, []);
-
-  const closeGatewayPaneContextMenu = useCallback(() => {
-    setGatewayPaneContextMenu(null);
-    emitSignal({ source: "ui", type: "cancel", payload: { target: "gateway_menu" }, severity: "info" });
-  }, []);
   const customTabPane = useMemo(
     () => ({
       activeProvider,
@@ -658,13 +598,31 @@ const operatorWorkspace = useOperatorWorkspaceState({
     setNavRailContext,
     setMessages,
     setServerKeyboardHighlightId,
-    closeMirageContextMenu,
-    closeGatewayPaneContextMenu,
+    closeMirageContextMenu: () => closeMirageContextMenuRef.current(),
+    closeGatewayPaneContextMenu: () => closeGatewayPaneContextMenuRef.current(),
     focusGatewayConnectionPanel,
     handleTabClickRef,
     openRealmorphismKitTabRef,
     customTabPane,
   });
+
+  const {
+    mirageContextMenu,
+    gatewayPaneContextMenu,
+    closeMirageContextMenu,
+    closeGatewayPaneContextMenu,
+    handleMiragePaneContextMenu,
+    handleGatewayPaneContextMenu,
+    copyMirageLastAssistant,
+    copyMirageSelectionOrLastMessage,
+  } = useCyberdeckPaneContextMenus({
+    messages,
+    streamText,
+    closeRailTabContextMenu,
+  });
+
+  closeMirageContextMenuRef.current = closeMirageContextMenu;
+  closeGatewayPaneContextMenuRef.current = closeGatewayPaneContextMenu;
 
   useDeckSignal(handleModuleFocusSignal);
 
@@ -779,234 +737,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
     setMuthurStall,
     composeStartedAtRef,
   });
-
-  const handleModelLabelClick = useCallback((targetServer: "s" | "ct" | "b" = "s") => {
-    const safe = safeServerId(targetServer);
-    useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-    useCyberdeckTabStore.getState().setServer(safe as (typeof SERVER_IDS)[number]);
-    setNavRailContext("gateway");
-    setServerKeyboardHighlightId(null);
-    setProviderKeyboardHighlightId(activeProvider);
-    setModelKeyboardHighlightId(modelID || null);
-    gatewayColumnRef.current?.focus({ preventScroll: true });
-    if (safe === "s") {
-      focusGatewayConnectionPanel();
-    } else {
-      gatewayBlankSettingsRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-    }
-  }, [activeProvider, focusGatewayConnectionPanel, modelID]);
-
-  const focusFixedServerPanel = useCallback(
-    (serverId: (typeof SERVER_IDS)[number]) => {
-      if (serverId === "s") {
-        handleModelLabelClick("s");
-        return;
-      }
-      if (serverId === "ct") {
-        handleModelLabelClick("ct");
-        return;
-      }
-      if (serverId === "b") {
-        handleModelLabelClick("b");
-        return;
-      }
-      gatewayColumnRef.current?.focus({ preventScroll: true });
-    },
-    [handleModelLabelClick],
-  );
-
-  const openOperatorPaneOnStartup = useCallback(() => {
-    useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-    useCyberdeckTabStore.getState().setServer("m");
-    setNavRailContext("tabs");
-    setServerKeyboardHighlightId("m");
-    setOperatorSurfaceMode("workspace");
-    setOperatorDocMode("edit");
-    startupRailResolvedRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    if (!ENABLE_AUTOMATION) return;
-    if (!didHydrateProviderState || !providerConfigHydrated || startupRailResolvedRef.current) return;
-
-    if (hasAnyProviderClientKey(providerKeys, defaultKeyAvailableByProvider)) {
-      openOperatorPaneOnStartup();
-      return;
-    }
-
-    if (connectionState === "offline") {
-      handleModelLabelClick("s");
-      offlineAutoOpenedRef.current = true;
-      startupRailResolvedRef.current = true;
-    }
-  }, [
-    connectionState,
-    defaultKeyAvailableByProvider,
-    didHydrateProviderState,
-    handleModelLabelClick,
-    openOperatorPaneOnStartup,
-    providerConfigHydrated,
-    providerKeys,
-  ]);
-
-  useEffect(() => {
-    if (!ENABLE_AUTOMATION) return;
-    const prevState = prevConnectionStateRef.current;
-    prevConnectionStateRef.current = connectionState;
-
-    if (connectionState === "connected" && prevState !== "connected") {
-      const activeModel = modelID || "UNSET_MODEL";
-      const line = `MODEL_CONNECTED // ${activeProvider.toUpperCase()} / ${activeModel}`;
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "system" && last.text === line) return prev;
-        return [...prev, { role: "system", text: line }];
-      });
-    }
-
-    if (
-      didHydrateProviderState &&
-      providerConfigHydrated &&
-      connectionState === "offline" &&
-      !offlineAutoOpenedRef.current &&
-      !hasAnyProviderClientKey(providerKeys, defaultKeyAvailableByProvider)
-    ) {
-      handleModelLabelClick("s");
-      offlineAutoOpenedRef.current = true;
-      return;
-    }
-    if (connectionState !== "offline") {
-      offlineAutoOpenedRef.current = false;
-    }
-  }, [activeProvider, connectionState, didHydrateProviderState, defaultKeyAvailableByProvider, handleModelLabelClick, modelID, providerConfigHydrated, providerKeys]);
-
-  const handleThirdColumnDragOver = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
-    if (serverRef.current !== "m" && serverRef.current !== "s") return;
-    e.preventDefault();
-    setIsMarkdownDragOver(true);
-  }, []);
-
-  const handleThirdColumnDragLeave = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-    setIsMarkdownDragOver(false);
-  }, []);
-
-  const handleThirdColumnDrop = useCallback(async (e: ReactDragEvent<HTMLDivElement>) => {
-    const activeServer = serverRef.current;
-    if (activeServer !== "m" && activeServer !== "s") return;
-
-    e.preventDefault();
-    setIsMarkdownDragOver(false);
-
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-
-    if (activeServer === "s") {
-      const looksText = isEditableOperatorFile(file) || file.type === "text/markdown";
-      if (!looksText) return;
-      try {
-        const text = await file.text();
-        setDroppedMarkdown(text);
-        setDroppedMarkdownName(file.name);
-      } catch {
-        // ignore failed file read
-      }
-      return;
-    }
-
-    if (activeServer === "m") {
-      const dropPath = `drop://${file.name}#${file.lastModified}`;
-      await openOperatorFile(dropPath, () => loadOperatorAssetFromFile(file));
-    }
-  }, [loadOperatorAssetFromFile, openOperatorFile]);
-
-  const openMirageContextMenu = useCallback(
-    (clientX: number, clientY: number) => {
-      if (typeof window === "undefined") return;
-      closeRailTabContextMenu();
-      closeGatewayPaneContextMenu();
-      const menuWidth = 176;
-      const menuHeight = 236;
-      const padding = 8;
-      const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
-      const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
-      setMirageContextMenu({ x, y });
-    },
-    [closeGatewayPaneContextMenu, closeRailTabContextMenu],
-  );
-
-  const openGatewayPaneContextMenu = useCallback(
-    (clientX: number, clientY: number) => {
-      if (typeof window === "undefined") return;
-      closeRailTabContextMenu();
-      closeMirageContextMenu();
-      const menuWidth = 176;
-      const menuHeight = 200;
-      const padding = 8;
-      const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
-      const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
-      setGatewayPaneContextMenu({ x, y });
-    },
-    [closeMirageContextMenu, closeRailTabContextMenu],
-  );
-
-  const handleMiragePaneContextMenu = useCallback(
-    (event: ReactMouseEvent<HTMLElement>) => {
-      if (contextMenuTargetIsTextField(event.target)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      openMirageContextMenu(event.clientX, event.clientY);
-    },
-    [openMirageContextMenu],
-  );
-
-  const handleGatewayPaneContextMenu = useCallback(
-    (event: ReactMouseEvent<HTMLElement>) => {
-      if (contextMenuTargetIsTextField(event.target)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      openGatewayPaneContextMenu(event.clientX, event.clientY);
-    },
-    [openGatewayPaneContextMenu],
-  );
-
-  const copyMirageLastAssistant = useCallback(async () => {
-    let text = streamText.trim();
-    if (!text) {
-      const last = [...messages].reverse().find((m) => m.role === "assistant");
-      text = typeof last?.text === "string" ? last.text.trim() : "";
-    }
-    if (!text) {
-      toast.error("No assistant message to copy.");
-      return;
-    }
-    try {
-      await copyTextToClipboard(text);
-      toast.success("Copied last assistant message.");
-    } catch {
-      toast.error("Could not copy.");
-    }
-  }, [messages, streamText]);
-
-  const copyMirageSelectionOrLastMessage = useCallback(async () => {
-    const sel = typeof window !== "undefined" ? window.getSelection()?.toString().trim() ?? "" : "";
-    let text = sel;
-    if (!text) {
-      const last = messages[messages.length - 1];
-      text = typeof last?.text === "string" ? last.text.trim() : "";
-      if (!text) text = streamText.trim();
-    }
-    if (!text) {
-      toast.error("Nothing to copy.");
-      return;
-    }
-    try {
-      await copyTextToClipboard(text);
-      toast.success(sel ? "Copied selected text." : "Copied last message.");
-    } catch {
-      toast.error("Could not copy.");
-    }
-  }, [messages, streamText]);
 
   const { handleSend, handleStop } = useMuthurChatSend({
     messages,
@@ -1228,7 +958,7 @@ const operatorWorkspace = useOperatorWorkspaceState({
       <CyberdeckServerRail
         railRef={serverRailRef}
         isMobileLayout={isMobileLayout}
-        fixedServers={fixedServers}
+        fixedServers={CYBERDECK_FIXED_SERVERS}
         navRailContext={navRailContext}
         serverKeyboardHighlightId={serverKeyboardHighlightId}
         railGlyphForServer={railGlyphForServer}
