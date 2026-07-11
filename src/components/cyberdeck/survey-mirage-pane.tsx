@@ -1,28 +1,25 @@
 "use client";
 
-import { SurveyMirageExtCapturePanel } from "@/components/cyberdeck/survey-mirage-ext-capture-panel";
-import { SurveyMirageHubPanel } from "@/components/cyberdeck/survey-mirage-hub-panel";
 import { SurveyMirageCapturePreview } from "@/components/cyberdeck/survey-mirage-capture-preview";
-import { SurveyMirageItemSelectList } from "@/components/cyberdeck/survey-mirage-item-select-list";
 import { SurveyMirageQueueTeamHost } from "@/components/cyberdeck/survey-mirage-queue-sync";
 import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-panel";
 import {
   SURVEY_ECHO_DISPLAY,
   SURVEY_MIRAGE_DISPLAY,
-  SURVEY_MIRAGE_TAGLINE,
   SURVEY_MODE_TITLE,
 } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyEchoLinkWatch } from "@/lib/cyberdeck/survey-echo-link-watch";
 import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
 import { SurveyHubSubPaneHint } from "@/components/cyberdeck/survey-hub-subpane-hint";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
-import { useSurveyExtensionPageContextStatus } from "@/lib/cyberdeck/survey-extension-page-context.client";
-import { readSurveyMiragePairCredentials } from "@/lib/cyberdeck/survey-pairing-client";
 
+/**
+ * Mirage Survey sub-pane — capture Echo screen, then read answers.
+ * Advanced queue / extension / hub-QR tooling lives elsewhere (TEAM LINKS, PowerFist).
+ */
 export function SurveyMiragePane() {
   const { paired, terminated } = useSurveyEchoLinkWatch("mirage");
   const team = useSurveyTeamStatus();
-  const extension = useSurveyExtensionPageContextStatus();
   const hubEnabled = isSurveyHubEnabled();
   const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
 
@@ -33,58 +30,26 @@ export function SurveyMiragePane() {
       data-survey-runtime="browser"
     >
       <SurveyMirageQueueTeamHost role="mirage" />
-      <div>
-        <p className="text-fuchsia-300/90">
-          {SURVEY_MODE_TITLE} // {SURVEY_MIRAGE_DISPLAY} · mirage-browser
-        </p>
-        <p className="mt-1 text-[9px] text-[#6a6a8a]">{SURVEY_MIRAGE_TAGLINE}</p>
-      </div>
 
-      <SurveyMirageExtCapturePanel />
-
-      {extension.lastSnapshot ? (
-        <p className="rounded border border-emerald-500/40 bg-emerald-950/15 px-3 py-2 text-[8px] leading-relaxed text-[#8ab89a]">
-          echo-extension · last received{" "}
-          <strong className="text-emerald-300/90">
-            {extension.lastSnapshot.title || extension.lastSnapshot.url}
-          </strong>
-          {extension.deliveredAt ? (
-            <span className="text-[#5f8f74]">
-              {" "}
-              · {new Date(extension.deliveredAt).toLocaleTimeString()}
-            </span>
-          ) : null}
-        </p>
-      ) : null}
+      <p className="text-fuchsia-300/90">
+        {SURVEY_MODE_TITLE} // {SURVEY_MIRAGE_DISPLAY}
+      </p>
 
       {!mirageLinked && !terminated ? (
         hubEnabled ? (
           <SurveyHubSubPaneHint />
         ) : (
           <p className="text-[#8a8a8a]">
-            Enable Survey Hub above to connect with {SURVEY_ECHO_DISPLAY}.
+            Enable Survey Hub above, then link {SURVEY_ECHO_DISPLAY} with the PIN.
           </p>
         )
       ) : null}
 
-      {mirageLinked ? (
-        <>
-          <SurveyMirageItemSelectList surface="mirage" className="-mx-4 rounded-none border-x-0" />
-          <SurveyMirageCapturePreview />
-          <div className="border-t border-[#1c1c1c] pt-4">
-            <SurveySolutionsPanel />
-          </div>
-        </>
-      ) : null}
+      <SurveyMirageCapturePreview />
 
-      {!hubEnabled ? (
-        <div className="border-t border-[#1c1c1c] pt-4">
-          <SurveyMirageHubPanel
-            echoHost={paired?.echoHost ?? readSurveyMiragePairCredentials()?.echoHost ?? null}
-            echoHttpPort={paired?.httpPort ?? readSurveyMiragePairCredentials()?.httpPort ?? null}
-          />
-        </div>
-      ) : null}
+      <div className="border-t border-[#1c1c1c] pt-4">
+        <SurveySolutionsPanel />
+      </div>
     </div>
   );
 }
