@@ -6,15 +6,14 @@ Minimal capture drone for the **Echo** screenshot machine — tray on Windows, s
 
 ### What's new in ${version}
 
+- **Remote screenshot over HTTP** — \`POST /api/survey/echo/command\` with \`{"action":"echo.screenshot"}\` returns PNG from Mirage / Tailscale (no local \`pnpm satellite:dev\` required)
+- **Survey command API** — screenshot, clipboard, listening, and echo-extension tab capture on the Satellite pair server
+- Spy → Survey route rename (\`/api/survey/...\`) for pairing codes and PIN enter
+- Echo-extension bridge for Mirage browser tab capture
 - **Mirage pairing feedback** — Pair with ECHO shows searching, linked, or error; Satellite updates linked Mirages immediately
-- **6-digit Spy pairing codes in the app** — Mirage/PowerFist enter PIN only; no URL paste for team link
+- **6-digit pairing codes in the app** — Mirage/PowerFist enter PIN only; no URL paste for team link
 - **Test capture preview** — Test capture now shows a thumbnail of what was captured
-- **Test capture no longer hangs** — 20s timeout with a clear error if Screen Recording needs re-grant after upgrade
-- **macOS PKG install fix** — installer no longer fails at Summary when upgrading over a running Echo Satellite
 - **Check for updates** in the app — one-click download and install from GitHub releases
-- Automatic update check on startup when a newer Satellite build exists
-- **Code-only pairing** — Mirage/PowerFist enter the 6-digit PIN; browser finds Echo on Wi‑Fi (no IP typing)
-- **Linked Mirages** on the Status panel — Spy team connections plus capture relay hub
 
 ### macOS (Apple Silicon)
 
