@@ -1,7 +1,9 @@
 "use client";
 
+import { useCallback } from "react";
 import { SurveyMirageCapturePreview } from "@/components/cyberdeck/survey-mirage-capture-preview";
 import { SurveyMirageQueueTeamHost } from "@/components/cyberdeck/survey-mirage-queue-sync";
+import { SurveyPairPinForm } from "@/components/cyberdeck/survey-pair-pin-form";
 import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-panel";
 import {
   SURVEY_ECHO_DISPLAY,
@@ -9,19 +11,51 @@ import {
   SURVEY_MODE_TITLE,
 } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyEchoLinkWatch } from "@/lib/cyberdeck/survey-echo-link-watch";
-import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
-import { SurveyHubSubPaneHint } from "@/components/cyberdeck/survey-hub-subpane-hint";
+import { saveSurveyMiragePairCredentials } from "@/lib/cyberdeck/survey-pair-credentials.client";
+import { notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 
+/** Default Tailscale MagicDNS / mesh IP for Echo Mac when pairing from Windows Mirage. */
+const DEFAULT_ECHO_TAILSCALE_HOST = "100.70.46.6";
+
 /**
- * Mirage Survey sub-pane — capture Echo screen, then read answers.
- * Advanced queue / extension / hub-QR tooling lives elsewhere (TEAM LINKS, PowerFist).
+ * Mirage Survey sub-pane — PIN-pair Echo, capture screen, read answers.
  */
 export function SurveyMiragePane() {
-  const { paired, terminated } = useSurveyEchoLinkWatch("mirage");
+  const { paired, terminated, resetLinkWatch } = useSurveyEchoLinkWatch("mirage");
   const team = useSurveyTeamStatus();
-  const hubEnabled = isSurveyHubEnabled();
   const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
+
+  const handlePaired = useCallback(
+    (result: {
+      echoHost: string;
+      httpPort: number;
+      echoNodeId: string;
+      token: string;
+      nodeId?: string;
+      sessionEpoch: number;
+    }) => {
+      // Satellite often reports LAN IP; keep Tailscale mesh host for Windows Mirage.
+      const lan =
+        result.echoHost.startsWith("192.168.") ||
+        result.echoHost.startsWith("10.") ||
+        result.echoHost.startsWith("172.");
+      const echoHost = lan ? DEFAULT_ECHO_TAILSCALE_HOST : result.echoHost;
+      saveSurveyMiragePairCredentials({
+        echoHost,
+        httpPort: result.httpPort,
+        echoNodeId: result.echoNodeId,
+        mirageToken: result.token,
+        nodeId: result.nodeId ?? "",
+        sessionEpoch: result.sessionEpoch,
+        pairedAt: new Date().toISOString(),
+      });
+      resetLinkWatch();
+      notifySurveyTeamStatusChanged();
+      void team.refresh();
+    },
+    [resetLinkWatch, team],
+  );
 
   return (
     <div
@@ -36,13 +70,20 @@ export function SurveyMiragePane() {
       </p>
 
       {!mirageLinked && !terminated ? (
-        hubEnabled ? (
-          <SurveyHubSubPaneHint />
-        ) : (
-          <p className="text-[#8a8a8a]">
-            Enable Survey Hub above, then link {SURVEY_ECHO_DISPLAY} with the PIN.
-          </p>
-        )
+        <SurveyPairPinForm
+          role="mirage"
+          roleLabel={SURVEY_MIRAGE_DISPLAY}
+          buttonLabel={`Pair with ${SURVEY_ECHO_DISPLAY}`}
+          defaultEchoHost={DEFAULT_ECHO_TAILSCALE_HOST}
+          onPaired={handlePaired}
+        />
+      ) : null}
+
+      {mirageLinked ? (
+        <p className="text-[9px] text-emerald-300/80">
+          LINKED // {SURVEY_ECHO_DISPLAY}
+          {paired?.echoHost ? ` · ${paired.echoHost}:${paired.httpPort}` : null}
+        </p>
       ) : null}
 
       <SurveyMirageCapturePreview />

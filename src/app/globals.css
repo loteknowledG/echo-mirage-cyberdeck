@@ -3,6 +3,7 @@
 @import "../styles/cyberdeck-realmorphism.css";
 @import "../styles/cyberdeck-asciimorphism-depth.css";
 @import "../styles/ambient-twinkle.css";
+@import "perfect-scrollbar/css/perfect-scrollbar.css";
 /* Import Mrs Saint Delafield from Google Fonts */
 /* If Google Fonts import is blocked, you can self-host a WOFF2 at /public/fonts/MrsSaintDelafield.woff2 */
 html,
@@ -19,8 +20,6 @@ body,
   font-style: normal;
   font-display: swap;
 }
-
-@import "perfect-scrollbar/css/perfect-scrollbar.css";
 
 @tailwind base;
 @tailwind components;
