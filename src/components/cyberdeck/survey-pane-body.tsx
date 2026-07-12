@@ -27,6 +27,8 @@ export function CyberdeckSurveyPaneBody() {
   const team = useSurveyTeamStatus();
   const powerfistDeckMode =
     activeSubPane === "powerfist" && isSurveyTeamTripleLinked(team);
+  /** Mirage tab stays capture + answers; Hub/TEAM LINKS live on Echo / PowerFist. */
+  const showSurveyHubChrome = activeSubPane !== "mirage" && !powerfistDeckMode;
 
   useEffect(() => {
     const fromUrl = parseSurveyEmpSubPaneFromLocation();
@@ -51,14 +53,12 @@ export function CyberdeckSurveyPaneBody() {
             : "custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden"
         }
       >
-        {!powerfistDeckMode ? (
+        {showSurveyHubChrome ? (
           <>
             {isSurveyHubEnabled() ? <SurveyHubPanel /> : <SurveyLegacyNotice />}
+            <SurveyTeamStatusPanel />
           </>
         ) : null}
-        {powerfistDeckMode ? null : (
-          <SurveyTeamStatusPanel />
-        )}
         {activeSubPane === "echo" ? <SurveyEchoPane /> : null}
         {activeSubPane === "mirage" ? <SurveyMiragePane /> : null}
         {activeSubPane === "powerfist" ? (
