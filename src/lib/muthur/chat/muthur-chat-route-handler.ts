@@ -89,12 +89,12 @@ function respondProvidersList(sessionScoped: boolean) {
     type: "providers",
     data: sessionScoped
       ? [
-          { id: "opencode", name: "OpenCode", description: "Zen uplink", status: "ready" },
+          { id: "opencode", name: "OpenCode Zen", description: "Zen uplink", status: "ready" },
           { id: "openrouter", name: "OpenRouter", description: "Model mesh", status: "config" },
           { id: "openai", name: "OpenAI", description: "GPT family", status: "config" },
         ]
       : [
-          { id: "opencode", name: "OpenCode", description: "Default AI provider", status: "ready" },
+          { id: "opencode", name: "OpenCode Zen", description: "Default AI provider", status: "ready" },
           { id: "openai", name: "OpenAI", description: "GPT-4 and variants", status: "config" },
           { id: "anthropic", name: "Anthropic", description: "Claude models", status: "config" },
           { id: "ollama", name: "Ollama", description: "Local models", status: "config" },

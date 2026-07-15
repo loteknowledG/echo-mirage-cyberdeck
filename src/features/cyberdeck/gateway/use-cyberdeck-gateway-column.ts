@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState, type DragEvent as ReactDragEvent, type MutableRefObject, type RefObject, type SetStateAction } from "react";
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
-import { hasAnyProviderClientKey } from "@/features/cyberdeck/gateway/use-provider-connection";
+import {
+  cyberdeckProviderDisplayName,
+  hasAnyProviderClientKey,
+} from "@/features/cyberdeck/gateway/use-provider-connection";
 import { useCyberdeckTabStore, type CyberdeckServerId } from "@/lib/cyberdeck-tab-store";
 import { isEditableOperatorFile } from "@/features/cyberdeck/muthur/coding-verify-format";
 import { safeServerId, SERVER_IDS } from "@/features/cyberdeck/workspace/custom-tab-model";
@@ -160,7 +163,7 @@ export function useCyberdeckGatewayColumn({
 
     if (connectionState === "connected" && prevState !== "connected") {
       const activeModel = modelID || "UNSET_MODEL";
-      const line = `MODEL_CONNECTED // ${activeProvider.toUpperCase()} / ${activeModel}`;
+      const line = `MODEL_CONNECTED // ${cyberdeckProviderDisplayName(activeProvider)} / ${activeModel}`;
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "system" && last.text === line) return prev;

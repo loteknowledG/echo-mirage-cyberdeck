@@ -39,6 +39,21 @@ import { playDeckSystemSound } from "@/features/cyberdeck/runtime/defer-deck-aud
 
 export const CYBERDECK_PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
 
+export type CyberdeckProviderId = (typeof CYBERDECK_PROVIDER_IDS)[number];
+
+export const CYBERDECK_PROVIDER_LABELS: Record<CyberdeckProviderId, string> = {
+  opencode: "OPENCODE ZEN",
+  openrouter: "OPENROUTER",
+  openai: "OPENAI",
+};
+
+export function cyberdeckProviderDisplayName(providerId: string): string {
+  if ((CYBERDECK_PROVIDER_IDS as readonly string[]).includes(providerId)) {
+    return CYBERDECK_PROVIDER_LABELS[providerId as CyberdeckProviderId];
+  }
+  return providerId.toUpperCase();
+}
+
 const DEFAULT_CLIENT_PROVIDER_KEYS = CLIENT_BAKED_PROVIDER_KEYS;
 const MODEL_PROBE_MIN_INTERVAL_MS = 15_000;
 const PROVIDER_RATE_LIMIT_COOLDOWN_MS = 90_000;
@@ -120,9 +135,9 @@ export function useProviderConnection({
   const providers = useMemo(
     () =>
       [
-        { id: "opencode" as const, name: "OPENCODE" },
-        { id: "openrouter" as const, name: "OPENROUTER" },
-        { id: "openai" as const, name: "OPENAI" },
+        { id: "opencode" as const, name: CYBERDECK_PROVIDER_LABELS.opencode },
+        { id: "openrouter" as const, name: CYBERDECK_PROVIDER_LABELS.openrouter },
+        { id: "openai" as const, name: CYBERDECK_PROVIDER_LABELS.openai },
       ] as const,
     [],
   );

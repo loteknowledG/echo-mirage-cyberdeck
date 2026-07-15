@@ -9,7 +9,7 @@ export function gatewayKeySysMessage(providerId: string): string {
     return "ENTER OPENROUTER KEY BELOW. create one by visiting OpenRouter console.";
   }
   if (providerId === "opencode") {
-    return "ENTER OPENCODE KEY BELOW. create one by visiting OpenCode console.";
+    return "ENTER OPENCODE ZEN KEY BELOW. create one by visiting OpenCode Zen console.";
   }
   return `ENTER ${providerId.toUpperCase()} KEY BELOW.`;
 }
@@ -21,11 +21,12 @@ export function isGatewayKeySysTip(text: string): boolean {
 }
 
 const GATEWAY_LINK_PARTS =
-  /(Open AI console|OpenRouter console|OpenCode console)/g;
+  /(Open AI console|OpenRouter console|OpenCode Zen console|OpenCode console)/g;
 
 const GATEWAY_LINK_HREF: Record<string, string> = {
   "Open AI console": "https://platform.openai.com/settings/api-keys",
   "OpenRouter console": "https://openrouter.ai/workspaces/default/keys",
+  "OpenCode Zen console": "https://opencode.ai",
   "OpenCode console": "https://opencode.ai",
 };
 
@@ -34,6 +35,7 @@ export function renderGatewayMessageText(text: string) {
     typeof text === "string" &&
     (text.includes("Open AI console") ||
       text.includes("OpenRouter console") ||
+      text.includes("OpenCode Zen console") ||
       text.includes("OpenCode console"));
   if (hasGatewayLink) {
     const parts = text.split(GATEWAY_LINK_PARTS);

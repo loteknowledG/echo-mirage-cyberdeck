@@ -254,7 +254,7 @@ export const GatewayColumn = forwardRef<HTMLDivElement, GatewayColumnProps>(func
                     autoComplete="off"
                     spellCheck={false}
                     className="min-h-[44px] w-full flex-1 rounded border border-[#2d2d2d] bg-black px-3 py-2 font-mono text-base text-green-300 outline-none focus:border-green-700 max-md:text-[16px] md:min-h-0 md:px-2 md:py-1 md:text-[10px]"
-                    placeholder={`${activeProvider.toUpperCase()} API KEY`}
+                    placeholder={`${providers.find((p) => p.id === activeProvider)?.name ?? activeProvider.toUpperCase()} API KEY`}
                   />
                   <CyberdeckControlButton
                     deckMode={deckMode}
