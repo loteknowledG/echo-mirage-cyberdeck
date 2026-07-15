@@ -95,6 +95,7 @@ async function ensureStandaloneRuntimeDeps(packagedDir) {
  * Verify next resolves from the packaged tree only.
  * Plain `require('next')` from cwd walks up into the monorepo node_modules and
  * falsely passes even when packaged next is missing (the 0.1.6 installer bug).
+ * Uses a temp file — Windows `node -e` cannot take multiline scripts via spawn.
  */
 async function verifyStandaloneRuntime(packagedDir) {
   console.log('[electron:prepare] verifying packaged server can require next…');
@@ -106,7 +107,8 @@ async function verifyStandaloneRuntime(packagedDir) {
     }
   }
 
-  const script = `
+  const verifyScriptPath = path.join(packagedDir, '.verify-next-runtime.cjs');
+  const script = `'use strict';
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
@@ -128,12 +130,17 @@ require(path.join(localModules, 'next'));
 console.log('[electron:prepare] next module ok');
 `;
 
-  await run(
-    process.execPath,
-    ['-e', script],
-    { ELECTRON_RUN_AS_NODE: '1', NODE_PATH: '' },
-    packagedDir,
-  );
+  await fs.writeFile(verifyScriptPath, script, 'utf8');
+  try {
+    await run(
+      process.execPath,
+      [verifyScriptPath],
+      { ELECTRON_RUN_AS_NODE: '1', NODE_PATH: '' },
+      packagedDir,
+    );
+  } finally {
+    await fs.rm(verifyScriptPath, { force: true });
+  }
 }
 
 async function main() {
