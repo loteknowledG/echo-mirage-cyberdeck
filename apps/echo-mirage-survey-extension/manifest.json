@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "echo-extension",
   "short_name": "echo-extension",
-  "version": "0.2.2",
-  "description": "echo-extension — copy Chrome tab text for Survey (HackerRank-aware via echo-electron).",
+  "version": "0.2.3",
+  "description": "echo-extension — copy Chrome tab text for Survey via echo-electron.",
   "permissions": ["activeTab", "scripting", "storage", "tabs", "alarms"],
   "host_permissions": ["<all_urls>"],
   "action": {

@@ -27,7 +27,7 @@ open "/Applications/Echo Mirage Cyberdeck.app"
 
 **First launch:** right-click the app → **Open** (or **System Settings → Privacy & Security → Open Anyway**).
 
-Spy / Echo capture requires **Screen Recording** permission in System Settings.
+Echo capture requires **Screen Recording** permission in System Settings.
 
 ### Windows (x64)
 - **Echo-Mirage-Cyberdeck-Setup-${version}.exe**

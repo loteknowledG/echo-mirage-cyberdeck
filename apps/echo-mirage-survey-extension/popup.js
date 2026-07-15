@@ -17,7 +17,7 @@ sendButton?.addEventListener("click", async () => {
     }
     const title = result.title ? ` · ${result.title.slice(0, 48)}` : "";
     setStatus(
-      `Sent (Phase 0) to mirage-browser (${result.delivered}/${result.mirageTabs})${title}. Prefer Mirage Capture via echo-electron for spy flow.`,
+      `Sent (Phase 0) to mirage-browser (${result.delivered}/${result.mirageTabs})${title}. Prefer Mirage Capture via echo-electron for cross-browser capture.`,
     );
   } catch (err) {
     setStatus(err instanceof Error ? err.message : "Extension error.", true);

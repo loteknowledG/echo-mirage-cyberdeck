@@ -98,13 +98,13 @@ export function ingestSurveyExtensionPageContext(raw: unknown): SurveyExtensionP
   return snapshot;
 }
 
-/** Run SOLVE on the last echo-extension page text (HackerRank / tab capture). */
+/** Run SOLVE on the last echo-extension page text. */
 export async function solveLastSurveyExtensionPage(): Promise<{ ok: boolean; message: string }> {
   const snapshot = status.lastSnapshot;
   if (!snapshot?.pageText.trim()) {
     return {
       ok: false,
-      message: "No extension page text yet — Capture active tab (focus HackerRank first).",
+      message: "No extension page text yet — Capture active tab (focus the page in capture Chrome first).",
     };
   }
   return solveMirageSelectedTextAsync(snapshot.pageText);

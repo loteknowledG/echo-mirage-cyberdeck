@@ -45,7 +45,7 @@ export function SurveyMirageExtCapturePanel() {
     }
     setMessage(
       result.snapshotIngested
-        ? `${result.message} · staged for SOLVE (HackerRank / page text)`
+        ? `${result.message} · staged for SOLVE (page text)`
         : result.message,
     );
   }, []);
@@ -138,10 +138,10 @@ export function SurveyMirageExtCapturePanel() {
       data-testid="survey-mirage-ext-capture-panel"
     >
       <p className="mb-1 text-[9px] tracking-[0.08em] text-emerald-300/90">
-        echo-extension · HackerRank / tab text
+        echo-extension · tab text capture
       </p>
       <p className="mb-3 text-[8px] leading-relaxed text-[#5f8f74]">
-        Focus a HackerRank challenge in capture Chrome (extension loaded), then Capture active tab.
+        Focus the page you want in capture Chrome (extension loaded), then Capture active tab.
         Text is staged into Solutions — press SOLVE PAGE TEXT for the answer. Mirage must be local
         HTTP (not Vercel).
         {echoHostHint ? ` Echo · ${echoHostHint}` : ""}

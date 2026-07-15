@@ -80,7 +80,7 @@ export const SURVEY_TRIFORCE_DECKS: PreviewDeckWithTarget[] = [
         type: "echo",
         title: "Solve Selected Text",
         purpose:
-          "Copy Echo's frontmost selection and run Codex on the text — ideal for HackerRank prompts without a screenshot.",
+          "Copy Echo's frontmost selection and run Codex on the text — ideal for long prompts without a screenshot.",
         risk: "caution",
         surveyCommand: SURVEY_ECHO_COMMAND.SOLVE_SELECTED_TEXT,
       },

@@ -23,7 +23,7 @@ function capturePageSnapshotInTab() {
       .slice(0, maxChars);
   }
 
-  function extractHackerRank() {
+  function extractFocusedChallengeText() {
     if (!host.includes("hackerrank")) return "";
     const selectors = [
       '[data-attr2="problem-statement"]',
@@ -42,7 +42,7 @@ function capturePageSnapshotInTab() {
   }
 
   const focused =
-    extractHackerRank() ||
+    extractFocusedChallengeText() ||
     (document.body ? document.body.innerText || document.body.textContent || "" : "");
   const pageText = normalizePageText(focused);
 
