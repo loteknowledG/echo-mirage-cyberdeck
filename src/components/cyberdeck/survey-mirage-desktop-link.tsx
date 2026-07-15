@@ -37,7 +37,7 @@ export function SurveyMirageDesktopLink() {
   const handleDownload = useCallback(() => {
     if (!info) {
       window.open(
-        "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/download/desktop-v0.1.4/Echo-Mirage-Cyberdeck-Setup-0.1.4.exe",
+        "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/download/desktop-v0.1.6/Echo-Mirage-Cyberdeck-Setup-0.1.6.exe",
         "_blank",
         "noopener,noreferrer",
       );
@@ -115,12 +115,12 @@ export function SurveyMirageDesktopLink() {
         <p className="text-[8px] text-[#5f5f5f]">
           Direct:{" "}
           <a
-            href="https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/download/desktop-v0.1.4/Echo-Mirage-Cyberdeck-Setup-0.1.4.exe"
+            href="https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/download/desktop-v0.1.6/Echo-Mirage-Cyberdeck-Setup-0.1.6.exe"
             target="_blank"
             rel="noopener noreferrer"
             className="text-fuchsia-300/90 underline decoration-fuchsia-800/80 underline-offset-2"
           >
-            Echo-Mirage-Cyberdeck-Setup-0.1.4.exe
+            Echo-Mirage-Cyberdeck-Setup-0.1.6.exe
           </a>
         </p>
       )}

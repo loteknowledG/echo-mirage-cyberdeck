@@ -4,7 +4,7 @@ const http = require('http');
 const net = require('net');
 const path = require('path');
 
-const { loadDesktopProviderEnv } = require('../scripts/load-desktop-provider-env');
+const { loadDesktopProviderEnv } = require('./load-desktop-provider-env');
 
 /** @type {import('child_process').ChildProcess | null} */
 let serverProcess = null;

@@ -10,6 +10,7 @@ import { ThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { AppUpdatePrompt } from '@/components/providers/app-update-prompt';
 import { ChunkReload } from '@/components/providers/chunk-reload';
+import { RuntimeWindowTitle } from '@/components/providers/runtime-window-title';
 
 const SignatureScript = Mrs_Saint_Delafield({
   subsets: ['latin'],
@@ -58,6 +59,7 @@ export default async function RootLayout({
         <ThemeProvider attribute="class" forcedTheme="dark">
           <QueryProvider>
             <div className="app-min-width-wrapper min-h-screen bg-background">
+              <RuntimeWindowTitle />
               <ChunkReload />
               <AppUpdatePrompt />
               {children}
