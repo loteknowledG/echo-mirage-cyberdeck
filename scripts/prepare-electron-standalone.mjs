@@ -65,12 +65,9 @@ async function resolveProjectModuleDir(name) {
   }
 }
 
+/** Always refresh from the project install — never trust a stub/symlink leftover. */
 async function ensureRuntimeModule(packagedDir, name) {
   const dest = moduleDestPath(packagedDir, name);
-  if (await pathExists(path.join(dest, 'package.json'))) {
-    return;
-  }
-
   const src = await resolveProjectModuleDir(name);
   if (!src) {
     throw new Error(
@@ -78,9 +75,14 @@ async function ensureRuntimeModule(packagedDir, name) {
     );
   }
 
-  console.log(`[electron:prepare] copying missing standalone runtime dep: ${name}`);
+  console.log(`[electron:prepare] copying standalone runtime dep: ${name}`);
+  await fs.rm(dest, { recursive: true, force: true });
   await fs.mkdir(path.dirname(dest), { recursive: true });
   await fs.cp(src, dest, { recursive: true, force: true, dereference: true });
+
+  if (!(await pathExists(path.join(dest, 'package.json')))) {
+    throw new Error(`[electron:prepare] copy failed — missing ${path.join(dest, 'package.json')}`);
+  }
 }
 
 async function ensureStandaloneRuntimeDeps(packagedDir) {
@@ -89,12 +91,47 @@ async function ensureStandaloneRuntimeDeps(packagedDir) {
   }
 }
 
+/**
+ * Verify next resolves from the packaged tree only.
+ * Plain `require('next')` from cwd walks up into the monorepo node_modules and
+ * falsely passes even when packaged next is missing (the 0.1.6 installer bug).
+ */
 async function verifyStandaloneRuntime(packagedDir) {
   console.log('[electron:prepare] verifying packaged server can require next…');
+
+  for (const name of STANDALONE_RUNTIME_MODULES) {
+    const pkg = path.join(moduleDestPath(packagedDir, name), 'package.json');
+    if (!(await pathExists(pkg))) {
+      throw new Error(`[electron:prepare] missing packaged runtime dep: ${name} (${pkg})`);
+    }
+  }
+
+  const script = `
+const fs = require('fs');
+const path = require('path');
+const Module = require('module');
+const root = process.cwd();
+const localModules = path.join(root, 'node_modules');
+const nextPkg = path.join(localModules, 'next', 'package.json');
+if (!fs.existsSync(nextPkg)) {
+  console.error('[electron:prepare] next package.json missing at', nextPkg);
+  process.exit(1);
+}
+const originalNodeModulePaths = Module._nodeModulePaths;
+Module._nodeModulePaths = function (from) {
+  return originalNodeModulePaths(from).filter((candidate) => {
+    const normalized = path.normalize(candidate);
+    return normalized === localModules || normalized.startsWith(localModules + path.sep);
+  });
+};
+require(path.join(localModules, 'next'));
+console.log('[electron:prepare] next module ok');
+`;
+
   await run(
     process.execPath,
-    ['-e', "require('next'); console.log('[electron:prepare] next module ok')"],
-    { ELECTRON_RUN_AS_NODE: '1' },
+    ['-e', script],
+    { ELECTRON_RUN_AS_NODE: '1', NODE_PATH: '' },
     packagedDir,
   );
 }
