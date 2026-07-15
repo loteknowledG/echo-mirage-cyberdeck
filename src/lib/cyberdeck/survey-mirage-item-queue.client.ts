@@ -14,6 +14,7 @@ import {
   completeSurveyAnalyzeStatus,
 } from "@/lib/cyberdeck/survey-analyze-status.client";
 import { appendSurveyChatMessage, notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
+import { surveyCaptureStackPngList } from "@/lib/cyberdeck/survey-capture-stack.client";
 import {
   readLastSurveyCapture,
   readLastSurveySelection,
@@ -551,37 +552,58 @@ export async function answerCurrentMirageItemAsync(): Promise<{ ok: boolean; mes
   return solveMirageCaptureAsync();
 }
 
-/** Run Codex vision on the current preview capture (queue item or last Echo screenshot). */
+/** Run vision on the capture stack (multi-page) or current preview capture. */
 export async function solveMirageCaptureAsync(): Promise<{ ok: boolean; message: string }> {
+  const stackPngs = surveyCaptureStackPngList();
   const capture = resolveMiragePreviewCapture();
-  if (!capture) {
+
+  if (stackPngs.length === 0 && !capture) {
     return {
       ok: false,
       message: "No capture to solve — take a screenshot first.",
     };
   }
 
-  const item = ensureMirageQueueItemForCapture(capture);
+  const imageDataUrl =
+    capture?.imageDataUrl ??
+    (stackPngs.length > 0 ? `data:image/png;base64,${stackPngs[stackPngs.length - 1]}` : "");
+  const multiPage = stackPngs.length > 1;
+  const prompt = multiPage
+    ? "These screenshots are consecutive pages of one question or problem (page 1 first). Read every page in order, reconstruct the full problem, then solve it. Be concise and actionable."
+    : capture?.prompt || SURVEY_SILENT_CAPTURE_PROMPT;
+
+  const item = ensureMirageQueueItemForCapture({
+    imageDataUrl,
+    prompt,
+    item: capture?.item ?? null,
+  });
   const { index, items } = getMirageQueueSnapshot();
   const itemIndex = items.findIndex((entry) => entry.id === item.id);
   const displayIndex = itemIndex >= 0 ? itemIndex : index;
+  const pageLabel = multiPage ? ` · ${stackPngs.length} pages` : "";
 
   appendSurveyChatMessage({
     role: "system",
-    text: `SURVEY // ANALYZE // item ${displayIndex + 1}/${items.length} via Codex CLI…`,
+    text: `SURVEY // ANALYZE // item ${displayIndex + 1}/${items.length}${pageLabel}…`,
   });
-  appendSurveyChatMessage({ role: "user", text: capture.prompt });
+  appendSurveyChatMessage({ role: "user", text: prompt });
 
   beginSurveyAnalyzeStatus({
     itemId: item.id,
     itemIndex: displayIndex,
     itemTotal: items.length,
-    provider: "codex",
+    provider: "auto",
   });
 
+  const pngBase64List =
+    stackPngs.length > 0
+      ? stackPngs
+      : [surveyImageDataUrlToBase64(imageDataUrl)];
+
   const result = await analyzeSurveyCaptureClient({
-    pngBase64: surveyImageDataUrlToBase64(capture.imageDataUrl),
-    prompt: capture.prompt,
+    pngBase64: pngBase64List[0],
+    pngBase64List,
+    prompt,
     provider: "auto",
   });
 
@@ -602,12 +624,14 @@ export async function solveMirageCaptureAsync(): Promise<{ ok: boolean; message:
   });
   appendSurveyChatMessage({ role: "assistant", text: result.text });
   notifySurveyMuthurArchive(
-    `SURVEY // SOLVED // item ${displayIndex + 1}/${items.length} (${result.provider})`,
+    `SURVEY // SOLVED // item ${displayIndex + 1}/${items.length}${pageLabel} (${result.provider})`,
   );
 
   return {
     ok: true,
-    message: `Answered item ${displayIndex + 1}/${items.length} via ${result.provider}.`,
+    message: multiPage
+      ? `Answered ${stackPngs.length} pages via ${result.provider}.`
+      : `Answered item ${displayIndex + 1}/${items.length} via ${result.provider}.`,
   };
 }
 

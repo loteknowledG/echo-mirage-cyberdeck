@@ -10,6 +10,14 @@ import {
   takeSurveyScreenshot,
 } from "@/lib/cyberdeck/survey-deck-command.client";
 import {
+  clearSurveyCaptureStack,
+  readSurveyCaptureStack,
+  removeSurveyCaptureStackPage,
+  SURVEY_CAPTURE_STACK_CHANGED_EVENT,
+  SURVEY_CAPTURE_STACK_MAX,
+  type SurveyCaptureStackPage,
+} from "@/lib/cyberdeck/survey-capture-stack.client";
+import {
   resolveMiragePreviewContent,
   solveMirageCaptureAsync,
   SURVEY_MIRAGE_ITEM_CHANGED_EVENT,
@@ -17,6 +25,15 @@ import {
 import { SURVEY_ECHO_DISPLAY } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyAnalyzeStatus } from "@/lib/cyberdeck/survey-analyze-status.client";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
+import { SURVEY_PAIR_PIN_DRAFT_EVENT } from "@/lib/cyberdeck/survey-pair-pin-draft";
+import {
+  isSurveyHttpsPairBlocked,
+  SURVEY_PWA_PAIR_BLOCKED_MESSAGE,
+} from "@/lib/cyberdeck/survey-pairing-shared.client";
+import {
+  isEchoMirageDesktopShell,
+  openDesktopCyberdeckApp,
+} from "@/lib/electron/desktop-install.client";
 
 function formatCaptureSize(imageSrc: string): string {
   const bytes = Math.round((imageSrc.length * 3) / 4);
@@ -30,15 +47,27 @@ export function SurveyMirageCapturePreview() {
   const team = useSurveyTeamStatus();
   const analyzeStatus = useSurveyAnalyzeStatus();
   const [captureTick, setCaptureTick] = useState(0);
+  const [endpointTick, setEndpointTick] = useState(0);
+  const [stackTick, setStackTick] = useState(0);
+  const [activePageId, setActivePageId] = useState<string | null>(null);
   const [captureBusy, setCaptureBusy] = useState(false);
   const [solveBusy, setSolveBusy] = useState(false);
   const [deckMessage, setDeckMessage] = useState<string | null>(null);
+  const [pwaBlocked, setPwaBlocked] = useState(false);
 
   const bumpCapture = useCallback(() => setCaptureTick((value) => value + 1), []);
+  const bumpEndpoint = useCallback(() => setEndpointTick((value) => value + 1), []);
+  const bumpStack = useCallback(() => setStackTick((value) => value + 1), []);
+
+  useEffect(() => {
+    setPwaBlocked(isSurveyHttpsPairBlocked());
+  }, []);
 
   useEffect(() => {
     window.addEventListener(SURVEY_LAST_CAPTURE_EVENT, bumpCapture);
     window.addEventListener(SURVEY_MIRAGE_ITEM_CHANGED_EVENT, bumpCapture);
+    window.addEventListener(SURVEY_PAIR_PIN_DRAFT_EVENT, bumpEndpoint);
+    window.addEventListener(SURVEY_CAPTURE_STACK_CHANGED_EVENT, bumpStack);
     const onStorage = (event: StorageEvent) => {
       if (event.key === SURVEY_LAST_CAPTURE_STORAGE_KEY) bumpCapture();
     };
@@ -46,27 +75,56 @@ export function SurveyMirageCapturePreview() {
     return () => {
       window.removeEventListener(SURVEY_LAST_CAPTURE_EVENT, bumpCapture);
       window.removeEventListener(SURVEY_MIRAGE_ITEM_CHANGED_EVENT, bumpCapture);
+      window.removeEventListener(SURVEY_PAIR_PIN_DRAFT_EVENT, bumpEndpoint);
+      window.removeEventListener(SURVEY_CAPTURE_STACK_CHANGED_EVENT, bumpStack);
       window.removeEventListener("storage", onStorage);
     };
-  }, [bumpCapture]);
+  }, [bumpCapture, bumpEndpoint, bumpStack]);
 
   useEffect(() => {
     if (analyzeStatus.phase !== "running") setSolveBusy(false);
   }, [analyzeStatus.phase]);
+
+  const stackPages = useMemo(() => {
+    void stackTick;
+    void captureTick;
+    return readSurveyCaptureStack();
+  }, [stackTick, captureTick]);
+
+  useEffect(() => {
+    if (stackPages.length === 0) {
+      setActivePageId(null);
+      return;
+    }
+    if (!activePageId || !stackPages.some((page) => page.id === activePageId)) {
+      setActivePageId(stackPages[stackPages.length - 1]?.id ?? null);
+    }
+  }, [stackPages, activePageId]);
 
   const previewContent = useMemo(() => {
     void captureTick;
     return resolveMiragePreviewContent();
   }, [captureTick]);
 
-  const imageSrc = previewContent?.kind === "image" ? previewContent.imageDataUrl : null;
-  const solving = analyzeStatus.phase === "running";
+  const activePage: SurveyCaptureStackPage | null =
+    stackPages.find((page) => page.id === activePageId) ??
+    stackPages[stackPages.length - 1] ??
+    null;
 
-  const echoCtx = useMemo(
-    () => resolveSurveyEchoDeckContext(team.echoHost),
-    [team.echoHost],
-  );
-  const echoReady = Boolean(echoCtx.echoHost);
+  const imageSrc = activePage
+    ? `data:image/png;base64,${activePage.pngBase64}`
+    : previewContent?.kind === "image"
+      ? previewContent.imageDataUrl
+      : null;
+  const solving = analyzeStatus.phase === "running";
+  const pageCount = stackPages.length;
+  const canSolve = pageCount > 0 || Boolean(imageSrc);
+
+  const echoCtx = useMemo(() => {
+    void endpointTick;
+    return resolveSurveyEchoDeckContext(team.echoHost);
+  }, [endpointTick, team.echoHost]);
+  const echoReady = Boolean(echoCtx.echoHost) && !pwaBlocked;
   const echoTargetLabel = echoCtx.echoHost
     ? `${echoCtx.echoHost}:${echoCtx.echoHttpPort}`
     : null;
@@ -76,19 +134,41 @@ export function SurveyMirageCapturePreview() {
     setCaptureBusy(true);
     setDeckMessage(null);
     const result = await takeSurveyScreenshot(echoCtx);
-    setDeckMessage(result.message);
-    if (result.ok) bumpCapture();
+    setDeckMessage(
+      result.ok
+        ? `${result.message} · page added (${Math.min(pageCount + 1, SURVEY_CAPTURE_STACK_MAX)}/${SURVEY_CAPTURE_STACK_MAX})`
+        : result.message,
+    );
+    if (result.ok) {
+      bumpCapture();
+      bumpStack();
+    }
     setCaptureBusy(false);
-  }, [bumpCapture, captureBusy, echoCtx, solving]);
+  }, [bumpCapture, bumpStack, captureBusy, echoCtx, pageCount, solving]);
 
   const handleSolve = useCallback(async () => {
-    if (!imageSrc || solveBusy || solving) return;
+    if (!canSolve || solveBusy || solving) return;
     setSolveBusy(true);
     setDeckMessage(null);
     const result = await solveMirageCaptureAsync();
     setDeckMessage(result.message);
     setSolveBusy(false);
-  }, [imageSrc, solveBusy, solving]);
+  }, [canSolve, solveBusy, solving]);
+
+  const handleClearPages = useCallback(() => {
+    clearSurveyCaptureStack();
+    setActivePageId(null);
+    setDeckMessage("Capture pages cleared.");
+    bumpStack();
+  }, [bumpStack]);
+
+  const handleRemovePage = useCallback(
+    (pageId: string) => {
+      removeSurveyCaptureStackPage(pageId);
+      bumpStack();
+    },
+    [bumpStack],
+  );
 
   return (
     <section
@@ -98,7 +178,12 @@ export function SurveyMirageCapturePreview() {
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[9px] tracking-[0.1em] text-fuchsia-300/90">CAPTURE</p>
-        {imageSrc ? (
+        {pageCount > 0 ? (
+          <p className="text-[8px] text-[#6a6a6a]">
+            {pageCount} page{pageCount === 1 ? "" : "s"}
+            {imageSrc ? ` · ${formatCaptureSize(imageSrc)}` : null}
+          </p>
+        ) : imageSrc ? (
           <p className="text-[8px] text-[#6a6a6a]">{formatCaptureSize(imageSrc)}</p>
         ) : null}
       </div>
@@ -106,44 +191,130 @@ export function SurveyMirageCapturePreview() {
       <div className="mb-3 flex flex-wrap gap-2">
         <CyberdeckActionButton
           variant="neutral"
-          disabled={!echoReady || captureBusy || solving}
+          disabled={!echoReady || captureBusy || solving || pageCount >= SURVEY_CAPTURE_STACK_MAX}
           onClick={() => void handleScreenshot()}
           data-testid="survey-mirage-take-screenshot"
         >
-          {captureBusy ? "CAPTURING…" : `${SURVEY_ECHO_DISPLAY} · SCREENSHOT`}
+          {captureBusy
+            ? "CAPTURING…"
+            : pageCount > 0
+              ? `${SURVEY_ECHO_DISPLAY} · + PAGE`
+              : `${SURVEY_ECHO_DISPLAY} · SCREENSHOT`}
         </CyberdeckActionButton>
         <CyberdeckActionButton
           variant="accent"
-          disabled={!imageSrc || solveBusy || solving}
+          disabled={!canSolve || solveBusy || solving}
           onClick={() => void handleSolve()}
           data-testid="survey-mirage-solve-capture"
         >
-          {solving && imageSrc ? "SOLVING…" : "SOLVE"}
+          {solving && canSolve
+            ? "SOLVING…"
+            : pageCount > 1
+              ? `SOLVE ${pageCount} PAGES`
+              : "SOLVE"}
         </CyberdeckActionButton>
+        {pageCount > 0 ? (
+          <CyberdeckActionButton
+            variant="neutral"
+            disabled={captureBusy || solveBusy || solving}
+            onClick={handleClearPages}
+            data-testid="survey-mirage-clear-pages"
+          >
+            CLEAR PAGES
+          </CyberdeckActionButton>
+        ) : null}
       </div>
 
-      {!echoReady ? (
+      {pwaBlocked ? (
+        <div className="mb-2 space-y-2">
+          <p className="text-[8px] leading-relaxed text-amber-200/90">
+            {SURVEY_PWA_PAIR_BLOCKED_MESSAGE}
+          </p>
+          {!isEchoMirageDesktopShell() ? (
+            <CyberdeckActionButton
+              variant="accent"
+              onClick={() => void openDesktopCyberdeckApp()}
+              data-testid="survey-mirage-open-desktop-for-capture"
+            >
+              Open desktop cyberdeck
+            </CyberdeckActionButton>
+          ) : null}
+        </div>
+      ) : !echoReady ? (
         <p className="mb-2 text-[8px] text-[#6a6a6a]">
-          Link {SURVEY_ECHO_DISPLAY} in TEAM LINKS first — capture runs on that machine.
+          Enter {SURVEY_ECHO_DISPLAY} IP above (Tailscale), then SCREENSHOT runs on that Mac.
         </p>
       ) : echoTargetLabel ? (
         <p className="mb-2 text-[8px] text-[#6a6a6a]">
           {SURVEY_ECHO_DISPLAY} · {echoTargetLabel}
+          {" — "}press + PAGE for each extra screen, then SOLVE.
         </p>
       ) : null}
 
       {solving ? <SurveyAnalyzeSolvingBanner status={analyzeStatus} compact /> : null}
 
+      {pageCount > 1 ? (
+        <div className="mb-3 flex flex-wrap gap-2" data-testid="survey-mirage-page-strip">
+          {stackPages.map((page, index) => {
+            const selected = page.id === activePage?.id;
+            return (
+              <button
+                key={page.id}
+                type="button"
+                onClick={() => setActivePageId(page.id)}
+                className={`relative overflow-hidden rounded border ${
+                  selected ? "border-fuchsia-500/70" : "border-[#2a2a2a]"
+                } bg-black`}
+                title={`Page ${index + 1}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- local capture preview */}
+                <img
+                  src={`data:image/png;base64,${page.pngBase64}`}
+                  alt={`Page ${index + 1}`}
+                  className="h-14 w-20 object-cover object-left-top"
+                />
+                <span className="absolute bottom-0 left-0 right-0 bg-black/75 px-1 text-[8px] text-[#cfcfcf]">
+                  {index + 1}
+                </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="absolute right-0 top-0 bg-black/80 px-1 text-[8px] text-[#ff8a8a]"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleRemovePage(page.id);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleRemovePage(page.id);
+                    }
+                  }}
+                >
+                  ×
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       {!imageSrc ? (
         <p className="text-[9px] leading-relaxed text-[#6a6a6a]">
-          No capture yet — press SCREENSHOT, then SOLVE to fill Answers below.
+          No capture yet — SCREENSHOT for page 1, + PAGE for more screens, then SOLVE.
         </p>
       ) : (
         <div className="relative overflow-hidden rounded border border-[#1c1c1c] bg-black">
+          {pageCount > 1 ? (
+            <p className="absolute left-2 top-2 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[8px] text-fuchsia-200/90">
+              PAGE {stackPages.findIndex((page) => page.id === activePage?.id) + 1}/{pageCount}
+            </p>
+          ) : null}
           {/* eslint-disable-next-line @next/next/no-img-element -- data URL / local capture blob */}
           <img
             src={imageSrc}
-            alt="Echo capture preview"
+            alt={pageCount > 1 ? `Echo capture page` : "Echo capture preview"}
             className={`max-h-[min(42vh,420px)] w-full object-contain object-left-top ${solving ? "opacity-60" : ""}`}
           />
         </div>

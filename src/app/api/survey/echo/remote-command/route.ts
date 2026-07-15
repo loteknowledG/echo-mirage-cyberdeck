@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  DEFAULT_ECHO_TAILSCALE_HOST,
+  isLanPrivateEchoHost,
+  preferMeshEchoHost,
+} from "@/lib/cyberdeck/survey-pair-pin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -6,10 +11,10 @@ export const dynamic = "force-dynamic";
 /** Proxy Echo Deck commands from Mirage cyberdeck → Echo Satellite HTTP. */
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
-  const echoHost = searchParams.get("echoHost")?.trim();
+  const echoHostRaw = searchParams.get("echoHost")?.trim();
   const echoHttpPort = Number(searchParams.get("echoHttpPort") || 3050);
 
-  if (!echoHost || !Number.isFinite(echoHttpPort) || echoHttpPort <= 0) {
+  if (!echoHostRaw || !Number.isFinite(echoHttpPort) || echoHttpPort <= 0) {
     return NextResponse.json(
       { ok: false, reason: "echoHost and echoHttpPort are required." },
       { status: 400 },
@@ -36,9 +41,13 @@ export async function POST(request: Request) {
         ? Number(tabIdRaw)
         : undefined;
 
-  const hostsToTry = [echoHost];
-  if (echoHost !== "127.0.0.1" && echoHost !== "localhost") {
-    hostsToTry.push("127.0.0.1");
+  // Remap Echo LAN ads to Tailscale; never fall back to 127.0.0.1 (that's Mirage on Windows).
+  const meshHost = preferMeshEchoHost(echoHostRaw) ?? echoHostRaw;
+  const hostsToTry = [meshHost];
+  if (echoHostRaw !== meshHost) {
+    hostsToTry.push(echoHostRaw);
+  } else if (isLanPrivateEchoHost(echoHostRaw)) {
+    hostsToTry.push(DEFAULT_ECHO_TAILSCALE_HOST);
   }
 
   const forwardBody: { action: string; tabId?: number } = { action };
@@ -46,7 +55,7 @@ export async function POST(request: Request) {
     forwardBody.tabId = tabId;
   }
 
-  let lastError = `Could not reach echo-electron at ${echoHost}:${echoHttpPort}.`;
+  let lastError = `Could not reach echo-electron at ${meshHost}:${echoHttpPort}.`;
   for (const host of hostsToTry) {
     try {
       const res = await fetch(`http://${host}:${echoHttpPort}/api/survey/echo/command`, {

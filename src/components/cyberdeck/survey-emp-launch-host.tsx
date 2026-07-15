@@ -34,7 +34,7 @@ export function SurveyEmpLaunchHost() {
           timers.push(
             window.setTimeout(() => {
               if (cancelled) return;
-              void requestSurveyHubConnect({ force: true, quiet: false });
+              void requestSurveyHubConnect({ force: true, quiet: true });
             }, ms),
           );
         }
@@ -46,7 +46,7 @@ export function SurveyEmpLaunchHost() {
           timers.push(
             window.setTimeout(() => {
               if (cancelled) return;
-              void runSurveyMiragePowerfistHubRestore();
+              void runSurveyMiragePowerfistHubRestore({ quiet: true });
             }, ms),
           );
         }

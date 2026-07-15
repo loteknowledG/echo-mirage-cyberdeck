@@ -10,26 +10,34 @@ import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
 import { runSurveyHubConnect } from "@/lib/cyberdeck/survey-hub.client";
 import { isSurveyTeamTripleLinked } from "@/lib/cyberdeck/survey-team-status";
 import { refreshSurveyTeamStatus } from "@/lib/cyberdeck/survey-team-status-store.client";
-import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 
-/** Cumulative delays after cyberdeck open — keeps trying until triple-linked or cap. */
-const AUTO_CONNECT_RETRY_MS = [0, 2_000, 5_000, 10_000, 20_000, 30_000, 45_000, 60_000, 90_000] as const;
+/**
+ * Background retries after cyberdeck open — always quiet (no MUTHUR spam).
+ * Explicit Connect / MUTHUR requests stay loud via the event handler.
+ */
+const AUTO_CONNECT_RETRY_MS = [2_000, 12_000, 30_000, 60_000] as const;
 
 /** Survey Hub auto-connect on cyberdeck open and on explicit request (MUTHUR / operator). */
 export function SurveyAutoPairHost() {
-  const team = useSurveyTeamStatus();
-  const tripleLinked = isSurveyTeamTripleLinked(team);
   const runningRef = useRef(false);
+  const backgroundStoppedRef = useRef(false);
 
   useEffect(() => {
     if (!isSurveyHubEnabled()) return;
 
     let cancelled = false;
     const cleanups: Array<() => void> = [];
+    backgroundStoppedRef.current = false;
 
     const run = async (force: boolean, quiet: boolean, emitResult: boolean) => {
-      if (runningRef.current || cancelled || team.loading || tripleLinked) {
-        if (emitResult && tripleLinked) {
+      if (runningRef.current || cancelled) {
+        return;
+      }
+
+      const fresh = await refreshSurveyTeamStatus();
+      if (isSurveyTeamTripleLinked(fresh)) {
+        backgroundStoppedRef.current = true;
+        if (emitResult) {
           dispatchSurveyHubConnectResult({
             ran: false,
             skipped: "Already triple-linked.",
@@ -45,14 +53,19 @@ export function SurveyAutoPairHost() {
         if (emitResult) {
           dispatchSurveyHubConnectResult(result);
         }
+        if (result.ran && result.steps.length > 0 && result.steps.every((step) => step.ok)) {
+          backgroundStoppedRef.current = true;
+        }
       } finally {
         runningRef.current = false;
       }
     };
 
+    // Background only — never posts hub failures into MUTHUR chat.
     for (const delayMs of AUTO_CONNECT_RETRY_MS) {
       const timerId = window.setTimeout(() => {
-        void run(true, delayMs > 0, false);
+        if (cancelled || backgroundStoppedRef.current) return;
+        void run(true, true, false);
       }, delayMs);
       cleanups.push(() => window.clearTimeout(timerId));
     }
@@ -69,6 +82,7 @@ export function SurveyAutoPairHost() {
           });
           return;
         }
+        // Operator / MUTHUR explicit connect may talk; default quiet=false.
         await run(detail?.force !== false, detail?.quiet ?? false, true);
       })();
     };
@@ -76,12 +90,14 @@ export function SurveyAutoPairHost() {
 
     return () => {
       cancelled = true;
+      backgroundStoppedRef.current = true;
       for (const cleanup of cleanups) {
         cleanup();
       }
       window.removeEventListener(SURVEY_HUB_CONNECT_REQUEST_EVENT, onRequest);
     };
-  }, [team.loading, tripleLinked]);
+    // Mount once — do not re-arm when team.loading flickers (that spammed MUTHUR).
+  }, []);
 
   return null;
 }

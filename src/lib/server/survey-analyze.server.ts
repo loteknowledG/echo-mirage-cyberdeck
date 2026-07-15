@@ -1,4 +1,5 @@
 // SERVER ONLY — vision analysis for Survey captures.
+// Auto chain: Codex → OpenAI/OpenRouter → Cursor → MUTHUR (OpenCode Zen).
 
 import { SURVEY_SELECTED_TEXT_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
 import { isCodexCliAvailable } from "@/lib/server/cadre/adapters/codex-runtime-adapter.server";
@@ -7,6 +8,14 @@ import {
   analyzeSurveyCaptureViaCodex,
   analyzeSurveyTextViaCodex,
 } from "@/lib/server/survey-analyze-codex.server";
+import {
+  analyzeSurveyCaptureViaCursor,
+  analyzeSurveyTextViaCursor,
+} from "@/lib/server/survey-analyze-cursor.server";
+import {
+  analyzeSurveyCaptureViaMuthur,
+  analyzeSurveyTextViaMuthur,
+} from "@/lib/server/survey-analyze-muthur.server";
 
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -14,19 +23,55 @@ const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 export const DEFAULT_SURVEY_PROMPT =
   "Describe what is on this screen. If it shows a coding interview question or LeetCode-style problem, summarize the problem statement and constraints clearly.";
 
-type SurveyVisionProvider = "auto" | "codex" | "openai" | "openrouter";
+export const DEFAULT_SURVEY_MULTI_PAGE_PROMPT =
+  "These screenshots are consecutive pages of one question or problem (page 1 first). Read every page in order, reconstruct the full problem, then solve it. Be concise and actionable.";
+
+function normalizePngList(input: SurveyAnalyzeInput): string[] {
+  const fromList = Array.isArray(input.pngBase64List)
+    ? input.pngBase64List.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+    : [];
+  if (fromList.length > 0) return fromList.slice(0, 6);
+  const single = input.pngBase64?.trim();
+  return single ? [single] : [];
+}
+
+function resolveCapturePrompt(input: SurveyAnalyzeInput, pageCount: number): string {
+  const custom = input.prompt?.trim();
+  if (custom) return custom;
+  return pageCount > 1 ? DEFAULT_SURVEY_MULTI_PAGE_PROMPT : DEFAULT_SURVEY_PROMPT;
+}
+
+type SurveyVisionProvider =
+  | "auto"
+  | "codex"
+  | "openai"
+  | "openrouter"
+  | "cursor"
+  | "muthur";
 
 function resolveVisionProvider(input: SurveyAnalyzeInput): SurveyVisionProvider {
   const raw = input.provider?.trim().toLowerCase();
-  if (raw === "codex" || raw === "openai" || raw === "openrouter") return raw;
+  if (
+    raw === "codex" ||
+    raw === "openai" ||
+    raw === "openrouter" ||
+    raw === "cursor" ||
+    raw === "muthur"
+  ) {
+    return raw;
+  }
   return "auto";
 }
 
-function resolveAutoVisionProvider(): "codex" | "openai" | "openrouter" {
-  if (isCodexCliAvailable()) return "codex";
-  if (resolveServerProviderCredentials("openai", undefined).apiKey) return "openai";
-  if (resolveServerProviderCredentials("openrouter", undefined).apiKey) return "openrouter";
-  return "codex";
+function listApiVisionFallbacks(): Array<"openai" | "openrouter"> {
+  const providers: Array<"openai" | "openrouter"> = [];
+  if (resolveServerProviderCredentials("openai", undefined).apiKey) {
+    providers.push("openai");
+  }
+  if (resolveServerProviderCredentials("openrouter", undefined).apiKey) {
+    providers.push("openrouter");
+  }
+  return providers;
 }
 
 function resolveVisionModel(provider: string): string {
@@ -44,6 +89,8 @@ function resolveChatEndpoint(provider: string): string | null {
 
 export type SurveyAnalyzeInput = {
   pngBase64?: string;
+  /** Ordered multi-page captures (page 1 first). */
+  pngBase64List?: string[];
   selectionText?: string;
   prompt?: string;
   provider?: string;
@@ -58,24 +105,34 @@ export type SurveyAnalyzeResult =
 async function analyzeSurveyCaptureViaApi(
   input: SurveyAnalyzeInput,
   provider: "openai" | "openrouter",
-  pngBase64: string,
+  pngList: string[],
 ): Promise<SurveyAnalyzeResult> {
   const endpoint = resolveChatEndpoint(provider);
   if (!endpoint) {
     return {
       ok: false,
-      error: `Provider "${provider}" does not support Survey vision yet. Use codex, openai, or openrouter.`,
+      error: `Provider "${provider}" does not support Survey vision yet.`,
     };
   }
 
   const { apiKey } = resolveServerProviderCredentials(provider, input.apiKey);
   if (!apiKey) {
-    return { ok: false, error: `No API key for ${provider}. Add credentials in Settings or use provider codex.` };
+    return { ok: false, error: `No API key for ${provider}.` };
   }
 
   const model = input.model?.trim() || resolveVisionModel(provider);
-  const prompt = input.prompt?.trim() || DEFAULT_SURVEY_PROMPT;
-  const imageUrl = `data:image/png;base64,${pngBase64}`;
+  const prompt = resolveCapturePrompt(input, pngList.length);
+  const content: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
+  for (const [index, png] of pngList.entries()) {
+    content.push({
+      type: "text",
+      text: `--- Page ${index + 1} of ${pngList.length} ---`,
+    });
+    content.push({
+      type: "image_url",
+      image_url: { url: `data:image/png;base64,${png}`, detail: "high" },
+    });
+  }
 
   try {
     const res = await fetch(endpoint, {
@@ -88,15 +145,7 @@ async function analyzeSurveyCaptureViaApi(
         model,
         max_tokens: 2048,
         temperature: 0.2,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              { type: "image_url", image_url: { url: imageUrl, detail: "high" } },
-            ],
-          },
-        ],
+        messages: [{ role: "user", content }],
       }),
     });
 
@@ -114,12 +163,12 @@ async function analyzeSurveyCaptureViaApi(
     const payload = (await res.json()) as {
       choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>;
     };
-    const content = payload.choices?.[0]?.message?.content;
+    const messageContent = payload.choices?.[0]?.message?.content;
     let text = "";
-    if (typeof content === "string") {
-      text = content.trim();
-    } else if (Array.isArray(content)) {
-      text = content
+    if (typeof messageContent === "string") {
+      text = messageContent.trim();
+    } else if (Array.isArray(messageContent)) {
+      text = messageContent
         .map((part) => (part.type === "text" ? part.text ?? "" : ""))
         .join("")
         .trim();
@@ -153,7 +202,7 @@ async function analyzeSurveySelectionViaApi(
 
   const { apiKey } = resolveServerProviderCredentials(provider, input.apiKey);
   if (!apiKey) {
-    return { ok: false, error: `No API key for ${provider}. Add credentials in Settings or use provider codex.` };
+    return { ok: false, error: `No API key for ${provider}.` };
   }
 
   const model = input.model?.trim() || (provider === "openrouter" ? "openai/gpt-4o" : "gpt-4o");
@@ -201,6 +250,84 @@ async function analyzeSurveySelectionViaApi(
   }
 }
 
+async function runAutoCaptureChain(
+  input: SurveyAnalyzeInput,
+  pngList: string[],
+  prompt: string,
+): Promise<SurveyAnalyzeResult> {
+  const errors: string[] = [];
+  const primary = pngList[0] ?? "";
+
+  if (isCodexCliAvailable()) {
+    const result = await analyzeSurveyCaptureViaCodex({
+      pngBase64: primary,
+      pngBase64List: pngList,
+      prompt,
+    });
+    if (result.ok) return result;
+    errors.push(`codex: ${result.error}`);
+  }
+
+  for (const fallback of listApiVisionFallbacks()) {
+    const result = await analyzeSurveyCaptureViaApi(input, fallback, pngList);
+    if (result.ok) return result;
+    errors.push(`${fallback}: ${result.error}`);
+  }
+
+  const cursorResult = await analyzeSurveyCaptureViaCursor({
+    pngBase64: primary,
+    pngBase64List: pngList,
+    prompt,
+  });
+  if (cursorResult.ok) return cursorResult;
+  errors.push(`cursor: ${cursorResult.error}`);
+
+  const muthurResult = await analyzeSurveyCaptureViaMuthur({
+    pngBase64: primary,
+    pngBase64List: pngList,
+    prompt,
+  });
+  if (muthurResult.ok) return muthurResult;
+  errors.push(`muthur: ${muthurResult.error}`);
+
+  return {
+    ok: false,
+    error: `Survey analyze exhausted fallbacks. ${errors.join(" · ")}`,
+  };
+}
+
+async function runAutoSelectionChain(
+  input: SurveyAnalyzeInput,
+  prompt: string,
+): Promise<SurveyAnalyzeResult> {
+  const errors: string[] = [];
+
+  if (isCodexCliAvailable()) {
+    const result = await analyzeSurveyTextViaCodex({ prompt });
+    if (result.ok) return result;
+    errors.push(`codex: ${result.error}`);
+  }
+
+  for (const fallback of listApiVisionFallbacks()) {
+    const result = await analyzeSurveySelectionViaApi(input, fallback, prompt);
+    if (result.ok) return result;
+    errors.push(`${fallback}: ${result.error}`);
+  }
+
+  const cursorResult = await analyzeSurveyTextViaCursor({ prompt });
+  if (cursorResult.ok) return cursorResult;
+  errors.push(`cursor: ${cursorResult.error}`);
+
+  const muthurResult = await analyzeSurveyTextViaMuthur({ prompt });
+  if (muthurResult.ok) return muthurResult;
+  errors.push(`muthur: ${muthurResult.error}`);
+
+  return {
+    ok: false,
+    error: `Survey text analyze exhausted fallbacks. ${errors.join(" · ")}`,
+  };
+}
+
 async function analyzeSurveySelection(
   input: SurveyAnalyzeInput,
   selectionText: string,
@@ -208,13 +335,26 @@ async function analyzeSurveySelection(
   const instruction = input.prompt?.trim() || SURVEY_SELECTED_TEXT_PROMPT;
   const prompt = `${instruction}\n\n---\n\n${selectionText}`;
   const requested = resolveVisionProvider(input);
-  const provider = requested === "auto" ? resolveAutoVisionProvider() : requested;
 
-  if (provider === "codex") {
-    return analyzeSurveyTextViaCodex({ prompt });
+  if (requested === "auto") {
+    return runAutoSelectionChain(input, prompt);
   }
 
-  return analyzeSurveySelectionViaApi(input, provider, prompt);
+  switch (requested) {
+    case "codex":
+      return analyzeSurveyTextViaCodex({ prompt });
+    case "cursor":
+      return analyzeSurveyTextViaCursor({ prompt });
+    case "muthur":
+      return analyzeSurveyTextViaMuthur({ prompt });
+    case "openai":
+    case "openrouter":
+      return analyzeSurveySelectionViaApi(input, requested, prompt);
+    default: {
+      const _exhaustive: never = requested;
+      return { ok: false, error: `Unknown provider: ${String(_exhaustive)}` };
+    }
+  }
 }
 
 export async function analyzeSurveyCapture(input: SurveyAnalyzeInput): Promise<SurveyAnalyzeResult> {
@@ -223,18 +363,44 @@ export async function analyzeSurveyCapture(input: SurveyAnalyzeInput): Promise<S
     return analyzeSurveySelection(input, selectionText);
   }
 
-  const pngBase64 = input.pngBase64?.trim() ?? "";
-  if (!pngBase64) {
-    return { ok: false, error: "pngBase64 or selectionText is required." };
+  const pngList = normalizePngList(input);
+  if (pngList.length === 0) {
+    return { ok: false, error: "pngBase64, pngBase64List, or selectionText is required." };
   }
 
-  const prompt = input.prompt?.trim() || DEFAULT_SURVEY_PROMPT;
+  const prompt = resolveCapturePrompt(input, pngList.length);
   const requested = resolveVisionProvider(input);
-  const provider = requested === "auto" ? resolveAutoVisionProvider() : requested;
+  const primary = pngList[0] ?? "";
 
-  if (provider === "codex") {
-    return analyzeSurveyCaptureViaCodex({ pngBase64, prompt });
+  if (requested === "auto") {
+    return runAutoCaptureChain(input, pngList, prompt);
   }
 
-  return analyzeSurveyCaptureViaApi(input, provider, pngBase64);
+  switch (requested) {
+    case "codex":
+      return analyzeSurveyCaptureViaCodex({
+        pngBase64: primary,
+        pngBase64List: pngList,
+        prompt,
+      });
+    case "cursor":
+      return analyzeSurveyCaptureViaCursor({
+        pngBase64: primary,
+        pngBase64List: pngList,
+        prompt,
+      });
+    case "muthur":
+      return analyzeSurveyCaptureViaMuthur({
+        pngBase64: primary,
+        pngBase64List: pngList,
+        prompt,
+      });
+    case "openai":
+    case "openrouter":
+      return analyzeSurveyCaptureViaApi(input, requested, pngList);
+    default: {
+      const _exhaustive: never = requested;
+      return { ok: false, error: `Unknown provider: ${String(_exhaustive)}` };
+    }
+  }
 }

@@ -22,11 +22,23 @@ import {
 } from "@/lib/cyberdeck/survey-continuous-screenshot.client";
 import { SURVEY_SILENT_CAPTURE_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
 import { notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
+import { pushSurveyCaptureStackPage } from "@/lib/cyberdeck/survey-capture-stack.client";
 import {
   readSurveyMiragePairCredentials,
   readSurveyPowerfistPairCredentials,
 } from "@/lib/cyberdeck/survey-pairing-client";
-import { DEFAULT_ECHO_HTTP_PORT } from "@/lib/cyberdeck/survey-pair-pin";
+import {
+  isSurveyHttpsPairBlocked,
+  SURVEY_PWA_PAIR_BLOCKED_MESSAGE,
+} from "@/lib/cyberdeck/survey-pairing-shared.client";
+import { readSurveyPairPinDraft } from "@/lib/cyberdeck/survey-pair-pin-draft";
+import {
+  DEFAULT_ECHO_HTTP_PORT,
+  DEFAULT_ECHO_TAILSCALE_HOST,
+  isTailscaleCgNatHost,
+  preferMeshEchoHost,
+} from "@/lib/cyberdeck/survey-pair-pin";
+import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
 
 export const SURVEY_LAST_CAPTURE_STORAGE_KEY = "echo-mirage-survey-last-capture-v1";
 export const SURVEY_LAST_CAPTURE_EVENT = "echo-mirage-survey-last-capture";
@@ -51,19 +63,43 @@ export function resolveSurveyEchoDeckContext(
 ): SurveyDeckCommandContext {
   const mirageCreds = readSurveyMiragePairCredentials();
   const powerfistCreds = readSurveyPowerfistPairCredentials();
-  let echoHost =
-    teamEchoHost?.trim() ||
-    mirageCreds?.echoHost?.trim() ||
-    powerfistCreds?.echoHost?.trim() ||
-    null;
-  const echoHttpPort =
-    mirageCreds?.httpPort ?? powerfistCreds?.httpPort ?? DEFAULT_ECHO_HTTP_PORT;
+  const mirageDraft = readSurveyPairPinDraft("mirage");
+  const powerfistDraft = readSurveyPairPinDraft("powerfist");
+  const draftHost =
+    mirageDraft?.echoHost?.trim() || powerfistDraft?.echoHost?.trim() || null;
+  const draftPortRaw =
+    mirageDraft?.echoHttpPort?.trim() || powerfistDraft?.echoHttpPort?.trim() || "";
+  const draftPort = Number(draftPortRaw);
 
-  // One-machine dev (EMP ignition): loopback Echo before pair creds land in localStorage.
-  if (!echoHost && typeof window !== "undefined") {
+  // Prefer saved/draft mesh host over team LAN IP (Satellite often reports 10.x / 192.168).
+  const candidates = [
+    mirageCreds?.echoHost?.trim(),
+    draftHost,
+    powerfistCreds?.echoHost?.trim(),
+    teamEchoHost?.trim(),
+  ].filter((value): value is string => Boolean(value));
+
+  const meshCandidate = candidates.find((host) => isTailscaleCgNatHost(host));
+  let echoHost =
+    meshCandidate ??
+    preferMeshEchoHost(candidates[0] ?? null) ??
+    null;
+  let echoHttpPort =
+    mirageCreds?.httpPort ??
+    powerfistCreds?.httpPort ??
+    (Number.isFinite(draftPort) && draftPort > 0 ? draftPort : DEFAULT_ECHO_HTTP_PORT);
+
+  // Local HTTP / desktop shell can reach Tailscale Echo; hosted HTTPS PWA cannot.
+  if (!echoHost && typeof window !== "undefined" && !isSurveyHttpsPairBlocked()) {
     const { hostname } = window.location;
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      echoHost = "127.0.0.1";
+    const localHttp =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      isEchoMirageDesktopShell();
+    if (localHttp) {
+      // Windows Mirage ↔ Mac Echo over mesh (form default). Same-machine EMP can override via draft.
+      echoHost = DEFAULT_ECHO_TAILSCALE_HOST;
+      echoHttpPort = DEFAULT_ECHO_HTTP_PORT;
     }
   }
 
@@ -87,6 +123,8 @@ function storeLastCapture(pngBase64: string): void {
   } catch {
     /* ignore */
   }
+  // Multi-page questions: each screenshot appends to the session stack.
+  pushSurveyCaptureStackPage(pngBase64);
   window.dispatchEvent(
     new CustomEvent(SURVEY_LAST_CAPTURE_EVENT, {
       detail: { pngBase64 },
@@ -171,9 +209,16 @@ async function sendEchoRemoteCommand(
   ctx: SurveyDeckCommandContext,
   options?: { ingestClipboard?: boolean },
 ): Promise<SurveyDeckCommandResult> {
+  if (isSurveyHttpsPairBlocked()) {
+    return { ok: false, message: SURVEY_PWA_PAIR_BLOCKED_MESSAGE };
+  }
+
   const host = ctx.echoHost?.trim();
   if (!host) {
-    return { ok: false, message: "Echo host unknown — check TEAM LINKS." };
+    return {
+      ok: false,
+      message: `Echo host unknown — enter the ${DEFAULT_ECHO_TAILSCALE_HOST} Tailscale IP above, then retry.`,
+    };
   }
 
   const params = new URLSearchParams({

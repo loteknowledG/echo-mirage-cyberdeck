@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { SurveyMirageCapturePreview } from "@/components/cyberdeck/survey-mirage-capture-preview";
+import { SurveyMirageDesktopLink } from "@/components/cyberdeck/survey-mirage-desktop-link";
+import { SurveyMirageExtCapturePanel } from "@/components/cyberdeck/survey-mirage-ext-capture-panel";
 import { SurveyMirageQueueTeamHost } from "@/components/cyberdeck/survey-mirage-queue-sync";
 import { SurveyPairPinForm } from "@/components/cyberdeck/survey-pair-pin-form";
 import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-panel";
@@ -12,11 +15,20 @@ import {
 } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyEchoLinkWatch } from "@/lib/cyberdeck/survey-echo-link-watch";
 import { saveSurveyMiragePairCredentials } from "@/lib/cyberdeck/survey-pair-credentials.client";
+import {
+  DEFAULT_ECHO_TAILSCALE_HOST,
+  preferMeshEchoHost,
+} from "@/lib/cyberdeck/survey-pair-pin";
+import {
+  isSurveyHttpsPairBlocked,
+  SURVEY_PWA_PAIR_BLOCKED_MESSAGE,
+} from "@/lib/cyberdeck/survey-pairing-shared.client";
 import { notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
-
-/** Default Tailscale MagicDNS / mesh IP for Echo Mac when pairing from Windows Mirage. */
-const DEFAULT_ECHO_TAILSCALE_HOST = "100.70.46.6";
+import {
+  isEchoMirageDesktopShell,
+  openDesktopCyberdeckApp,
+} from "@/lib/electron/desktop-install.client";
 
 /**
  * Mirage Survey sub-pane — PIN-pair Echo, capture screen, read answers.
@@ -25,6 +37,11 @@ export function SurveyMiragePane() {
   const { paired, terminated, resetLinkWatch } = useSurveyEchoLinkWatch("mirage");
   const team = useSurveyTeamStatus();
   const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
+  const [pwaBlocked, setPwaBlocked] = useState(false);
+
+  useEffect(() => {
+    setPwaBlocked(isSurveyHttpsPairBlocked());
+  }, []);
 
   const handlePaired = useCallback(
     (result: {
@@ -36,11 +53,8 @@ export function SurveyMiragePane() {
       sessionEpoch: number;
     }) => {
       // Satellite often reports LAN IP; keep Tailscale mesh host for Windows Mirage.
-      const lan =
-        result.echoHost.startsWith("192.168.") ||
-        result.echoHost.startsWith("10.") ||
-        result.echoHost.startsWith("172.");
-      const echoHost = lan ? DEFAULT_ECHO_TAILSCALE_HOST : result.echoHost;
+      const echoHost =
+        preferMeshEchoHost(result.echoHost) ?? DEFAULT_ECHO_TAILSCALE_HOST;
       saveSurveyMiragePairCredentials({
         echoHost,
         httpPort: result.httpPort,
@@ -69,7 +83,25 @@ export function SurveyMiragePane() {
         {SURVEY_MODE_TITLE} // {SURVEY_MIRAGE_DISPLAY}
       </p>
 
-      {!mirageLinked && !terminated ? (
+      <SurveyMirageDesktopLink />
+
+      {pwaBlocked ? (
+        <div className="space-y-2 rounded border border-amber-900/50 bg-amber-950/20 p-3">
+          <p className="text-[9px] leading-relaxed text-amber-200/90">
+            {SURVEY_PWA_PAIR_BLOCKED_MESSAGE}
+          </p>
+          {!isEchoMirageDesktopShell() ? (
+            <CyberdeckActionButton
+              variant="accent"
+              onClick={() => void openDesktopCyberdeckApp()}
+            >
+              Open desktop cyberdeck
+            </CyberdeckActionButton>
+          ) : null}
+        </div>
+      ) : null}
+
+      {!mirageLinked && !terminated && !pwaBlocked ? (
         <SurveyPairPinForm
           role="mirage"
           roleLabel={SURVEY_MIRAGE_DISPLAY}
@@ -87,6 +119,8 @@ export function SurveyMiragePane() {
       ) : null}
 
       <SurveyMirageCapturePreview />
+
+      <SurveyMirageExtCapturePanel />
 
       <div className="border-t border-[#1c1c1c] pt-4">
         <SurveySolutionsPanel />

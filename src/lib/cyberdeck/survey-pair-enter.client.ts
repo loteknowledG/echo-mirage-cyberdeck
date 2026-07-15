@@ -167,13 +167,17 @@ export async function enterSurveyPairPin(input: {
   );
 
   if (isSurveyHttpsPairBlocked()) {
+    // Tailscale / LAN IP on a hosted HTTPS page cannot reach Echo — desktop cyberdeck required.
+    if (resolvedEndpoint.host) {
+      traceSurveyPairing("pair blocked: HTTPS PWA + direct Echo host (use desktop)");
+      return { ok: false, reason: SURVEY_PWA_PAIR_BLOCKED_MESSAGE };
+    }
     traceSurveyPairing("pair route: cloud relay (HTTPS shell)");
     const echoNodeId = input.echoNodeId?.trim();
     if (!echoNodeId) {
       return {
         ok: false,
-        reason:
-          "Enter Echo team ID from Echo Satellite (cloud relay). IP/port are not required in the PWA.",
+        reason: SURVEY_PWA_PAIR_BLOCKED_MESSAGE,
       };
     }
     const { enterSurveyPairPinViaRelay } = await import("@/lib/cyberdeck/survey-relay.client");

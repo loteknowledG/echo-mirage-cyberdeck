@@ -62,6 +62,12 @@ function log(line: string): void {
   notifySurveyMuthurArchive(`SURVEY HUB // ${line}`);
 }
 
+/** Hub chatter into MUTHUR — skipped when quiet (background auto-retry). */
+function hubSpeak(line: string, quiet: boolean): void {
+  if (quiet) return;
+  log(line);
+}
+
 function shouldThrottleHubConnect(): boolean {
   if (typeof window === "undefined") return true;
   try {
@@ -385,7 +391,7 @@ export async function runSurveyHubConnect(options?: {
   }
 
   if (!quiet) {
-    log("connecting team…");
+    hubSpeak("connecting team…", quiet);
   }
   markHubConnectRun();
 
@@ -403,10 +409,10 @@ export async function runSurveyHubConnect(options?: {
       if (!(await mirageEchoLinkActive())) {
         const paired = await pairMirageDirect(echo);
         if (paired.ok) {
-          log(formatSurveyEchoMirageLinkedLine(paired.echoHost));
+          hubSpeak(formatSurveyEchoMirageLinkedLine(paired.echoHost), quiet);
           steps.push({ id: "mirage", ok: true, detail: `${paired.echoHost}:${paired.httpPort}` });
         } else {
-          log(`Mirage pair failed — ${paired.detail}`);
+          hubSpeak(`Mirage pair failed — ${paired.detail}`, quiet);
           steps.push({ id: "mirage", ok: false, detail: paired.detail });
         }
       } else {
@@ -416,17 +422,17 @@ export async function runSurveyHubConnect(options?: {
       if (!(await powerfistEchoLinkActive())) {
         const paired = await pairPowerfistEchoDirect(echo);
         if (paired.ok) {
-          log(formatSurveyEchoPowerfistLinkedLine(paired.echoHost));
+          hubSpeak(formatSurveyEchoPowerfistLinkedLine(paired.echoHost), quiet);
           steps.push({ id: "powerfist-echo", ok: true, detail: `${paired.echoHost}:${paired.httpPort}` });
         } else {
-          log(`PowerFist ↔ Echo failed — ${paired.detail}`);
+          hubSpeak(`PowerFist ↔ Echo failed — ${paired.detail}`, quiet);
           steps.push({ id: "powerfist-echo", ok: false, detail: paired.detail });
         }
       } else {
         steps.push({ id: "powerfist-echo", ok: true, detail: "already linked" });
       }
     } else if (!echoNodeId) {
-      if (!quiet) log(`skipped — ${echo.reason}`);
+      hubSpeak(`skipped — ${echo.reason}`, quiet);
       return { ran: false, skipped: echo.reason, steps, echoNodeId: null };
     }
   }
@@ -441,7 +447,7 @@ export async function runSurveyHubConnect(options?: {
     if (!echoNodeId) {
       const msg =
         "Enter Echo team ID once (from Echo Satellite status panel) — Survey Hub saves it for next time.";
-      if (!quiet) log(msg);
+      hubSpeak(msg, quiet);
       return { ran: false, skipped: msg, steps, echoNodeId: null };
     }
 
@@ -449,22 +455,20 @@ export async function runSurveyHubConnect(options?: {
 
     const bundleResult = await fetchSurveyRelayBundle(echoNodeId);
     if (!bundleResult.ok) {
-      if (!quiet) log(`relay — ${bundleResult.reason}`);
+      hubSpeak(`relay — ${bundleResult.reason}`, quiet);
       return { ran: false, skipped: bundleResult.reason, steps, echoNodeId };
     }
 
     const bundle = bundleResult.bundle;
-    if (!quiet) {
-      log(`relay bundle · team ${echoNodeId.slice(0, 8)}… · Echo ${bundle.echoHost}`);
-    }
+    hubSpeak(`relay bundle · team ${echoNodeId.slice(0, 8)}… · Echo ${bundle.echoHost}`, quiet);
 
     if (!(await mirageEchoLinkActive())) {
       const paired = await pairMirageRelay(echoNodeId, bundle.miragePin);
       if (paired.ok) {
-        log(formatSurveyEchoMirageLinkedLine(paired.echoHost));
+        hubSpeak(formatSurveyEchoMirageLinkedLine(paired.echoHost), quiet);
         steps.push({ id: "mirage", ok: true, detail: `relay · ${paired.echoHost}` });
       } else {
-        log(`Mirage relay failed — ${paired.detail}`);
+        hubSpeak(`Mirage relay failed — ${paired.detail}`, quiet);
         steps.push({ id: "mirage", ok: false, detail: paired.detail });
       }
     } else {
@@ -482,10 +486,10 @@ export async function runSurveyHubConnect(options?: {
       } else {
         const paired = await pairPowerfistEchoRelay(echoNodeId, pfPin);
         if (paired.ok) {
-          log(formatSurveyEchoPowerfistLinkedLine(paired.echoHost));
+          hubSpeak(formatSurveyEchoPowerfistLinkedLine(paired.echoHost), quiet);
           steps.push({ id: "powerfist-echo", ok: true, detail: `relay · ${paired.echoHost}` });
         } else {
-          log(`PowerFist relay failed — ${paired.detail}`);
+          hubSpeak(`PowerFist relay failed — ${paired.detail}`, quiet);
           steps.push({ id: "powerfist-echo", ok: false, detail: paired.detail });
         }
       }
@@ -499,15 +503,18 @@ export async function runSurveyHubConnect(options?: {
   if (!hubLinked) {
     const relayReady = await waitForPowerfistRelayReady();
     if (!relayReady) {
-      log("Mirage hub failed — PowerFist relay not ready.");
+      hubSpeak("Mirage hub failed — PowerFist relay not ready.", quiet);
       steps.push({ id: "powerfist-hub", ok: false, detail: "PowerFist relay not ready." });
     } else {
       const restored = await restoreMirageHubLink();
       if (restored.ok) {
-        log(formatSurveyMiragePowerfistLinkedLine(readPowerfistRemoteCredentials()?.deviceId ?? "remote"));
+        hubSpeak(
+          formatSurveyMiragePowerfistLinkedLine(readPowerfistRemoteCredentials()?.deviceId ?? "remote"),
+          quiet,
+        );
         steps.push({ id: "powerfist-hub", ok: true, detail: restored.detail });
       } else {
-        log(`Mirage hub failed — ${restored.detail}`);
+        hubSpeak(`Mirage hub failed — ${restored.detail}`, quiet);
         steps.push({ id: "powerfist-hub", ok: false, detail: restored.detail });
       }
     }
@@ -526,9 +533,13 @@ export async function runSurveyHubConnect(options?: {
 
   const failed = steps.filter((step) => !step.ok).length;
   if (failed === 0) {
+    // Success is worth one line even on quiet background connect.
     log("team connected — all links green.");
   } else {
-    log(`${failed} link(s) need attention — ensure Echo Satellite Survey tab is open, then retry.`);
+    hubSpeak(
+      `${failed} link(s) need attention — ensure Echo Satellite Survey tab is open, then retry.`,
+      quiet,
+    );
   }
 
   return finishSurveyHubConnect({

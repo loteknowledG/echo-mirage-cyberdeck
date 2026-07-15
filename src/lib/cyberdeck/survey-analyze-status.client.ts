@@ -162,6 +162,19 @@ export function completeSurveyAnalyzeStatus(input: {
   });
 }
 
+/** Reset analyze banner / last result (solutions CLEAR). */
+export function clearSurveyAnalyzeStatus(): void {
+  stopProgressTicker();
+  writeStatus({ ...IDLE_STATUS, updatedAt: new Date().toISOString() });
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 export function useSurveyAnalyzeStatus(): SurveyAnalyzeStatus {
   const [status, setStatus] = useState<SurveyAnalyzeStatus>(() => readSurveyAnalyzeStatus());
 

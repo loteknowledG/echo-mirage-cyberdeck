@@ -103,10 +103,10 @@ jobs:
           Write-Host "Publishing $($assets.Count) Windows asset(s) to release $tag"
           gh release view $tag 2>$null
           if ($LASTEXITCODE -ne 0) {
+            # Do not mark --latest: Echo Satellite releases own "latest" for Satellite downloads.
             gh release create $tag @assets `
               --title "Echo Mirage Desktop $version" `
-              --notes-file $notesFile.FullName `
-              --latest
+              --notes-file $notesFile.FullName
           } else {
             gh release upload $tag @assets --clobber
           }
@@ -205,7 +205,6 @@ jobs:
           else
             gh release create "$tag" "${assets[@]}" \
               --title "Echo Mirage Desktop ${version}" \
-              --notes-file "$notes_file" \
-              --latest
+              --notes-file "$notes_file"
           fi
           rm -f "$notes_file"

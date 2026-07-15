@@ -12,12 +12,14 @@ export function surveyImageDataUrlToBase64(imageDataUrl: string): string {
 
 /** Vision analyze via `/api/survey/analyze` — defaults to Codex CLI when no API key. */
 export async function analyzeSurveyCaptureClient(input: {
-  pngBase64: string;
+  pngBase64?: string;
+  pngBase64List?: string[];
   prompt?: string;
   provider?: string;
 }): Promise<SurveyAnalyzeClientResult> {
   return analyzeSurveyRequestClient({
     pngBase64: input.pngBase64,
+    pngBase64List: input.pngBase64List,
     prompt: input.prompt,
     provider: input.provider,
   });
@@ -38,6 +40,7 @@ export async function analyzeSurveySelectionClient(input: {
 
 async function analyzeSurveyRequestClient(input: {
   pngBase64?: string;
+  pngBase64List?: string[];
   selectionText?: string;
   prompt?: string;
   provider?: string;
@@ -47,6 +50,7 @@ async function analyzeSurveyRequestClient(input: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       pngBase64: input.pngBase64,
+      pngBase64List: input.pngBase64List,
       selectionText: input.selectionText,
       prompt: input.prompt,
       provider: input.provider ?? "auto",

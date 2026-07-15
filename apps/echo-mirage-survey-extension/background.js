@@ -10,10 +10,42 @@ const inFlightCommandIds = new Set();
 
 /** Self-contained — injected into arbitrary tabs (no closure imports). */
 function capturePageSnapshotInTab() {
-  const maxChars = 6000;
-  const body = document.body;
-  const rawText = body ? body.innerText || body.textContent || "" : "";
-  const pageText = rawText.replace(/\s+/g, " ").trim().slice(0, maxChars);
+  const maxChars = 12000;
+  const host = (window.location.hostname || "").toLowerCase();
+
+  function normalizePageText(raw) {
+    return String(raw || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/[ \t]{2,}/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+      .slice(0, maxChars);
+  }
+
+  function extractHackerRank() {
+    if (!host.includes("hackerrank")) return "";
+    const selectors = [
+      '[data-attr2="problem-statement"]',
+      ".challenge-body-html",
+      "#content .challenge-text",
+      ".problem-statement",
+      '[class*="challenge-body"]',
+      '[class*="ProblemStatement"]',
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      const text = el && (el.innerText || el.textContent || "");
+      if (text && text.trim().length > 80) return text;
+    }
+    return "";
+  }
+
+  const focused =
+    extractHackerRank() ||
+    (document.body ? document.body.innerText || document.body.textContent || "" : "");
+  const pageText = normalizePageText(focused);
+
   return {
     url: window.location.href,
     title: document.title || "",

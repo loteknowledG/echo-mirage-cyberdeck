@@ -4,7 +4,7 @@ export const SURVEY_EXTENSION_PAGE_CONTEXT_EVENT = "echo-mirage:survey-extension
 export const SURVEY_EXTENSION_PAGE_CONTEXT_MESSAGE_TYPE =
   "echo-mirage:survey-extension-page-context";
 
-export const SURVEY_EXTENSION_MAX_PAGE_TEXT_CHARS = 6000;
+export const SURVEY_EXTENSION_MAX_PAGE_TEXT_CHARS = 12000;
 
 export type SurveyExtensionPageSnapshot = {
   url: string;

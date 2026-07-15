@@ -51,6 +51,12 @@ export function appendSurveyChatMessage(input: {
   return entry;
 }
 
+/** Wipe Survey solutions transcript (SYS / SOLVE / follow-ups). */
+export function clearSurveyChatMessages(): void {
+  messages = [];
+  emitChatChanged();
+}
+
 export function notifySurveyMuthurArchive(text: string): void {
   const line = text.trim();
   if (!line) return;

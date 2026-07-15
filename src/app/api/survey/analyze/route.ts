@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 type AnalyzeBody = {
   pngBase64?: string;
+  /** Ordered pages for multi-screen questions (preferred over single pngBase64). */
+  pngBase64List?: string[];
   selectionText?: string;
   prompt?: string;
   provider?: string;
@@ -27,8 +29,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid JSON." }, { status: 400 });
   }
 
+  const list = Array.isArray(body.pngBase64List)
+    ? body.pngBase64List.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+    : [];
+
   const result = await analyzeSurveyCapture({
     pngBase64: body.pngBase64,
+    pngBase64List: list.length > 0 ? list : undefined,
     selectionText: body.selectionText,
     prompt: body.prompt,
     provider: body.provider,

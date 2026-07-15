@@ -55,6 +55,7 @@ function runCodexExec(args: string[], timeoutMs: number): Promise<number> {
 async function runCodexExecToOutput(input: {
   prompt: string;
   imagePath?: string;
+  imagePaths?: string[];
 }): Promise<SurveyAnalyzeResult> {
   if (!isCodexCliAvailable()) {
     return {
@@ -74,8 +75,14 @@ async function runCodexExecToOutput(input: {
 
   try {
     const execArgs = ["exec", "--skip-git-repo-check", "--ephemeral", "-o", outputPath];
-    if (input.imagePath) {
-      execArgs.push("-i", input.imagePath);
+    const paths =
+      input.imagePaths && input.imagePaths.length > 0
+        ? input.imagePaths
+        : input.imagePath
+          ? [input.imagePath]
+          : [];
+    for (const imagePath of paths) {
+      execArgs.push("-i", imagePath);
     }
     const model = process.env.SURVEY_CODEX_MODEL?.trim();
     if (model) {
@@ -123,21 +130,32 @@ async function runCodexExecToOutput(input: {
 
 export async function analyzeSurveyCaptureViaCodex(input: {
   pngBase64: string;
+  pngBase64List?: string[];
   prompt: string;
 }): Promise<SurveyAnalyzeResult> {
-  const pngBase64 = input.pngBase64.trim();
-  if (!pngBase64) {
+  const list = (
+    Array.isArray(input.pngBase64List) && input.pngBase64List.length > 0
+      ? input.pngBase64List
+      : [input.pngBase64]
+  )
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  if (list.length === 0) {
     return { ok: false, error: "pngBase64 is required." };
   }
 
   const tmpDir = await mkdtemp(join(tmpdir(), "survey-codex-"));
-  const imagePath = join(tmpDir, "capture.png");
-
   try {
-    await writeFile(imagePath, Buffer.from(pngBase64, "base64"));
+    const imagePaths: string[] = [];
+    for (const [index, png] of list.entries()) {
+      const imagePath = join(tmpDir, `capture-${index + 1}.png`);
+      await writeFile(imagePath, Buffer.from(png, "base64"));
+      imagePaths.push(imagePath);
+    }
     return await runCodexExecToOutput({
       prompt: input.prompt,
-      imagePath,
+      imagePaths,
     });
   } finally {
     await rm(tmpDir, { recursive: true, force: true }).catch(() => {

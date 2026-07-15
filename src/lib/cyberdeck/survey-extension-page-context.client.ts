@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { storeLastSurveySelection } from "@/lib/cyberdeck/survey-deck-command.client";
+import {
+  ingestMirageQueueItem,
+  solveMirageSelectedTextAsync,
+} from "@/lib/cyberdeck/survey-mirage-item-queue.client";
+import { notifySurveyMuthurArchive, notifySurveyFocusChat } from "@/lib/cyberdeck/survey-chat";
 import {
   SURVEY_EXTENSION_MAX_PAGE_TEXT_CHARS,
   SURVEY_EXTENSION_PAGE_CONTEXT_EVENT,
   SURVEY_EXTENSION_PAGE_CONTEXT_MESSAGE_TYPE,
   type SurveyExtensionPageSnapshot,
 } from "@/lib/cyberdeck/survey-extension-page-context";
-import { notifySurveyMuthurArchive, notifySurveyFocusChat } from "@/lib/cyberdeck/survey-chat";
+import { useEffect, useState } from "react";
 
 export type SurveyExtensionPageContextStatus = {
   lastSnapshot: SurveyExtensionPageSnapshot | null;
@@ -47,6 +52,18 @@ export function formatSurveyExtensionPageContextForMuthur(
   ].join("\n");
 }
 
+function stageExtensionCaptureForSolve(snapshot: SurveyExtensionPageSnapshot): void {
+  const text = snapshot.pageText.trim();
+  if (!text) return;
+  storeLastSurveySelection(text);
+  ingestMirageQueueItem({
+    title: snapshot.title.trim() || "Extension page",
+    prompt: text,
+    source: "clipboard",
+    select: true,
+  });
+}
+
 export function ingestSurveyExtensionPageContext(raw: unknown): SurveyExtensionPageSnapshot | null {
   if (!raw || typeof raw !== "object") return null;
   const input = raw as Partial<SurveyExtensionPageSnapshot>;
@@ -74,10 +91,23 @@ export function ingestSurveyExtensionPageContext(raw: unknown): SurveyExtensionP
     deliveredAt: new Date().toISOString(),
     deliveryCount: status.deliveryCount + 1,
   };
+  stageExtensionCaptureForSolve(snapshot);
   notifySurveyMuthurArchive(formatSurveyExtensionPageContextForMuthur(snapshot));
   notifySurveyFocusChat();
   emitChanged();
   return snapshot;
+}
+
+/** Run SOLVE on the last echo-extension page text (HackerRank / tab capture). */
+export async function solveLastSurveyExtensionPage(): Promise<{ ok: boolean; message: string }> {
+  const snapshot = status.lastSnapshot;
+  if (!snapshot?.pageText.trim()) {
+    return {
+      ok: false,
+      message: "No extension page text yet — Capture active tab (focus HackerRank first).",
+    };
+  }
+  return solveMirageSelectedTextAsync(snapshot.pageText);
 }
 
 export function readSurveyExtensionPageContextStatus(): SurveyExtensionPageContextStatus {
