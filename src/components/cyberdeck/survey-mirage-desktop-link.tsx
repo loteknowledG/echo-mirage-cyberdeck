@@ -46,9 +46,9 @@ export function SurveyMirageDesktopLink() {
     }
     openDesktopInstaller(info);
     setStatus(
-      info.installerAvailable
+      info.downloadUrl || info.installerAvailable
         ? `Downloading ${info.fileName ?? "Mirage desktop"}…`
-        : "Opening desktop releases…",
+        : "Opening Mirage desktop installer…",
     );
   }, [info]);
 

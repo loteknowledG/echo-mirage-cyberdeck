@@ -86,6 +86,27 @@ export async function fetchSatelliteInstallInfo(): Promise<SatelliteInstallInfo 
   }
 }
 
+const FALLBACK_WIN_DESKTOP_INSTALLER_URL =
+  "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/download/desktop-v0.1.6/Echo-Mirage-Cyberdeck-Setup-0.1.6.exe";
+const FALLBACK_MAC_DESKTOP_INSTALLER_URL =
+  "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/download/desktop-v0.1.6/Echo-Mirage-Cyberdeck-0.1.6.dmg";
+
+function fallbackDesktopInstallerUrl(platform: DesktopInstallPlatform): string | null {
+  switch (platform) {
+    case "win":
+      return FALLBACK_WIN_DESKTOP_INSTALLER_URL;
+    case "mac":
+      return FALLBACK_MAC_DESKTOP_INSTALLER_URL;
+    case "linux":
+    case "unsupported":
+      return null;
+    default: {
+      const exhaustive: never = platform;
+      return exhaustive;
+    }
+  }
+}
+
 export function openInstallDownload(
   info: Pick<
     DesktopInstallInfo | SatelliteInstallInfo,
@@ -100,13 +121,16 @@ export function openInstallDownload(
   const wrongExtension =
     clientPlatform === "mac" && info.fileName?.endsWith(".exe") === true;
   if (platformMismatch || wrongExtension) {
-    window.open(info.releasePageUrl, "_blank", "noopener,noreferrer");
+    const mismatchFallback = fallbackDesktopInstallerUrl(clientPlatform);
+    window.open(mismatchFallback ?? info.releasePageUrl, "_blank", "noopener,noreferrer");
     return;
   }
   const target =
     info.installerAvailable && info.downloadUrl
       ? info.downloadUrl
-      : info.releasePageUrl;
+      : fallbackDesktopInstallerUrl(info.platform) ??
+        fallbackDesktopInstallerUrl(clientPlatform) ??
+        info.releasePageUrl;
   window.open(target, "_blank", "noopener,noreferrer");
 }
 

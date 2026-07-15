@@ -20,6 +20,8 @@ const GITHUB_RELEASES_API =
   "https://api.github.com/repos/loteknowledG/echo-mirage-cyberdeck/releases?per_page=30";
 const DESKTOP_RELEASES_PAGE =
   "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases?q=desktop-v";
+const GITHUB_DESKTOP_DOWNLOAD_BASE =
+  "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/download";
 
 function readPackageVersion(): string {
   try {
@@ -42,6 +44,24 @@ function desktopInstallerFileName(version: string, platform: DesktopInstallPlatf
     default:
       return null;
   }
+}
+
+function desktopReleaseTagUrl(version: string): string {
+  return `https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/tag/desktop-v${version}`;
+}
+
+/** Direct asset URL — used when GitHub Releases API is rate-limited or unavailable. */
+function constructedDesktopInstallerUrl(
+  version: string,
+  platform: DesktopInstallPlatform,
+): { fileName: string; downloadUrl: string; releasePageUrl: string } | null {
+  const fileName = desktopInstallerFileName(version, platform);
+  if (!fileName) return null;
+  return {
+    fileName,
+    downloadUrl: `${GITHUB_DESKTOP_DOWNLOAD_BASE}/desktop-v${version}/${fileName}`,
+    releasePageUrl: desktopReleaseTagUrl(version),
+  };
 }
 
 function githubHeaders(): Record<string, string> {
@@ -204,10 +224,21 @@ export async function getDesktopInstallInfo(
           releasePageUrl = published.releasePageUrl;
           installerAvailable = true;
         } else {
-          statusMessage =
-            platform === "mac"
-              ? "No macOS Mirage desktop build published yet. Open desktop-v releases or run the desktop-installer workflow."
-              : "No Windows Mirage desktop build published yet. Open desktop-v releases or run the desktop-installer workflow.";
+          // Prefer direct asset URL over the releases search page when the API is unavailable.
+          const constructed = constructedDesktopInstallerUrl(packageVersion, platform);
+          if (constructed) {
+            downloadUrl = constructed.downloadUrl;
+            fileName = constructed.fileName;
+            releasePageUrl = constructed.releasePageUrl;
+            installerAvailable = true;
+            statusMessage =
+              "Using direct installer URL (GitHub release listing unavailable).";
+          } else {
+            statusMessage =
+              platform === "mac"
+                ? "No macOS Mirage desktop build published yet. Open desktop-v releases or run the desktop-installer workflow."
+                : "No Windows Mirage desktop build published yet. Open desktop-v releases or run the desktop-installer workflow.";
+          }
         }
       }
     }
