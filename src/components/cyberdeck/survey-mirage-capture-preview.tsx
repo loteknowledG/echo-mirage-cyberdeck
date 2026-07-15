@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SurveyAnalyzeSolvingBanner } from "@/components/cyberdeck/survey-analyze-solving-banner";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
+import { SurveyProviderSetup } from "@/components/cyberdeck/survey-provider-setup";
 import {
   resolveSurveyEchoDeckContext,
   SURVEY_LAST_CAPTURE_EVENT,
@@ -224,6 +225,8 @@ export function SurveyMirageCapturePreview() {
           </CyberdeckActionButton>
         ) : null}
       </div>
+
+      <SurveyProviderSetup />
 
       {pwaBlocked ? (
         <div className="mb-2 space-y-2">

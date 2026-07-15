@@ -286,6 +286,8 @@ async function runAutoCaptureChain(
     pngBase64: primary,
     pngBase64List: pngList,
     prompt,
+    apiKey: input.apiKey,
+    model: input.model,
   });
   if (muthurResult.ok) return muthurResult;
   errors.push(`muthur: ${muthurResult.error}`);
@@ -318,7 +320,11 @@ async function runAutoSelectionChain(
   if (cursorResult.ok) return cursorResult;
   errors.push(`cursor: ${cursorResult.error}`);
 
-  const muthurResult = await analyzeSurveyTextViaMuthur({ prompt });
+  const muthurResult = await analyzeSurveyTextViaMuthur({
+    prompt,
+    apiKey: input.apiKey,
+    model: input.model,
+  });
   if (muthurResult.ok) return muthurResult;
   errors.push(`muthur: ${muthurResult.error}`);
 
@@ -346,7 +352,11 @@ async function analyzeSurveySelection(
     case "cursor":
       return analyzeSurveyTextViaCursor({ prompt });
     case "muthur":
-      return analyzeSurveyTextViaMuthur({ prompt });
+      return analyzeSurveyTextViaMuthur({
+        prompt,
+        apiKey: input.apiKey,
+        model: input.model,
+      });
     case "openai":
     case "openrouter":
       return analyzeSurveySelectionViaApi(input, requested, prompt);
@@ -394,6 +404,8 @@ export async function analyzeSurveyCapture(input: SurveyAnalyzeInput): Promise<S
         pngBase64: primary,
         pngBase64List: pngList,
         prompt,
+        apiKey: input.apiKey,
+        model: input.model,
       });
     case "openai":
     case "openrouter":

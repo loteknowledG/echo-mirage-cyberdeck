@@ -4,6 +4,62 @@ export type SurveyAnalyzeClientResult =
   | { ok: true; text: string; model: string; provider: string }
   | { ok: false; error: string };
 
+export type SurveyGatewayProvider = "opencode" | "openrouter" | "openai";
+
+type SurveyClientCredentials = {
+  provider: "muthur" | "openrouter" | "openai";
+  apiKey: string;
+  model?: string;
+};
+
+const SURVEY_GATEWAY_PROVIDERS: SurveyGatewayProvider[] = [
+  "opencode",
+  "openrouter",
+  "openai",
+];
+
+function toSurveyProvider(
+  provider: SurveyGatewayProvider,
+): SurveyClientCredentials["provider"] {
+  return provider === "opencode" ? "muthur" : provider;
+}
+
+export function readSurveyGatewayCredentials(): SurveyClientCredentials | null {
+  if (typeof window === "undefined") return null;
+
+  const storedActive = window.localStorage.getItem("active_provider");
+  const active = SURVEY_GATEWAY_PROVIDERS.includes(
+    storedActive as SurveyGatewayProvider,
+  )
+    ? (storedActive as SurveyGatewayProvider)
+    : "opencode";
+  const ordered = [
+    active,
+    ...SURVEY_GATEWAY_PROVIDERS.filter((provider) => provider !== active),
+  ];
+
+  for (const provider of ordered) {
+    const apiKey = window.localStorage.getItem(`key_${provider}`)?.trim() ?? "";
+    if (!apiKey) continue;
+    const model =
+      window.localStorage.getItem(`ascii_model_${provider}`)?.trim() || undefined;
+    return { provider: toSurveyProvider(provider), apiKey, model };
+  }
+
+  return null;
+}
+
+export function saveSurveyGatewayCredentials(
+  provider: SurveyGatewayProvider,
+  apiKey: string,
+): void {
+  if (typeof window === "undefined") return;
+  const trimmed = apiKey.trim();
+  if (!trimmed) return;
+  window.localStorage.setItem("active_provider", provider);
+  window.localStorage.setItem(`key_${provider}`, trimmed);
+}
+
 export function surveyImageDataUrlToBase64(imageDataUrl: string): string {
   const trimmed = imageDataUrl.trim();
   const comma = trimmed.indexOf(",");
@@ -45,6 +101,11 @@ async function analyzeSurveyRequestClient(input: {
   prompt?: string;
   provider?: string;
 }): Promise<SurveyAnalyzeClientResult> {
+  const savedCredentials =
+    !input.provider || input.provider === "auto"
+      ? readSurveyGatewayCredentials()
+      : null;
+
   const res = await fetch("/api/survey/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -53,7 +114,9 @@ async function analyzeSurveyRequestClient(input: {
       pngBase64List: input.pngBase64List,
       selectionText: input.selectionText,
       prompt: input.prompt,
-      provider: input.provider ?? "auto",
+      provider: savedCredentials?.provider ?? input.provider ?? "auto",
+      apiKey: savedCredentials?.apiKey,
+      model: savedCredentials?.model,
     }),
   });
 

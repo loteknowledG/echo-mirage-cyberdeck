@@ -94,8 +94,10 @@ export async function analyzeSurveyCaptureViaMuthur(input: {
   pngBase64: string;
   pngBase64List?: string[];
   prompt: string;
+  apiKey?: string;
+  model?: string;
 }): Promise<SurveyAnalyzeResult> {
-  const { apiKey } = resolveServerProviderCredentials("opencode", undefined);
+  const { apiKey } = resolveServerProviderCredentials("opencode", input.apiKey);
   if (!apiKey) {
     return {
       ok: false,
@@ -120,7 +122,7 @@ export async function analyzeSurveyCaptureViaMuthur(input: {
     return { ok: false, error: "prompt is required." };
   }
 
-  const model = resolveMuthurVisionModel();
+  const model = input.model?.trim() || resolveMuthurVisionModel();
   const content: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
   for (const [index, png] of list.entries()) {
     content.push({ type: "text", text: `--- Page ${index + 1} of ${list.length} ---` });
@@ -146,8 +148,10 @@ export async function analyzeSurveyCaptureViaMuthur(input: {
 
 export async function analyzeSurveyTextViaMuthur(input: {
   prompt: string;
+  apiKey?: string;
+  model?: string;
 }): Promise<SurveyAnalyzeResult> {
-  const { apiKey } = resolveServerProviderCredentials("opencode", undefined);
+  const { apiKey } = resolveServerProviderCredentials("opencode", input.apiKey);
   if (!apiKey) {
     return {
       ok: false,
@@ -160,7 +164,7 @@ export async function analyzeSurveyTextViaMuthur(input: {
     return { ok: false, error: "prompt is required." };
   }
 
-  const model = resolveMuthurVisionModel();
+  const model = input.model?.trim() || resolveMuthurVisionModel();
   return postOpenCodeChat({
     model,
     apiKey,
