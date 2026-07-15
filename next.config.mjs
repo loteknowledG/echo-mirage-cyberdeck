@@ -125,6 +125,7 @@ const nextConfig = {
 		"/*": [
 			"./assets/figlet-fonts/**",
 			// Next standalone trace can omit hoisted/pnpm symlinks — force runtime deps for Electron.
+			"./node_modules/@cursor/sdk*/**",
 			"./node_modules/next/**",
 			"./node_modules/@next/env/**",
 			"./node_modules/@swc/helpers/**",
@@ -135,6 +136,7 @@ const nextConfig = {
 	},
 	// Treat as external in the Node.js server runtime (native / optional / E2E-only).
 	serverExternalPackages: [
+		"@cursor/sdk",
 		"@mariozechner/pi-ai",
 		"@mariozechner/pi-agent-core",
 		"figlet",
