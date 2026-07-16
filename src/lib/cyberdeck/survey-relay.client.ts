@@ -101,7 +101,7 @@ export async function fetchActiveSurveyRelayBundle(): Promise<
         ok: false,
         reason:
           payload.reason ??
-          "No live Echo yet — on the Mac open Echo Satellite (with relay secret) and tap Send to Mirage.",
+          "No live Echo yet — open Echo Satellite on the Mac (Screen Recording on). It pushes to the relay automatically.",
       };
     }
     rememberSurveyRelayEchoNodeId(payload.bundle.echoNodeId);

@@ -225,8 +225,8 @@ async function initializeAfterReady() {
   await applySurveyRelayEnvFromDisk(app);
   logger.log(
     surveyRelaySecretConfigured()
-      ? "survey-relay secret loaded (env or userData/survey-relay.env)"
-      : "survey-relay secret missing — set it in Satellite UI or SURVEY_RELAY_SECRET env (required for Vercel middlebox)",
+      ? "survey-relay ready (built-in / env / userData) — auto-push + command poll"
+      : "survey-relay ready — auto-push + command poll (no shared secret required)",
   );
   initSpyEchoPairing(app);
 

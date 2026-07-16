@@ -1,7 +1,7 @@
 {
   "name": "echo-satellite",
   "private": true,
-  "version": "0.3.13",
+  "version": "0.3.14",
   "description": "Echo Mirage capture satellite — Electron tray agent",
   "author": "Craftwerk Corp",
   "main": "electron/main.mjs",

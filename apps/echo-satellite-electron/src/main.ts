@@ -133,8 +133,6 @@ const powerfistPinExpiryEl = document.querySelector<HTMLElement>("#powerfist-pin
 const regenerateCodesBtn = document.querySelector<HTMLButtonElement>("#regenerate-codes")!;
 const sendToMirageBtn = document.querySelector<HTMLButtonElement>("#send-to-mirage")!;
 const sendMirageResultEl = document.querySelector<HTMLElement>("#send-mirage-result")!;
-const relaySecretInput = document.querySelector<HTMLInputElement>("#relay-secret")!;
-const saveRelaySecretBtn = document.querySelector<HTMLButtonElement>("#save-relay-secret")!;
 const relaySecretStatusEl = document.querySelector<HTMLElement>("#relay-secret-status")!;
 const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
 const capturePreviewEl = document.querySelector<HTMLImageElement>("#capture-preview")!;
@@ -225,9 +223,7 @@ function formatCodeExpiry(expiresAt: string | null): string {
 
 function renderSpyCodes(codes: SpyCodes): void {
   const hosts = codes.lanHosts?.length ? codes.lanHosts.join(", ") : codes.echoHost;
-  echoTeamIdEl.textContent = codes.echoNodeId
-    ? `Echo team ID (for Mirage cloud relay): ${codes.echoNodeId}`
-    : "Echo team ID: —";
+  echoTeamIdEl.textContent = "";
   echoLanEl.textContent = `Direct LAN/Tailscale: ${codes.echoHost}:${codes.httpPort}${codes.lanHosts && codes.lanHosts.length > 1 ? ` (${hosts})` : ""}`;
   miragePinEl.textContent = codes.miragePin ?? "———";
   powerfistPinEl.textContent = codes.powerfistPin ?? "———";
@@ -249,8 +245,8 @@ async function refreshSpyCodes(): Promise<void> {
 async function refreshRelaySecretStatus(): Promise<void> {
   const status = await api.getRelaySecretStatus();
   relaySecretStatusEl.textContent = status.configured
-    ? `Relay secret saved (${status.preview}) — cloud middlebox auth ready.`
-    : "Relay secret not set — paste SURVEY_RELAY_SECRET from cyberdeck .env.local, then Save.";
+    ? "Cloud relay ready — keep Echo open; Mirage PWA finds you automatically."
+    : "Cloud relay not ready.";
 }
 
 async function refreshPermissions(): Promise<void> {
@@ -347,22 +343,6 @@ regenerateCodesBtn.addEventListener("click", async () => {
   }
   regenerateCodesBtn.disabled = false;
   await refreshStatus();
-});
-
-saveRelaySecretBtn.addEventListener("click", async () => {
-  saveRelaySecretBtn.disabled = true;
-  relaySecretStatusEl.textContent = "Saving relay secret…";
-  const result = await api.saveRelaySecret(relaySecretInput.value);
-  if (result.ok) {
-    relaySecretInput.value = "";
-    await refreshRelaySecretStatus();
-    sendMirageResultEl.textContent = result.configured
-      ? "Relay secret saved — tap Send to Mirage, then retry SCREENSHOT on PWA."
-      : "Relay secret cleared.";
-  } else {
-    relaySecretStatusEl.textContent = "reason" in result ? result.reason : "Save failed.";
-  }
-  saveRelaySecretBtn.disabled = false;
 });
 
 sendToMirageBtn.addEventListener("click", async () => {

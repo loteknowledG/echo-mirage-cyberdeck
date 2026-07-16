@@ -88,7 +88,7 @@ export function SurveyMiragePane() {
         <div className="space-y-2 rounded border border-amber-900/50 bg-amber-950/20 p-3">
           <p className="text-[9px] leading-relaxed text-amber-200/90">
             HTTPS PWA uses the cloud relay for Echo screenshots — keep Echo Satellite open on the
-            Mac (relay secret set) and tap Send to Mirage. No team id to paste.
+            Mac. No secret and no team id to paste.
           </p>
           {!isEchoMirageDesktopShell() ? (
             <CyberdeckActionButton

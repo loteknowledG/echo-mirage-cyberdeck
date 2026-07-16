@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { DEFAULT_SURVEY_RELAY_SECRET } from "./survey-relay-defaults.mjs";
 
 /**
  * Persist Survey cloud-relay auth in Echo userData so double-clicked .app
@@ -52,6 +53,9 @@ export async function applySurveyRelayEnvFromDisk(app) {
   } catch {
     /* missing file is fine */
   }
+  if (!process.env.SURVEY_RELAY_SECRET?.trim() && DEFAULT_SURVEY_RELAY_SECRET) {
+    process.env.SURVEY_RELAY_SECRET = DEFAULT_SURVEY_RELAY_SECRET;
+  }
 }
 
 /**
@@ -59,7 +63,7 @@ export async function applySurveyRelayEnvFromDisk(app) {
  */
 export async function loadSurveyRelaySecret(app) {
   await applySurveyRelayEnvFromDisk(app);
-  return process.env.SURVEY_RELAY_SECRET?.trim() || "";
+  return process.env.SURVEY_RELAY_SECRET?.trim() || DEFAULT_SURVEY_RELAY_SECRET || "";
 }
 
 /**
@@ -85,5 +89,6 @@ export async function saveSurveyRelaySecret(app, secret) {
 }
 
 export function surveyRelaySecretConfigured() {
-  return Boolean(process.env.SURVEY_RELAY_SECRET?.trim());
+  // Built-in production default counts — no paste UI required.
+  return true;
 }

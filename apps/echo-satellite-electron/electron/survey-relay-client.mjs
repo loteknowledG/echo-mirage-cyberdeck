@@ -1,11 +1,15 @@
 import * as logger from "./logger.mjs";
+import {
+  DEFAULT_SURVEY_RELAY_BASE_URL,
+  DEFAULT_SURVEY_RELAY_SECRET,
+} from "./survey-relay-defaults.mjs";
 
 const DEFAULT_CYBERDECK_ORIGIN =
   process.env.ECHO_MIRAGE_CYBERDECK_URL?.trim()?.replace(/\/cyberdeck\/?$/, "") ||
-  "https://echo-mirage-cyberdeck.vercel.app";
+  DEFAULT_SURVEY_RELAY_BASE_URL;
 
 function relaySecret() {
-  return process.env.SURVEY_RELAY_SECRET?.trim() || "";
+  return process.env.SURVEY_RELAY_SECRET?.trim() || DEFAULT_SURVEY_RELAY_SECRET || "";
 }
 
 function relayHeaders() {
@@ -24,7 +28,7 @@ function cyberdeckOrigin() {
 function relayBaseUrl() {
   const fromEnv = process.env.SURVEY_RELAY_BASE_URL?.trim();
   if (fromEnv) return fromEnv.replace(/\/$/, "");
-  return cyberdeckOrigin();
+  return cyberdeckOrigin() || DEFAULT_SURVEY_RELAY_BASE_URL;
 }
 
 /**
@@ -151,7 +155,7 @@ export async function pollSurveyRelayCommandRequests(echoNodeId, executeCommand)
     if (!res.ok || !payload.ok) {
       if (res.status === 401) {
         logger.log(
-          "survey-relay command poll unauthorized — set SURVEY_RELAY_SECRET in Satellite UI (must match cyberdeck Vercel)",
+          "survey-relay command poll unauthorized — middlebox expects a relay secret this build does not have",
         );
       }
       return { ok: false, reason: payload.reason ?? `HTTP ${res.status}` };

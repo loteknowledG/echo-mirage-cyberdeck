@@ -83,7 +83,7 @@ export function SurveyMirageCapturePreview() {
         }
         setRelayLiveId(null);
         setRelayWaitHint(
-          "Waiting for Echo — open Satellite on the Mac and tap Send to Mirage (no team id needed).",
+          "Waiting for Echo — open Satellite on the Mac (Screen Recording on). No secret or team id needed.",
         );
       });
     };
