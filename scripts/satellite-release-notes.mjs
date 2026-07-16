@@ -6,14 +6,10 @@ Minimal capture drone for the **Echo** screenshot machine — tray on Windows, s
 
 ### What's new in ${version}
 
-- **Remote screenshot over HTTP** — \`POST /api/survey/echo/command\` with \`{"action":"echo.screenshot"}\` returns PNG from Mirage / Tailscale (no local \`pnpm satellite:dev\` required)
-- **Survey command API** — screenshot, clipboard, listening, and echo-extension tab capture on the Satellite pair server
-- Spy → Survey route rename (\`/api/survey/...\`) for pairing codes and PIN enter
-- Echo-extension bridge for Mirage browser tab capture
-- **Mirage pairing feedback** — Pair with ECHO shows searching, linked, or error; Satellite updates linked Mirages immediately
-- **6-digit pairing codes in the app** — Mirage/PowerFist enter PIN only; no URL paste for team link
-- **Test capture preview** — Test capture now shows a thumbnail of what was captured
-- **Check for updates** in the app — one-click download and install from GitHub releases
+- **Screenshot over cloud relay** — HTTPS Mirage PWA can enqueue \`echo.screenshot\` via Next/Upstash middlebox; Satellite polls, captures locally, and returns JPEG (no Electron Mirage desktop required for capture)
+- **JPEG captures** — primary display encode at quality ~72 for smaller relay payloads under Upstash size limits
+- Set \`SURVEY_RELAY_SECRET\` to match the cyberdeck Vercel env when using authenticated relay
+- Earlier: remote screenshot over HTTP, Survey command API, echo-extension bridge, 6-digit pairing, Check for updates
 
 ### macOS (Apple Silicon)
 
@@ -25,13 +21,13 @@ If macOS still warns about an unidentified developer, the release was built with
 
 Grant **Screen Recording** on first launch, then pair from Mirage Spy → Echo QR on port **3050**.
 
-### Windows (x64)
-
-Double-click **Echo-Satellite_${version}_x64-setup.exe**. Upgrades in place — installer closes any running Echo Satellite automatically.
-
 ### Pairing
 
 Mirage Spy → Echo QR → this machine's LAN IP and port **3050** (\`/powerfist/capture-pair\`).
+
+### Windows (x64)
+
+Double-click **Echo-Satellite_${version}_x64-setup.exe**. Upgrades in place — installer closes any running Echo Satellite automatically.
 
 Built from [\`satellite-installer\`](https://github.com/loteknowledG/echo-mirage-cyberdeck/actions/workflows/satellite-installer.yml).
 `;
