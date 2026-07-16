@@ -13,6 +13,7 @@ import { DepthButton, DepthPanel } from "@/components/realmorphism";
 import { SettingsAppUpdateSection } from "@/components/cyberdeck/settings-app-update-section";
 import { SettingsPowerfistPairingSection } from "@/components/cyberdeck/settings-powerfist-pairing-section";
 import { SettingsSilentModeSection } from "@/components/cyberdeck/settings-silent-mode-section";
+import { SettingsVersionSection } from "@/components/cyberdeck/settings-version-section";
 import { MuthurComposerAudioKnobs } from "@/components/cyberdeck/muthur-composer-audio-knobs";
 
 const SWITCH_LEGACY_EMERALD =
@@ -56,6 +57,7 @@ export function CyberdeckSettingsPaneBody({
           }
         />
         <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-4">
+          <SettingsVersionSection />
           <section className="flex flex-col gap-2">
             <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">VOICE</div>
             <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">
