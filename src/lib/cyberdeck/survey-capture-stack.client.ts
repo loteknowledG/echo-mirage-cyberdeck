@@ -1,5 +1,7 @@
 "use client";
 
+import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
+
 /** In-session multi-page Echo captures for one multi-screen question. */
 
 export const SURVEY_CAPTURE_STACK_CHANGED_EVENT = "echo-mirage-survey-capture-stack";
@@ -79,7 +81,7 @@ export function removeSurveyCaptureStackPage(pageId: string): SurveyCaptureStack
 }
 
 export function surveyCaptureStackAsDataUrls(): string[] {
-  return readRaw().map((page) => `data:image/png;base64,${page.pngBase64}`);
+  return readRaw().map((page) => surveyCaptureDataUrl(page.pngBase64));
 }
 
 export function surveyCaptureStackPngList(): string[] {

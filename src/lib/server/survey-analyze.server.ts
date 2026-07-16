@@ -16,6 +16,7 @@ import {
   analyzeSurveyCaptureViaMuthur,
   analyzeSurveyTextViaMuthur,
 } from "@/lib/server/survey-analyze-muthur.server";
+import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -130,7 +131,7 @@ async function analyzeSurveyCaptureViaApi(
     });
     content.push({
       type: "image_url",
-      image_url: { url: `data:image/png;base64,${png}`, detail: "high" },
+      image_url: { url: surveyCaptureDataUrl(png), detail: "high" },
     });
   }
 

@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { clipboard } from "electron";
-import { capturePrimaryMonitorPng } from "./capture.mjs";
+import { capturePrimaryMonitorJpeg } from "./capture.mjs";
 import {
   enqueueEchoExtensionCommand,
   getEchoExtensionBridgeStatus,
@@ -123,11 +123,13 @@ async function captureExtensionActiveTab() {
 
 async function executeScreenshot() {
   try {
-    const capture = await capturePrimaryMonitorPng();
+    // JPEG keeps cloud-relay / Upstash payloads under request-size caps.
+    const capture = await capturePrimaryMonitorJpeg(72);
     return {
       ok: true,
-      message: `Screenshot ${capture.width}×${capture.height} captured on Echo.`,
+      message: `Screenshot ${capture.width}×${capture.height} captured on Echo (JPEG ${Math.round(capture.bytes / 1024)} KB).`,
       pngBase64: capture.pngBase64,
+      mimeType: capture.mimeType,
       width: capture.width,
       height: capture.height,
     };

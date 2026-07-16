@@ -20,6 +20,7 @@ import {
   startSurveyContinuousScreenshot,
   stopSurveyContinuousScreenshot,
 } from "@/lib/cyberdeck/survey-continuous-screenshot.client";
+import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 import { SURVEY_SILENT_CAPTURE_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
 import { notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
 import { pushSurveyCaptureStackPage } from "@/lib/cyberdeck/survey-capture-stack.client";
@@ -153,7 +154,7 @@ function storeLastCapture(pngBase64: string): void {
   ingestMirageQueueItem({
     title: "Echo capture",
     prompt: SURVEY_SILENT_CAPTURE_PROMPT,
-    imageDataUrl: `data:image/png;base64,${pngBase64}`,
+    imageDataUrl: surveyCaptureDataUrl(pngBase64),
     source: "capture",
   });
 }
@@ -246,7 +247,7 @@ function applyEchoCommandSideEffects(
       title: "Echo selection",
       prompt: clipText || SURVEY_SILENT_CAPTURE_PROMPT,
       imageDataUrl: payload.pngBase64
-        ? `data:image/png;base64,${payload.pngBase64}`
+        ? surveyCaptureDataUrl(payload.pngBase64)
         : undefined,
       source: "clipboard",
     });
@@ -381,7 +382,7 @@ async function solveEchoClipboardPayload(
     ingestMirageQueueItem({
       title: "Echo clipboard",
       prompt: SURVEY_SILENT_CAPTURE_PROMPT,
-      imageDataUrl: `data:image/png;base64,${copy.pngBase64}`,
+      imageDataUrl: surveyCaptureDataUrl(copy.pngBase64),
       source: "clipboard",
     });
     const solved = await solveMirageCaptureAsync();

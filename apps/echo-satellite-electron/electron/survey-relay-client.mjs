@@ -180,6 +180,7 @@ export async function pollSurveyRelayCommandRequests(echoNodeId, executeCommand)
           message: result?.message,
           reason: result?.reason,
           pngBase64: result?.pngBase64,
+          mimeType: result?.mimeType,
           clipboard: result?.clipboard,
           width: result?.width,
           height: result?.height,

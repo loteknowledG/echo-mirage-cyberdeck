@@ -1,4 +1,5 @@
 import { Monitor } from "node-screenshots";
+import { nativeImage } from "electron";
 
 const CAPTURE_TIMEOUT_MS = 20_000;
 
@@ -28,7 +29,7 @@ export function withCaptureTimeout(promise, ms, message) {
 }
 
 /**
- * @returns {Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer }>}
+ * @returns {Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer, mimeType: string }>}
  */
 export async function capturePrimaryMonitorPng() {
   const monitors = Monitor.all();
@@ -59,6 +60,30 @@ export async function capturePrimaryMonitorPng() {
     width,
     height,
     pngBuffer,
+    mimeType: "image/png",
+  };
+}
+
+/**
+ * Primary-display capture as JPEG (smaller for cloud relay / Upstash).
+ * `pngBase64` keeps the wire field name; payload is JPEG (`mimeType: image/jpeg`).
+ *
+ * @param {number} [quality=72] electron nativeImage JPEG quality 0–100
+ * @returns {Promise<{ pngBase64: string, width: number, height: number, mimeType: string, bytes: number }>}
+ */
+export async function capturePrimaryMonitorJpeg(quality = 72) {
+  const capture = await capturePrimaryMonitorPng();
+  const q = Math.min(100, Math.max(1, Number(quality) || 72));
+  const jpegBuffer = nativeImage.createFromBuffer(capture.pngBuffer).toJPEG(q);
+  if (!jpegBuffer?.length) {
+    throw new Error("JPEG encode failed.");
+  }
+  return {
+    pngBase64: jpegBuffer.toString("base64"),
+    width: capture.width,
+    height: capture.height,
+    mimeType: "image/jpeg",
+    bytes: jpegBuffer.length,
   };
 }
 

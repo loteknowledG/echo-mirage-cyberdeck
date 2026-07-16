@@ -14,6 +14,7 @@ import {
   completeSurveyAnalyzeStatus,
 } from "@/lib/cyberdeck/survey-analyze-status.client";
 import { appendSurveyChatMessage, notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
+import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 import { surveyCaptureStackPngList } from "@/lib/cyberdeck/survey-capture-stack.client";
 import {
   readLastSurveyCapture,
@@ -504,7 +505,7 @@ export function resolveMiragePreviewContent(): MiragePreviewContent | null {
   if (last?.pngBase64) {
     return {
       kind: "image",
-      imageDataUrl: `data:image/png;base64,${last.pngBase64}`,
+      imageDataUrl: surveyCaptureDataUrl(last.pngBase64),
       prompt: current ? resolveItemPrompt(current) : SURVEY_SILENT_CAPTURE_PROMPT,
       item: current,
     };
@@ -566,7 +567,7 @@ export async function solveMirageCaptureAsync(): Promise<{ ok: boolean; message:
 
   const imageDataUrl =
     capture?.imageDataUrl ??
-    (stackPngs.length > 0 ? `data:image/png;base64,${stackPngs[stackPngs.length - 1]}` : "");
+    (stackPngs.length > 0 ? surveyCaptureDataUrl(stackPngs[stackPngs.length - 1]!) : "");
   const multiPage = stackPngs.length > 1;
   const prompt = multiPage
     ? "These screenshots are consecutive pages of one question or problem (page 1 first). Read every page in order, reconstruct the full problem, then solve it. Be concise and actionable."

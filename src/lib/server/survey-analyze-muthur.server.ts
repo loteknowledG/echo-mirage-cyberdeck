@@ -2,6 +2,7 @@
 
 import { resolveServerProviderCredentials } from "@/lib/server/provider-credentials.server";
 import type { SurveyAnalyzeResult } from "@/lib/server/survey-analyze.server";
+import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 
 const OPENCODE_ZEN_CHAT_URL = "https://opencode.ai/zen/v1/chat/completions";
 
@@ -128,7 +129,7 @@ export async function analyzeSurveyCaptureViaMuthur(input: {
     content.push({ type: "text", text: `--- Page ${index + 1} of ${list.length} ---` });
     content.push({
       type: "image_url",
-      image_url: { url: `data:image/png;base64,${png}`, detail: "high" },
+      image_url: { url: surveyCaptureDataUrl(png), detail: "high" },
     });
   }
 

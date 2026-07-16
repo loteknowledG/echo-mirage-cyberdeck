@@ -6,6 +6,7 @@ import {
 } from "@/lib/server/powerfist-pairing-registry.server";
 import { storePowerfistMission } from "@/lib/server/powerfist-mission-store.server";
 import type { SurveyMissionKind } from "@/lib/cyberdeck/powerfist-mission.types";
+import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
   }
 
   await storePowerfistMission({ missionId, kind, prompt, pngBase64 });
-  const imageDataUrl = `data:image/png;base64,${pngBase64}`;
+  const imageDataUrl = surveyCaptureDataUrl(pngBase64);
   const delivered = await broadcastPowerfistMissionSolve({
     missionId,
     kind,

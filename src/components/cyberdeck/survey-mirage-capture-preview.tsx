@@ -19,6 +19,7 @@ import {
   SURVEY_CAPTURE_STACK_MAX,
   type SurveyCaptureStackPage,
 } from "@/lib/cyberdeck/survey-capture-stack.client";
+import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 import {
   resolveMiragePreviewContent,
   solveMirageCaptureAsync,
@@ -111,7 +112,7 @@ export function SurveyMirageCapturePreview() {
     null;
 
   const imageSrc = activePage
-    ? `data:image/png;base64,${activePage.pngBase64}`
+    ? surveyCaptureDataUrl(activePage.pngBase64)
     : previewContent?.kind === "image"
       ? previewContent.imageDataUrl
       : null;
@@ -280,7 +281,7 @@ export function SurveyMirageCapturePreview() {
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- local capture preview */}
                 <img
-                  src={`data:image/png;base64,${page.pngBase64}`}
+                  src={surveyCaptureDataUrl(page.pngBase64)}
                   alt={`Page ${index + 1}`}
                   className="h-14 w-20 object-cover object-left-top"
                 />
