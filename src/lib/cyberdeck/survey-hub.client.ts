@@ -460,6 +460,14 @@ export async function runSurveyHubConnect(options?: {
     }
 
     const bundle = bundleResult.bundle;
+    if (bundleResult.source === "active" && bundle.echoNodeId !== echoNodeId) {
+      hubSpeak(
+        `relay team corrected · ${echoNodeId.slice(0, 8)}… → ${bundle.echoNodeId.slice(0, 8)}…`,
+        quiet,
+      );
+      echoNodeId = bundle.echoNodeId;
+      saveSurveyHubTeamId(echoNodeId);
+    }
     hubSpeak(`relay bundle · team ${echoNodeId.slice(0, 8)}… · Echo ${bundle.echoHost}`, quiet);
 
     if (!(await mirageEchoLinkActive())) {

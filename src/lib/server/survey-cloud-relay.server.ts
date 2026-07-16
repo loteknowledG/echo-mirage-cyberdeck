@@ -73,6 +73,8 @@ export type SurveyRelayCommandResult = {
 
 type RelayStore = {
   bundles: Record<string, SurveyRelayBundle>;
+  /** Most recently pushed Echo team id — Mirage can recover from a stale saved id. */
+  activeEchoNodeId?: string | null;
   requests: Record<string, SurveyRelayPairRequest>;
   results: Record<string, SurveyRelayPairResult>;
   requestIdsByEcho: Record<string, string[]>;
@@ -80,6 +82,8 @@ type RelayStore = {
   commandResults: Record<string, SurveyRelayCommandResult>;
   commandIdsByEcho: Record<string, string[]>;
 };
+
+const ACTIVE_ECHO_KEY = "survey:relay:active-echo-node";
 
 function relayStatePath(): string {
   const fromEnv = process.env.ECHO_MIRAGE_SURVEY_RELAY_STATE_PATH?.trim();
@@ -98,6 +102,7 @@ function memoryStore(): RelayStore {
   if (!globalStore[REGISTRY_KEY]) {
     globalStore[REGISTRY_KEY] = {
       bundles: {},
+      activeEchoNodeId: null,
       requests: {},
       results: {},
       requestIdsByEcho: {},
@@ -111,6 +116,7 @@ function memoryStore(): RelayStore {
   store.commandResults ??= {};
   store.commandIdsByEcho ??= {};
   store.bundles ??= {};
+  store.activeEchoNodeId ??= null;
   store.requests ??= {};
   store.results ??= {};
   store.requestIdsByEcho ??= {};
@@ -124,6 +130,7 @@ async function readFileStore(): Promise<RelayStore> {
     const parsed = JSON.parse(raw) as Partial<RelayStore>;
     const fromDisk: RelayStore = {
       bundles: parsed.bundles ?? {},
+      activeEchoNodeId: parsed.activeEchoNodeId ?? null,
       requests: parsed.requests ?? {},
       results: parsed.results ?? {},
       requestIdsByEcho: parsed.requestIdsByEcho ?? {},
@@ -212,8 +219,46 @@ async function upstashDel(key: string): Promise<void> {
   await upstashCommand(["DEL", key]);
 }
 
+async function upstashGetString(key: string): Promise<string | null> {
+  const raw = await upstashCommand(["GET", key]);
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+}
+
+async function upstashSetString(key: string, value: string, ttlSec: number): Promise<void> {
+  await upstashCommand(["SET", key, value, "EX", ttlSec]);
+}
+
 function bundleKey(echoNodeId: string): string {
   return `survey:relay:bundle:${echoNodeId}`;
+}
+
+async function saveActiveEchoNodeId(echoNodeId: string): Promise<void> {
+  const id = echoNodeId.trim();
+  if (!id) return;
+  if (upstashConfigured()) {
+    await upstashSetString(ACTIVE_ECHO_KEY, id, BUNDLE_TTL_SEC);
+    return;
+  }
+  const store = await readFileStore();
+  store.activeEchoNodeId = id;
+  await writeFileStore(store);
+}
+
+async function readActiveEchoNodeId(): Promise<string | null> {
+  if (upstashConfigured()) {
+    return upstashGetString(ACTIVE_ECHO_KEY);
+  }
+  const store = await readFileStore();
+  pruneStore(store);
+  const id = store.activeEchoNodeId?.trim() || null;
+  if (!id) return null;
+  const bundle = store.bundles[id];
+  if (!bundle || Date.parse(bundle.expiresAt) <= Date.now()) {
+    store.activeEchoNodeId = null;
+    await writeFileStore(store);
+    return null;
+  }
+  return id;
 }
 
 function requestKey(requestId: string): string {
@@ -297,12 +342,14 @@ export async function saveSurveyRelayBundle(
 
   if (upstashConfigured()) {
     await upstashSetJson(bundleKey(bundle.echoNodeId), record, BUNDLE_TTL_SEC);
+    await saveActiveEchoNodeId(bundle.echoNodeId);
     return record;
   }
 
   const store = await readFileStore();
   pruneStore(store);
   store.bundles[bundle.echoNodeId] = record;
+  store.activeEchoNodeId = bundle.echoNodeId;
   await writeFileStore(store);
   return record;
 }
@@ -333,6 +380,29 @@ export async function loadSurveyRelayBundle(
     return null;
   }
   return record;
+}
+
+/** Most recently pushed Echo bundle (survives Mirage saving a stale team id). */
+export async function loadActiveSurveyRelayBundle(): Promise<SurveyRelayBundle | null> {
+  const activeId = await readActiveEchoNodeId();
+  if (!activeId) return null;
+  return loadSurveyRelayBundle(activeId);
+}
+
+/**
+ * Prefer the caller's team id when a live bundle exists; otherwise use the active Echo.
+ */
+export async function resolveSurveyRelayBundle(
+  preferredEchoNodeId?: string | null,
+): Promise<{ bundle: SurveyRelayBundle; source: "preferred" | "active" } | null> {
+  const preferred = preferredEchoNodeId?.trim() || "";
+  if (preferred) {
+    const exact = await loadSurveyRelayBundle(preferred);
+    if (exact) return { bundle: exact, source: "preferred" };
+  }
+  const active = await loadActiveSurveyRelayBundle();
+  if (active) return { bundle: active, source: "active" };
+  return null;
 }
 
 export async function createSurveyRelayPairRequest(input: {

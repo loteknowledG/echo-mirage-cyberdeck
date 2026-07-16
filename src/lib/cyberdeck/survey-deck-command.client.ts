@@ -36,8 +36,11 @@ import {
   isTailscaleCgNatHost,
   preferMeshEchoHost,
 } from "@/lib/cyberdeck/survey-pair-pin";
-import { resolveSurveyHubTeamId } from "@/lib/cyberdeck/survey-hub-store.client";
-import { sendSurveyEchoCommandViaRelay } from "@/lib/cyberdeck/survey-relay.client";
+import { resolveSurveyHubTeamId, saveSurveyHubTeamId } from "@/lib/cyberdeck/survey-hub-store.client";
+import {
+  ensureSurveyRelayEchoNodeId,
+  sendSurveyEchoCommandViaRelay,
+} from "@/lib/cyberdeck/survey-relay.client";
 import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
 
 export const SURVEY_LAST_CAPTURE_STORAGE_KEY = "echo-mirage-survey-last-capture-v1";
@@ -259,16 +262,28 @@ async function sendEchoRemoteCommandViaRelay(
   action: string,
   options?: { ingestClipboard?: boolean },
 ): Promise<SurveyDeckCommandResult> {
-  const echoNodeId = resolveSurveyRelayEchoNodeId();
-  if (!echoNodeId) {
+  const preferred = resolveSurveyRelayEchoNodeId();
+  const live = await ensureSurveyRelayEchoNodeId(preferred);
+  if (!live.ok) {
     return {
       ok: false,
       message:
-        "HTTPS PWA cannot call Echo over HTTP — enter Echo team ID (pair / Survey Hub), keep Echo Satellite online, then retry via relay middlebox.",
+        live.reason ||
+        "HTTPS PWA cannot call Echo over HTTP — open Echo Satellite, tap Send to Mirage, then retry via relay middlebox.",
     };
   }
 
-  const payload = await sendSurveyEchoCommandViaRelay({ echoNodeId, action });
+  if (live.source === "active" && preferred && preferred !== live.echoNodeId) {
+    saveSurveyHubTeamId(live.echoNodeId);
+    logDeck(
+      `relay team corrected · ${preferred.slice(0, 8)}… → ${live.echoNodeId.slice(0, 8)}…`,
+    );
+  }
+
+  const payload = await sendSurveyEchoCommandViaRelay({
+    echoNodeId: live.echoNodeId,
+    action,
+  });
   if (!payload.ok) {
     return {
       ok: false,

@@ -2,13 +2,38 @@
 
 import { getOrCreatePowerfistDeviceId } from "@/lib/cyberdeck/survey-pairing-client";
 import { getOrCreateSurveyNodeId } from "@/lib/cyberdeck/survey-mode";
+import { saveSurveyHubTeamId } from "@/lib/cyberdeck/survey-hub-store.client";
+import {
+  readSurveyMiragePairCredentials,
+  saveSurveyMiragePairCredentials,
+  readSurveyPowerfistPairCredentials,
+  saveSurveyPowerfistPairCredentials,
+} from "@/lib/cyberdeck/survey-pair-credentials.client";
 import { surveyRelayPath } from "@/lib/cyberdeck/survey-relay-base";
 import { traceSurveyPairing } from "@/lib/cyberdeck/survey-pairing-trace";
 import type { SurveyRelayBundleClient } from "@/lib/cyberdeck/survey-relay-types";
 
+function rememberSurveyRelayEchoNodeId(echoNodeId: string): void {
+  const id = echoNodeId.trim();
+  if (!id) return;
+  saveSurveyHubTeamId(id);
+
+  const mirage = readSurveyMiragePairCredentials();
+  if (mirage && mirage.echoNodeId !== id) {
+    saveSurveyMiragePairCredentials({ ...mirage, echoNodeId: id });
+  }
+  const powerfist = readSurveyPowerfistPairCredentials();
+  if (powerfist && powerfist.echoNodeId !== id) {
+    saveSurveyPowerfistPairCredentials({ ...powerfist, echoNodeId: id });
+  }
+}
+
 export async function fetchSurveyRelayBundle(
   echoNodeId: string,
-): Promise<{ ok: true; bundle: SurveyRelayBundleClient } | { ok: false; reason: string }> {
+): Promise<
+  | { ok: true; bundle: SurveyRelayBundleClient; source: "preferred" | "active" }
+  | { ok: false; reason: string }
+> {
   const id = echoNodeId.trim();
   if (!id) {
     return { ok: false, reason: "Enter Echo team ID (from Echo Satellite status panel)." };
@@ -23,12 +48,68 @@ export async function fetchSurveyRelayBundle(
       },
     );
     const payload = (await res.json()) as
-      | { ok: true; bundle: SurveyRelayBundleClient }
+      | {
+          ok: true;
+          bundle: SurveyRelayBundleClient;
+          source?: "preferred" | "active";
+        }
       | { ok: false; reason?: string };
     if (!payload.ok) {
       return { ok: false, reason: payload.reason ?? "Relay bundle not available." };
     }
-    return { ok: true, bundle: payload.bundle };
+    const source = payload.source === "active" ? "active" : "preferred";
+    rememberSurveyRelayEchoNodeId(payload.bundle.echoNodeId);
+    return { ok: true, bundle: payload.bundle, source };
+  } catch {
+    return { ok: false, reason: "Could not reach cloud relay." };
+  }
+}
+
+/** Resolve live Echo team id — recovers when Mirage stored a stale id. */
+export async function ensureSurveyRelayEchoNodeId(
+  preferred?: string | null,
+): Promise<{ ok: true; echoNodeId: string; source: "preferred" | "active" } | { ok: false; reason: string }> {
+  const preferredId = preferred?.trim() || "";
+  if (preferredId) {
+    const result = await fetchSurveyRelayBundle(preferredId);
+    if (result.ok) {
+      return {
+        ok: true,
+        echoNodeId: result.bundle.echoNodeId,
+        source: result.source,
+      };
+    }
+    if (result.reason === "Could not reach cloud relay.") {
+      return result;
+    }
+  }
+
+  try {
+    const res = await fetch(surveyRelayPath("/api/survey/relay/bundle?active=1"), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    });
+    const payload = (await res.json()) as
+      | {
+          ok: true;
+          bundle: SurveyRelayBundleClient;
+          source?: "preferred" | "active";
+        }
+      | { ok: false; reason?: string };
+    if (!payload.ok) {
+      return {
+        ok: false,
+        reason:
+          payload.reason ??
+          "No live Echo relay bundle — on Echo Mac open Satellite, set the relay secret, tap Send to Mirage.",
+      };
+    }
+    rememberSurveyRelayEchoNodeId(payload.bundle.echoNodeId);
+    return {
+      ok: true,
+      echoNodeId: payload.bundle.echoNodeId,
+      source: payload.source === "preferred" ? "preferred" : "active",
+    };
   } catch {
     return { ok: false, reason: "Could not reach cloud relay." };
   }

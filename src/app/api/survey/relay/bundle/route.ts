@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  loadSurveyRelayBundle,
+  resolveSurveyRelayBundle,
   saveSurveyRelayBundle,
   surveyRelayStorageMode,
   verifySurveyRelaySecret,
@@ -72,19 +72,28 @@ export async function POST(request: Request) {
   }, { headers: CORS });
 }
 
-/** Mirage fetches the latest bundle for an Echo team id. */
+/**
+ * Mirage fetches a relay bundle.
+ * - Prefer `echoNodeId` when that Echo still has a live push.
+ * - If missing/stale (or only `?active=1`), fall back to the most recently pushed Echo.
+ */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const echoNodeId = searchParams.get("echoNodeId")?.trim();
-  if (!echoNodeId) {
+  const echoNodeId = searchParams.get("echoNodeId")?.trim() || null;
+  const wantActive = searchParams.get("active") === "1" || searchParams.get("active") === "true";
+
+  if (!echoNodeId && !wantActive) {
     return NextResponse.json(
-      { ok: false, reason: "echoNodeId query param is required." },
+      {
+        ok: false,
+        reason: "echoNodeId query param is required (or pass active=1 for the latest Echo push).",
+      },
       { status: 400, headers: CORS },
     );
   }
 
-  const bundle = await loadSurveyRelayBundle(echoNodeId);
-  if (!bundle) {
+  const resolved = await resolveSurveyRelayBundle(wantActive ? null : echoNodeId);
+  if (!resolved) {
     return NextResponse.json(
       {
         ok: false,
@@ -96,5 +105,13 @@ export async function GET(request: Request) {
     );
   }
 
-  return NextResponse.json({ ok: true, bundle, storage: surveyRelayStorageMode() }, { headers: CORS });
+  return NextResponse.json(
+    {
+      ok: true,
+      bundle: resolved.bundle,
+      source: resolved.source,
+      storage: surveyRelayStorageMode(),
+    },
+    { headers: CORS },
+  );
 }
