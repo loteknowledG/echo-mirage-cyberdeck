@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { isLocalhostRequest } from "@/lib/server/is-localhost-request.server";
-import { analyzeSurveyCapture } from "@/lib/server/survey-analyze.server";
+import {
+  analyzeSurveyCapture,
+  DEFAULT_SURVEY_MULTI_PAGE_PROMPT,
+  DEFAULT_SURVEY_PROMPT,
+} from "@/lib/server/survey-analyze.server";
 import { resolveServerProviderCredentials } from "@/lib/server/provider-credentials.server";
 import {
   createSurveyRelayCommandRequest,
@@ -24,15 +28,19 @@ type AnalyzeBody = {
   model?: string;
 };
 
+type RelaySolveInput = {
+  prompt?: string;
+  pngBase64?: string;
+  pngBase64List?: string[];
+};
+
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function runRelayCodexSolve(input: {
-  prompt?: string;
-  pngBase64?: string;
-  pngBase64List?: string[];
-}): Promise<{ ok: boolean; text?: string; model?: string; provider?: string; error?: string }> {
+async function runRelayCodexSolve(
+  input: RelaySolveInput,
+): Promise<{ ok: boolean; text?: string; model?: string; provider?: string; error?: string }> {
   const relay = await resolveSurveyRelayBundle(null);
   if (!relay) {
     return {
@@ -76,7 +84,8 @@ async function runRelayCodexSolve(input: {
   }
   return {
     ok: false,
-    error: "Echo did not answer relay Codex solve in time. Keep Echo Satellite open and retry.",
+    error:
+      "Echo did not answer relay Codex solve in time. Keep Echo Satellite open with codex login, then retry.",
   };
 }
 
@@ -88,6 +97,44 @@ function hasRemoteAnalyzeCredentials(body: AnalyzeBody): boolean {
   return false;
 }
 
+function normalizePngList(body: AnalyzeBody): string[] {
+  return Array.isArray(body.pngBase64List)
+    ? body.pngBase64List.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+    : [];
+}
+
+function hasRelaySolvePayload(body: AnalyzeBody, pngList: string[]): boolean {
+  return (
+    pngList.length > 0 ||
+    Boolean(body.pngBase64?.trim()) ||
+    Boolean(body.selectionText?.trim())
+  );
+}
+
+function resolveRelayPrompt(body: AnalyzeBody, pageCount: number): string {
+  const custom = body.prompt?.trim();
+  if (custom) return custom;
+  if (body.selectionText?.trim()) {
+    return body.prompt?.trim() || "Answer the selected text clearly and concisely.";
+  }
+  return pageCount > 1 ? DEFAULT_SURVEY_MULTI_PAGE_PROMPT : DEFAULT_SURVEY_PROMPT;
+}
+
+function buildRelaySolveInput(body: AnalyzeBody, pngList: string[]): RelaySolveInput {
+  const selectionText = body.selectionText?.trim();
+  const prompt = resolveRelayPrompt(body, pngList.length);
+  if (selectionText && pngList.length === 0 && !body.pngBase64?.trim()) {
+    return {
+      prompt: `${prompt}\n\n---\n\n${selectionText}`,
+    };
+  }
+  return {
+    prompt,
+    pngBase64: body.pngBase64,
+    pngBase64List: pngList.length > 0 ? pngList : undefined,
+  };
+}
+
 /** Survey Mirage — vision analyze for captured screenshots (Codex CLI or API key). */
 export async function POST(request: Request) {
   let body: AnalyzeBody;
@@ -97,21 +144,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid JSON." }, { status: 400 });
   }
 
-  // Localhost: Codex/Cursor CLIs OK. Hosted PWA: require a gateway key (client or server env).
-  if (!isLocalhostRequest(request) && !hasRemoteAnalyzeCredentials(body)) {
+  const list = normalizePngList(body);
+  const hosted = !isLocalhostRequest(request);
+  const hasCredentials = hasRemoteAnalyzeCredentials(body);
+  const relayBundle = hosted ? await resolveSurveyRelayBundle(null) : null;
+  const relayAvailable = Boolean(relayBundle);
+  const canRelaySolve = hasRelaySolvePayload(body, list);
+
+  if (hosted && !hasCredentials && !relayAvailable) {
     return NextResponse.json(
       {
         ok: false,
         error:
-          "ANALYZE needs a gateway key on the hosted PWA — save OpenAI / OpenRouter / OpenCode Zen under CAPTURE, then SOLVE again.",
+          "SOLVE needs Echo Satellite online (codex login on that Mac) or a CAPTURE gateway key (OpenAI / OpenRouter / OpenCode Zen).",
       },
       { status: 403 },
     );
   }
 
-  const list = Array.isArray(body.pngBase64List)
-    ? body.pngBase64List.map((entry) => String(entry ?? "").trim()).filter(Boolean)
-    : [];
+  if (hosted && !hasCredentials && relayAvailable && canRelaySolve) {
+    const relaySolve = await runRelayCodexSolve(buildRelaySolveInput(body, list));
+    if (relaySolve.ok) {
+      return NextResponse.json({
+        ok: true,
+        text: relaySolve.text,
+        model: relaySolve.model,
+        provider: relaySolve.provider,
+      });
+    }
+    return NextResponse.json({ ok: false, error: relaySolve.error }, { status: 502 });
+  }
 
   const result = await analyzeSurveyCapture({
     pngBase64: body.pngBase64,
@@ -124,22 +186,23 @@ export async function POST(request: Request) {
     model: body.model,
   });
 
-  if (!result.ok) {
-    if (!isLocalhostRequest(request) && (list.length > 0 || body.pngBase64?.trim())) {
-      const relaySolve = await runRelayCodexSolve({
-        prompt: body.prompt,
-        pngBase64: body.pngBase64,
-        pngBase64List: list.length > 0 ? list : undefined,
+  if (!result.ok && hosted && relayAvailable && canRelaySolve) {
+    const relaySolve = await runRelayCodexSolve(buildRelaySolveInput(body, list));
+    if (relaySolve.ok) {
+      return NextResponse.json({
+        ok: true,
+        text: relaySolve.text,
+        model: relaySolve.model,
+        provider: relaySolve.provider,
       });
-      if (relaySolve.ok) {
-        return NextResponse.json({
-          ok: true,
-          text: relaySolve.text,
-          model: relaySolve.model,
-          provider: relaySolve.provider,
-        });
-      }
     }
+    return NextResponse.json(
+      { ok: false, error: `${result.error} · codex-relay: ${relaySolve.error}` },
+      { status: 502 },
+    );
+  }
+
+  if (!result.ok) {
     return NextResponse.json(result, { status: 502 });
   }
 
