@@ -85,4 +85,25 @@ exports.default = async function electronAfterPack(context) {
   console.log(
     `[electron:afterPack] cyberdeck-chat chunks ok (${chunkIds.map((id) => `${id}.js`).join(", ") || "none"})`,
   );
+
+  // serverExternalPackages are not always traced into standalone — force-copy from the project tree.
+  const requiredExternals = ["just-bash", "sql.js"];
+  for (const name of requiredExternals) {
+    const src = path.join(projectDir, "node_modules", name);
+    const dest = path.join(destModules, name);
+    if (!fs.existsSync(path.join(src, "package.json"))) {
+      throw new Error(`[electron:afterPack] missing project dependency ${name} at ${src}`);
+    }
+    fs.rmSync(dest, { recursive: true, force: true });
+    fs.cpSync(src, dest, { recursive: true, dereference: true });
+    console.log(`[electron:afterPack] forced ${name} into packaged node_modules`);
+  }
+
+  const sqlWasm = path.join(destModules, "sql.js", "dist", "sql-wasm.wasm");
+  if (!fs.existsSync(sqlWasm)) {
+    throw new Error(`[electron:afterPack] missing ${sqlWasm}`);
+  }
+  if (!fs.existsSync(path.join(destModules, "just-bash", "package.json"))) {
+    throw new Error("[electron:afterPack] just-bash missing after force-copy");
+  }
 };

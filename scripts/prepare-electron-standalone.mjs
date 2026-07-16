@@ -16,6 +16,9 @@ const STANDALONE_RUNTIME_MODULES = [
   'styled-jsx',
   'react',
   'react-dom',
+  // serverExternalPackages — must exist on disk in packaged Electron (NFT often drops them).
+  'just-bash',
+  'sql.js',
 ];
 
 function run(command, args, env = {}, cwd = root) {

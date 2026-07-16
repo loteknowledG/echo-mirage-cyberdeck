@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CyberdeckFilterButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { SurveyMirageCapturePreview } from "@/components/cyberdeck/survey-mirage-capture-preview";
 import { SurveyMirageExtCapturePanel } from "@/components/cyberdeck/survey-mirage-ext-capture-panel";
 import { SurveyMirageQueueTeamHost } from "@/components/cyberdeck/survey-mirage-queue-sync";
@@ -20,6 +21,16 @@ import { isSurveyHttpsPairBlocked } from "@/lib/cyberdeck/survey-pairing-shared.
 import { notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 
+type SurveyMirageWorkflow = "screenshot" | "extension";
+
+const WORKFLOW_STORAGE_KEY = "echo-mirage-survey-mirage-workflow-v1";
+
+function readStoredWorkflow(): SurveyMirageWorkflow {
+  if (typeof window === "undefined") return "screenshot";
+  const raw = window.localStorage.getItem(WORKFLOW_STORAGE_KEY);
+  return raw === "extension" ? "extension" : "screenshot";
+}
+
 /**
  * Mirage Survey sub-pane — capture via cloud relay (HTTPS PWA) or direct Echo (LAN).
  */
@@ -28,9 +39,20 @@ export function SurveyMiragePane() {
   const team = useSurveyTeamStatus();
   const mirageLinked = team.echoMirage.state === "linked" || Boolean(paired && !terminated);
   const [pwaBlocked, setPwaBlocked] = useState(false);
+  const [workflow, setWorkflow] = useState<SurveyMirageWorkflow>("screenshot");
 
   useEffect(() => {
     setPwaBlocked(isSurveyHttpsPairBlocked());
+    setWorkflow(readStoredWorkflow());
+  }, []);
+
+  const selectWorkflow = useCallback((next: SurveyMirageWorkflow) => {
+    setWorkflow(next);
+    try {
+      window.localStorage.setItem(WORKFLOW_STORAGE_KEY, next);
+    } catch {
+      /* ignore quota */
+    }
   }, []);
 
   const handlePaired = useCallback(
@@ -86,9 +108,38 @@ export function SurveyMiragePane() {
         </p>
       ) : null}
 
-      <SurveyMirageCapturePreview />
+      <div
+        className="flex flex-wrap items-center gap-2"
+        role="tablist"
+        aria-label="Mirage capture workflow"
+        data-testid="survey-mirage-workflow-toggle"
+      >
+        <p className="text-[9px] tracking-[0.1em] text-fuchsia-300/90">WORKFLOW</p>
+        <CyberdeckFilterButton
+          active={workflow === "screenshot"}
+          role="tab"
+          aria-selected={workflow === "screenshot"}
+          onClick={() => selectWorkflow("screenshot")}
+          data-testid="survey-mirage-workflow-screenshot"
+        >
+          SCREENSHOT
+        </CyberdeckFilterButton>
+        <CyberdeckFilterButton
+          active={workflow === "extension"}
+          role="tab"
+          aria-selected={workflow === "extension"}
+          onClick={() => selectWorkflow("extension")}
+          data-testid="survey-mirage-workflow-extension"
+        >
+          EXTENSION
+        </CyberdeckFilterButton>
+      </div>
 
-      <SurveyMirageExtCapturePanel />
+      {workflow === "screenshot" ? (
+        <SurveyMirageCapturePreview />
+      ) : (
+        <SurveyMirageExtCapturePanel />
+      )}
 
       <div className="border-t border-[#1c1c1c] pt-4">
         <SurveySolutionsPanel />

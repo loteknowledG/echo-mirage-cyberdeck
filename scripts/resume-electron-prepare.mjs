@@ -20,6 +20,8 @@ const STANDALONE_RUNTIME_MODULES = [
   'styled-jsx',
   'react',
   'react-dom',
+  'just-bash',
+  'sql.js',
 ];
 
 function run(command, args, env = {}, cwd = root) {

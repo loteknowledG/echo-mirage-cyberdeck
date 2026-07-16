@@ -125,14 +125,23 @@ export function SurveyMirageCapturePreview() {
     return readSurveyCaptureStack();
   }, [stackTick, captureTick]);
 
+  const latestPageId = stackPages[stackPages.length - 1]?.id ?? null;
+
+  // New screenshots append to the tip — always focus that page so the operator
+  // does not have to re-select it in the strip.
   useEffect(() => {
-    if (stackPages.length === 0) {
+    if (!latestPageId) {
       setActivePageId(null);
       return;
     }
-    if (!activePageId || !stackPages.some((page) => page.id === activePageId)) {
-      setActivePageId(stackPages[stackPages.length - 1]?.id ?? null);
-    }
+    setActivePageId(latestPageId);
+  }, [latestPageId]);
+
+  // If the focused page was removed from the middle of the stack, fall back.
+  useEffect(() => {
+    if (!activePageId || stackPages.length === 0) return;
+    if (stackPages.some((page) => page.id === activePageId)) return;
+    setActivePageId(stackPages[stackPages.length - 1]?.id ?? null);
   }, [stackPages, activePageId]);
 
   const previewContent = useMemo(() => {
