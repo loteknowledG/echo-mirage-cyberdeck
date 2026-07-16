@@ -12,6 +12,10 @@ import {
   takeSurveyScreenshot,
 } from "@/lib/cyberdeck/survey-deck-command.client";
 import {
+  ensureSurveyRelayEchoNodeId,
+  SURVEY_RELAY_ECHO_CHANGED_EVENT,
+} from "@/lib/cyberdeck/survey-relay.client";
+import {
   clearSurveyCaptureStack,
   readSurveyCaptureStack,
   removeSurveyCaptureStackPage,
@@ -30,10 +34,6 @@ import { useSurveyAnalyzeStatus } from "@/lib/cyberdeck/survey-analyze-status.cl
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import { SURVEY_PAIR_PIN_DRAFT_EVENT } from "@/lib/cyberdeck/survey-pair-pin-draft";
 import { isSurveyHttpsPairBlocked } from "@/lib/cyberdeck/survey-pairing-shared.client";
-import {
-  isEchoMirageDesktopShell,
-  openDesktopCyberdeckApp,
-} from "@/lib/electron/desktop-install.client";
 
 function formatCaptureSize(imageSrc: string): string {
   const bytes = Math.round((imageSrc.length * 3) / 4);
@@ -54,6 +54,8 @@ export function SurveyMirageCapturePreview() {
   const [solveBusy, setSolveBusy] = useState(false);
   const [deckMessage, setDeckMessage] = useState<string | null>(null);
   const [pwaBlocked, setPwaBlocked] = useState(false);
+  const [relayLiveId, setRelayLiveId] = useState<string | null>(null);
+  const [relayWaitHint, setRelayWaitHint] = useState<string | null>(null);
 
   const bumpCapture = useCallback(() => setCaptureTick((value) => value + 1), []);
   const bumpEndpoint = useCallback(() => setEndpointTick((value) => value + 1), []);
@@ -64,10 +66,41 @@ export function SurveyMirageCapturePreview() {
   }, []);
 
   useEffect(() => {
+    if (!pwaBlocked) {
+      setRelayLiveId(null);
+      setRelayWaitHint(null);
+      return;
+    }
+    let cancelled = false;
+    const discover = () => {
+      void ensureSurveyRelayEchoNodeId(resolveSurveyRelayEchoNodeId()).then((result) => {
+        if (cancelled) return;
+        if (result.ok) {
+          setRelayLiveId(result.echoNodeId);
+          setRelayWaitHint(null);
+          bumpEndpoint();
+          return;
+        }
+        setRelayLiveId(null);
+        setRelayWaitHint(
+          "Waiting for Echo — open Satellite on the Mac and tap Send to Mirage (no team id needed).",
+        );
+      });
+    };
+    discover();
+    const timer = window.setInterval(discover, 20_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [pwaBlocked, bumpEndpoint]);
+
+  useEffect(() => {
     window.addEventListener(SURVEY_LAST_CAPTURE_EVENT, bumpCapture);
     window.addEventListener(SURVEY_MIRAGE_ITEM_CHANGED_EVENT, bumpCapture);
     window.addEventListener(SURVEY_PAIR_PIN_DRAFT_EVENT, bumpEndpoint);
     window.addEventListener(SURVEY_CAPTURE_STACK_CHANGED_EVENT, bumpStack);
+    window.addEventListener(SURVEY_RELAY_ECHO_CHANGED_EVENT, bumpEndpoint);
     const onStorage = (event: StorageEvent) => {
       if (event.key === SURVEY_LAST_CAPTURE_STORAGE_KEY) bumpCapture();
     };
@@ -77,6 +110,7 @@ export function SurveyMirageCapturePreview() {
       window.removeEventListener(SURVEY_MIRAGE_ITEM_CHANGED_EVENT, bumpCapture);
       window.removeEventListener(SURVEY_PAIR_PIN_DRAFT_EVENT, bumpEndpoint);
       window.removeEventListener(SURVEY_CAPTURE_STACK_CHANGED_EVENT, bumpStack);
+      window.removeEventListener(SURVEY_RELAY_ECHO_CHANGED_EVENT, bumpEndpoint);
       window.removeEventListener("storage", onStorage);
     };
   }, [bumpCapture, bumpEndpoint, bumpStack]);
@@ -126,12 +160,15 @@ export function SurveyMirageCapturePreview() {
   }, [endpointTick, team.echoHost]);
   const relayEchoNodeId = useMemo(() => {
     void endpointTick;
-    return resolveSurveyRelayEchoNodeId();
-  }, [endpointTick]);
-  const relayReady = pwaBlocked && Boolean(relayEchoNodeId);
+    return relayLiveId || resolveSurveyRelayEchoNodeId();
+  }, [endpointTick, relayLiveId]);
+  // HTTPS PWA: screenshots ride the relay; no manual team id — discover active Echo.
+  const relayReady = pwaBlocked;
   const echoReady = (Boolean(echoCtx.echoHost) && !pwaBlocked) || relayReady;
-  const echoTargetLabel = relayReady
-    ? `relay · team ${relayEchoNodeId!.slice(0, 8)}…`
+  const echoTargetLabel = pwaBlocked
+    ? relayEchoNodeId
+      ? `relay · team ${relayEchoNodeId.slice(0, 8)}…`
+      : "relay · auto-discovering Echo…"
     : echoCtx.echoHost
       ? `${echoCtx.echoHost}:${echoCtx.echoHttpPort}`
       : null;
@@ -234,22 +271,14 @@ export function SurveyMirageCapturePreview() {
 
       <SurveyProviderSetup />
 
-      {pwaBlocked && !relayReady ? (
-        <div className="mb-2 space-y-2">
-          <p className="text-[8px] leading-relaxed text-amber-200/90">
-            HTTPS PWA cannot call Echo over HTTP. Pair with Echo team ID so screenshots ride the
-            relay middlebox, or open the desktop cyberdeck for direct LAN/mesh.
-          </p>
-          {!isEchoMirageDesktopShell() ? (
-            <CyberdeckActionButton
-              variant="accent"
-              onClick={() => void openDesktopCyberdeckApp()}
-              data-testid="survey-mirage-open-desktop-for-capture"
-            >
-              Open desktop cyberdeck
-            </CyberdeckActionButton>
-          ) : null}
-        </div>
+      {pwaBlocked && relayWaitHint && !relayEchoNodeId ? (
+        <p className="mb-2 text-[8px] leading-relaxed text-amber-200/90">{relayWaitHint}</p>
+      ) : null}
+
+      {pwaBlocked && !relayEchoNodeId && !relayWaitHint ? (
+        <p className="mb-2 text-[8px] text-[#6a6a6a]">
+          Looking for Echo on the cloud relay…
+        </p>
       ) : !echoReady ? (
         <p className="mb-2 text-[8px] text-[#6a6a6a]">
           Enter {SURVEY_ECHO_DISPLAY} IP above (Tailscale), then SCREENSHOT runs on that Mac.
@@ -257,7 +286,7 @@ export function SurveyMirageCapturePreview() {
       ) : echoTargetLabel ? (
         <p className="mb-2 text-[8px] text-[#6a6a6a]">
           {SURVEY_ECHO_DISPLAY} · {echoTargetLabel}
-          {relayReady
+          {pwaBlocked
             ? " — screenshot via relay middlebox (Echo still captures)."
             : " — press + PAGE for each extra screen, then SOLVE."}
         </p>

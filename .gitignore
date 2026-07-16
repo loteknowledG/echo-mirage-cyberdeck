@@ -182,3 +182,5 @@ data/property-manager/cases/*
 !data/property-manager/cases/.gitkeep
 .env*
 node_modules
+*.docx
+/Documents

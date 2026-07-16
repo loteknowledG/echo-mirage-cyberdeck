@@ -2,7 +2,10 @@
 
 import { getOrCreatePowerfistDeviceId } from "@/lib/cyberdeck/survey-pairing-client";
 import { getOrCreateSurveyNodeId } from "@/lib/cyberdeck/survey-mode";
-import { saveSurveyHubTeamId } from "@/lib/cyberdeck/survey-hub-store.client";
+import {
+  resolveSurveyHubTeamId,
+  saveSurveyHubTeamId,
+} from "@/lib/cyberdeck/survey-hub-store.client";
 import {
   readSurveyMiragePairCredentials,
   saveSurveyMiragePairCredentials,
@@ -13,9 +16,13 @@ import { surveyRelayPath } from "@/lib/cyberdeck/survey-relay-base";
 import { traceSurveyPairing } from "@/lib/cyberdeck/survey-pairing-trace";
 import type { SurveyRelayBundleClient } from "@/lib/cyberdeck/survey-relay-types";
 
+/** Fired when Mirage learns / corrects the live Echo team id from the cloud relay. */
+export const SURVEY_RELAY_ECHO_CHANGED_EVENT = "echo-mirage-survey-relay-echo-changed";
+
 function rememberSurveyRelayEchoNodeId(echoNodeId: string): void {
   const id = echoNodeId.trim();
   if (!id) return;
+  const previous = resolveSurveyHubTeamId();
   saveSurveyHubTeamId(id);
 
   const mirage = readSurveyMiragePairCredentials();
@@ -26,6 +33,12 @@ function rememberSurveyRelayEchoNodeId(echoNodeId: string): void {
   if (powerfist && powerfist.echoNodeId !== id) {
     saveSurveyPowerfistPairCredentials({ ...powerfist, echoNodeId: id });
   }
+
+  if (typeof window !== "undefined" && previous !== id) {
+    window.dispatchEvent(
+      new CustomEvent(SURVEY_RELAY_ECHO_CHANGED_EVENT, { detail: { echoNodeId: id } }),
+    );
+  }
 }
 
 export async function fetchSurveyRelayBundle(
@@ -35,8 +48,9 @@ export async function fetchSurveyRelayBundle(
   | { ok: false; reason: string }
 > {
   const id = echoNodeId.trim();
+  // Empty id → pull the most recently pushed Echo (no manual team id).
   if (!id) {
-    return { ok: false, reason: "Enter Echo team ID (from Echo Satellite status panel)." };
+    return fetchActiveSurveyRelayBundle();
   }
 
   try {
@@ -65,7 +79,43 @@ export async function fetchSurveyRelayBundle(
   }
 }
 
-/** Resolve live Echo team id — recovers when Mirage stored a stale id. */
+/** Pull the Echo Satellite that most recently pushed a relay bundle. */
+export async function fetchActiveSurveyRelayBundle(): Promise<
+  | { ok: true; bundle: SurveyRelayBundleClient; source: "preferred" | "active" }
+  | { ok: false; reason: string }
+> {
+  try {
+    const res = await fetch(surveyRelayPath("/api/survey/relay/bundle?active=1"), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    });
+    const payload = (await res.json()) as
+      | {
+          ok: true;
+          bundle: SurveyRelayBundleClient;
+          source?: "preferred" | "active";
+        }
+      | { ok: false; reason?: string };
+    if (!payload.ok) {
+      return {
+        ok: false,
+        reason:
+          payload.reason ??
+          "No live Echo yet — on the Mac open Echo Satellite (with relay secret) and tap Send to Mirage.",
+      };
+    }
+    rememberSurveyRelayEchoNodeId(payload.bundle.echoNodeId);
+    return {
+      ok: true,
+      bundle: payload.bundle,
+      source: payload.source === "preferred" ? "preferred" : "active",
+    };
+  } catch {
+    return { ok: false, reason: "Could not reach cloud relay." };
+  }
+}
+
+/** Resolve live Echo team id — auto-discovers; no manual team id required. */
 export async function ensureSurveyRelayEchoNodeId(
   preferred?: string | null,
 ): Promise<{ ok: true; echoNodeId: string; source: "preferred" | "active" } | { ok: false; reason: string }> {
@@ -84,35 +134,13 @@ export async function ensureSurveyRelayEchoNodeId(
     }
   }
 
-  try {
-    const res = await fetch(surveyRelayPath("/api/survey/relay/bundle?active=1"), {
-      cache: "no-store",
-      signal: AbortSignal.timeout(12_000),
-    });
-    const payload = (await res.json()) as
-      | {
-          ok: true;
-          bundle: SurveyRelayBundleClient;
-          source?: "preferred" | "active";
-        }
-      | { ok: false; reason?: string };
-    if (!payload.ok) {
-      return {
-        ok: false,
-        reason:
-          payload.reason ??
-          "No live Echo relay bundle — on Echo Mac open Satellite, set the relay secret, tap Send to Mirage.",
-      };
-    }
-    rememberSurveyRelayEchoNodeId(payload.bundle.echoNodeId);
-    return {
-      ok: true,
-      echoNodeId: payload.bundle.echoNodeId,
-      source: payload.source === "preferred" ? "preferred" : "active",
-    };
-  } catch {
-    return { ok: false, reason: "Could not reach cloud relay." };
-  }
+  const active = await fetchActiveSurveyRelayBundle();
+  if (!active.ok) return active;
+  return {
+    ok: true,
+    echoNodeId: active.bundle.echoNodeId,
+    source: active.source,
+  };
 }
 
 async function sleep(ms: number): Promise<void> {

@@ -21,7 +21,6 @@ import {
 } from "@/lib/cyberdeck/survey-pair-pin";
 import {
   isSurveyHttpsPairBlocked,
-  SURVEY_PWA_PAIR_BLOCKED_MESSAGE,
 } from "@/lib/cyberdeck/survey-pairing-shared.client";
 import { notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
@@ -88,11 +87,12 @@ export function SurveyMiragePane() {
       {pwaBlocked ? (
         <div className="space-y-2 rounded border border-amber-900/50 bg-amber-950/20 p-3">
           <p className="text-[9px] leading-relaxed text-amber-200/90">
-            {SURVEY_PWA_PAIR_BLOCKED_MESSAGE}
+            HTTPS PWA uses the cloud relay for Echo screenshots — keep Echo Satellite open on the
+            Mac (relay secret set) and tap Send to Mirage. No team id to paste.
           </p>
           {!isEchoMirageDesktopShell() ? (
             <CyberdeckActionButton
-              variant="accent"
+              variant="neutral"
               onClick={() => void openDesktopCyberdeckApp()}
             >
               Open desktop cyberdeck
