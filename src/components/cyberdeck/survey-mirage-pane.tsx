@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { SurveyMirageCapturePreview } from "@/components/cyberdeck/survey-mirage-capture-preview";
-import { SurveyMirageDesktopLink } from "@/components/cyberdeck/survey-mirage-desktop-link";
 import { SurveyMirageExtCapturePanel } from "@/components/cyberdeck/survey-mirage-ext-capture-panel";
 import { SurveyMirageQueueTeamHost } from "@/components/cyberdeck/survey-mirage-queue-sync";
 import { SurveyPairPinForm } from "@/components/cyberdeck/survey-pair-pin-form";
@@ -19,18 +17,12 @@ import {
   DEFAULT_ECHO_TAILSCALE_HOST,
   preferMeshEchoHost,
 } from "@/lib/cyberdeck/survey-pair-pin";
-import {
-  isSurveyHttpsPairBlocked,
-} from "@/lib/cyberdeck/survey-pairing-shared.client";
+import { isSurveyHttpsPairBlocked } from "@/lib/cyberdeck/survey-pairing-shared.client";
 import { notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
-import {
-  isEchoMirageDesktopShell,
-  openDesktopCyberdeckApp,
-} from "@/lib/electron/desktop-install.client";
 
 /**
- * Mirage Survey sub-pane — PIN-pair Echo, capture screen, read answers.
+ * Mirage Survey sub-pane — capture via cloud relay (HTTPS PWA) or direct Echo (LAN).
  */
 export function SurveyMiragePane() {
   const { paired, terminated, resetLinkWatch } = useSurveyEchoLinkWatch("mirage");
@@ -82,23 +74,11 @@ export function SurveyMiragePane() {
         {SURVEY_MODE_TITLE} // {SURVEY_MIRAGE_DISPLAY}
       </p>
 
-      <SurveyMirageDesktopLink />
-
       {pwaBlocked ? (
-        <div className="space-y-2 rounded border border-amber-900/50 bg-amber-950/20 p-3">
-          <p className="text-[9px] leading-relaxed text-amber-200/90">
-            HTTPS PWA uses the cloud relay for Echo screenshots — keep Echo Satellite open on the
-            Mac. No secret and no team id to paste.
-          </p>
-          {!isEchoMirageDesktopShell() ? (
-            <CyberdeckActionButton
-              variant="neutral"
-              onClick={() => void openDesktopCyberdeckApp()}
-            >
-              Open desktop cyberdeck
-            </CyberdeckActionButton>
-          ) : null}
-        </div>
+        <p className="text-[9px] leading-relaxed text-[#8a8a8a]">
+          Cloud relay — keep Echo Satellite open on the Mac. Screenshots go through the middlebox;
+          no desktop app and no team id to paste.
+        </p>
       ) : null}
 
       {!mirageLinked && !terminated && !pwaBlocked ? (
@@ -111,11 +91,15 @@ export function SurveyMiragePane() {
         />
       ) : null}
 
-      {mirageLinked ? (
+      {mirageLinked && !pwaBlocked ? (
         <p className="text-[9px] text-emerald-300/80">
           LINKED // {SURVEY_ECHO_DISPLAY}
           {paired?.echoHost ? ` · ${paired.echoHost}:${paired.httpPort}` : null}
         </p>
+      ) : null}
+
+      {pwaBlocked ? (
+        <p className="text-[9px] text-emerald-300/80">RELAY // {SURVEY_ECHO_DISPLAY} · cloud middlebox</p>
       ) : null}
 
       <SurveyMirageCapturePreview />

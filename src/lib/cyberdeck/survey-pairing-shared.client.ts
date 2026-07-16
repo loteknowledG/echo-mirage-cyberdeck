@@ -1,7 +1,7 @@
 import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
 
 export const SURVEY_PWA_PAIR_BLOCKED_MESSAGE =
-  "Installed PWA cannot reach Echo over Tailscale or LAN. On this laptop, click Open desktop cyberdeck below (or run pnpm electron:dev) and pair from there.";
+  "HTTPS PWA cannot reach Echo over Tailscale or LAN — screenshots use the cloud relay. Keep Echo Satellite open on the Mac.";
 
 export const LEGACY_SPY_PAIR_ENTER_PATH = "/api/spy/pair/enter";
 
