@@ -51,5 +51,38 @@ exports.default = async function electronAfterPack(context) {
     );
   }
 
+  // Re-copy server chunks — some packers/traces drop webpack deps that cyberdeck-chat needs.
+  const sourceChunks = path.join(sourceRoot, ".next", "server", "chunks");
+  const destChunks = path.join(appDir, ".next", "server", "chunks");
+  if (!fs.existsSync(sourceChunks)) {
+    throw new Error(`[electron:afterPack] missing source chunks at ${sourceChunks}`);
+  }
+  fs.mkdirSync(destChunks, { recursive: true });
+  fs.cpSync(sourceChunks, destChunks, { recursive: true, dereference: true });
+
+  const chatRoute = path.join(appDir, ".next", "server", "app", "api", "cyberdeck-chat", "route.js");
+  if (!fs.existsSync(chatRoute)) {
+    throw new Error(`[electron:afterPack] missing ${chatRoute}`);
+  }
+  const routeSource = fs.readFileSync(chatRoute, "utf8");
+  const chunkIds = [];
+  for (const match of routeSource.matchAll(/\.X\(\d+,\[([^\]]+)\]/g)) {
+    for (const raw of match[1].split(",")) {
+      const id = raw.trim();
+      if (/^\d+$/.test(id)) chunkIds.push(id);
+    }
+  }
+  const missing = chunkIds.filter(
+    (id) => !fs.existsSync(path.join(destChunks, `${id}.js`)),
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `[electron:afterPack] cyberdeck-chat missing chunks: ${missing.map((id) => `${id}.js`).join(", ")}`,
+    );
+  }
+
   console.log(`[electron:afterPack] next package present at ${nextPkg}`);
+  console.log(
+    `[electron:afterPack] cyberdeck-chat chunks ok (${chunkIds.map((id) => `${id}.js`).join(", ") || "none"})`,
+  );
 };

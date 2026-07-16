@@ -17,7 +17,7 @@ const SURVEY_CORS_HEADERS = {
 };
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { status: 204, headers: SURVEY_CORS_HEADERS });
+  return new NextResponse(null, { status: 204, headers: SURVEY_CORS_HEADERS });
 }
 
 type EnterBody = {

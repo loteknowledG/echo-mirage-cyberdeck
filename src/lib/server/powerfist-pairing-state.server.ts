@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { resolveEchoTmpPath } from "@/lib/server/echo-runtime-paths.server";
 
 export type PowerfistPairingSession = {
   pairId: string;
@@ -57,7 +58,7 @@ export type PowerfistPairingState = {
 export function powerfistPairingStatePath(): string {
   return (
     process.env.ECHO_MIRAGE_POWERFIST_STATE_PATH?.trim() ||
-    path.join(process.cwd(), ".tmp", "powerfist-ws.json")
+    resolveEchoTmpPath("powerfist-ws.json")
   );
 }
 

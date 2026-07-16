@@ -6,6 +6,7 @@ import os from "os";
 import path from "path";
 import { SURVEY_PAIR_PIN_LENGTH } from "@/lib/cyberdeck/survey-pair-pin";
 import { resolveHttpPort } from "@/lib/server/is-localhost-request.server";
+import { resolveEchoTmpPath } from "@/lib/server/echo-runtime-paths.server";
 
 export type SurveyPairRole = "mirage" | "powerfist";
 
@@ -52,7 +53,7 @@ const REGISTRY_KEY = "__echoMirageSpyEchoPairing";
 function echoSpyPairingStatePath(): string {
   return (
     process.env.ECHO_MIRAGE_SPY_PAIRING_STATE_PATH?.trim() ||
-    path.join(process.cwd(), ".tmp", "echo-spy-pairing.json")
+    resolveEchoTmpPath("echo-spy-pairing.json")
   );
 }
 

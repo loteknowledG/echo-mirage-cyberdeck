@@ -3,6 +3,7 @@
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import { resolveEchoTmpPath } from "@/lib/server/echo-runtime-paths.server";
 
 const REGISTRY_KEY = "__echoMirageSurveyCloudRelay";
 const BUNDLE_TTL_SEC = 15 * 60;
@@ -96,11 +97,7 @@ const ACTIVE_ECHO_KEY = "survey:relay:active-echo-node";
 function relayStatePath(): string {
   const fromEnv = process.env.ECHO_MIRAGE_SURVEY_RELAY_STATE_PATH?.trim();
   if (fromEnv) return fromEnv;
-  // Vercel serverless FS is read-only except /tmp — cwd/.tmp writes 500.
-  if (process.env.VERCEL) {
-    return path.join("/tmp", "echo-mirage-survey-cloud-relay.json");
-  }
-  return path.join(process.cwd(), ".tmp", "survey-cloud-relay.json");
+  return resolveEchoTmpPath("survey-cloud-relay.json");
 }
 
 function memoryStore(): RelayStore {

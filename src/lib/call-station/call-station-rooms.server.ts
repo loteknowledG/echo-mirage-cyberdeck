@@ -8,6 +8,7 @@ import type {
   CallStationRoom,
   CallStationStore,
 } from "@/lib/call-station/types";
+import { resolveEchoTmpPath } from "@/lib/server/echo-runtime-paths.server";
 
 const REGISTRY_KEY = "__echoMirageCallStationRooms";
 const UPSTASH_KEY = "call-station:rooms";
@@ -17,7 +18,7 @@ const ROOM_TTL_SEC = 30 * 60;
 function statePath(): string {
   return (
     process.env.ECHO_MIRAGE_CALL_STATION_STATE_PATH?.trim() ||
-    path.join(process.cwd(), ".tmp", "call-station-rooms.json")
+    resolveEchoTmpPath("call-station-rooms.json")
   );
 }
 

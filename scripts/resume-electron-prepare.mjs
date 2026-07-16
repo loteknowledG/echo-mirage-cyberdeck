@@ -1,3 +1,7 @@
+/**
+ * Resume Electron prepare after a successful Next standalone build
+ * (skips clean + next build — use when only post-build steps failed).
+ */
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import fs from 'node:fs/promises';
@@ -7,8 +11,8 @@ import { fileURLToPath } from 'node:url';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const requireFromRoot = createRequire(path.join(root, 'package.json'));
 const standaloneDir = path.join(root, '.next', 'standalone');
+const packagedDir = path.join(root, '.next', 'standalone-electron');
 
-/** Runtime modules server.js must resolve inside the packaged app directory. */
 const STANDALONE_RUNTIME_MODULES = [
   'next',
   '@next/env',
@@ -43,11 +47,6 @@ async function pathExists(target) {
   }
 }
 
-async function copyRecursive(from, to) {
-  await fs.mkdir(path.dirname(to), { recursive: true });
-  await fs.cp(from, to, { recursive: true, force: true, dereference: true });
-}
-
 function moduleDestPath(baseDir, name) {
   if (name.startsWith('@')) {
     const [scope, pkg] = name.split('/');
@@ -65,43 +64,25 @@ async function resolveProjectModuleDir(name) {
   }
 }
 
-/** Always refresh from the project install — never trust a stub/symlink leftover. */
 async function ensureRuntimeModule(packagedDir, name) {
   const dest = moduleDestPath(packagedDir, name);
   const src = await resolveProjectModuleDir(name);
   if (!src) {
-    throw new Error(
-      `[electron:prepare] cannot patch standalone — missing project dependency "${name}". Run pnpm install.`,
-    );
+    throw new Error(`[electron:resume] missing project dependency "${name}"`);
   }
-
-  console.log(`[electron:prepare] copying standalone runtime dep: ${name}`);
+  console.log(`[electron:resume] copying standalone runtime dep: ${name}`);
   await fs.rm(dest, { recursive: true, force: true });
   await fs.mkdir(path.dirname(dest), { recursive: true });
   await fs.cp(src, dest, { recursive: true, force: true, dereference: true });
-
-  if (!(await pathExists(path.join(dest, 'package.json')))) {
-    throw new Error(`[electron:prepare] copy failed — missing ${path.join(dest, 'package.json')}`);
-  }
 }
 
-async function ensureStandaloneRuntimeDeps(packagedDir) {
-  for (const name of STANDALONE_RUNTIME_MODULES) {
-    await ensureRuntimeModule(packagedDir, name);
-  }
-}
-
-/**
- * Next standalone file tracing can omit server chunks that webpack still references.
- * Force-merge the full build chunk tree so routes like /api/cyberdeck-chat do not 500.
- */
 async function syncServerChunks(standaloneRoot) {
   const sourceChunks = path.join(root, '.next', 'server', 'chunks');
   const destChunks = path.join(standaloneRoot, '.next', 'server', 'chunks');
   if (!(await pathExists(sourceChunks))) {
-    throw new Error(`[electron:prepare] missing source chunks at ${sourceChunks}`);
+    throw new Error(`[electron:resume] missing source chunks at ${sourceChunks}`);
   }
-  console.log('[electron:prepare] syncing .next/server/chunks into standalone…');
+  console.log('[electron:resume] syncing .next/server/chunks…');
   await fs.mkdir(destChunks, { recursive: true });
   await fs.cp(sourceChunks, destChunks, { recursive: true, force: true, dereference: true });
 }
@@ -128,46 +109,26 @@ async function verifyCyberdeckChatChunks(standaloneRoot) {
     'route.js',
   );
   if (!(await pathExists(routeJs))) {
-    throw new Error(`[electron:prepare] missing ${routeJs}`);
+    throw new Error(`[electron:resume] missing ${routeJs}`);
   }
   const source = await fs.readFile(routeJs, 'utf8');
   const chunkIds = collectWebpackChunkIds(source);
-  if (chunkIds.length === 0) {
-    console.warn('[electron:prepare] no webpack chunk ids found in cyberdeck-chat route.js');
-    return;
-  }
   const missing = [];
   for (const id of chunkIds) {
     const chunkPath = path.join(standaloneRoot, '.next', 'server', 'chunks', `${id}.js`);
     if (!(await pathExists(chunkPath))) missing.push(`${id}.js`);
   }
   if (missing.length > 0) {
-    throw new Error(
-      `[electron:prepare] cyberdeck-chat missing server chunks: ${missing.join(', ')}. MUTHUR chat would fail in Electron.`,
-    );
+    throw new Error(`[electron:resume] cyberdeck-chat missing chunks: ${missing.join(', ')}`);
   }
   console.log(
-    `[electron:prepare] cyberdeck-chat chunks ok (${chunkIds.map((id) => `${id}.js`).join(', ')})`,
+    `[electron:resume] cyberdeck-chat chunks ok (${chunkIds.map((id) => `${id}.js`).join(', ')})`,
   );
 }
 
-/**
- * Verify next resolves from the packaged tree only.
- * Plain `require('next')` from cwd walks up into the monorepo node_modules and
- * falsely passes even when packaged next is missing (the 0.1.6 installer bug).
- * Uses a temp file — Windows `node -e` cannot take multiline scripts via spawn.
- */
-async function verifyStandaloneRuntime(packagedDir) {
-  console.log('[electron:prepare] verifying packaged server can require next…');
-
-  for (const name of STANDALONE_RUNTIME_MODULES) {
-    const pkg = path.join(moduleDestPath(packagedDir, name), 'package.json');
-    if (!(await pathExists(pkg))) {
-      throw new Error(`[electron:prepare] missing packaged runtime dep: ${name} (${pkg})`);
-    }
-  }
-
-  const verifyScriptPath = path.join(packagedDir, '.verify-next-runtime.cjs');
+async function verifyStandaloneRuntime(packagedRoot) {
+  console.log('[electron:resume] verifying packaged server can require next…');
+  const verifyScriptPath = path.join(packagedRoot, '.verify-next-runtime.cjs');
   const script = `'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -176,7 +137,7 @@ const root = process.cwd();
 const localModules = path.join(root, 'node_modules');
 const nextPkg = path.join(localModules, 'next', 'package.json');
 if (!fs.existsSync(nextPkg)) {
-  console.error('[electron:prepare] next package.json missing at', nextPkg);
+  console.error('[electron:resume] next package.json missing at', nextPkg);
   process.exit(1);
 }
 const originalNodeModulePaths = Module._nodeModulePaths;
@@ -187,27 +148,21 @@ Module._nodeModulePaths = function (from) {
   });
 };
 require(path.join(localModules, 'next'));
-console.log('[electron:prepare] next module ok');
+console.log('[electron:resume] next module ok');
 `;
-
   await fs.writeFile(verifyScriptPath, script, 'utf8');
   try {
-    // shell:false — process.execPath is often under "C:\Program Files\..." and breaks with shell:true.
     await new Promise((resolve, reject) => {
       const child = spawn(process.execPath, [verifyScriptPath], {
-        cwd: packagedDir,
-        env: {
-          ...process.env,
-          ELECTRON_RUN_AS_NODE: '1',
-          NODE_PATH: '',
-        },
+        cwd: packagedRoot,
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', NODE_PATH: '' },
         stdio: 'inherit',
         shell: false,
       });
       child.on('error', reject);
       child.on('exit', (code) => {
         if (code === 0) resolve();
-        else reject(new Error(`${process.execPath} ${verifyScriptPath} exited with code ${code}`));
+        else reject(new Error(`verify exited ${code}`));
       });
     });
   } finally {
@@ -216,60 +171,30 @@ console.log('[electron:prepare] next module ok');
 }
 
 async function main() {
-  console.log('[electron:prepare] clearing Windows build blockers…');
-  await run('node', ['scripts/clean-windows-build-blockers.mjs']);
-
-  console.log('[electron:prepare] building Next.js standalone bundle…');
-  await run('pnpm', ['run', 'build'], {
-    ECHO_MIRAGE_ELECTRON_BUILD: '1',
-  });
-
-  const serverJs = path.join(standaloneDir, 'server.js');
-  if (!(await pathExists(serverJs))) {
-    throw new Error(`Missing ${serverJs}. Standalone output was not produced.`);
+  if (!(await pathExists(path.join(standaloneDir, 'server.js')))) {
+    throw new Error('Missing .next/standalone — run full electron:prepare first.');
   }
 
-  console.log('[electron:prepare] copying public/, .next/static, and assets/…');
-  await copyRecursive(path.join(root, 'public'), path.join(standaloneDir, 'public'));
-  await copyRecursive(
-    path.join(root, '.next', 'static'),
-    path.join(standaloneDir, '.next', 'static'),
-  );
-
-  const assetsDir = path.join(root, 'assets');
-  if (await pathExists(assetsDir)) {
-    await copyRecursive(assetsDir, path.join(standaloneDir, 'assets'));
+  for (const name of STANDALONE_RUNTIME_MODULES) {
+    await ensureRuntimeModule(standaloneDir, name);
   }
-
-  await ensureStandaloneRuntimeDeps(standaloneDir);
   await syncServerChunks(standaloneDir);
   await verifyCyberdeckChatChunks(standaloneDir);
 
-  const packagedDir = path.join(root, '.next', 'standalone-electron');
-  console.log('[electron:prepare] materializing standalone for electron (dereference symlinks)…');
+  console.log('[electron:resume] materializing standalone-electron…');
   await fs.rm(packagedDir, { recursive: true, force: true });
   await fs.cp(standaloneDir, packagedDir, { recursive: true, force: true, dereference: true });
 
-  const packagedServerJs = path.join(packagedDir, 'server.js');
-  if (!(await pathExists(packagedServerJs))) {
-    throw new Error(`Missing ${packagedServerJs} after materialize.`);
+  for (const name of STANDALONE_RUNTIME_MODULES) {
+    await ensureRuntimeModule(packagedDir, name);
   }
-
-  await ensureStandaloneRuntimeDeps(packagedDir);
   await syncServerChunks(packagedDir);
   await verifyCyberdeckChatChunks(packagedDir);
   await verifyStandaloneRuntime(packagedDir);
 
-  console.log('[electron:prepare] writing desktop provider env (when CI secrets present)…');
+  console.log('[electron:resume] writing desktop provider env…');
   await run('node', ['scripts/write-desktop-provider-env.mjs']);
-
-  const buildIdPath = path.join(root, '.next', 'BUILD_ID');
-  if (await pathExists(buildIdPath)) {
-    const buildId = (await fs.readFile(buildIdPath, 'utf8')).trim();
-    console.log(`[electron:prepare] standalone-electron ready (build ${buildId})`);
-  } else {
-    console.log('[electron:prepare] standalone-electron ready');
-  }
+  console.log('[electron:resume] ready — run electron-builder --win');
 }
 
 main().catch((error) => {

@@ -112,6 +112,8 @@ async function startPackagedNextServer() {
   const port = await findFreePort();
   const { app } = require('electron');
   const powerfistStatePath = path.join(app.getPath('userData'), 'powerfist-ws.json');
+  const runtimeTmpDir = path.join(app.getPath('userData'), 'tmp');
+  fs.mkdirSync(runtimeTmpDir, { recursive: true });
 
   // Installer bundle rarely has secrets. Prefer userData override, then project .env.local in unpackaged runs.
   const desktopProviderEnv = loadDesktopProviderEnv(appDir, {
@@ -140,6 +142,11 @@ async function startPackagedNextServer() {
       ECHO_MIRAGE_POWERFIST_STATE_PATH: powerfistStatePath,
       ECHO_MIRAGE_POWERFIST_WS_HOST: '0.0.0.0',
       ECHO_MIRAGE_DESKTOP_SHELL: '1',
+      // Program Files install is read-only — keep Next state under userData.
+      ECHO_MIRAGE_TMP_DIR: runtimeTmpDir,
+      TMPDIR: runtimeTmpDir,
+      TEMP: runtimeTmpDir,
+      TMP: runtimeTmpDir,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,

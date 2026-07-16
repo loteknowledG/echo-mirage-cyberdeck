@@ -19,7 +19,7 @@ const CORS = {
 };
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { status: 204, headers: CORS });
+  return new NextResponse(null, { status: 204, headers: CORS });
 }
 
 type CommandRequestBody = {

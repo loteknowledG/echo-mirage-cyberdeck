@@ -117,7 +117,8 @@ const nextConfig = {
 		},
 	},
 	experimental: {
-		webpackMemoryOptimizations: true,
+		// Memory optimizations can hang long webpack compiles on some Windows/USB disks.
+		webpackMemoryOptimizations: process.env.ECHO_MIRAGE_ELECTRON_BUILD !== "1",
 	},
 	outputFileTracingIncludes: {
 		"/api/glyph/*": ["./assets/figlet-fonts/**"],
