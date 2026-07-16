@@ -102,6 +102,10 @@ type SatelliteApi = {
   checkPermissions: () => Promise<SatellitePermissionStatus>;
   openScreenRecordingSettings: () => Promise<void>;
   getDiagnostics: () => Promise<DiagnosticsReport>;
+  getRelaySecretStatus: () => Promise<{ ok: true; configured: boolean; preview: string }>;
+  saveRelaySecret: (
+    secret: string,
+  ) => Promise<{ ok: true; configured: boolean } | { ok: false; reason: string }>;
   checkForUpdates: () => Promise<UpdateCheckResult>;
   downloadAndInstallUpdate: (input: {
     downloadUrl: string;
@@ -129,6 +133,9 @@ const powerfistPinExpiryEl = document.querySelector<HTMLElement>("#powerfist-pin
 const regenerateCodesBtn = document.querySelector<HTMLButtonElement>("#regenerate-codes")!;
 const sendToMirageBtn = document.querySelector<HTMLButtonElement>("#send-to-mirage")!;
 const sendMirageResultEl = document.querySelector<HTMLElement>("#send-mirage-result")!;
+const relaySecretInput = document.querySelector<HTMLInputElement>("#relay-secret")!;
+const saveRelaySecretBtn = document.querySelector<HTMLButtonElement>("#save-relay-secret")!;
+const relaySecretStatusEl = document.querySelector<HTMLElement>("#relay-secret-status")!;
 const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
 const capturePreviewEl = document.querySelector<HTMLImageElement>("#capture-preview")!;
 const permissionResultEl = document.querySelector<HTMLElement>("#permission-result")!;
@@ -239,6 +246,13 @@ async function refreshSpyCodes(): Promise<void> {
   }
 }
 
+async function refreshRelaySecretStatus(): Promise<void> {
+  const status = await api.getRelaySecretStatus();
+  relaySecretStatusEl.textContent = status.configured
+    ? `Relay secret saved (${status.preview}) — cloud middlebox auth ready.`
+    : "Relay secret not set — paste SURVEY_RELAY_SECRET from cyberdeck .env.local, then Save.";
+}
+
 async function refreshPermissions(): Promise<void> {
   const perm = await api.checkPermissions();
   if (perm.screenRecording) {
@@ -335,6 +349,22 @@ regenerateCodesBtn.addEventListener("click", async () => {
   await refreshStatus();
 });
 
+saveRelaySecretBtn.addEventListener("click", async () => {
+  saveRelaySecretBtn.disabled = true;
+  relaySecretStatusEl.textContent = "Saving relay secret…";
+  const result = await api.saveRelaySecret(relaySecretInput.value);
+  if (result.ok) {
+    relaySecretInput.value = "";
+    await refreshRelaySecretStatus();
+    sendMirageResultEl.textContent = result.configured
+      ? "Relay secret saved — tap Send to Mirage, then retry SCREENSHOT on PWA."
+      : "Relay secret cleared.";
+  } else {
+    relaySecretStatusEl.textContent = "reason" in result ? result.reason : "Save failed.";
+  }
+  saveRelaySecretBtn.disabled = false;
+});
+
 sendToMirageBtn.addEventListener("click", async () => {
   sendToMirageBtn.disabled = true;
   sendMirageResultEl.textContent = "Preparing…";
@@ -416,6 +446,7 @@ api.onUpdateAvailable((result) => {
 
 void refreshPermissions();
 void refreshSpyCodes();
+void refreshRelaySecretStatus();
 void refreshStatus();
 void refreshDiagnostics();
 void refreshUpdateCheck();

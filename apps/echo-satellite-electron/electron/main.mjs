@@ -38,6 +38,12 @@ import {
 } from "./survey-relay-client.mjs";
 import { completeSurveyPairEnterByPin } from "./spy-echo-pairing.mjs";
 import { executeEchoSatelliteCommand } from "./echo-commands.mjs";
+import {
+  applySurveyRelayEnvFromDisk,
+  loadSurveyRelaySecret,
+  saveSurveyRelaySecret,
+  surveyRelaySecretConfigured,
+} from "./survey-relay-config.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -216,6 +222,12 @@ async function refreshSpyLinks() {
 
 async function initializeAfterReady() {
   logger.step(3, 8, "app ready — starting services");
+  await applySurveyRelayEnvFromDisk(app);
+  logger.log(
+    surveyRelaySecretConfigured()
+      ? "survey-relay secret loaded (env or userData/survey-relay.env)"
+      : "survey-relay secret missing — set it in Satellite UI or SURVEY_RELAY_SECRET env (required for Vercel middlebox)",
+  );
   initSpyEchoPairing(app);
 
   pairServer = startPairServer({
@@ -263,6 +275,21 @@ async function initializeAfterReady() {
 
 function registerIpc() {
   ipcMain.handle("satellite:get-status", () => statusSnapshot());
+
+  ipcMain.handle("satellite:get-relay-secret-status", async () => {
+    const secret = await loadSurveyRelaySecret(app);
+    return {
+      ok: true,
+      configured: Boolean(secret),
+      preview: secret ? `${secret.slice(0, 8)}…` : "",
+    };
+  });
+
+  ipcMain.handle("satellite:save-relay-secret", async (_event, secret) => {
+    const result = await saveSurveyRelaySecret(app, typeof secret === "string" ? secret : "");
+    void refreshSpyLinks();
+    return result;
+  });
 
   ipcMain.handle("satellite:get-spy-codes", async () => {
     const status = await getEchoSurveyPairingStatus();

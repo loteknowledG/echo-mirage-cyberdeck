@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld("satellite", {
   checkPermissions: () => ipcRenderer.invoke("satellite:check-permissions"),
   openScreenRecordingSettings: () => ipcRenderer.invoke("satellite:open-screen-settings"),
   getDiagnostics: () => ipcRenderer.invoke("satellite:get-diagnostics"),
+  getRelaySecretStatus: () => ipcRenderer.invoke("satellite:get-relay-secret-status"),
+  saveRelaySecret: (secret) => ipcRenderer.invoke("satellite:save-relay-secret", secret),
   onDisarm: (handler) => {
     const listener = () => handler();
     ipcRenderer.on("satellite:disarm", listener);

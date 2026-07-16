@@ -7,7 +7,8 @@ Minimal capture drone for the **Echo** screenshot machine — tray on Windows, s
 ### What's new in ${version}
 
 - **Screenshot over cloud relay** — HTTPS Mirage PWA can enqueue \`echo.screenshot\` via Next/Upstash middlebox; Satellite polls, captures locally, and returns JPEG (no Electron Mirage desktop required for capture)
-- **JPEG captures** — primary display encode at quality ~72 for smaller relay payloads under Upstash size limits
+- **JPEG captures** — primary display encode via node-screenshots for smaller relay payloads
+- **Relay secret in UI** — paste \`SURVEY_RELAY_SECRET\` (same as cyberdeck Vercel / \`.env.local\`) and Save; stored in Satellite userData
 - Set \`SURVEY_RELAY_SECRET\` to match the cyberdeck Vercel env when using authenticated relay
 - Earlier: remote screenshot over HTTP, Survey command API, echo-extension bridge, 6-digit pairing, Check for updates
 

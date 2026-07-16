@@ -36,6 +36,19 @@
           Mirage enters the <strong>Echo team ID</strong> and Mirage code in Survey → <strong>m</strong>
           (cloud relay — no IP needed). Use <strong>Send to Mirage</strong> to push codes to the relay.
         </p>
+        <label class="field">
+          <span>Cloud relay secret (same as cyberdeck <code>SURVEY_RELAY_SECRET</code>)</span>
+          <input
+            id="relay-secret"
+            type="password"
+            autocomplete="off"
+            placeholder="Paste SURVEY_RELAY_SECRET from .env.local"
+          />
+        </label>
+        <div class="actions">
+          <button id="save-relay-secret" type="button">Save relay secret</button>
+        </div>
+        <p id="relay-secret-status" class="mono muted"></p>
         <p id="echo-team-id" class="mono muted"></p>
         <p id="echo-lan" class="mono muted"></p>
         <div class="pin-grid">
