@@ -6,7 +6,12 @@ import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 
 const OPENCODE_ZEN_CHAT_URL = "https://opencode.ai/zen/v1/chat/completions";
 
-function resolveMuthurVisionModel(input?: SurveyAnalyzeInput): string {
+type MuthurVisionModelInput = {
+  model?: string;
+  gatewayProvider?: "opencode" | "openrouter" | "openai";
+};
+
+function resolveMuthurVisionModel(input?: MuthurVisionModelInput): string {
   const fromSaved = input?.model?.trim();
   if (fromSaved && input?.gatewayProvider === "opencode") {
     return fromSaved;
