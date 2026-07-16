@@ -170,6 +170,14 @@ declare global {
     ): () => void;
   }
 
+  interface EchoMirageProviderEnvBridge {
+    getStatus(): Promise<{
+      configured: Record<string, boolean>;
+      userDataPath: string;
+    }>;
+    write(vars: Record<string, string>): Promise<{ ok: boolean; path?: string }>;
+  }
+
   interface Window {
     echoMirageClipboard?: EchoMirageClipboardBridge;
     echoMirageBrowser?: EchoMirageBrowserBridge;
@@ -178,6 +186,7 @@ declare global {
     echoMirageMediaProtection?: EchoMirageMediaProtectionBridge;
     echoMirageSilentMode?: EchoMirageSilentModeBridge;
     echoMirageAppUpdate?: EchoMirageAppUpdateBridge;
+    echoMirageProviderEnv?: EchoMirageProviderEnvBridge;
   }
 }
 

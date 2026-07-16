@@ -26,6 +26,11 @@ const {
   startPackagedNextServer,
   stopPackagedNextServer,
 } = require('./packaged-server');
+const {
+  loadDesktopProviderEnv,
+  writeDesktopProviderEnv,
+  DESKTOP_PROVIDER_ENV_KEYS,
+} = require('./load-desktop-provider-env');
 const { initializeAutoUpdater } = require('./auto-updater');
 
 initializeSilentMode({ app, Tray, Menu, nativeImage });
@@ -1414,6 +1419,29 @@ app.whenReady().then(async () => {
   await initializeMediaProtection();
   await loadSilentModeState();
   registerSilentModeIpc(ipcMain);
+
+  ipcMain.handle('echo:provider-env:status', async () => {
+    const appDir = app.isPackaged
+      ? path.join(process.resourcesPath, 'app')
+      : path.resolve(__dirname, '..', '.next', 'standalone-electron');
+    const loaded = loadDesktopProviderEnv(appDir, {
+      userDataDir: app.getPath('userData'),
+      projectRoot: app.isPackaged ? undefined : path.resolve(__dirname, '..'),
+    });
+    return {
+      configured: Object.fromEntries(
+        DESKTOP_PROVIDER_ENV_KEYS.map((key) => [key, Boolean(loaded[key])]),
+      ),
+      userDataPath: path.join(app.getPath('userData'), 'desktop-provider.env'),
+    };
+  });
+
+  ipcMain.handle('echo:provider-env:write', async (_event, vars) => {
+    const payload = vars && typeof vars === 'object' ? vars : {};
+    const pathWritten = writeDesktopProviderEnv(app.getPath('userData'), payload);
+    return { ok: true, path: pathWritten };
+  });
+
   initializeAutoUpdater();
   if (getSilentMode()) {
     ensureTray();

@@ -87,9 +87,9 @@ export async function fetchSatelliteInstallInfo(): Promise<SatelliteInstallInfo 
 }
 
 const FALLBACK_WIN_DESKTOP_INSTALLER_URL =
-  "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/download/desktop-v0.1.9/Echo-Mirage-Cyberdeck-Setup-0.1.9.exe";
+  "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/download/desktop-v0.1.10/Echo-Mirage-Cyberdeck-Setup-0.1.10.exe";
 const FALLBACK_MAC_DESKTOP_INSTALLER_URL =
-  "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/download/desktop-v0.1.9/Echo-Mirage-Cyberdeck-0.1.9.dmg";
+  "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases/download/desktop-v0.1.10/Echo-Mirage-Cyberdeck-0.1.10.dmg";
 
 function fallbackDesktopInstallerUrl(platform: DesktopInstallPlatform): string | null {
   switch (platform) {

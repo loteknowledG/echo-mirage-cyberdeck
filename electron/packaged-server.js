@@ -25,6 +25,10 @@ function getStandaloneDir() {
   return path.resolve(__dirname, '..', '.next', 'standalone');
 }
 
+function getProjectRoot() {
+  return path.resolve(__dirname, '..');
+}
+
 function appendServerLog(text) {
   serverLogTail = `${serverLogTail}${text}`.slice(-8000);
   try {
@@ -109,7 +113,19 @@ async function startPackagedNextServer() {
   const { app } = require('electron');
   const powerfistStatePath = path.join(app.getPath('userData'), 'powerfist-ws.json');
 
-  const desktopProviderEnv = loadDesktopProviderEnv(appDir);
+  // Installer bundle rarely has secrets. Prefer userData override, then project .env.local in unpackaged runs.
+  const desktopProviderEnv = loadDesktopProviderEnv(appDir, {
+    userDataDir: app.getPath('userData'),
+    projectRoot: app.isPackaged ? undefined : getProjectRoot(),
+  });
+  const loadedKeys = Object.keys(desktopProviderEnv);
+  if (loadedKeys.length > 0) {
+    appendServerLog(`[echo-next] provider env loaded (${loadedKeys.join(', ')})\n`);
+  } else {
+    appendServerLog(
+      '[echo-next] provider env empty — set keys in Settings / MAINNET-UPLINK, or place desktop-provider.env in userData\n',
+    );
+  }
 
   serverProcess = spawn(process.execPath, [serverJs], {
     cwd: appDir,

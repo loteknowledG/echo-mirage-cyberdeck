@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  gatewayProviderToEnvKey,
+  persistDesktopProviderEnv,
+} from "@/lib/electron/desktop-provider-env.client";
+
 export type SurveyAnalyzeClientResult =
   | { ok: true; text: string; model: string; provider: string }
   | { ok: false; error: string };
@@ -58,6 +63,9 @@ export function saveSurveyGatewayCredentials(
   if (!trimmed) return;
   window.localStorage.setItem("active_provider", provider);
   window.localStorage.setItem(`key_${provider}`, trimmed);
+  void persistDesktopProviderEnv({
+    [gatewayProviderToEnvKey(provider)]: trimmed,
+  });
 }
 
 export function surveyImageDataUrlToBase64(imageDataUrl: string): string {

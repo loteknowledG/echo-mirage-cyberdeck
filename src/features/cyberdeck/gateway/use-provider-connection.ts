@@ -35,6 +35,10 @@ import {
   resolveOutboundProviderCredentials,
   resolveProviderConnectionLabel,
 } from "@/lib/provider-credentials";
+import {
+  gatewayProviderToEnvKey,
+  persistDesktopProviderEnv,
+} from "@/lib/electron/desktop-provider-env.client";
 import { playDeckSystemSound } from "@/features/cyberdeck/runtime/defer-deck-audio";
 
 export const CYBERDECK_PROVIDER_IDS = ["opencode", "openrouter", "openai"] as const;
@@ -298,6 +302,16 @@ export function useProviderConnection({
           ? cachedFromState
           : loadProviderModelsCache(provider);
 
+      // Never treat a stale model cache as "CONNECTED" when we have no key.
+      if (!outbound.apiKey && !defaultKeyAvailableByProvider[provider]) {
+        setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "idle" }));
+        setVerifiedProviders((prev) => ({ ...prev, [provider]: false }));
+        if (activeProvider === provider) {
+          setModelList(cached.length > 0 ? cached : []);
+        }
+        return;
+      }
+
       if (!force && cached.length > 0) {
         setModelCacheByProvider((prev) => ({ ...prev, [provider]: cached }));
         setModelFetchStatusByProvider((prev) => ({ ...prev, [provider]: "ready" }));
@@ -428,6 +442,7 @@ export function useProviderConnection({
     },
     [
       activeProvider,
+      defaultKeyAvailableByProvider,
       modelCacheByProvider,
       providerKeys,
       rateLimitedProviders,
@@ -520,12 +535,17 @@ export function useProviderConnection({
   const submitGatewayKey = useCallback(async () => {
     const trimmed = gatewayKeyDraft.trim();
     if (!trimmed) return;
-    const provider = credentialReplaceProvider ?? activeProvider;
+    const provider = (credentialReplaceProvider ?? activeProvider) as CyberdeckProviderId;
     setProviderKeys((prev) => ({ ...prev, [provider]: trimmed }));
     try {
       localStorage.setItem(`key_${provider}`, trimmed);
     } catch {
       /* ignore */
+    }
+    if ((CYBERDECK_PROVIDER_IDS as readonly string[]).includes(provider)) {
+      void persistDesktopProviderEnv({
+        [gatewayProviderToEnvKey(provider)]: trimmed,
+      });
     }
     setCredentialReplaceProvider(null);
     setGatewayKeyDraft("");

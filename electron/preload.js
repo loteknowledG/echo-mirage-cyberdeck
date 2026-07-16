@@ -60,6 +60,11 @@ contextBridge.exposeInMainWorld('echoMirageAppUpdate', {
   },
 });
 
+contextBridge.exposeInMainWorld('echoMirageProviderEnv', {
+  getStatus: () => ipcRenderer.invoke('echo:provider-env:status'),
+  write: (vars) => ipcRenderer.invoke('echo:provider-env:write', vars || {}),
+});
+
 contextBridge.exposeInMainWorld('echoMirageOpen', {
   pickConvertDocument: () => ipcRenderer.invoke('echo-mirage-open:pick-convert-document'),
   pickOperatorFolder: () => ipcRenderer.invoke('echo-mirage-open:pick-operator-folder'),
