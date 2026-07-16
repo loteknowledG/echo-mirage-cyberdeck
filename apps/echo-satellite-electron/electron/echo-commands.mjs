@@ -124,7 +124,7 @@ async function captureExtensionActiveTab() {
 async function executeScreenshot() {
   try {
     // JPEG keeps cloud-relay / Upstash payloads under request-size caps.
-    const capture = await capturePrimaryMonitorJpeg(72);
+    const capture = await capturePrimaryMonitorJpeg();
     return {
       ok: true,
       message: `Screenshot ${capture.width}×${capture.height} captured on Echo (JPEG ${Math.round(capture.bytes / 1024)} KB).`,

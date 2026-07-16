@@ -1,5 +1,4 @@
 import { Monitor } from "node-screenshots";
-import { nativeImage } from "electron";
 
 const CAPTURE_TIMEOUT_MS = 20_000;
 
@@ -29,9 +28,9 @@ export function withCaptureTimeout(promise, ms, message) {
 }
 
 /**
- * @returns {Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer, mimeType: string }>}
+ * @returns {Promise<import("node-screenshots").Image>}
  */
-export async function capturePrimaryMonitorPng() {
+async function capturePrimaryImage() {
   const monitors = Monitor.all();
   const primary = monitors.find((monitor) => monitor.isPrimary()) ?? monitors[0];
   if (!primary) {
@@ -44,16 +43,25 @@ export async function capturePrimaryMonitorPng() {
     "Capture timed out. On macOS, grant Screen Recording for Echo Satellite, then quit and reopen the app.",
   );
 
+  const { width, height } = readPixelSize(image);
+  if (!width || !height) {
+    throw new Error("Capture returned zero-size image — check Screen Recording permission.");
+  }
+
+  return image;
+}
+
+/**
+ * @returns {Promise<{ pngBase64: string, width: number, height: number, pngBuffer: Buffer, mimeType: string }>}
+ */
+export async function capturePrimaryMonitorPng() {
+  const image = await capturePrimaryImage();
   const png = image.toPngSync();
   if (!png?.length) {
     throw new Error("Capture returned an empty image.");
   }
 
   const { width, height } = readPixelSize(image);
-  if (!width || !height) {
-    throw new Error("Capture returned zero-size image — check Screen Recording permission.");
-  }
-
   const pngBuffer = Buffer.from(png);
   return {
     pngBase64: pngBuffer.toString("base64"),
@@ -66,22 +74,24 @@ export async function capturePrimaryMonitorPng() {
 
 /**
  * Primary-display capture as JPEG (smaller for cloud relay / Upstash).
+ * Uses node-screenshots (no Electron import — smoke tests run under plain Node).
  * `pngBase64` keeps the wire field name; payload is JPEG (`mimeType: image/jpeg`).
  *
- * @param {number} [quality=72] electron nativeImage JPEG quality 0–100
  * @returns {Promise<{ pngBase64: string, width: number, height: number, mimeType: string, bytes: number }>}
  */
-export async function capturePrimaryMonitorJpeg(quality = 72) {
-  const capture = await capturePrimaryMonitorPng();
-  const q = Math.min(100, Math.max(1, Number(quality) || 72));
-  const jpegBuffer = nativeImage.createFromBuffer(capture.pngBuffer).toJPEG(q);
-  if (!jpegBuffer?.length) {
+export async function capturePrimaryMonitorJpeg() {
+  const image = await capturePrimaryImage();
+  const jpeg = image.toJpegSync();
+  if (!jpeg?.length) {
     throw new Error("JPEG encode failed.");
   }
+
+  const { width, height } = readPixelSize(image);
+  const jpegBuffer = Buffer.from(jpeg);
   return {
     pngBase64: jpegBuffer.toString("base64"),
-    width: capture.width,
-    height: capture.height,
+    width,
+    height,
     mimeType: "image/jpeg",
     bytes: jpegBuffer.length,
   };
