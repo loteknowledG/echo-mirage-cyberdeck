@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isLocalhostRequest } from "@/lib/server/is-localhost-request.server";
 import { analyzeSurveyCapture } from "@/lib/server/survey-analyze.server";
+import { resolveServerProviderCredentials } from "@/lib/server/provider-credentials.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,17 +17,33 @@ type AnalyzeBody = {
   model?: string;
 };
 
+function hasRemoteAnalyzeCredentials(body: AnalyzeBody): boolean {
+  if (body.apiKey?.trim()) return true;
+  if (resolveServerProviderCredentials("openai", undefined).apiKey) return true;
+  if (resolveServerProviderCredentials("openrouter", undefined).apiKey) return true;
+  if (resolveServerProviderCredentials("opencode", undefined).apiKey) return true;
+  return false;
+}
+
 /** Survey Mirage — vision analyze for captured screenshots (Codex CLI or API key). */
 export async function POST(request: Request) {
-  if (!isLocalhostRequest(request)) {
-    return NextResponse.json({ ok: false, error: "Localhost only." }, { status: 403 });
-  }
-
   let body: AnalyzeBody;
   try {
     body = (await request.json()) as AnalyzeBody;
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON." }, { status: 400 });
+  }
+
+  // Localhost: Codex/Cursor CLIs OK. Hosted PWA: require a gateway key (client or server env).
+  if (!isLocalhostRequest(request) && !hasRemoteAnalyzeCredentials(body)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "ANALYZE needs a gateway key on the hosted PWA — save OpenAI / OpenRouter / OpenCode Zen under CAPTURE, then SOLVE again.",
+      },
+      { status: 403 },
+    );
   }
 
   const list = Array.isArray(body.pngBase64List)

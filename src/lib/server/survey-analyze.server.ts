@@ -64,12 +64,16 @@ function resolveVisionProvider(input: SurveyAnalyzeInput): SurveyVisionProvider 
   return "auto";
 }
 
-function listApiVisionFallbacks(): Array<"openai" | "openrouter"> {
+function listApiVisionFallbacks(input?: SurveyAnalyzeInput): Array<"openai" | "openrouter"> {
   const providers: Array<"openai" | "openrouter"> = [];
-  if (resolveServerProviderCredentials("openai", undefined).apiKey) {
+  const pref = input?.provider?.trim().toLowerCase();
+  // Only apply the client-supplied key to the provider it was saved for.
+  const openaiKey = pref === "openai" ? input?.apiKey : undefined;
+  const openrouterKey = pref === "openrouter" ? input?.apiKey : undefined;
+  if (resolveServerProviderCredentials("openai", openaiKey).apiKey) {
     providers.push("openai");
   }
-  if (resolveServerProviderCredentials("openrouter", undefined).apiKey) {
+  if (resolveServerProviderCredentials("openrouter", openrouterKey).apiKey) {
     providers.push("openrouter");
   }
   return providers;
@@ -269,7 +273,7 @@ async function runAutoCaptureChain(
     errors.push(`codex: ${result.error}`);
   }
 
-  for (const fallback of listApiVisionFallbacks()) {
+  for (const fallback of listApiVisionFallbacks(input)) {
     const result = await analyzeSurveyCaptureViaApi(input, fallback, pngList);
     if (result.ok) return result;
     errors.push(`${fallback}: ${result.error}`);
@@ -311,7 +315,7 @@ async function runAutoSelectionChain(
     errors.push(`codex: ${result.error}`);
   }
 
-  for (const fallback of listApiVisionFallbacks()) {
+  for (const fallback of listApiVisionFallbacks(input)) {
     const result = await analyzeSurveySelectionViaApi(input, fallback, prompt);
     if (result.ok) return result;
     errors.push(`${fallback}: ${result.error}`);

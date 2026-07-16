@@ -52,7 +52,7 @@ export function SurveyProviderSetup() {
   return (
     <div className="mb-3 rounded border border-amber-900/50 bg-amber-950/10 p-2">
       <p className="mb-2 text-[8px] leading-relaxed text-amber-200/80">
-        ANALYZE // PROVIDER KEY REQUIRED — saved locally in this desktop profile.
+        ANALYZE // PROVIDER KEY REQUIRED — saved in this browser for cloud SOLVE.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <select
