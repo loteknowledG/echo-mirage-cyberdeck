@@ -455,7 +455,7 @@ export async function runSurveyHubConnect(options?: {
         hubSpeak(`relay auto-found Echo · team ${echoNodeId.slice(0, 8)}…`, quiet);
       } else {
         const msg =
-          "No live Echo on the cloud relay — open Echo Satellite on the Mac (it auto-pushes).",
+          "No live Echo on the cloud relay — open Echo Satellite on the Mac (it auto-pushes).";
         hubSpeak(msg, quiet);
         return { ran: false, skipped: live.reason || msg, steps, echoNodeId: null };
       }

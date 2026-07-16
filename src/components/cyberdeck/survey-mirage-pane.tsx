@@ -9,7 +9,6 @@ import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-pa
 import {
   SURVEY_ECHO_DISPLAY,
   SURVEY_MIRAGE_DISPLAY,
-  SURVEY_MODE_TITLE,
 } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyEchoLinkWatch } from "@/lib/cyberdeck/survey-echo-link-watch";
 import { saveSurveyMiragePairCredentials } from "@/lib/cyberdeck/survey-pair-credentials.client";
@@ -70,17 +69,6 @@ export function SurveyMiragePane() {
     >
       <SurveyMirageQueueTeamHost role="mirage" />
 
-      <p className="text-fuchsia-300/90">
-        {SURVEY_MODE_TITLE} // {SURVEY_MIRAGE_DISPLAY}
-      </p>
-
-      {pwaBlocked ? (
-        <p className="text-[9px] leading-relaxed text-[#8a8a8a]">
-          Cloud relay — keep Echo Satellite open on the Mac. Screenshots go through the middlebox;
-          no desktop app and no team id to paste.
-        </p>
-      ) : null}
-
       {!mirageLinked && !terminated && !pwaBlocked ? (
         <SurveyPairPinForm
           role="mirage"
@@ -96,10 +84,6 @@ export function SurveyMiragePane() {
           LINKED // {SURVEY_ECHO_DISPLAY}
           {paired?.echoHost ? ` · ${paired.echoHost}:${paired.httpPort}` : null}
         </p>
-      ) : null}
-
-      {pwaBlocked ? (
-        <p className="text-[9px] text-emerald-300/80">RELAY // {SURVEY_ECHO_DISPLAY} · cloud middlebox</p>
       ) : null}
 
       <SurveyMirageCapturePreview />
