@@ -82,10 +82,13 @@ type RelayStore = {
 };
 
 function relayStatePath(): string {
-  return (
-    process.env.ECHO_MIRAGE_SURVEY_RELAY_STATE_PATH?.trim() ||
-    path.join(process.cwd(), ".tmp", "survey-cloud-relay.json")
-  );
+  const fromEnv = process.env.ECHO_MIRAGE_SURVEY_RELAY_STATE_PATH?.trim();
+  if (fromEnv) return fromEnv;
+  // Vercel serverless FS is read-only except /tmp — cwd/.tmp writes 500.
+  if (process.env.VERCEL) {
+    return path.join("/tmp", "echo-mirage-survey-cloud-relay.json");
+  }
+  return path.join(process.cwd(), ".tmp", "survey-cloud-relay.json");
 }
 
 function memoryStore(): RelayStore {
@@ -107,14 +110,19 @@ function memoryStore(): RelayStore {
   store.commandRequests ??= {};
   store.commandResults ??= {};
   store.commandIdsByEcho ??= {};
+  store.bundles ??= {};
+  store.requests ??= {};
+  store.results ??= {};
+  store.requestIdsByEcho ??= {};
   return store;
 }
 
 async function readFileStore(): Promise<RelayStore> {
+  const cached = memoryStore();
   try {
     const raw = await fs.readFile(relayStatePath(), "utf8");
     const parsed = JSON.parse(raw) as Partial<RelayStore>;
-    return {
+    const fromDisk: RelayStore = {
       bundles: parsed.bundles ?? {},
       requests: parsed.requests ?? {},
       results: parsed.results ?? {},
@@ -123,30 +131,55 @@ async function readFileStore(): Promise<RelayStore> {
       commandResults: parsed.commandResults ?? {},
       commandIdsByEcho: parsed.commandIdsByEcho ?? {},
     };
+    // Prefer disk as source of truth, keep memory in sync for same isolate.
+    const globalStore = globalThis as typeof globalThis & {
+      [REGISTRY_KEY]?: RelayStore;
+    };
+    globalStore[REGISTRY_KEY] = fromDisk;
+    return fromDisk;
   } catch {
-    return memoryStore();
+    return cached;
   }
 }
 
 async function writeFileStore(store: RelayStore): Promise<void> {
-  const filePath = relayStatePath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(store, null, 2), "utf8");
   const globalStore = globalThis as typeof globalThis & {
     [REGISTRY_KEY]?: RelayStore;
   };
+  // Always keep in-memory copy — required when disk is not durable/writable.
   globalStore[REGISTRY_KEY] = store;
+  try {
+    const filePath = relayStatePath();
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, JSON.stringify(store, null, 2), "utf8");
+  } catch {
+    // Ignore FS errors (e.g. rare Vercel edge cases); memory still holds the update.
+  }
 }
 
 function upstashConfigured(): boolean {
-  return Boolean(
-    process.env.UPSTASH_REDIS_REST_URL?.trim() && process.env.UPSTASH_REDIS_REST_TOKEN?.trim(),
+  return Boolean(upstashRestUrl() && upstashRestToken());
+}
+
+function upstashRestUrl(): string | null {
+  return (
+    process.env.UPSTASH_REDIS_REST_URL?.trim() ||
+    process.env.KV_REST_API_URL?.trim() ||
+    null
+  );
+}
+
+function upstashRestToken(): string | null {
+  return (
+    process.env.UPSTASH_REDIS_REST_TOKEN?.trim() ||
+    process.env.KV_REST_API_TOKEN?.trim() ||
+    null
   );
 }
 
 async function upstashCommand(command: (string | number)[]): Promise<unknown> {
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  const url = upstashRestUrl();
+  const token = upstashRestToken();
   if (!url || !token) {
     throw new Error("Upstash Redis is not configured.");
   }

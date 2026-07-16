@@ -31,37 +31,42 @@ type CommandRequestBody = {
 
 /** Mirage enqueues an Echo command via cloud/Go relay (no direct Echo HTTP). */
 export async function POST(request: Request) {
-  let body: CommandRequestBody;
   try {
-    body = (await request.json()) as CommandRequestBody;
-  } catch {
-    return NextResponse.json({ ok: false, reason: "Invalid JSON." }, { status: 400, headers: CORS });
-  }
+    let body: CommandRequestBody;
+    try {
+      body = (await request.json()) as CommandRequestBody;
+    } catch {
+      return NextResponse.json({ ok: false, reason: "Invalid JSON." }, { status: 400, headers: CORS });
+    }
 
-  const echoNodeId = body.echoNodeId?.trim();
-  const action = body.action?.trim();
-  if (!echoNodeId || !action) {
+    const echoNodeId = body.echoNodeId?.trim();
+    const action = body.action?.trim();
+    if (!echoNodeId || !action) {
+      return NextResponse.json(
+        { ok: false, reason: "echoNodeId and action are required." },
+        { status: 400, headers: CORS },
+      );
+    }
+
+    const commandRequest = await createSurveyRelayCommandRequest({
+      echoNodeId,
+      action,
+      tabId: body.tabId,
+      nodeId: body.nodeId,
+    });
+
     return NextResponse.json(
-      { ok: false, reason: "echoNodeId and action are required." },
-      { status: 400, headers: CORS },
+      {
+        ok: true,
+        requestId: commandRequest.requestId,
+        storage: surveyRelayStorageMode(),
+      },
+      { headers: CORS },
     );
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "Command request failed.";
+    return NextResponse.json({ ok: false, reason }, { status: 500, headers: CORS });
   }
-
-  const commandRequest = await createSurveyRelayCommandRequest({
-    echoNodeId,
-    action,
-    tabId: body.tabId,
-    nodeId: body.nodeId,
-  });
-
-  return NextResponse.json(
-    {
-      ok: true,
-      requestId: commandRequest.requestId,
-      storage: surveyRelayStorageMode(),
-    },
-    { headers: CORS },
-  );
 }
 
 /** Poll command result (Mirage) or list pending commands (Echo with auth). */
