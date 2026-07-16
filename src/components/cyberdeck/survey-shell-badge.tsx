@@ -26,9 +26,9 @@ function pairHint(shell: SurveyCyberdeckShellInfo): string {
     return "Direct Echo pair OK";
   }
   if (shell.kind === "pwa") {
-    return "Use cloud relay or desktop";
+    return "Cloud relay for Echo";
   }
-  return "Use cloud relay or desktop for remote Echo";
+  return "Cloud relay for remote Echo";
 }
 
 /** Shell indicator — stacks in the EMP rail on wide screens, inline at rail end on mobile. */
