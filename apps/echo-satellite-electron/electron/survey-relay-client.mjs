@@ -149,6 +149,11 @@ export async function pollSurveyRelayCommandRequests(echoNodeId, executeCommand)
     });
     const payload = await res.json();
     if (!res.ok || !payload.ok) {
+      if (res.status === 401) {
+        logger.log(
+          "survey-relay command poll unauthorized — set SURVEY_RELAY_SECRET in Satellite UI (must match cyberdeck Vercel)",
+        );
+      }
       return { ok: false, reason: payload.reason ?? `HTTP ${res.status}` };
     }
 
