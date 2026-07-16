@@ -32,10 +32,12 @@ import {
 import { buildMiragePairingBundle } from "./send-to-mirage.mjs";
 import { checkForSatelliteUpdate, downloadAndInstallSatelliteUpdate } from "./updater.mjs";
 import {
+  pollSurveyRelayCommandRequests,
   pollSurveyRelayPairRequests,
   pushSurveyRelayBundle,
 } from "./survey-relay-client.mjs";
 import { completeSurveyPairEnterByPin } from "./spy-echo-pairing.mjs";
+import { executeEchoSatelliteCommand } from "./echo-commands.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -199,6 +201,9 @@ async function refreshSpyLinks() {
     };
     void pushSurveyRelayBundle(cachedSpyStatus);
     void pollSurveyRelayPairRequests(cachedSpyStatus.echoNodeId, completeSurveyPairEnterByPin);
+    void pollSurveyRelayCommandRequests(cachedSpyStatus.echoNodeId, (action, extras) =>
+      executeEchoSatelliteCommand(action, { app, tabId: extras?.tabId }),
+    );
   } catch (error) {
     cachedSpyStatus = null;
     cachedSpyLinks = { reachable: false, mirages: [] };

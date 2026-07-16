@@ -6,6 +6,7 @@ import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-
 import { SurveyProviderSetup } from "@/components/cyberdeck/survey-provider-setup";
 import {
   resolveSurveyEchoDeckContext,
+  resolveSurveyRelayEchoNodeId,
   SURVEY_LAST_CAPTURE_EVENT,
   SURVEY_LAST_CAPTURE_STORAGE_KEY,
   takeSurveyScreenshot,
@@ -27,10 +28,7 @@ import { SURVEY_ECHO_DISPLAY } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyAnalyzeStatus } from "@/lib/cyberdeck/survey-analyze-status.client";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import { SURVEY_PAIR_PIN_DRAFT_EVENT } from "@/lib/cyberdeck/survey-pair-pin-draft";
-import {
-  isSurveyHttpsPairBlocked,
-  SURVEY_PWA_PAIR_BLOCKED_MESSAGE,
-} from "@/lib/cyberdeck/survey-pairing-shared.client";
+import { isSurveyHttpsPairBlocked } from "@/lib/cyberdeck/survey-pairing-shared.client";
 import {
   isEchoMirageDesktopShell,
   openDesktopCyberdeckApp,
@@ -125,10 +123,17 @@ export function SurveyMirageCapturePreview() {
     void endpointTick;
     return resolveSurveyEchoDeckContext(team.echoHost);
   }, [endpointTick, team.echoHost]);
-  const echoReady = Boolean(echoCtx.echoHost) && !pwaBlocked;
-  const echoTargetLabel = echoCtx.echoHost
-    ? `${echoCtx.echoHost}:${echoCtx.echoHttpPort}`
-    : null;
+  const relayEchoNodeId = useMemo(() => {
+    void endpointTick;
+    return resolveSurveyRelayEchoNodeId();
+  }, [endpointTick]);
+  const relayReady = pwaBlocked && Boolean(relayEchoNodeId);
+  const echoReady = (Boolean(echoCtx.echoHost) && !pwaBlocked) || relayReady;
+  const echoTargetLabel = relayReady
+    ? `relay · team ${relayEchoNodeId!.slice(0, 8)}…`
+    : echoCtx.echoHost
+      ? `${echoCtx.echoHost}:${echoCtx.echoHttpPort}`
+      : null;
 
   const handleScreenshot = useCallback(async () => {
     if (captureBusy || solving) return;
@@ -228,10 +233,11 @@ export function SurveyMirageCapturePreview() {
 
       <SurveyProviderSetup />
 
-      {pwaBlocked ? (
+      {pwaBlocked && !relayReady ? (
         <div className="mb-2 space-y-2">
           <p className="text-[8px] leading-relaxed text-amber-200/90">
-            {SURVEY_PWA_PAIR_BLOCKED_MESSAGE}
+            HTTPS PWA cannot call Echo over HTTP. Pair with Echo team ID so screenshots ride the
+            relay middlebox, or open the desktop cyberdeck for direct LAN/mesh.
           </p>
           {!isEchoMirageDesktopShell() ? (
             <CyberdeckActionButton
@@ -250,7 +256,9 @@ export function SurveyMirageCapturePreview() {
       ) : echoTargetLabel ? (
         <p className="mb-2 text-[8px] text-[#6a6a6a]">
           {SURVEY_ECHO_DISPLAY} · {echoTargetLabel}
-          {" — "}press + PAGE for each extra screen, then SOLVE.
+          {relayReady
+            ? " — screenshot via relay middlebox (Echo still captures)."
+            : " — press + PAGE for each extra screen, then SOLVE."}
         </p>
       ) : null}
 

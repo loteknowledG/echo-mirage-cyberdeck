@@ -47,11 +47,38 @@ export type SurveyRelayPairResult = {
   completedAt: string;
 };
 
+/** Async Echo command over cloud relay (screenshot, clipboard, etc.). */
+export type SurveyRelayCommandRequest = {
+  requestId: string;
+  echoNodeId: string;
+  action: string;
+  tabId?: number;
+  nodeId?: string;
+  createdAt: string;
+  status: "pending" | "complete" | "failed";
+};
+
+export type SurveyRelayCommandResult = {
+  requestId: string;
+  ok: boolean;
+  action?: string;
+  message?: string;
+  reason?: string;
+  pngBase64?: string;
+  clipboard?: { text?: string; hasImage?: boolean; formats?: string[] };
+  width?: number;
+  height?: number;
+  completedAt: string;
+};
+
 type RelayStore = {
   bundles: Record<string, SurveyRelayBundle>;
   requests: Record<string, SurveyRelayPairRequest>;
   results: Record<string, SurveyRelayPairResult>;
   requestIdsByEcho: Record<string, string[]>;
+  commandRequests: Record<string, SurveyRelayCommandRequest>;
+  commandResults: Record<string, SurveyRelayCommandResult>;
+  commandIdsByEcho: Record<string, string[]>;
 };
 
 function relayStatePath(): string {
@@ -71,9 +98,16 @@ function memoryStore(): RelayStore {
       requests: {},
       results: {},
       requestIdsByEcho: {},
+      commandRequests: {},
+      commandResults: {},
+      commandIdsByEcho: {},
     };
   }
-  return globalStore[REGISTRY_KEY];
+  const store = globalStore[REGISTRY_KEY];
+  store.commandRequests ??= {};
+  store.commandResults ??= {};
+  store.commandIdsByEcho ??= {};
+  return store;
 }
 
 async function readFileStore(): Promise<RelayStore> {
@@ -85,6 +119,9 @@ async function readFileStore(): Promise<RelayStore> {
       requests: parsed.requests ?? {},
       results: parsed.results ?? {},
       requestIdsByEcho: parsed.requestIdsByEcho ?? {},
+      commandRequests: parsed.commandRequests ?? {},
+      commandResults: parsed.commandResults ?? {},
+      commandIdsByEcho: parsed.commandIdsByEcho ?? {},
     };
   } catch {
     return memoryStore();
@@ -158,6 +195,18 @@ function pendingListKey(echoNodeId: string): string {
   return `survey:relay:pending:${echoNodeId}`;
 }
 
+function commandRequestKey(requestId: string): string {
+  return `survey:relay:command-request:${requestId}`;
+}
+
+function commandResultKey(requestId: string): string {
+  return `survey:relay:command-result:${requestId}`;
+}
+
+function commandPendingListKey(echoNodeId: string): string {
+  return `survey:relay:command-pending:${echoNodeId}`;
+}
+
 function pruneStore(store: RelayStore): void {
   const now = Date.now();
   for (const [id, bundle] of Object.entries(store.bundles)) {
@@ -167,6 +216,12 @@ function pruneStore(store: RelayStore): void {
     if (request.status !== "pending") continue;
     if (Date.parse(request.createdAt) + REQUEST_TTL_SEC * 1000 <= now) {
       delete store.requests[id];
+    }
+  }
+  for (const [id, request] of Object.entries(store.commandRequests)) {
+    if (request.status !== "pending") continue;
+    if (Date.parse(request.createdAt) + REQUEST_TTL_SEC * 1000 <= now) {
+      delete store.commandRequests[id];
     }
   }
 }
@@ -367,4 +422,130 @@ export async function loadSurveyRelayPairRequest(
 
   const store = await readFileStore();
   return store.requests[id] ?? null;
+}
+
+export async function createSurveyRelayCommandRequest(input: {
+  echoNodeId: string;
+  action: string;
+  tabId?: number;
+  nodeId?: string;
+}): Promise<SurveyRelayCommandRequest> {
+  const requestId = crypto.randomUUID();
+  const request: SurveyRelayCommandRequest = {
+    requestId,
+    echoNodeId: input.echoNodeId.trim(),
+    action: input.action.trim(),
+    tabId: Number.isFinite(input.tabId) ? input.tabId : undefined,
+    nodeId: input.nodeId?.trim() || undefined,
+    createdAt: new Date().toISOString(),
+    status: "pending",
+  };
+
+  if (upstashConfigured()) {
+    await upstashSetJson(commandRequestKey(requestId), request, REQUEST_TTL_SEC);
+    const list =
+      (await upstashGetJson<string[]>(commandPendingListKey(request.echoNodeId))) ?? [];
+    if (!list.includes(requestId)) {
+      list.push(requestId);
+    }
+    await upstashSetJson(commandPendingListKey(request.echoNodeId), list, REQUEST_TTL_SEC);
+    return request;
+  }
+
+  const store = await readFileStore();
+  pruneStore(store);
+  store.commandRequests[requestId] = request;
+  const ids = store.commandIdsByEcho[request.echoNodeId] ?? [];
+  if (!ids.includes(requestId)) ids.push(requestId);
+  store.commandIdsByEcho[request.echoNodeId] = ids;
+  await writeFileStore(store);
+  return request;
+}
+
+export async function listPendingSurveyRelayCommandRequests(
+  echoNodeId: string,
+): Promise<SurveyRelayCommandRequest[]> {
+  const id = echoNodeId.trim();
+  if (!id) return [];
+
+  if (upstashConfigured()) {
+    const list = (await upstashGetJson<string[]>(commandPendingListKey(id))) ?? [];
+    const requests: SurveyRelayCommandRequest[] = [];
+    for (const requestId of list) {
+      const request = await upstashGetJson<SurveyRelayCommandRequest>(
+        commandRequestKey(requestId),
+      );
+      if (!request || request.status !== "pending") continue;
+      requests.push(request);
+    }
+    return requests;
+  }
+
+  const store = await readFileStore();
+  pruneStore(store);
+  const ids = store.commandIdsByEcho[id] ?? [];
+  return ids
+    .map((requestId) => store.commandRequests[requestId])
+    .filter((request): request is SurveyRelayCommandRequest =>
+      Boolean(request && request.status === "pending"),
+    );
+}
+
+export async function saveSurveyRelayCommandResult(
+  result: SurveyRelayCommandResult,
+  echoNodeId: string,
+): Promise<void> {
+  if (upstashConfigured()) {
+    await upstashSetJson(commandResultKey(result.requestId), result, RESULT_TTL_SEC);
+    const request = await upstashGetJson<SurveyRelayCommandRequest>(
+      commandRequestKey(result.requestId),
+    );
+    if (request) {
+      request.status = result.ok ? "complete" : "failed";
+      await upstashSetJson(commandRequestKey(result.requestId), request, REQUEST_TTL_SEC);
+    }
+    const list = (await upstashGetJson<string[]>(commandPendingListKey(echoNodeId))) ?? [];
+    const next = list.filter((id) => id !== result.requestId);
+    await upstashSetJson(commandPendingListKey(echoNodeId), next, REQUEST_TTL_SEC);
+    return;
+  }
+
+  const store = await readFileStore();
+  pruneStore(store);
+  store.commandResults[result.requestId] = result;
+  const request = store.commandRequests[result.requestId];
+  if (request) {
+    request.status = result.ok ? "complete" : "failed";
+  }
+  const ids = store.commandIdsByEcho[echoNodeId] ?? [];
+  store.commandIdsByEcho[echoNodeId] = ids.filter((entry) => entry !== result.requestId);
+  await writeFileStore(store);
+}
+
+export async function loadSurveyRelayCommandResult(
+  requestId: string,
+): Promise<SurveyRelayCommandResult | null> {
+  const id = requestId.trim();
+  if (!id) return null;
+
+  if (upstashConfigured()) {
+    return upstashGetJson<SurveyRelayCommandResult>(commandResultKey(id));
+  }
+
+  const store = await readFileStore();
+  return store.commandResults[id] ?? null;
+}
+
+export async function loadSurveyRelayCommandRequest(
+  requestId: string,
+): Promise<SurveyRelayCommandRequest | null> {
+  const id = requestId.trim();
+  if (!id) return null;
+
+  if (upstashConfigured()) {
+    return upstashGetJson<SurveyRelayCommandRequest>(commandRequestKey(id));
+  }
+
+  const store = await readFileStore();
+  return store.commandRequests[id] ?? null;
 }

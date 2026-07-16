@@ -27,10 +27,7 @@ import {
   readSurveyMiragePairCredentials,
   readSurveyPowerfistPairCredentials,
 } from "@/lib/cyberdeck/survey-pairing-client";
-import {
-  isSurveyHttpsPairBlocked,
-  SURVEY_PWA_PAIR_BLOCKED_MESSAGE,
-} from "@/lib/cyberdeck/survey-pairing-shared.client";
+import { isSurveyHttpsPairBlocked } from "@/lib/cyberdeck/survey-pairing-shared.client";
 import { readSurveyPairPinDraft } from "@/lib/cyberdeck/survey-pair-pin-draft";
 import {
   DEFAULT_ECHO_HTTP_PORT,
@@ -38,6 +35,8 @@ import {
   isTailscaleCgNatHost,
   preferMeshEchoHost,
 } from "@/lib/cyberdeck/survey-pair-pin";
+import { resolveSurveyHubTeamId } from "@/lib/cyberdeck/survey-hub-store.client";
+import { sendSurveyEchoCommandViaRelay } from "@/lib/cyberdeck/survey-relay.client";
 import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
 
 export const SURVEY_LAST_CAPTURE_STORAGE_KEY = "echo-mirage-survey-last-capture-v1";
@@ -104,6 +103,27 @@ export function resolveSurveyEchoDeckContext(
   }
 
   return { echoHost, echoHttpPort };
+}
+
+/** Echo team ID for HTTPS middlebox commands when direct Echo HTTP is blocked. */
+export function resolveSurveyRelayEchoNodeId(preferred?: string | null): string | null {
+  const direct = preferred?.trim();
+  if (direct) return direct;
+
+  const fromCreds =
+    readSurveyMiragePairCredentials()?.echoNodeId?.trim() ||
+    readSurveyPowerfistPairCredentials()?.echoNodeId?.trim() ||
+    null;
+  if (fromCreds) return fromCreds;
+
+  const fromHub = resolveSurveyHubTeamId();
+  if (fromHub) return fromHub;
+
+  const mirageDraft = readSurveyPairPinDraft("mirage");
+  const powerfistDraft = readSurveyPairPinDraft("powerfist");
+  const fromDraft =
+    mirageDraft?.echoNodeId?.trim() || powerfistDraft?.echoNodeId?.trim() || null;
+  return fromDraft || null;
 }
 
 function logDeck(line: string): void {
@@ -204,13 +224,74 @@ export async function solveSurveyClipboard(
   return executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.SOLVE_CLIPBOARD, ctx);
 }
 
+function applyEchoCommandSideEffects(
+  action: string,
+  payload: {
+    pngBase64?: string;
+    clipboard?: { text?: string; hasImage?: boolean; formats?: string[] };
+  },
+  options?: { ingestClipboard?: boolean },
+): { clipboardText?: string } {
+  if (action === SURVEY_ECHO_COMMAND.SCREENSHOT && payload.pngBase64) {
+    storeLastCapture(payload.pngBase64);
+  }
+  const clipText = payload.clipboard?.text?.trim();
+  const shouldIngest =
+    options?.ingestClipboard !== false && action === SURVEY_ECHO_COMMAND.COPY_SELECTED;
+  if (shouldIngest && (payload.pngBase64 || clipText)) {
+    if (clipText) {
+      storeLastSurveySelection(clipText);
+    }
+    ingestMirageQueueItem({
+      title: "Echo selection",
+      prompt: clipText || SURVEY_SILENT_CAPTURE_PROMPT,
+      imageDataUrl: payload.pngBase64
+        ? `data:image/png;base64,${payload.pngBase64}`
+        : undefined,
+      source: "clipboard",
+    });
+  }
+  return { clipboardText: clipText };
+}
+
+async function sendEchoRemoteCommandViaRelay(
+  action: string,
+  options?: { ingestClipboard?: boolean },
+): Promise<SurveyDeckCommandResult> {
+  const echoNodeId = resolveSurveyRelayEchoNodeId();
+  if (!echoNodeId) {
+    return {
+      ok: false,
+      message:
+        "HTTPS PWA cannot call Echo over HTTP — enter Echo team ID (pair / Survey Hub), keep Echo Satellite online, then retry via relay middlebox.",
+    };
+  }
+
+  const payload = await sendSurveyEchoCommandViaRelay({ echoNodeId, action });
+  if (!payload.ok) {
+    return {
+      ok: false,
+      message: payload.reason ?? "Relay command failed.",
+    };
+  }
+
+  const side = applyEchoCommandSideEffects(action, payload, options);
+  return {
+    ok: true,
+    message: payload.message ?? `${action} OK via relay`,
+    pngBase64: payload.pngBase64,
+    clipboardText: side.clipboardText,
+  };
+}
+
 async function sendEchoRemoteCommand(
   action: string,
   ctx: SurveyDeckCommandContext,
   options?: { ingestClipboard?: boolean },
 ): Promise<SurveyDeckCommandResult> {
+  // Hosted HTTPS PWA cannot hit Echo :3050 directly — use Go/Next relay as middlebox.
   if (isSurveyHttpsPairBlocked()) {
-    return { ok: false, message: SURVEY_PWA_PAIR_BLOCKED_MESSAGE };
+    return sendEchoRemoteCommandViaRelay(action, options);
   }
 
   const host = ctx.echoHost?.trim();
@@ -249,31 +330,12 @@ async function sendEchoRemoteCommand(
       };
     }
 
-    if (action === SURVEY_ECHO_COMMAND.SCREENSHOT && payload.pngBase64) {
-      storeLastCapture(payload.pngBase64);
-    }
-    const clipText = payload.clipboard?.text?.trim();
-    const shouldIngest =
-      options?.ingestClipboard !== false && action === SURVEY_ECHO_COMMAND.COPY_SELECTED;
-    if (shouldIngest && (payload.pngBase64 || clipText)) {
-      if (clipText) {
-        storeLastSurveySelection(clipText);
-      }
-      ingestMirageQueueItem({
-        title: "Echo selection",
-        prompt: clipText || SURVEY_SILENT_CAPTURE_PROMPT,
-        imageDataUrl: payload.pngBase64
-          ? `data:image/png;base64,${payload.pngBase64}`
-          : undefined,
-        source: "clipboard",
-      });
-    }
-
+    const side = applyEchoCommandSideEffects(action, payload, options);
     return {
       ok: true,
       message: payload.message ?? `${action} OK`,
       pngBase64: payload.pngBase64,
-      clipboardText: clipText,
+      clipboardText: side.clipboardText,
     };
   } catch (err) {
     return {

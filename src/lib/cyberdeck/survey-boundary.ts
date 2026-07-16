@@ -48,7 +48,7 @@
  * | Transport | When | Primary modules | Never import from |
  * |-----------|------|-----------------|-------------------|
  * | A Direct LAN/localhost HTTP | Desktop cyberdeck, Echo reachable | survey-pair-enter.client, survey-echo-status.client | cyberdeck-app core |
- * | B Cloud relay | isSurveyHttpsPairBlocked() or Hub LAN fallback | survey-relay.client, survey-cloud-relay.server | cyberdeck-app core |
+ * | B Cloud relay | isSurveyHttpsPairBlocked() or Hub LAN fallback | survey-relay.client, survey-cloud-relay.server, /api/survey/relay/command-request | cyberdeck-app core |
  * | C Mirage hub WS | powerfist-hub step after Echo links | survey-hub-socket.ts | cyberdeck-app core |
  * | D Team socket (aux) | Deprecated legacy pairing hints | survey-team-socket.client.ts | cyberdeck-app core |
  *

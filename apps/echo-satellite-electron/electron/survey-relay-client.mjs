@@ -128,3 +128,74 @@ export async function pollSurveyRelayPairRequests(echoNodeId, completePair) {
     return { ok: false, reason };
   }
 }
+
+/**
+ * Poll pending Mirage commands from the HTTPS middlebox, run them locally on Echo,
+ * then PUT results (including screenshot PNG) back through the relay.
+ *
+ * @param {string} echoNodeId
+ * @param {(action: string, extras?: { tabId?: number }) => Promise<object>} executeCommand
+ */
+export async function pollSurveyRelayCommandRequests(echoNodeId, executeCommand) {
+  const id = echoNodeId?.trim();
+  if (!id) return { ok: false, reason: "echoNodeId required" };
+
+  const url = `${relayBaseUrl()}/api/survey/relay/command-request?echoNodeId=${encodeURIComponent(id)}`;
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: relayHeaders(),
+      signal: AbortSignal.timeout(12_000),
+    });
+    const payload = await res.json();
+    if (!res.ok || !payload.ok) {
+      return { ok: false, reason: payload.reason ?? `HTTP ${res.status}` };
+    }
+
+    const pending = Array.isArray(payload.pending) ? payload.pending : [];
+    let completed = 0;
+    for (const request of pending) {
+      const action = typeof request.action === "string" ? request.action : "";
+      let result;
+      try {
+        result = await executeCommand(action, {
+          tabId: Number.isFinite(request.tabId) ? request.tabId : undefined,
+        });
+      } catch (error) {
+        result = {
+          ok: false,
+          reason: error instanceof Error ? error.message : String(error),
+        };
+      }
+
+      const responseUrl = `${relayBaseUrl()}/api/survey/relay/command-request`;
+      await fetch(responseUrl, {
+        method: "PUT",
+        headers: relayHeaders(),
+        body: JSON.stringify({
+          requestId: request.requestId,
+          echoNodeId: id,
+          ok: result?.ok === true,
+          action,
+          message: result?.message,
+          reason: result?.reason,
+          pngBase64: result?.pngBase64,
+          clipboard: result?.clipboard,
+          width: result?.width,
+          height: result?.height,
+        }),
+        // Screenshots can be multi-MB base64 — allow a longer PUT.
+        signal: AbortSignal.timeout(90_000),
+      });
+      completed += 1;
+      logger.log(
+        `survey-relay command ${request.requestId.slice(0, 8)}… · ${action} → ${result?.ok ? "ok" : result?.reason ?? "fail"}`,
+      );
+    }
+
+    return { ok: true, completed };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { ok: false, reason };
+  }
+}
