@@ -99,6 +99,7 @@ export type SurveyAnalyzeInput = {
   selectionText?: string;
   prompt?: string;
   provider?: string;
+  gatewayProvider?: "opencode" | "openrouter" | "openai";
   apiKey?: string;
   model?: string;
 };
@@ -293,6 +294,7 @@ async function runAutoCaptureChain(
     prompt,
     apiKey: input.apiKey,
     model: input.model,
+    gatewayProvider: input.gatewayProvider,
   });
   if (muthurResult.ok) return muthurResult;
   errors.push(`muthur: ${muthurResult.error}`);
@@ -329,6 +331,7 @@ async function runAutoSelectionChain(
     prompt,
     apiKey: input.apiKey,
     model: input.model,
+    gatewayProvider: input.gatewayProvider,
   });
   if (muthurResult.ok) return muthurResult;
   errors.push(`muthur: ${muthurResult.error}`);
@@ -361,6 +364,7 @@ async function analyzeSurveySelection(
         prompt,
         apiKey: input.apiKey,
         model: input.model,
+        gatewayProvider: input.gatewayProvider,
       });
     case "openai":
     case "openrouter":
@@ -411,6 +415,7 @@ export async function analyzeSurveyCapture(input: SurveyAnalyzeInput): Promise<S
         prompt,
         apiKey: input.apiKey,
         model: input.model,
+        gatewayProvider: input.gatewayProvider,
       });
     case "openai":
     case "openrouter":

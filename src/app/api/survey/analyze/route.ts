@@ -13,6 +13,7 @@ type AnalyzeBody = {
   selectionText?: string;
   prompt?: string;
   provider?: string;
+  gatewayProvider?: "opencode" | "openrouter" | "openai";
   apiKey?: string;
   model?: string;
 };
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
     selectionText: body.selectionText,
     prompt: body.prompt,
     provider: body.provider,
+    gatewayProvider: body.gatewayProvider,
     apiKey: body.apiKey,
     model: body.model,
   });

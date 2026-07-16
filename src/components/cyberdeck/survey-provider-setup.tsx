@@ -9,13 +9,13 @@ import {
 } from "@/lib/cyberdeck/survey-analyze.client";
 
 const PROVIDER_LABELS: Record<SurveyGatewayProvider, string> = {
-  opencode: "OPENCODE ZEN",
-  openrouter: "OPENROUTER",
-  openai: "OPENAI",
+  opencode: "OPENCODE ZEN (text chat)",
+  openrouter: "OPENROUTER (screenshots)",
+  openai: "OPENAI (screenshots)",
 };
 
 export function SurveyProviderSetup() {
-  const [provider, setProvider] = useState<SurveyGatewayProvider>("opencode");
+  const [provider, setProvider] = useState<SurveyGatewayProvider>("openrouter");
   const [apiKey, setApiKey] = useState("");
   const [configured, setConfigured] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -52,7 +52,8 @@ export function SurveyProviderSetup() {
   return (
     <div className="mb-3 rounded border border-amber-900/50 bg-amber-950/10 p-2">
       <p className="mb-2 text-[8px] leading-relaxed text-amber-200/80">
-        ANALYZE // PROVIDER KEY REQUIRED — saved in this browser for cloud SOLVE.
+        SOLVE needs a vision model — OpenRouter or OpenAI keys read screenshots. OpenCode Zen is for
+        text chat only on the hosted PWA.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <select

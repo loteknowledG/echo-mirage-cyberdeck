@@ -141,9 +141,8 @@ export function SurveyMirageExtCapturePanel() {
         echo-extension · tab text capture
       </p>
       <p className="mb-3 text-[8px] leading-relaxed text-[#5f8f74]">
-        Focus the page you want in capture Chrome (extension loaded), then Capture active tab.
-        Text is staged into Solutions — press SOLVE PAGE TEXT for the answer. Mirage must be local
-        HTTP (not Vercel).
+        Optional — capture page text from Chrome on the Echo Mac (extension + local Mirage or
+        desktop cyberdeck). Relay screenshots above work from this Vercel PWA without the extension.
         {echoHostHint ? ` Echo · ${echoHostHint}` : ""}
       </p>
 

@@ -12,21 +12,31 @@ export type SurveyAnalyzeClientResult =
 export type SurveyGatewayProvider = "opencode" | "openrouter" | "openai";
 
 type SurveyClientCredentials = {
+  gatewayProvider: SurveyGatewayProvider;
   provider: "muthur" | "openrouter" | "openai";
   apiKey: string;
   model?: string;
 };
 
 const SURVEY_GATEWAY_PROVIDERS: SurveyGatewayProvider[] = [
-  "opencode",
   "openrouter",
   "openai",
+  "opencode",
 ];
 
 function toSurveyProvider(
   provider: SurveyGatewayProvider,
 ): SurveyClientCredentials["provider"] {
   return provider === "opencode" ? "muthur" : provider;
+}
+
+/** Map saved gateway key → vision analyze provider (OpenCode uses MUTHUR lane). */
+export function resolveSurveyAnalyzeProvider(
+  creds: SurveyClientCredentials | null,
+  fallback = "auto",
+): string {
+  if (!creds) return fallback;
+  return creds.provider;
 }
 
 export function readSurveyGatewayCredentials(): SurveyClientCredentials | null {
@@ -48,7 +58,12 @@ export function readSurveyGatewayCredentials(): SurveyClientCredentials | null {
     if (!apiKey) continue;
     const model =
       window.localStorage.getItem(`ascii_model_${provider}`)?.trim() || undefined;
-    return { provider: toSurveyProvider(provider), apiKey, model };
+    return {
+      gatewayProvider: provider,
+      provider: toSurveyProvider(provider),
+      apiKey,
+      model,
+    };
   }
 
   return null;
@@ -122,7 +137,8 @@ async function analyzeSurveyRequestClient(input: {
       pngBase64List: input.pngBase64List,
       selectionText: input.selectionText,
       prompt: input.prompt,
-      provider: savedCredentials?.provider ?? input.provider ?? "auto",
+      provider: resolveSurveyAnalyzeProvider(savedCredentials, input.provider ?? "auto"),
+      gatewayProvider: savedCredentials?.gatewayProvider,
       apiKey: savedCredentials?.apiKey,
       model: savedCredentials?.model,
     }),

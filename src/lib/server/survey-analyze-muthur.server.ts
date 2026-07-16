@@ -6,13 +6,32 @@ import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 
 const OPENCODE_ZEN_CHAT_URL = "https://opencode.ai/zen/v1/chat/completions";
 
-function resolveMuthurVisionModel(): string {
+function resolveMuthurVisionModel(input?: SurveyAnalyzeInput): string {
+  const fromSaved = input?.model?.trim();
+  if (fromSaved && input?.gatewayProvider === "opencode") {
+    return fromSaved;
+  }
   return (
     process.env.SURVEY_MUTHUR_MODEL?.trim() ||
-    process.env.OPENCODE_MODEL?.trim() ||
     process.env.SURVEY_VISION_MODEL?.trim() ||
-    "trinity-large-preview-free"
+    process.env.OPENCODE_VISION_MODEL?.trim() ||
+  // OpenCode Zen chat default (trinity-*) is text-only — use a vision model for screenshots.
+    "gpt-4o-mini"
   );
+}
+
+function formatMuthurSurveyError(detail: string, status: number): string {
+  const trimmed = detail.trim();
+  if (
+    trimmed.includes("Upstream request failed") ||
+    trimmed.includes("provider (Console)")
+  ) {
+    return (
+      "OpenCode Zen could not read this screenshot (text-only model or upstream error). " +
+      "Under CAPTURE → replace key with OpenRouter or OpenAI, pick that provider, save, then SOLVE again."
+    );
+  }
+  return trimmed || `MUTHUR (OpenCode Zen) failed (${status}).`;
 }
 
 export function isMuthurSurveyFallbackConfigured(): boolean {
@@ -52,7 +71,7 @@ async function postOpenCodeChat(input: {
       }
       return {
         ok: false,
-        error: detail || `MUTHUR (OpenCode Zen) failed (${res.status}).`,
+        error: formatMuthurSurveyError(detail, res.status),
       };
     }
 
@@ -97,6 +116,7 @@ export async function analyzeSurveyCaptureViaMuthur(input: {
   prompt: string;
   apiKey?: string;
   model?: string;
+  gatewayProvider?: "opencode" | "openrouter" | "openai";
 }): Promise<SurveyAnalyzeResult> {
   const { apiKey } = resolveServerProviderCredentials("opencode", input.apiKey);
   if (!apiKey) {
@@ -123,7 +143,7 @@ export async function analyzeSurveyCaptureViaMuthur(input: {
     return { ok: false, error: "prompt is required." };
   }
 
-  const model = input.model?.trim() || resolveMuthurVisionModel();
+  const model = resolveMuthurVisionModel(input);
   const content: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
   for (const [index, png] of list.entries()) {
     content.push({ type: "text", text: `--- Page ${index + 1} of ${list.length} ---` });
@@ -151,6 +171,7 @@ export async function analyzeSurveyTextViaMuthur(input: {
   prompt: string;
   apiKey?: string;
   model?: string;
+  gatewayProvider?: "opencode" | "openrouter" | "openai";
 }): Promise<SurveyAnalyzeResult> {
   const { apiKey } = resolveServerProviderCredentials("opencode", input.apiKey);
   if (!apiKey) {
@@ -165,7 +186,7 @@ export async function analyzeSurveyTextViaMuthur(input: {
     return { ok: false, error: "prompt is required." };
   }
 
-  const model = input.model?.trim() || resolveMuthurVisionModel();
+  const model = resolveMuthurVisionModel(input);
   return postOpenCodeChat({
     model,
     apiKey,
