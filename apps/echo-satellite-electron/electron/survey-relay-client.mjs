@@ -138,7 +138,7 @@ export async function pollSurveyRelayPairRequests(echoNodeId, completePair) {
  * then PUT results (including screenshot PNG) back through the relay.
  *
  * @param {string} echoNodeId
- * @param {(action: string, extras?: { tabId?: number }) => Promise<object>} executeCommand
+ * @param {(action: string, extras?: { tabId?: number, payload?: object }) => Promise<object>} executeCommand
  */
 export async function pollSurveyRelayCommandRequests(echoNodeId, executeCommand) {
   const id = echoNodeId?.trim();
@@ -169,6 +169,7 @@ export async function pollSurveyRelayCommandRequests(echoNodeId, executeCommand)
       try {
         result = await executeCommand(action, {
           tabId: Number.isFinite(request.tabId) ? request.tabId : undefined,
+          payload: request.payload && typeof request.payload === "object" ? request.payload : undefined,
         });
       } catch (error) {
         result = {
@@ -188,6 +189,9 @@ export async function pollSurveyRelayCommandRequests(echoNodeId, executeCommand)
           action,
           message: result?.message,
           reason: result?.reason,
+          answerText: result?.answerText,
+          provider: result?.provider,
+          model: result?.model,
           pngBase64: result?.pngBase64,
           mimeType: result?.mimeType,
           clipboard: result?.clipboard,

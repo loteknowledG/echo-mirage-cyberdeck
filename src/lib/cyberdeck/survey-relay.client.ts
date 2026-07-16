@@ -275,6 +275,9 @@ export type SurveyRelayCommandClientResult = {
   message?: string;
   reason?: string;
   action?: string;
+  answerText?: string;
+  provider?: string;
+  model?: string;
   pngBase64?: string;
   clipboard?: { text?: string; hasImage?: boolean; formats?: string[] };
   width?: number;
@@ -289,6 +292,11 @@ export async function sendSurveyEchoCommandViaRelay(input: {
   echoNodeId: string;
   action: string;
   tabId?: number;
+  payload?: {
+    prompt?: string;
+    pngBase64?: string;
+    pngBase64List?: string[];
+  };
 }): Promise<SurveyRelayCommandClientResult> {
   const echoNodeId = input.echoNodeId.trim();
   const action = input.action.trim();
@@ -306,6 +314,7 @@ export async function sendSurveyEchoCommandViaRelay(input: {
         echoNodeId,
         action,
         tabId: input.tabId,
+        payload: input.payload,
         nodeId,
       }),
       cache: "no-store",
@@ -356,6 +365,9 @@ export async function sendSurveyEchoCommandViaRelay(input: {
           ok: true,
           message: result.message ?? `${action} OK via relay`,
           action: result.action ?? action,
+          answerText: result.answerText,
+          provider: result.provider,
+          model: result.model,
           pngBase64: result.pngBase64,
           clipboard: result.clipboard,
           width: result.width,

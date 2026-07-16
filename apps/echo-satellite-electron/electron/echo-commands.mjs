@@ -1,4 +1,8 @@
 import { execFileSync } from "node:child_process";
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { clipboard } from "electron";
 import { capturePrimaryMonitorJpeg } from "./capture.mjs";
 import {
@@ -16,7 +20,7 @@ const audioState = {
 
 /**
  * @param {string} action
- * @param {{ app?: import("electron").App, tabId?: number }} [deps]
+ * @param {{ app?: import("electron").App, tabId?: number, payload?: { prompt?: string, pngBase64?: string, pngBase64List?: string[] } }} [deps]
  */
 export async function executeEchoSatelliteCommand(action, deps = {}) {
   switch (action) {
@@ -40,8 +44,82 @@ export async function executeEchoSatelliteCommand(action, deps = {}) {
       return captureExtensionActiveTab();
     case "echo.ext-bridge-status":
       return { ok: true, ...getEchoExtensionBridgeStatus(), message: "echo-extension bridge status." };
+    case "echo.solve-codex":
+      return solveViaCodex(deps.payload);
     default:
       return { ok: false, reason: `Unknown Echo command: ${action}` };
+  }
+}
+
+function runCodexExec(args, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const cmd = process.platform === "win32" ? "cmd.exe" : "codex";
+    const cmdArgs =
+      process.platform === "win32" ? ["/c", "codex", ...args] : args;
+    const child = spawn(cmd, cmdArgs, { stdio: ["ignore", "pipe", "pipe"] });
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error(`Codex timed out after ${Math.round(timeoutMs / 1000)}s.`));
+    }, timeoutMs);
+    child.stderr.on("data", (buf) => {
+      stderr += buf.toString("utf8");
+    });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ code: code ?? 1, stderr: stderr.trim() });
+    });
+  });
+}
+
+/** @param {{ prompt?: string, pngBase64?: string, pngBase64List?: string[] } | undefined} payload */
+async function solveViaCodex(payload) {
+  const prompt = payload?.prompt?.trim() || "";
+  if (!prompt) {
+    return { ok: false, reason: "echo.solve-codex requires prompt." };
+  }
+  const images = [
+    ...(Array.isArray(payload?.pngBase64List) ? payload.pngBase64List : []),
+  ];
+  if (images.length === 0 && payload?.pngBase64?.trim()) {
+    images.push(payload.pngBase64.trim());
+  }
+
+  const tmp = await mkdtemp(join(tmpdir(), "echo-codex-"));
+  const outputPath = join(tmp, "answer.txt");
+  try {
+    const args = ["exec", "--skip-git-repo-check", "--ephemeral", "-o", outputPath];
+    for (let i = 0; i < images.length; i += 1) {
+      const imagePath = join(tmp, `capture-${i + 1}.png`);
+      await writeFile(imagePath, Buffer.from(images[i], "base64"));
+      args.push("-i", imagePath);
+    }
+    const model = process.env.SURVEY_CODEX_MODEL?.trim();
+    if (model) args.push("-m", model);
+    args.push(prompt);
+    const { code, stderr } = await runCodexExec(args, Number(process.env.SURVEY_CODEX_TIMEOUT_MS) || 180_000);
+    const answerText = (await readFile(outputPath, "utf8").catch(() => "")).trim();
+    if (!answerText) {
+      return {
+        ok: false,
+        reason: stderr || `Codex exec failed (exit ${code}). Run codex login on Echo Satellite machine.`,
+      };
+    }
+    return {
+      ok: true,
+      message: "Solved via Echo Codex CLI.",
+      answerText,
+      provider: "codex-relay",
+      model: model || "codex-subscription",
+    };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Codex solve failed." };
+  } finally {
+    await rm(tmp, { recursive: true, force: true }).catch(() => {});
   }
 }
 

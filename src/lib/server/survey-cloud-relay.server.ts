@@ -53,6 +53,11 @@ export type SurveyRelayCommandRequest = {
   echoNodeId: string;
   action: string;
   tabId?: number;
+  payload?: {
+    prompt?: string;
+    pngBase64?: string;
+    pngBase64List?: string[];
+  };
   nodeId?: string;
   createdAt: string;
   status: "pending" | "complete" | "failed";
@@ -64,6 +69,9 @@ export type SurveyRelayCommandResult = {
   action?: string;
   message?: string;
   reason?: string;
+  answerText?: string;
+  provider?: string;
+  model?: string;
   pngBase64?: string;
   clipboard?: { text?: string; hasImage?: boolean; formats?: string[] };
   width?: number;
@@ -531,6 +539,11 @@ export async function createSurveyRelayCommandRequest(input: {
   echoNodeId: string;
   action: string;
   tabId?: number;
+  payload?: {
+    prompt?: string;
+    pngBase64?: string;
+    pngBase64List?: string[];
+  };
   nodeId?: string;
 }): Promise<SurveyRelayCommandRequest> {
   const requestId = crypto.randomUUID();
@@ -539,6 +552,7 @@ export async function createSurveyRelayCommandRequest(input: {
     echoNodeId: input.echoNodeId.trim(),
     action: input.action.trim(),
     tabId: Number.isFinite(input.tabId) ? input.tabId : undefined,
+    payload: input.payload,
     nodeId: input.nodeId?.trim() || undefined,
     createdAt: new Date().toISOString(),
     status: "pending",

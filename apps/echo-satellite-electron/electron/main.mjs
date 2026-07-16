@@ -208,7 +208,11 @@ async function refreshSpyLinks() {
     void pushSurveyRelayBundle(cachedSpyStatus);
     void pollSurveyRelayPairRequests(cachedSpyStatus.echoNodeId, completeSurveyPairEnterByPin);
     void pollSurveyRelayCommandRequests(cachedSpyStatus.echoNodeId, (action, extras) =>
-      executeEchoSatelliteCommand(action, { app, tabId: extras?.tabId }),
+      executeEchoSatelliteCommand(action, {
+        app,
+        tabId: extras?.tabId,
+        payload: extras?.payload,
+      }),
     );
   } catch (error) {
     cachedSpyStatus = null;

@@ -26,6 +26,11 @@ type CommandRequestBody = {
   echoNodeId?: string;
   action?: string;
   tabId?: number;
+  payload?: {
+    prompt?: string;
+    pngBase64?: string;
+    pngBase64List?: string[];
+  };
   nodeId?: string;
 };
 
@@ -52,6 +57,7 @@ export async function POST(request: Request) {
       echoNodeId,
       action,
       tabId: body.tabId,
+      payload: body.payload,
       nodeId: body.nodeId,
     });
 
@@ -120,6 +126,9 @@ type CommandResponseBody = {
   action?: string;
   message?: string;
   reason?: string;
+  answerText?: string;
+  provider?: string;
+  model?: string;
   pngBase64?: string;
   clipboard?: { text?: string; hasImage?: boolean; formats?: string[] };
   width?: number;
@@ -158,6 +167,9 @@ export async function PUT(request: Request) {
       action: body.action,
       message: body.message,
       reason: body.reason,
+      answerText: body.answerText,
+      provider: body.provider,
+      model: body.model,
       pngBase64: body.pngBase64,
       clipboard: body.clipboard,
       width: body.width,
