@@ -148,12 +148,23 @@ export function PreviewMatrixArmedPanel({
             Running {armedCard.card.title}…
           </p>
         ) : executionResult ? (
-          <p
-            className={`cardOpenViewportPurpose cardOpenViewportResult${executionResult.ok ? " is-ok" : " is-fail"}`}
-            data-testid="powerfist-execution-result"
-          >
-            {executionResult.message}
-          </p>
+          <>
+            {executionResult.imageDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- local capture preview
+              <img
+                className="cardOpenViewportResultImage"
+                src={executionResult.imageDataUrl}
+                alt={`${armedCard.card.title} capture`}
+                data-testid="powerfist-execution-result-image"
+              />
+            ) : null}
+            <p
+              className={`cardOpenViewportPurpose cardOpenViewportResult${executionResult.ok ? " is-ok" : " is-fail"}`}
+              data-testid="powerfist-execution-result"
+            >
+              {executionResult.message}
+            </p>
+          </>
         ) : (
           <p className="cardOpenViewportPurpose">{armedCard.card.purpose}</p>
         )}

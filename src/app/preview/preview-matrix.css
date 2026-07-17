@@ -585,6 +585,16 @@
   border-color: rgba(248, 113, 113, 0.78);
 }
 
+.powerfist-preview-root .cardOpenViewportResultImage {
+  justify-self: center;
+  max-width: 100%;
+  max-height: min(46cqh, 340px);
+  object-fit: contain;
+  border: 1px solid rgba(103, 232, 249, 0.35);
+  border-radius: 6px;
+  box-shadow: 0 0 14px rgba(103, 232, 249, 0.18);
+}
+
 .powerfist-preview-root .cardOpenViewportResult.is-ok {
   color: rgba(167, 243, 208, 0.95);
 }

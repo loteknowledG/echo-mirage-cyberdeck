@@ -19,6 +19,7 @@ import {
   startSurveyContinuousScreenshot,
   stopSurveyContinuousScreenshot,
 } from "@/lib/cyberdeck/survey-continuous-screenshot.client";
+import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 import type { PreviewDeckWithTarget } from "./preview-data";
 import { CARD_PUSH_RECEIPT_DURATION_MS, cardChatMessage } from "./preview-matrix-play";
 
@@ -29,7 +30,9 @@ type UseSurveyDeckCommandsOptions = {
   applyFocus: (deckIndex: number, cardIndex: number) => void;
   composerText: string;
   setComposerText: (text: string) => void;
-  onDeckCommand?: (command: string) => Promise<{ ok: boolean; message: string }>;
+  onDeckCommand?: (
+    command: string,
+  ) => Promise<{ ok: boolean; message: string; imageDataUrl?: string }>;
   remoteSocketRef: RemoteSocketRef;
 };
 
@@ -37,6 +40,7 @@ type SurveyDeckPushResult = {
   ok: boolean;
   message: string;
   keepArmed?: boolean;
+  imageDataUrl?: string;
 };
 
 export function useSurveyDeckCommands({
@@ -86,12 +90,18 @@ export function useSurveyDeckCommands({
           return result;
         }
 
-        const result = onDeckCommand
+        const result: SurveyDeckPushResult = onDeckCommand
           ? await onDeckCommand(card.surveyCommand)
           : await executeSurveyDeckCommand(
               card.surveyCommand as SurveyDeckCommandId,
               resolveSurveyEchoDeckContext(),
-            );
+            ).then((raw) => ({
+              ok: raw.ok,
+              message: raw.message,
+              imageDataUrl: raw.pngBase64
+                ? surveyCaptureDataUrl(raw.pngBase64)
+                : undefined,
+            }));
         showPushReceipt(
           result.ok
             ? `<strong>${card.title}</strong> — ${result.message}`

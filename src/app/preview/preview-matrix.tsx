@@ -21,7 +21,9 @@ export function PreviewMatrix({
 }: {
   embedSurface?: "page" | "survey" | "rola-dex";
   decks?: PreviewDeckWithTarget[];
-  onDeckCommand?: (command: string) => Promise<{ ok: boolean; message: string }>;
+  onDeckCommand?: (
+    command: string,
+  ) => Promise<{ ok: boolean; message: string; imageDataUrl?: string }>;
 }) {
   const paneRef = useRef<HTMLElement>(null);
   const activeDecks = decks ?? ALL_PREVIEW_DECKS;
@@ -44,7 +46,10 @@ export function PreviewMatrix({
   );
 
   const handlePushCardRef = useRef<
-    (deckIndex: number, cardIndex: number) => Promise<{ ok: boolean; message: string; keepArmed?: boolean }>
+    (
+      deckIndex: number,
+      cardIndex: number,
+    ) => Promise<{ ok: boolean; message: string; keepArmed?: boolean; imageDataUrl?: string }>
   >(async () => ({ ok: false, message: "Not ready." }));
 
   const {

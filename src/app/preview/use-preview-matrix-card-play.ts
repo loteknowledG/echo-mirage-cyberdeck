@@ -10,6 +10,8 @@ export type CardExecutionResult = {
   ok: boolean;
   message: string;
   keepArmed?: boolean;
+  /** Optional visual payload (e.g. captured screenshot) shown on the result card. */
+  imageDataUrl?: string;
 };
 
 type ArmedCard = {
