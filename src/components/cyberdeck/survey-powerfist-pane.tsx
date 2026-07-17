@@ -15,7 +15,7 @@ import {
   SURVEY_POWERFIST_TAGLINE,
 } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyEchoLinkWatch } from "@/lib/cyberdeck/survey-echo-link-watch";
-import { isSurveyTeamTripleLinked, notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
+import { isSurveyPowerfistDeckReady, notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import {
   formatSurveyMiragePowerfistLinkedLine,
   notifySurveyMuthurArchive,
@@ -177,10 +177,9 @@ function SurveyPowerfistPairingPanel() {
 
 export function SurveyPowerfistPane() {
   const team = useSurveyTeamStatus();
-  const tripleLinked = isSurveyTeamTripleLinked(team);
-  const echoLinked = team.echoPowerfist.state === "linked";
+  const deckReady = isSurveyPowerfistDeckReady(team);
 
-  if (tripleLinked || echoLinked) {
+  if (deckReady) {
     return (
       <div className="cyberdeck-survey-powerfist-deck cyberdeck-rola-dex-pane flex min-h-0 flex-1 flex-col overflow-hidden bg-[#050807]">
         <SurveyMirageQueueTeamHost role="powerfist" />

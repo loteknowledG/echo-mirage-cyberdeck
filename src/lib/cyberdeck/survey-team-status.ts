@@ -54,3 +54,17 @@ export function isSurveyTeamTripleLinked(
     team.miragePowerfist.state === "linked"
   );
 }
+
+/**
+ * PowerFist decks drive Echo, and Mirage/PowerFist both talk to Echo (never each other).
+ * The PowerFist tab in this same app instance rides Mirage's Echo link, so decks are ready
+ * when Echo is linked to *either* PowerFist (a paired phone) or Mirage (this instance).
+ */
+export function isSurveyPowerfistDeckReady(
+  team: Pick<SurveyTeamStatus, "echoMirage" | "echoPowerfist" | "loading">,
+): boolean {
+  if (team.loading) return false;
+  return (
+    team.echoPowerfist.state === "linked" || team.echoMirage.state === "linked"
+  );
+}

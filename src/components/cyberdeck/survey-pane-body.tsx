@@ -15,7 +15,7 @@ import { SurveyMiragePane } from "@/components/cyberdeck/survey-mirage-pane";
 import { SurveyPowerfistPane } from "@/components/cyberdeck/survey-powerfist-pane";
 import { SurveyTeamStatusPanel } from "@/components/cyberdeck/survey-team-status-panel";
 import { SurveyHubMiragePowerfistAutoRestore } from "@/components/cyberdeck/survey-hub-mirage-powerfist-auto-restore";
-import { isSurveyTeamTripleLinked } from "@/lib/cyberdeck/survey-team-status";
+import { isSurveyPowerfistDeckReady } from "@/lib/cyberdeck/survey-team-status";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import type { SurveySubPane } from "@/lib/cyberdeck/survey-mode";
 
@@ -26,7 +26,7 @@ export function CyberdeckSurveyPaneBody() {
   });
   const team = useSurveyTeamStatus();
   const powerfistDeckMode =
-    activeSubPane === "powerfist" && isSurveyTeamTripleLinked(team);
+    activeSubPane === "powerfist" && isSurveyPowerfistDeckReady(team);
   /** Mirage tab stays capture + answers; Hub/TEAM LINKS live on Echo / PowerFist. */
   const showSurveyHubChrome = activeSubPane !== "mirage" && !powerfistDeckMode;
 
