@@ -6,10 +6,7 @@ import { ALL_PREVIEW_DECKS, type PreviewDeckWithTarget } from "./preview-data";
 import { PreviewMatrixArmedPanel } from "./preview-matrix-armed-panel";
 import { PreviewMatrixDeckCarousel } from "./preview-matrix-deck-carousel";
 import { PowerfistJoystickControls } from "./powerfist-joystick-controls";
-import {
-  CARD_PLAY_LAPS,
-  CARD_PLAY_TRAIL_DURATION_MS,
-} from "./preview-matrix-play";
+import { CARD_PLAY_TRAIL_DURATION_MS } from "./preview-matrix-play";
 import { usePowerfistMatrixRemote } from "./use-powerfist-matrix-remote";
 import { usePreviewMatrixCarousels } from "./use-preview-matrix-carousels";
 import { usePreviewMatrixCardPlay } from "./use-preview-matrix-card-play";
@@ -99,7 +96,6 @@ export function PreviewMatrix({
       style={
         {
           "--pf-card-play-trail-ms": `${CARD_PLAY_TRAIL_DURATION_MS}ms`,
-          "--pf-card-play-laps": CARD_PLAY_LAPS,
         } as React.CSSProperties
       }
     >

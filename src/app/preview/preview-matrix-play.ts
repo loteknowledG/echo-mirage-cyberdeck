@@ -9,8 +9,6 @@ export const CARD_PLAY_TRAIL_DURATION_MS = CARD_PLAY_LAP_DURATION_MS * CARD_PLAY
 export const CARD_PUSH_RECEIPT_DURATION_MS = 2400;
 export const CARD_PLAY_TRACE_PATH =
   "M 50 1 L 93 1 A 6 6 0 0 1 99 7 L 99 93 A 6 6 0 0 1 93 99 L 7 99 A 6 6 0 0 1 1 93 L 1 7 A 6 6 0 0 1 7 1 L 50 1";
-/** CSS end dashoffset for N forward laps (pathLength 1 starts at 1 → ends at 1-N). */
-export const CARD_PLAY_TRACE_END_OFFSET = 1 - CARD_PLAY_LAPS;
 
 export function cardChatMessage(
   deckName: string,
