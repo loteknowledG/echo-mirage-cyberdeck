@@ -158,6 +158,15 @@ export function PreviewMatrixArmedPanel({
                 data-testid="powerfist-execution-result-image"
               />
             ) : null}
+            {executionResult.answerText ? (
+              <pre
+                className="cardOpenViewportAnswer"
+                data-armed-scroll
+                data-testid="powerfist-execution-answer"
+              >
+                {executionResult.answerText}
+              </pre>
+            ) : null}
             <p
               className={`cardOpenViewportPurpose cardOpenViewportResult${executionResult.ok ? " is-ok" : " is-fail"}`}
               data-testid="powerfist-execution-result"

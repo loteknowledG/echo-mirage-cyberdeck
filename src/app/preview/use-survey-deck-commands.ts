@@ -32,7 +32,7 @@ type UseSurveyDeckCommandsOptions = {
   setComposerText: (text: string) => void;
   onDeckCommand?: (
     command: string,
-  ) => Promise<{ ok: boolean; message: string; imageDataUrl?: string }>;
+  ) => Promise<{ ok: boolean; message: string; imageDataUrl?: string; answerText?: string }>;
   remoteSocketRef: RemoteSocketRef;
 };
 
@@ -41,6 +41,7 @@ type SurveyDeckPushResult = {
   message: string;
   keepArmed?: boolean;
   imageDataUrl?: string;
+  answerText?: string;
 };
 
 export function useSurveyDeckCommands({

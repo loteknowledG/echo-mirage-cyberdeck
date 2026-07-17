@@ -22,6 +22,7 @@ export type SurveyPowerfistDeckResult = {
   ok: boolean;
   message: string;
   imageDataUrl?: string;
+  answerText?: string;
 };
 
 /** Route a PowerFist Screenshot/Extension deck card to its Survey action. */
@@ -42,7 +43,7 @@ export async function executeSurveyPowerfistDeckCommand(
     }
     case SURVEY_POWERFIST_DECK_COMMAND.SOLVE_CAPTURE: {
       const result = await solveMirageCaptureAsync();
-      return { ok: result.ok, message: result.message };
+      return { ok: result.ok, message: result.message, answerText: result.answerText };
     }
     case SURVEY_POWERFIST_DECK_COMMAND.CLEAR_CAPTURE: {
       clearSurveyCaptureStack();

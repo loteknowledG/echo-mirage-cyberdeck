@@ -23,7 +23,7 @@ export function PreviewMatrix({
   decks?: PreviewDeckWithTarget[];
   onDeckCommand?: (
     command: string,
-  ) => Promise<{ ok: boolean; message: string; imageDataUrl?: string }>;
+  ) => Promise<{ ok: boolean; message: string; imageDataUrl?: string; answerText?: string }>;
 }) {
   const paneRef = useRef<HTMLElement>(null);
   const activeDecks = decks ?? ALL_PREVIEW_DECKS;
@@ -49,7 +49,13 @@ export function PreviewMatrix({
     (
       deckIndex: number,
       cardIndex: number,
-    ) => Promise<{ ok: boolean; message: string; keepArmed?: boolean; imageDataUrl?: string }>
+    ) => Promise<{
+      ok: boolean;
+      message: string;
+      keepArmed?: boolean;
+      imageDataUrl?: string;
+      answerText?: string;
+    }>
   >(async () => ({ ok: false, message: "Not ready." }));
 
   const {

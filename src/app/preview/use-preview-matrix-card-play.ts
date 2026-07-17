@@ -12,6 +12,8 @@ export type CardExecutionResult = {
   keepArmed?: boolean;
   /** Optional visual payload (e.g. captured screenshot) shown on the result card. */
   imageDataUrl?: string;
+  /** Optional long-form solution text (e.g. SOLVE answer) shown on the result card. */
+  answerText?: string;
 };
 
 type ArmedCard = {
@@ -35,7 +37,11 @@ type UsePreviewMatrixCardPlayOptions = {
 
 function isInteractiveArmedTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
-  return Boolean(target.closest("button, input, textarea, select, label, a"));
+  // [data-armed-scroll] marks scrollable result content (e.g. solve answers)
+  // that must not start the hold-to-cancel gesture.
+  return Boolean(
+    target.closest("button, input, textarea, select, label, a, [data-armed-scroll]"),
+  );
 }
 
 export function usePreviewMatrixCardPlay({

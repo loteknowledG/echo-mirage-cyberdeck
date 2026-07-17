@@ -585,6 +585,24 @@
   border-color: rgba(248, 113, 113, 0.78);
 }
 
+.powerfist-preview-root .cardOpenViewportAnswer {
+  margin: 0;
+  min-height: 0;
+  max-height: min(52cqh, 380px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: rgba(207, 250, 254, 0.92);
+  font-size: clamp(12px, 1.7cqw, 15px);
+  line-height: 1.55;
+  border: 1px solid rgba(103, 232, 249, 0.28);
+  border-radius: 6px;
+  padding: 12px 14px;
+  background: rgba(8, 24, 28, 0.6);
+  text-align: left;
+}
+
 .powerfist-preview-root .cardOpenViewportResultImage {
   justify-self: center;
   max-width: 100%;

@@ -99,7 +99,11 @@ export function ingestSurveyExtensionPageContext(raw: unknown): SurveyExtensionP
 }
 
 /** Run SOLVE on the last echo-extension page text. */
-export async function solveLastSurveyExtensionPage(): Promise<{ ok: boolean; message: string }> {
+export async function solveLastSurveyExtensionPage(): Promise<{
+  ok: boolean;
+  message: string;
+  answerText?: string;
+}> {
   const snapshot = status.lastSnapshot;
   if (!snapshot?.pageText.trim()) {
     return {

@@ -554,7 +554,11 @@ export async function answerCurrentMirageItemAsync(): Promise<{ ok: boolean; mes
 }
 
 /** Run vision on the capture stack (multi-page) or current preview capture. */
-export async function solveMirageCaptureAsync(): Promise<{ ok: boolean; message: string }> {
+export async function solveMirageCaptureAsync(): Promise<{
+  ok: boolean;
+  message: string;
+  answerText?: string;
+}> {
   const stackPngs = surveyCaptureStackPngList();
   const capture = resolveMiragePreviewCapture();
 
@@ -633,13 +637,14 @@ export async function solveMirageCaptureAsync(): Promise<{ ok: boolean; message:
     message: multiPage
       ? `Answered ${stackPngs.length} pages via ${result.provider}.`
       : `Answered item ${displayIndex + 1}/${items.length} via ${result.provider}.`,
+    answerText: result.text,
   };
 }
 
 /** Run Codex on Echo selected text (no screenshot). */
 export async function solveMirageSelectedTextAsync(
   selectedText: string,
-): Promise<{ ok: boolean; message: string }> {
+): Promise<{ ok: boolean; message: string; answerText?: string }> {
   const text = selectedText.trim();
   if (!text) {
     return { ok: false, message: "No selected text to solve." };
@@ -717,6 +722,7 @@ export async function solveMirageSelectedTextAsync(
   return {
     ok: true,
     message: `Solved selected text (${text.length} chars) via ${result.provider}.`,
+    answerText: result.text,
   };
 }
 

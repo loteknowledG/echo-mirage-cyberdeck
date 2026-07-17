@@ -12,7 +12,7 @@ type DeckMatrixEmbedProps = {
   decks?: PreviewDeckWithTarget[];
   onDeckCommand?: (
     command: string,
-  ) => Promise<{ ok: boolean; message: string; imageDataUrl?: string }>;
+  ) => Promise<{ ok: boolean; message: string; imageDataUrl?: string; answerText?: string }>;
 };
 
 /** Shared PreviewMatrix wrapper for Rola Dex and Survey PowerFist deck surfaces. */
