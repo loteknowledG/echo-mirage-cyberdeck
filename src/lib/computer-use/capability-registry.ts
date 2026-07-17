@@ -4,7 +4,6 @@ import type {
   CapabilityCategory,
   ConfirmationPolicy,
   EnvironmentSupport,
-  RiskLevel,
   ReceiptType,
   VerificationType,
   ApprovalMode,
@@ -15,7 +14,6 @@ export type {
   CapabilityCategory,
   ConfirmationPolicy,
   EnvironmentSupport,
-  RiskLevel,
   ReceiptType,
   VerificationType,
   ApprovalMode,
@@ -31,7 +29,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "both",
     description: "Retrieve the currently focused window title and URL",
     owner: "muthur",
-    riskLevel: "low",
     receiptType: "tool.exec",
     verificationType: "logical",
     approvalMode: "auto",
@@ -42,7 +39,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "electron",
     description: "Enumerate all open Electron windows",
     owner: "muthur",
-    riskLevel: "low",
     receiptType: "tool.exec",
     verificationType: "logical",
     approvalMode: "auto",
@@ -53,7 +49,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "none",
     description: "Capture a screenshot of the current screen (not implemented)",
     owner: "muthur",
-    riskLevel: "medium",
     receiptType: "tool.exec",
     verificationType: "visual",
     approvalMode: "operator",
@@ -64,7 +59,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "none",
     description: "Focus a window by title or app name (not implemented)",
     owner: "muthur",
-    riskLevel: "medium",
     receiptType: "tool.exec",
     verificationType: "logical",
     approvalMode: "operator",
@@ -78,7 +72,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "electron",
     description: "Write text to the system clipboard",
     owner: "muthur",
-    riskLevel: "high",
     receiptType: "tool.exec",
     verificationType: "input_output",
     approvalMode: "user",
@@ -92,7 +85,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "electron",
     description: "Simulate a keyboard hotkey (limited allowlist)",
     owner: "muthur",
-    riskLevel: "high",
     receiptType: "tool.exec",
     verificationType: "input_output",
     approvalMode: "user",
@@ -106,7 +98,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "none",
     description: "Verify text is visible on screen via OCR (not implemented)",
     owner: "muthur",
-    riskLevel: "low",
     receiptType: "tool.exec",
     verificationType: "visual",
     approvalMode: "auto",
@@ -120,7 +111,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "none",
     description: "Verify a specific window is currently focused (not implemented)",
     owner: "muthur",
-    riskLevel: "low",
     receiptType: "tool.exec",
     verificationType: "logical",
     approvalMode: "auto",
@@ -134,7 +124,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "both",
     description: "Halt the current computer-use execution",
     owner: "user",
-    riskLevel: "low",
     receiptType: "tool.exec",
     verificationType: "none",
     approvalMode: "auto",
@@ -145,7 +134,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "both",
     description: "Render a pointer ring at a screen position (MUTHUR pointer hand)",
     owner: "muthur",
-    riskLevel: "low",
     receiptType: "tool.exec",
     verificationType: "visual",
     approvalMode: "auto",
@@ -165,7 +153,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "both",
     description: "Render a highlight glow at a screen position (MUTHUR pointer hand)",
     owner: "muthur",
-    riskLevel: "low",
     receiptType: "tool.exec",
     verificationType: "visual",
     approvalMode: "auto",
@@ -185,7 +172,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "both",
     description: "Remove all active MUTHUR pointer/highlight overlays",
     owner: "muthur",
-    riskLevel: "low",
     receiptType: "tool.exec",
     verificationType: "none",
     approvalMode: "auto",
@@ -196,7 +182,6 @@ export const CAPABILITY_REGISTRY: CapabilityRegistry = {
     environments: "none",
     description: "Unknown or unrecognized action",
     owner: "muthur",
-    riskLevel: "low",
     receiptType: "tool.exec",
     verificationType: "none",
     approvalMode: "auto",
@@ -250,10 +235,6 @@ export function getActionScope(
   return "control";
 }
 
-export function getRiskLevel(actionName: ActionName): RiskLevel {
-  return CAPABILITY_REGISTRY[actionName]?.riskLevel ?? "low";
-}
-
 export function getApprovalMode(actionName: ActionName): ApprovalMode {
   return CAPABILITY_REGISTRY[actionName]?.approvalMode ?? "auto";
 }
@@ -270,12 +251,6 @@ export function getCapabilityOwner(actionName: ActionName): ReceiptAuthority {
   return CAPABILITY_REGISTRY[actionName]?.owner ?? "muthur";
 }
 
-export function getHighRiskActions(): ActionName[] {
-  return Object.entries(CAPABILITY_REGISTRY)
-    .filter(([, meta]) => meta.riskLevel === "high")
-    .map(([name]) => name as ActionName);
-}
-
 export function getActionsByApprovalMode(mode: ApprovalMode): ActionName[] {
   return Object.entries(CAPABILITY_REGISTRY)
     .filter(([, meta]) => meta.approvalMode === mode)
@@ -285,7 +260,6 @@ export function getActionsByApprovalMode(mode: ApprovalMode): ActionName[] {
 export function getCapabilityManifest(): Array<{
   name: ActionName;
   category: CapabilityCategory;
-  riskLevel: RiskLevel;
   receiptType: ReceiptType;
   verificationType: VerificationType;
   approvalMode: ApprovalMode;
@@ -297,7 +271,6 @@ export function getCapabilityManifest(): Array<{
     .map(([name, meta]) => ({
       name: name as ActionName,
       category: meta.category,
-      riskLevel: meta.riskLevel,
       receiptType: meta.receiptType,
       verificationType: meta.verificationType,
       approvalMode: meta.approvalMode,

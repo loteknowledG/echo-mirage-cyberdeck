@@ -11,7 +11,6 @@ import {
   getHandCards,
   type ExecutionCard,
   type ExecutionHand,
-  type CardRisk,
   type CardCategory,
 } from "../src/lib/computer-use/execution-card-registry";
 
@@ -27,13 +26,6 @@ function assert(name: string, condition: boolean, detail?: unknown) {
 console.log("=== Execution Card Registry Probe ===\n");
 
 console.log("--- Types ---");
-const safeRisk: CardRisk = "safe";
-const cautionRisk: CardRisk = "caution";
-const restrictedRisk: CardRisk = "restricted";
-assert("CardRisk safe is valid", safeRisk === "safe");
-assert("CardRisk caution is valid", cautionRisk === "caution");
-assert("CardRisk restricted is valid", restrictedRisk === "restricted");
-
 const reviewCat: CardCategory = "review";
 const captureCat: CardCategory = "capture";
 const runtimeCat: CardCategory = "runtime";
@@ -56,7 +48,6 @@ for (const card of allCards) {
   assert(`card ${card.id} has valid category`, [
     "review", "capture", "runtime", "memory", "surface", "teaching", "recovery", "system"
   ].includes(card.category));
-  assert(`card ${card.id} has valid risk`, ["safe", "caution", "restricted"].includes(card.risk));
   assert(`card ${card.id} has tags array`, Array.isArray(card.tags));
   assert(`card ${card.id} has boolean enabled`, typeof card.enabled === "boolean");
   assert(`card ${card.id} has boolean requiresConfirmation`, typeof card.requiresConfirmation === "boolean");
@@ -85,15 +76,6 @@ for (const id of requiredIds) {
   const card = EXECUTION_CARD_REGISTRY[id];
   assert(`card ${id} is enabled`, card.enabled === true);
 }
-
-console.log("\n--- Card Risk Distribution ---");
-const safeCards = allCards.filter((c) => c.risk === "safe");
-const cautionCards = allCards.filter((c) => c.risk === "caution");
-const restrictedCards = allCards.filter((c) => c.risk === "restricted");
-assert("safe risk cards exist", safeCards.length > 0);
-assert("caution risk cards exist", cautionCards.length > 0);
-assert("restricted risk cards exist", restrictedCards.length > 0);
-assert("restricted risk card is emergency_halt", restrictedCards.some((c) => c.id === "emergency_halt"));
 
 console.log("\n--- Card Category Distribution ---");
 for (const cat of ["review", "capture", "runtime", "system", "teaching", "recovery"] as CardCategory[]) {

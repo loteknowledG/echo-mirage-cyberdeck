@@ -59,7 +59,6 @@ function main() {
   assert("fourth card title correct", reviewerCards[3].title === "Archive Outcome");
   assert("all cards staged status", reviewerCards.every((c) => c.status === "staged"));
   assert("all cards have scriptName", reviewerCards.every((c) => c.scriptName !== undefined));
-  assert("cards have proper risk levels", reviewerCards.some((c) => c.riskLevel === "low") && reviewerCards.some((c) => c.riskLevel === "medium"));
 
   console.log("\n--- Hand Preparation (staging only, no auto-stack) ---");
   clearDeck();
@@ -138,7 +137,6 @@ function main() {
   assert("describeDeck lists all 4 cards", desc.includes("Capture Builder Result") && desc.includes("Request Codex Review") && desc.includes("Summarize Review") && desc.includes("Archive Outcome"));
   assert("describeDeck shows Execution DISABLED", desc.includes("DISABLED"));
   assert("describeDeck shows stack depth", desc.includes("Stack depth:"));
-  assert("describeDeck shows risk level", desc.includes("low") || desc.includes("medium"));
   assert("describeDeck shows staged cards section", desc.includes("Staged Hand"));
 
   const push2 = pushHandToStack();

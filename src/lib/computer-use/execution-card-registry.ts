@@ -1,5 +1,3 @@
-export type CardRisk = "safe" | "caution" | "restricted";
-
 export type CardCategory =
   | "review"
   | "capture"
@@ -15,7 +13,6 @@ export type ExecutionCard = {
   name: string;
   description: string;
   category: CardCategory;
-  risk: CardRisk;
   tags: string[];
   enabled: boolean;
   requiresConfirmation: boolean;
@@ -40,7 +37,6 @@ function makeCard(partial: Omit<ExecutionCard, "id"> & { id?: string }): Executi
     name: partial.name,
     description: partial.description,
     category: partial.category,
-    risk: partial.risk,
     tags: partial.tags,
     enabled: partial.enabled,
     requiresConfirmation: partial.requiresConfirmation,
@@ -56,7 +52,6 @@ const CAPTURE_LAST_CHATGPT_RESPONSE = makeCard({
   name: "Capture Last ChatGPT Response",
   description: "Package the most recent ChatGPT response as a structured artifact for review or archival.",
   category: "capture",
-  risk: "safe",
   tags: ["chatgpt", "capture", "response", "artifact"],
   enabled: true,
   requiresConfirmation: false,
@@ -71,7 +66,6 @@ const CAPTURE_BUILDER_RESULT = makeCard({
   name: "Capture Builder Result",
   description: "Package the current build output into a structured artifact for review.",
   category: "capture",
-  risk: "safe",
   tags: ["build", "capture", "artifact", "compile"],
   enabled: true,
   requiresConfirmation: true,
@@ -86,7 +80,6 @@ const CAPTURE_REVIEW_RESULT = makeCard({
   name: "Capture Review Result",
   description: "Package the current review output into a structured artifact.",
   category: "capture",
-  risk: "safe",
   tags: ["review", "capture", "artifact"],
   enabled: true,
   requiresConfirmation: false,
@@ -100,7 +93,6 @@ const REQUEST_CODEX_REVIEW = makeCard({
   name: "Request Codex Review",
   description: "Present the current state to an AI reviewer for assessment.",
   category: "review",
-  risk: "caution",
   tags: ["codex", "review", "assessment", "ai"],
   enabled: true,
   requiresConfirmation: true,
@@ -115,7 +107,6 @@ const SUMMARIZE_REVIEW = makeCard({
   name: "Summarize Review",
   description: "Condense review findings into executive summary format.",
   category: "review",
-  risk: "safe",
   tags: ["review", "summary", "condense"],
   enabled: true,
   requiresConfirmation: false,
@@ -129,7 +120,6 @@ const ESCALATE_TO_LEAD = makeCard({
   name: "Escalate to Lead",
   description: "Escalate the current workflow to lead operator for guidance.",
   category: "review",
-  risk: "caution",
   tags: ["escalate", "lead", "review", "assistance"],
   enabled: true,
   requiresConfirmation: true,
@@ -144,7 +134,6 @@ const HOLD_RUNTIME = makeCard({
   name: "Hold Runtime",
   description: "Pause the current execution stack. Retains state for inspection.",
   category: "runtime",
-  risk: "safe",
   tags: ["runtime", "hold", "pause", "stack"],
   enabled: true,
   requiresConfirmation: false,
@@ -159,7 +148,6 @@ const CLEAR_RUNTIME = makeCard({
   name: "Clear Runtime",
   description: "Discard all staged cards from the current execution stack.",
   category: "runtime",
-  risk: "caution",
   tags: ["runtime", "clear", "discard", "stack"],
   enabled: true,
   requiresConfirmation: true,
@@ -174,7 +162,6 @@ const EMERGENCY_HALT = makeCard({
   name: "Emergency Halt",
   description: "Immediately halt all execution and teaching workflows. Resets indicators and pauses narration.",
   category: "runtime",
-  risk: "restricted",
   tags: ["emergency", "halt", "stop", "safety"],
   enabled: true,
   requiresConfirmation: false,
@@ -189,7 +176,6 @@ const START_TEACHING_MODE = makeCard({
   name: "Start Teaching Mode",
   description: "Enter guided teaching mode with step-by-step workflow highlighting.",
   category: "teaching",
-  risk: "safe",
   tags: ["teaching", "guided", "workflow", "demo"],
   enabled: true,
   requiresConfirmation: false,
@@ -204,7 +190,6 @@ const ACKNOWLEDGE_STEP = makeCard({
   name: "Acknowledge Step",
   description: "Mark current teaching step as acknowledged and advance to next.",
   category: "teaching",
-  risk: "safe",
   tags: ["teaching", "step", "acknowledge", "advance"],
   enabled: true,
   requiresConfirmation: false,
@@ -218,7 +203,6 @@ const RETRY_BUILDER = makeCard({
   name: "Retry Builder",
   description: "Re-run the last build command to capture fresh output.",
   category: "recovery",
-  risk: "caution",
   tags: ["recovery", "build", "retry"],
   enabled: true,
   requiresConfirmation: true,
@@ -233,7 +217,6 @@ const PREPARE_RECOVERY_HAND = makeCard({
   name: "Prepare Recovery Hand",
   description: "Stage a recovery hand with retry and escalation cards.",
   category: "recovery",
-  risk: "safe",
   tags: ["recovery", "hand", "stage"],
   enabled: true,
   requiresConfirmation: false,
@@ -248,7 +231,6 @@ const ARCHIVE_OUTCOME = makeCard({
   name: "Archive Outcome",
   description: "Commit the current session state to the operational archive.",
   category: "system",
-  risk: "safe",
   tags: ["archive", "session", "memory"],
   enabled: true,
   requiresConfirmation: true,
@@ -263,7 +245,6 @@ const OPEN_EXECUTION_DECK = makeCard({
   name: "Open Execution Deck",
   description: "Display the Execution Deck pane for tactical card operations.",
   category: "system",
-  risk: "safe",
   tags: ["deck", "system", "display"],
   enabled: true,
   requiresConfirmation: false,

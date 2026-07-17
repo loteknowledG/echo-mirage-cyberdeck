@@ -37,9 +37,9 @@ assert("all cards have id, name, description", cardIds.every((id) => {
   const card = EXECUTION_CARD_REGISTRY[id];
   return card.id && card.name && card.description;
 }));
-assert("all cards have category and risk", cardIds.every((id) => {
+assert("all cards have category", cardIds.every((id) => {
   const card = EXECUTION_CARD_REGISTRY[id];
-  return card.category && card.risk;
+  return card.category;
 }));
 assert("all cards have enabled boolean", cardIds.every((id) => {
   const card = EXECUTION_CARD_REGISTRY[id];
@@ -69,18 +69,9 @@ console.log("\n--- Card Display Metadata ---");
 const firstCard = EXECUTION_CARD_REGISTRY[cardIds[0]];
 assert("cards display name", typeof firstCard.name === "string");
 assert("cards display category", typeof firstCard.category === "string");
-assert("cards display risk", typeof firstCard.risk === "string");
 assert("cards display enabled state", typeof firstCard.enabled === "boolean");
 assert("cards display tags array", Array.isArray(firstCard.tags));
 assert("cards display aliases array", Array.isArray(firstCard.aliases ?? []));
-
-console.log("\n--- Risk Level Display ---");
-const riskLevels = ["safe", "caution", "restricted"];
-for (const risk of riskLevels) {
-  const cardsWithRisk = cardIds.filter((id) => EXECUTION_CARD_REGISTRY[id].risk === risk);
-  assert(`${risk} risk cards have visual semantics`, cardsWithRisk.length > 0 || risk === "restricted");
-}
-assert("emergency_halt is restricted", EXECUTION_CARD_REGISTRY["emergency_halt"]?.risk === "restricted");
 
 console.log("\n--- Category Display ---");
 const categories = ["review", "capture", "runtime", "teaching", "recovery", "system"];
@@ -174,7 +165,6 @@ assert("no case-insensitive duplicate aliases", uniqueAliases.size === allAliase
 
 console.log("\n--- Visual Semantic Completeness ---");
 for (const card of Object.values(EXECUTION_CARD_REGISTRY)) {
-  assert(`card ${card.id} has visual risk indicator`, ["safe", "caution", "restricted"].includes(card.risk));
   assert(`card ${card.id} has visual enabled indicator`, typeof card.enabled === "boolean");
   assert(`card ${card.id} has visual category indicator`, typeof card.category === "string");
 }

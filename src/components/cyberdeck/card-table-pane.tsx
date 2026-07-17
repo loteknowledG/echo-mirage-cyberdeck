@@ -23,9 +23,9 @@ type CardTablePaneProps = {
   stagedCardCount: number;
   stackDepth: number;
   executionEnabled: boolean;
-  topStackCard: { title: string; status: string; riskLevel: string } | null;
-  stackCards: Array<{ title: string; status: string; riskLevel: string }>;
-  stagedCards: Array<{ title: string; purpose: string; riskLevel: string; status: string; requiredConfirmation: boolean }>;
+  topStackCard: { title: string; status: string } | null;
+  stackCards: Array<{ title: string; status: string }>;
+  stagedCards: Array<{ title: string; purpose: string; status: string; requiredConfirmation: boolean }>;
   onPushHandToStack: () => void;
   onClearDeck: () => void;
   onExecute: () => void;
@@ -33,24 +33,6 @@ type CardTablePaneProps = {
   onSelectHand: (handId: string) => void;
   onStageCard: (cardId: string) => void;
   selectedCardIds: string[];
-};
-
-const RISK_COLORS: Record<string, string> = {
-  safe: "#22c55e",
-  caution: "#f59e0b",
-  restricted: "#ef4444",
-};
-
-const RISK_LABELS: Record<string, string> = {
-  safe: "SAFE",
-  caution: "CAUTION",
-  restricted: "RESTRICTED",
-};
-
-const RISK_BORDER: Record<string, string> = {
-  safe: "border-[#22c55e]/30",
-  caution: "border-[#f59e0b]/30",
-  restricted: "border-[#ef4444]/30",
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -74,7 +56,6 @@ function ExecutionCardTile({
   onClick: () => void;
 }) {
   const deckMode = useDeckMode();
-  const riskColor = RISK_COLORS[card.risk] ?? "#8a8a8a";
   const categoryColor = CATEGORY_COLORS[card.category] ?? "#8a8a8a";
 
   return (
@@ -90,16 +71,12 @@ function ExecutionCardTile({
             ? "group relative w-full rounded-sm border bg-black p-2 text-left transition-all border-[#22c55e]/60 bg-[#22c55e]/5"
             : "group relative w-full rounded-sm border bg-black p-2 text-left transition-all border-[#1c1c1c] hover:border-[#3a3a3a]",
         }),
-        card.risk === "restricted" && !isSelected && "border-[#ef4444]/20",
         !card.enabled && "opacity-50",
       )}
     >
       <div className="mb-1 flex items-start justify-between gap-1">
         <span className="font-mono text-[9px] tracking-[0.06em]" style={{ color: categoryColor }}>
           {card.category.toUpperCase()}
-        </span>
-        <span className="font-mono text-[8px] tracking-[0.04em]" style={{ color: riskColor }}>
-          {RISK_LABELS[card.risk]}
         </span>
       </div>
       <div className="font-mono text-[10px] text-[#cfcfcf] leading-tight">{card.name}</div>
@@ -148,11 +125,9 @@ function StagedCardRow({
   card,
   onRemove,
 }: {
-  card: { title: string; riskLevel: string; requiredConfirmation: boolean };
+  card: { title: string; requiredConfirmation: boolean };
   onRemove: () => void;
 }) {
-  const riskColor = RISK_COLORS[card.riskLevel as keyof typeof RISK_COLORS] ?? "#8a8a8a";
-
   return (
     <div className="flex items-center gap-2 border-b border-[#141414] pb-1 last:border-0 last:pb-0">
       <button
@@ -164,11 +139,8 @@ function StagedCardRow({
       </button>
       <span className="font-mono text-[10px] text-[#cfcfcf]">{card.title}</span>
       {card.requiredConfirmation && (
-        <span className="font-mono text-[8px] tracking-[0.04em] text-amber-500">CONF</span>
+        <span className="ml-auto font-mono text-[8px] tracking-[0.04em] text-amber-500">CONF</span>
       )}
-      <span className="ml-auto font-mono text-[8px] tracking-[0.04em]" style={{ color: riskColor }}>
-        {card.riskLevel.toUpperCase()}
-      </span>
     </div>
   );
 }
@@ -272,7 +244,6 @@ export function CardTablePane({
                       key={card.id}
                       card={{
                         title: card.name,
-                        riskLevel: card.risk,
                         requiredConfirmation: card.requiresConfirmation,
                       }}
                       onRemove={() => onStageCard(card.id)}
@@ -313,12 +284,6 @@ export function CardTablePane({
                     <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-[#cfcfcf]">
                       {card.title}
                     </span>
-                    <span
-                      className="font-mono text-[9px] tracking-[0.06em]"
-                      style={{ color: RISK_COLORS[card.riskLevel as keyof typeof RISK_COLORS] ?? "#8a8a8a" }}
-                    >
-                      {card.riskLevel.toUpperCase()}
-                    </span>
                   </div>
                 ))}
               </div>
@@ -330,7 +295,7 @@ export function CardTablePane({
               <div className="mb-1 text-[9px] tracking-[0.08em] text-[#6a6a6a]">TOP OF STACK</div>
               <div className="font-mono text-[10px] text-[#22c55e]">{topStackCard.title}</div>
               <div className="font-mono text-[9px] text-[#6a6a6a]">
-                {topStackCard.status.toUpperCase()} · {topStackCard.riskLevel.toUpperCase()} RISK
+                {topStackCard.status.toUpperCase()}
               </div>
             </div>
           )}

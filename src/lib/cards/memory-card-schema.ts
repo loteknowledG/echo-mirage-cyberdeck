@@ -4,7 +4,6 @@ export interface MemoryCardFrontmatter {
   title: string;
   project?: string;
   deck?: string;
-  risk?: string;
   clicks?: number;
   tags?: string[];
   aliases?: string[];

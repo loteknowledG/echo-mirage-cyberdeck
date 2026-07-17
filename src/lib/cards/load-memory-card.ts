@@ -96,7 +96,6 @@ export function loadMemoryCard(filePath: string): MemoryCard | null {
       title: parsed.title!,
       project: parsed.project,
       deck: parsed.deck,
-      risk: parsed.risk,
       clicks: parsed.clicks,
       tags: parsed.tags,
       aliases: parsed.aliases,

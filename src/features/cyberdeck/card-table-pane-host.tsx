@@ -35,14 +35,12 @@ export function CardTablePaneHost({ selectedCardIds, setSelectedCardIds }: CardT
           ? {
               title: getCardTableState().currentCard!.title,
               status: getCardTableState().currentCard!.status,
-              riskLevel: getCardTableState().currentCard!.riskLevel,
             }
           : null
       }
       stackCards={getCardTableState().executionStack.map((c) => ({
         title: c.title,
         status: c.status,
-        riskLevel: c.riskLevel,
       }))}
       stagedCards={selectedCardIds.map((id) => {
         const card = getCardTableState().stagedHand?.cards.find((c) => c.id === id);
@@ -50,14 +48,12 @@ export function CardTablePaneHost({ selectedCardIds, setSelectedCardIds }: CardT
           ? {
               title: card.title,
               purpose: card.purpose,
-              riskLevel: card.riskLevel,
               status: card.status,
               requiredConfirmation: card.requiredConfirmation,
             }
           : {
               title: id,
               purpose: "",
-              riskLevel: "low" as const,
               status: "staged" as const,
               requiredConfirmation: false,
             };

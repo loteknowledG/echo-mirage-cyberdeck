@@ -12,8 +12,6 @@ export type ReceiptType =
 
 export type ReceiptStatus = "success" | "failed" | "blocked";
 
-export type RiskLevel = "low" | "medium" | "high";
-
 export type ApprovalMode = "auto" | "operator" | "user" | "muthur";
 
 export type VerificationType = "none" | "content_hash" | "input_output" | "visual" | "logical";
@@ -51,7 +49,6 @@ export interface CapabilityRegisterReceipt extends ReceiptBase {
   type: "capability.register";
   capabilityId: string;
   capabilityName: string;
-  riskLevel: RiskLevel;
   receiptType: ReceiptType;
   verificationType: VerificationType;
   approvalMode: ApprovalMode;
@@ -94,7 +91,6 @@ export interface EnhancedCapabilityMetadata {
   environments: EnvironmentSupport;
   description: string;
   owner: ReceiptAuthority;
-  riskLevel: RiskLevel;
   receiptType: ReceiptType;
   verificationType: VerificationType;
   approvalMode: ApprovalMode;

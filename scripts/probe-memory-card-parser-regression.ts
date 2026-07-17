@@ -149,11 +149,10 @@ if (contentCard) {
 
 console.log("\n--- Optional Fields ---");
 
-writeTestCard("optional-fields", `---\ncard_id: test.optional.v0\ncard_type: memory\ntitle: Optional Fields\nproject: my-project\ndeck: my-deck\nrisk: caution\nclicks: 5\nversion: v1\n---\n# Optional`);
+writeTestCard("optional-fields", `---\ncard_id: test.optional.v0\ncard_type: memory\ntitle: Optional Fields\nproject: my-project\ndeck: my-deck\nclicks: 5\nversion: v1\n---\n# Optional`);
 const optionalCard = loadMemoryCard(join(testDir, "optional-fields.md"));
 assert("optional project parses", optionalCard?.project === "my-project");
 assert("optional deck parses", optionalCard?.deck === "my-deck");
-assert("optional risk parses", optionalCard?.risk === "caution");
 assert("optional clicks parses", optionalCard?.clicks === 5);
 assert("optional version parses", optionalCard?.version === "v1");
 

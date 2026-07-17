@@ -11,18 +11,6 @@ type RollADeckProps = {
   onCardChange?: (cardIndex: number, deckIndex: number) => void;
 };
 
-const RISK_COLORS: Record<string, string> = {
-  safe: "#22c55e",
-  caution: "#f59e0b",
-  restricted: "#ef4444",
-};
-
-const RISK_LABELS: Record<string, string> = {
-  safe: "SAFE",
-  caution: "CAUTION",
-  restricted: "RESTRICTED",
-};
-
 const CATEGORY_COLORS: Record<string, string> = {
   review: "#8b5cf6",
   capture: "#06b6d4",
@@ -60,7 +48,6 @@ function CardSlide({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const riskColor = RISK_COLORS[card.risk] ?? "#8a8a8a";
   const categoryColor = CATEGORY_COLORS[card.category] ?? "#8a8a8a";
 
   return (
@@ -87,12 +74,6 @@ function CardSlide({
               style={{ color: categoryColor }}
             >
               {card.category}
-            </span>
-            <span
-              className="rounded-full border px-2 py-1 font-mono text-[10px] tracking-[0.06em]"
-              style={{ color: riskColor, borderColor: `${riskColor}40` }}
-            >
-              {RISK_LABELS[card.risk]}
             </span>
           </div>
           <h3 className="font-mono text-xl leading-tight tracking-wide text-[#d8ffe5]">

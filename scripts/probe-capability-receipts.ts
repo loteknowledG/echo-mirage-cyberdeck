@@ -1,12 +1,10 @@
 import {
   CAPABILITY_REGISTRY,
   getCapability,
-  getRiskLevel,
   getApprovalMode,
   getReceiptType,
   getVerificationType,
   getCapabilityOwner,
-  getHighRiskActions,
   getActionsByApprovalMode,
   getCapabilityManifest,
   requiresConfirmation,
@@ -48,20 +46,11 @@ function main() {
   assert("manifest has 12 capabilities", manifest.length === 12);
 
   for (const cap of manifest) {
-    assert(`${cap.name} has riskLevel`, cap.riskLevel !== undefined);
     assert(`${cap.name} has receiptType`, cap.receiptType !== undefined);
     assert(`${cap.name} has verificationType`, cap.verificationType !== undefined);
     assert(`${cap.name} has approvalMode`, cap.approvalMode !== undefined);
     assert(`${cap.name} has owner`, cap.owner !== undefined);
   }
-
-  console.log("\n--- Risk Levels ---");
-  const highRisk = getHighRiskActions();
-  assert("paste_text is high risk", highRisk.includes("paste_text"));
-  assert("hotkey is high risk", highRisk.includes("hotkey"));
-  assert("get_active_window is low risk", getRiskLevel("get_active_window") === "low");
-  assert("capture_screen is medium risk", getRiskLevel("capture_screen") === "medium");
-  assert("2 high-risk actions", highRisk.length === 2);
 
   console.log("\n--- Approval Modes ---");
   const autoActions = getActionsByApprovalMode("auto");

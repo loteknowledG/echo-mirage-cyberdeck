@@ -1,11 +1,9 @@
 export type CardStatus = "staged" | "stacked" | "blocked" | "running" | "complete" | "failed" | "skipped";
-export type RiskLevel = "low" | "medium" | "high";
 
 export interface ExecutionCard {
   id: string;
   title: string;
   purpose: string;
-  riskLevel: RiskLevel;
   requiredConfirmation: boolean;
   status: CardStatus;
   inputsSummary: string;
@@ -213,13 +211,12 @@ export function getStagedCardCount(): number {
   return state.stagedHand?.cards.length ?? 0;
 }
 
-export function prepareHandFromRegistry(handName: string, registryCards: Array<{ id: string; name: string; description: string; risk: string; requiresConfirmation: boolean }>): ExecutionHand {
+export function prepareHandFromRegistry(handName: string, registryCards: Array<{ id: string; name: string; description: string; requiresConfirmation: boolean }>): ExecutionHand {
   const now = new Date().toISOString();
   const cards: ExecutionCard[] = registryCards.map((rc) => ({
     id: makeId("card"),
     title: rc.name,
     purpose: rc.description,
-    riskLevel: rc.risk === "safe" ? "low" : rc.risk === "caution" ? "medium" : "high",
     requiredConfirmation: rc.requiresConfirmation,
     status: "staged",
     inputsSummary: "",
@@ -241,7 +238,7 @@ export function prepareHandFromRegistry(handName: string, registryCards: Array<{
   return hand;
 }
 
-export function syncStagedHandFromSelectedIds(selectedCardIds: string[], registryCards: Record<string, { name: string; description: string; risk: string; requiresConfirmation: boolean }>): ExecutionHand {
+export function syncStagedHandFromSelectedIds(selectedCardIds: string[], registryCards: Record<string, { name: string; description: string; requiresConfirmation: boolean }>): ExecutionHand {
   const now = new Date().toISOString();
   const cards: ExecutionCard[] = selectedCardIds.map((id) => {
     const rc = registryCards[id];
@@ -249,7 +246,6 @@ export function syncStagedHandFromSelectedIds(selectedCardIds: string[], registr
       id: makeId("card"),
       title: rc?.name ?? id,
       purpose: rc?.description ?? "",
-      riskLevel: (rc?.risk === "safe" ? "low" : rc?.risk === "caution" ? "medium" : "high") as RiskLevel,
       requiredConfirmation: rc?.requiresConfirmation ?? false,
       status: "staged" as CardStatus,
       inputsSummary: "",
@@ -286,7 +282,7 @@ export function describeDeck(): string {
     lines.push("## Staged Hand");
     lines.push(`  ${deck.stagedHand.name} — ${deck.stagedHand.cards.length} card(s)`);
     for (const card of deck.stagedHand.cards) {
-      lines.push(`    [ ] ${card.title} (${card.riskLevel} risk) — ${card.purpose}`);
+      lines.push(`    [ ] ${card.title} — ${card.purpose}`);
     }
     lines.push("");
   }
@@ -296,7 +292,7 @@ export function describeDeck(): string {
     deck.executionStack.forEach((card, idx) => {
       const topMarker = idx === 0 ? ">>>" : "   ";
       const statusMarker = card.status === "stacked" ? "[S]" : card.status === "blocked" ? "[B]" : card.status === "running" ? "[R]" : card.status === "complete" ? "[OK]" : card.status === "failed" ? "[FL]" : card.status === "skipped" ? "[SK]" : "[?]";
-      lines.push(`  ${topMarker} ${statusMarker} ${card.title} (${card.riskLevel})`);
+      lines.push(`  ${topMarker} ${statusMarker} ${card.title}`);
     });
     lines.push("");
   }
@@ -322,7 +318,6 @@ export function buildReviewerHand(): ExecutionCard[] {
       id: makeId("card"),
       title: "Capture Builder Result",
       purpose: "Package the current build output into a structured artifact for review.",
-      riskLevel: "low",
       requiredConfirmation: true,
       status: "staged",
       inputsSummary: "Build artifacts, routes count, type errors",
@@ -335,7 +330,6 @@ export function buildReviewerHand(): ExecutionCard[] {
       id: makeId("card"),
       title: "Request Codex Review",
       purpose: "Present the current state to an AI reviewer for assessment.",
-      riskLevel: "medium",
       requiredConfirmation: true,
       status: "staged",
       inputsSummary: "Current file state, changed files, git diff",
@@ -348,7 +342,6 @@ export function buildReviewerHand(): ExecutionCard[] {
       id: makeId("card"),
       title: "Summarize Review",
       purpose: "Condense review findings into executive summary format.",
-      riskLevel: "low",
       requiredConfirmation: false,
       status: "staged",
       inputsSummary: "Review output, artifact references",
@@ -361,7 +354,6 @@ export function buildReviewerHand(): ExecutionCard[] {
       id: makeId("card"),
       title: "Archive Outcome",
       purpose: "Commit the current session state to the operational archive.",
-      riskLevel: "low",
       requiredConfirmation: true,
       status: "staged",
       inputsSummary: "Session state, deck contents, timestamp",
