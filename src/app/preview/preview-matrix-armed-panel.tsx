@@ -216,24 +216,19 @@ export function PreviewMatrixArmedPanel({
             ? "Hold disabled while executing…"
             : `Hold panel — runner ×${CARD_PLAY_LAPS} to cancel`}
       </p>
-      <div className="cardOpenViewportActions">
-        {continuousActive ? (
-          <button type="button" className="push is-stop" onClick={handleStop} data-testid="survey-continuous-stop">
-            Stop
-          </button>
-        ) : (
-          <>
-            <button type="button" className="cardClose" onClick={onResetCardPlay}>
-              Close
+      {continuousActive || showComposer ? (
+        <div className="cardOpenViewportActions">
+          {continuousActive ? (
+            <button type="button" className="push is-stop" onClick={handleStop} data-testid="survey-continuous-stop">
+              Stop
             </button>
-            {showComposer ? (
-              <button type="button" className="push" onClick={handlePush}>
-                Push
-              </button>
-            ) : null}
-          </>
-        )}
-      </div>
+          ) : (
+            <button type="button" className="push" onClick={handlePush}>
+              Push
+            </button>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }
