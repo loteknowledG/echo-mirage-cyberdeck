@@ -134,7 +134,6 @@ export function useSurveyDeckCommands({
         actor: "operator",
         card: {
           deckName: deck.name,
-          risk: card.risk,
           title: card.title,
           type: card.type,
         },

@@ -15,7 +15,6 @@ export type PowerFistStackCommand = {
   actor: PowerFistStackActor;
   card: {
     deckName: string;
-    risk: string;
     title: string;
     type: string;
   };
