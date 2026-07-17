@@ -6,7 +6,10 @@ import { ALL_PREVIEW_DECKS, type PreviewDeckWithTarget } from "./preview-data";
 import { PreviewMatrixArmedPanel } from "./preview-matrix-armed-panel";
 import { PreviewMatrixDeckCarousel } from "./preview-matrix-deck-carousel";
 import { PowerfistJoystickControls } from "./powerfist-joystick-controls";
-import { CARD_PLAY_TRAIL_DURATION_MS } from "./preview-matrix-play";
+import {
+  CARD_PLAY_LAPS,
+  CARD_PLAY_TRAIL_DURATION_MS,
+} from "./preview-matrix-play";
 import { usePowerfistMatrixRemote } from "./use-powerfist-matrix-remote";
 import { usePreviewMatrixCarousels } from "./use-preview-matrix-carousels";
 import { usePreviewMatrixCardPlay } from "./use-preview-matrix-card-play";
@@ -43,7 +46,9 @@ export function PreviewMatrix({
     !surveyCommandMode,
   );
 
-  const handlePushCardRef = useRef<(deckIndex: number, cardIndex: number) => void>(() => {});
+  const handlePushCardRef = useRef<
+    (deckIndex: number, cardIndex: number) => Promise<{ ok: boolean; message: string; keepArmed?: boolean }>
+  >(async () => ({ ok: false, message: "Not ready." }));
 
   const {
     armedCard,
@@ -53,6 +58,9 @@ export function PreviewMatrix({
     armedPanelTraceKey,
     composerText,
     setComposerText,
+    executionPending,
+    executionResult,
+    setExecutionResult,
     cancelCardHold,
     cancelArmedPanelHold,
     resetCardPlay,
@@ -65,12 +73,10 @@ export function PreviewMatrix({
     applyFocus,
     navigateCard,
     navigateDeck,
-    onArmedPanelPush: (deckIndex, cardIndex) => {
-      handlePushCardRef.current(deckIndex, cardIndex);
-    },
+    onExecuteCard: (deckIndex, cardIndex) => handlePushCardRef.current(deckIndex, cardIndex),
   });
 
-  const { handlePushCard, pushReceiptHtml } = useSurveyDeckCommands({
+  const { handlePushCard } = useSurveyDeckCommands({
     activeDecks,
     applyFocus,
     composerText,
@@ -79,12 +85,10 @@ export function PreviewMatrix({
     remoteSocketRef,
   });
 
-  handlePushCardRef.current = (deckIndex, cardIndex) => {
-    void handlePushCard(deckIndex, cardIndex).then((result) => {
-      if (!result?.keepArmed) {
-        resetCardPlay();
-      }
-    });
+  handlePushCardRef.current = async (deckIndex, cardIndex) => {
+    const result = await handlePushCard(deckIndex, cardIndex);
+    // Keep the large card open so it can show the execution result (cancel with ×3 hold).
+    return { ...result, keepArmed: result.keepArmed ?? true };
   };
 
   return (
@@ -95,6 +99,7 @@ export function PreviewMatrix({
       style={
         {
           "--pf-card-play-trail-ms": `${CARD_PLAY_TRAIL_DURATION_MS}ms`,
+          "--pf-card-play-laps": CARD_PLAY_LAPS,
         } as React.CSSProperties
       }
     >
@@ -124,24 +129,21 @@ export function PreviewMatrix({
                   armedPanelArming={armedPanelArming}
                   armedPanelTraceKey={armedPanelTraceKey}
                   composerText={composerText}
+                  executionPending={executionPending}
+                  executionResult={executionResult}
                   onCancelArmedPanelHold={cancelArmedPanelHold}
                   onArmedPanelPointerDown={handleArmedPanelPointerDown}
                   onArmedPanelPointerMove={handleArmedPanelPointerMove}
                   onComposerTextChange={setComposerText}
-                  onPushCard={handlePushCard}
+                  onPushCard={async (deckIndex, cardIndex) => {
+                    const result = await handlePushCardRef.current(deckIndex, cardIndex);
+                    setExecutionResult(result);
+                    return result;
+                  }}
                   onResetCardPlay={() => {
                     stopSurveyContinuousScreenshot();
                     resetCardPlay();
                   }}
-                />
-              ) : null}
-              {pushReceiptHtml ? (
-                <div
-                  aria-live="polite"
-                  className="cardPushReceipt"
-                  data-testid="powerfist-push-receipt"
-                  dangerouslySetInnerHTML={{ __html: pushReceiptHtml }}
-                  role="status"
                 />
               ) : null}
             </section>

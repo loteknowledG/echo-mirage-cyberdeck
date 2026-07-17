@@ -77,7 +77,7 @@ export function useSurveyDeckCommands({
           const echoCtx = resolveSurveyEchoDeckContext();
           const result = isSurveyContinuousScreenshotRunning()
             ? { ...stopSurveyContinuousScreenshot(), keepArmed: false }
-            : await startSurveyContinuousScreenshot(echoCtx);
+            : { ...(await startSurveyContinuousScreenshot(echoCtx)), keepArmed: true };
           showPushReceipt(
             result.ok
               ? `<strong>${card.title}</strong> — ${result.message}`

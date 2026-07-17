@@ -5,11 +5,15 @@ import type { PreviewDeckWithTarget } from "./preview-data";
 import { SURVEY_ECHO_COMMAND } from "@/lib/cyberdeck/survey-deck-data";
 import { useSurveyContinuousScreenshotStatus } from "@/lib/cyberdeck/survey-continuous-screenshot.client";
 import {
+  CARD_PLAY_LAPS,
   CARD_PLAY_TRACE_PATH,
   cardNeedsComposer,
   composerPlaceholderForArg,
 } from "./preview-matrix-play";
-import type { ArmedPanelArmingMode } from "./use-preview-matrix-card-play";
+import type {
+  ArmedPanelArmingMode,
+  CardExecutionResult,
+} from "./use-preview-matrix-card-play";
 
 type ArmedCard = {
   card: PreviewDeckWithTarget["cards"][number];
@@ -23,11 +27,16 @@ type PreviewMatrixArmedPanelProps = {
   armedPanelArming: ArmedPanelArmingMode | null;
   armedPanelTraceKey: number;
   composerText: string;
+  executionPending?: boolean;
+  executionResult?: CardExecutionResult | null;
   onCancelArmedPanelHold: () => void;
   onArmedPanelPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
   onArmedPanelPointerMove: (event: React.PointerEvent<HTMLElement>) => void;
   onComposerTextChange: (value: string) => void;
-  onPushCard: (deckIndex: number, cardIndex: number) => void | Promise<unknown>;
+  onPushCard: (
+    deckIndex: number,
+    cardIndex: number,
+  ) => void | Promise<CardExecutionResult | unknown>;
   onResetCardPlay: () => void;
 };
 
@@ -36,6 +45,8 @@ export function PreviewMatrixArmedPanel({
   armedPanelArming,
   armedPanelTraceKey,
   composerText,
+  executionPending = false,
+  executionResult = null,
   onCancelArmedPanelHold,
   onArmedPanelPointerDown,
   onArmedPanelPointerMove,
@@ -47,13 +58,15 @@ export function PreviewMatrixArmedPanel({
   const isContinuousCard =
     armedCard.card.surveyCommand === SURVEY_ECHO_COMMAND.CONTINUOUS_SCREENSHOTS;
   const continuousActive = isContinuousCard && continuous.running;
+  const needsComposer = cardNeedsComposer(armedCard.card);
+  const showComposer = needsComposer && !executionResult && !executionPending;
 
   const handlePush = () => {
     void Promise.resolve(onPushCard(armedCard.deckIndex, armedCard.cardIndex)).then((result) => {
       const keepArmed =
         result && typeof result === "object" && "keepArmed" in result
           ? Boolean((result as { keepArmed?: boolean }).keepArmed)
-          : false;
+          : true;
       if (!keepArmed) onResetCardPlay();
     });
   };
@@ -62,14 +75,28 @@ export function PreviewMatrixArmedPanel({
     onResetCardPlay();
   };
 
+  const statusLabel = continuousActive
+    ? "Live // Continuous capture"
+    : armedPanelArming === "cancel"
+      ? `Canceling // Trace ×${CARD_PLAY_LAPS}`
+      : executionPending
+        ? "Executing…"
+        : executionResult
+          ? executionResult.ok
+            ? "Result // Complete"
+            : "Result // Failed"
+          : showComposer
+            ? "Prepared // Enter argument"
+            : "Prepared // Locked";
+
   return (
     <section
-      className={`cardOpenViewport${armedPanelArming === "push" ? " is-arming-push" : ""}${armedPanelArming === "cancel" ? " is-arming-cancel" : ""}${continuousActive ? " is-continuous-active" : ""}`}
+      className={`cardOpenViewport${armedPanelArming === "cancel" ? " is-arming-cancel" : ""}${continuousActive ? " is-continuous-active" : ""}${executionPending ? " is-executing" : ""}${executionResult && !executionResult.ok ? " is-result-failed" : ""}${executionResult?.ok ? " is-result-ok" : ""}`}
       data-testid="powerfist-open-card"
-      onPointerDown={continuousActive ? undefined : onArmedPanelPointerDown}
-      onPointerMove={continuousActive ? undefined : onArmedPanelPointerMove}
-      onPointerUp={continuousActive ? undefined : onCancelArmedPanelHold}
-      onPointerCancel={continuousActive ? undefined : onCancelArmedPanelHold}
+      onPointerDown={continuousActive || executionPending ? undefined : onArmedPanelPointerDown}
+      onPointerMove={continuousActive || executionPending ? undefined : onArmedPanelPointerMove}
+      onPointerUp={continuousActive || executionPending ? undefined : onCancelArmedPanelHold}
+      onPointerCancel={continuousActive || executionPending ? undefined : onCancelArmedPanelHold}
     >
       {armedPanelArming ? (
         <svg
@@ -90,16 +117,10 @@ export function PreviewMatrixArmedPanel({
         <div>
           <div className="cardArmedPanelStatus">
             <span
-              className={`cardArmedPanelDot${armedPanelArming === "cancel" ? " is-cancel" : ""}`}
+              className={`cardArmedPanelDot${armedPanelArming === "cancel" ? " is-cancel" : ""}${executionResult && !executionResult.ok ? " is-cancel" : ""}`}
               aria-hidden
             />
-            {continuousActive
-              ? "Live // Continuous capture"
-              : armedPanelArming === "cancel"
-                ? "Disarming // Red reverse ×2"
-                : armedPanelArming === "push"
-                  ? "Arming push // Trace ×2"
-                  : "Prepared // Locked"}
+            {statusLabel}
           </div>
           <h2 className="cardOpenViewportTitle">{armedCard.card.title}</h2>
         </div>
@@ -122,7 +143,20 @@ export function PreviewMatrixArmedPanel({
             {armedCard.card.preview.value}
           </pre>
         ) : null}
-        <p className="cardOpenViewportPurpose">{armedCard.card.purpose}</p>
+        {executionPending ? (
+          <p className="cardOpenViewportPurpose" data-testid="powerfist-execution-pending">
+            Running {armedCard.card.title}…
+          </p>
+        ) : executionResult ? (
+          <p
+            className={`cardOpenViewportPurpose cardOpenViewportResult${executionResult.ok ? " is-ok" : " is-fail"}`}
+            data-testid="powerfist-execution-result"
+          >
+            {executionResult.message}
+          </p>
+        ) : (
+          <p className="cardOpenViewportPurpose">{armedCard.card.purpose}</p>
+        )}
         {continuousActive ? (
           <div className="survey-continuous-shot-panel" data-testid="survey-continuous-shot-panel">
             <p className="survey-continuous-shot-label">
@@ -142,7 +176,7 @@ export function PreviewMatrixArmedPanel({
             </p>
           </div>
         ) : null}
-        {cardNeedsComposer(armedCard.card) ? (
+        {showComposer ? (
           <label className="cardOpenViewportComposer">
             <span className="cardOpenViewportComposerLabel">
               {armedCard.card.toolOverride?.composerArg}
@@ -158,8 +192,7 @@ export function PreviewMatrixArmedPanel({
               onKeyDown={(event) => {
                 if (event.key !== "Enter") return;
                 event.preventDefault();
-                onPushCard(armedCard.deckIndex, armedCard.cardIndex);
-                onResetCardPlay();
+                handlePush();
               }}
             />
           </label>
@@ -168,7 +201,9 @@ export function PreviewMatrixArmedPanel({
       <p className="cardOpenViewportGestureHint">
         {continuousActive
           ? "Continuous mode — Stop to disarm this card."
-          : "Hold panel — clockwise trace ×2 to push · counter-clockwise red ×2 to cancel"}
+          : executionPending
+            ? "Hold disabled while executing…"
+            : `Hold panel — runner ×${CARD_PLAY_LAPS} to cancel`}
       </p>
       <div className="cardOpenViewportActions">
         {continuousActive ? (
@@ -180,9 +215,11 @@ export function PreviewMatrixArmedPanel({
             <button type="button" className="cardClose" onClick={onResetCardPlay}>
               Close
             </button>
-            <button type="button" className="push" onClick={handlePush}>
-              Push
-            </button>
+            {showComposer ? (
+              <button type="button" className="push" onClick={handlePush}>
+                Push
+              </button>
+            ) : null}
           </>
         )}
       </div>

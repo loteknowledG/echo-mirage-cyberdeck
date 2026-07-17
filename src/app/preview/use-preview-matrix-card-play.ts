@@ -2,9 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PreviewDeckWithTarget } from "./preview-data";
-import { CARD_PLAY_TRAIL_DURATION_MS } from "./preview-matrix-play";
+import { CARD_PLAY_TRAIL_DURATION_MS, cardNeedsComposer } from "./preview-matrix-play";
 
-export type ArmedPanelArmingMode = "push" | "cancel";
+export type ArmedPanelArmingMode = "cancel";
+
+export type CardExecutionResult = {
+  ok: boolean;
+  message: string;
+  keepArmed?: boolean;
+};
 
 type ArmedCard = {
   card: PreviewDeckWithTarget["cards"][number];
@@ -18,14 +24,12 @@ type UsePreviewMatrixCardPlayOptions = {
   applyFocus: (deckIndex: number, cardIndex: number) => void;
   navigateCard: (direction: 1 | -1) => void;
   navigateDeck: (direction: 1 | -1) => void;
-  onArmedPanelPush?: (deckIndex: number, cardIndex: number) => void;
+  /** Hold ×3 on a deck card executes immediately (unless the card needs a composer). */
+  onExecuteCard?: (
+    deckIndex: number,
+    cardIndex: number,
+  ) => Promise<CardExecutionResult | void> | CardExecutionResult | void;
 };
-
-function normalizeAngleDelta(delta: number): number {
-  if (delta > Math.PI) return delta - Math.PI * 2;
-  if (delta < -Math.PI) return delta + Math.PI * 2;
-  return delta;
-}
 
 function isInteractiveArmedTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -37,13 +41,15 @@ export function usePreviewMatrixCardPlay({
   applyFocus,
   navigateCard,
   navigateDeck,
-  onArmedPanelPush,
+  onExecuteCard,
 }: UsePreviewMatrixCardPlayOptions) {
   const [composerText, setComposerText] = useState("");
   const [armingCardKey, setArmingCardKey] = useState<string | null>(null);
   const [armedCardKey, setArmedCardKey] = useState<string | null>(null);
   const [armedPanelArming, setArmedPanelArming] = useState<ArmedPanelArmingMode | null>(null);
   const [armedPanelTraceKey, setArmedPanelTraceKey] = useState(0);
+  const [executionPending, setExecutionPending] = useState(false);
+  const [executionResult, setExecutionResult] = useState<CardExecutionResult | null>(null);
 
   const cardHoldRef = useRef<{
     key: string;
@@ -55,13 +61,11 @@ export function usePreviewMatrixCardPlay({
 
   const armedPanelHoldRef = useRef<{
     pointerId: number;
-    mode: ArmedPanelArmingMode;
-    angleSum: number;
-    lastAngle: number;
-    centerX: number;
-    centerY: number;
     timer: ReturnType<typeof setTimeout>;
   } | null>(null);
+
+  const onExecuteCardRef = useRef(onExecuteCard);
+  onExecuteCardRef.current = onExecuteCard;
 
   const armedCard = useMemo((): ArmedCard | null => {
     if (!armedCardKey) return null;
@@ -93,45 +97,34 @@ export function usePreviewMatrixCardPlay({
     const openedCardKey = armedCardKey;
     setArmedCardKey(null);
     setComposerText("");
+    setExecutionPending(false);
+    setExecutionResult(null);
     if (!openedCardKey) return;
     const [deckIndex, cardIndex] = openedCardKey.split(":").map(Number);
     requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
   }, [applyFocus, armedCardKey, cancelArmedPanelHold, cancelCardHold]);
 
-  const completeArmedPanelHold = useCallback(
-    (mode: ArmedPanelArmingMode) => {
-      if (!armedCardKey) return;
-      const [deckIndex, cardIndex] = armedCardKey.split(":").map(Number);
-      armedPanelHoldRef.current = null;
-      setArmedPanelArming(null);
-      if (mode === "push") {
-        onArmedPanelPush?.(deckIndex, cardIndex);
-        cancelCardHold();
-        setComposerText("");
-        return;
+  const runCardExecution = useCallback(async (deckIndex: number, cardIndex: number) => {
+    setExecutionPending(true);
+    setExecutionResult(null);
+    try {
+      const result = await onExecuteCardRef.current?.(deckIndex, cardIndex);
+      if (result && typeof result === "object") {
+        setExecutionResult(result);
+        if (result.keepArmed === false) {
+          // Continuous stop / explicit dismiss after execute.
+          setArmedCardKey(null);
+          setComposerText("");
+          setExecutionPending(false);
+          requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
+          return result;
+        }
       }
-      cancelCardHold();
-      setArmedCardKey(null);
-      setComposerText("");
-      requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
-    },
-    [applyFocus, armedCardKey, cancelCardHold, onArmedPanelPush],
-  );
-
-  const restartArmedPanelTimer = useCallback(
-    (pointerId: number) => {
-      const hold = armedPanelHoldRef.current;
-      if (!hold || hold.pointerId !== pointerId) return;
-      clearTimeout(hold.timer);
-      setArmedPanelTraceKey((key) => key + 1);
-      hold.timer = setTimeout(() => {
-        const current = armedPanelHoldRef.current;
-        if (!current || current.pointerId !== pointerId) return;
-        completeArmedPanelHold(current.mode);
-      }, CARD_PLAY_TRAIL_DURATION_MS);
-    },
-    [completeArmedPanelHold],
-  );
+      return result;
+    } finally {
+      setExecutionPending(false);
+    }
+  }, [applyFocus]);
 
   const handleCardPointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>, deckIndex: number, cardIndex: number) => {
@@ -139,6 +132,7 @@ export function usePreviewMatrixCardPlay({
       if (armedCardKey) return;
       cancelCardHold();
       setArmedCardKey(null);
+      setExecutionResult(null);
       applyFocus(deckIndex, cardIndex);
       const key = `${deckIndex}:${cardIndex}`;
       const timer = setTimeout(() => {
@@ -147,6 +141,13 @@ export function usePreviewMatrixCardPlay({
         setArmingCardKey(null);
         setComposerText("");
         setArmedCardKey(key);
+
+        const deck = activeDecks[deckIndex];
+        const card = deck?.cards[cardIndex];
+        // Composer cards open the large panel for input; everything else executes on activate.
+        if (card && !cardNeedsComposer(card)) {
+          void runCardExecution(deckIndex, cardIndex);
+        }
       }, CARD_PLAY_TRAIL_DURATION_MS);
       cardHoldRef.current = {
         key,
@@ -157,7 +158,7 @@ export function usePreviewMatrixCardPlay({
       };
       setArmingCardKey(key);
     },
-    [applyFocus, armedCardKey, cancelCardHold],
+    [activeDecks, applyFocus, armedCardKey, cancelCardHold, runCardExecution],
   );
 
   const handleCardPointerMove = useCallback(
@@ -175,61 +176,40 @@ export function usePreviewMatrixCardPlay({
     (event: React.PointerEvent<HTMLElement>) => {
       if (event.button !== 0 || !event.isPrimary || !armedCardKey) return;
       if (isInteractiveArmedTarget(event.target)) return;
+      if (executionPending) return;
 
       cancelArmedPanelHold();
-      const rect = event.currentTarget.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const startAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
 
       const timer = setTimeout(() => {
         const hold = armedPanelHoldRef.current;
         if (!hold || hold.pointerId !== event.pointerId) return;
-        completeArmedPanelHold(hold.mode);
+        armedPanelHoldRef.current = null;
+        setArmedPanelArming(null);
+        // 3-lap hold on the result card = cancel / dismiss.
+        const [deckIndex, cardIndex] = armedCardKey.split(":").map(Number);
+        cancelCardHold();
+        setArmedCardKey(null);
+        setComposerText("");
+        setExecutionResult(null);
+        requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
       }, CARD_PLAY_TRAIL_DURATION_MS);
 
       armedPanelHoldRef.current = {
         pointerId: event.pointerId,
-        mode: "push",
-        angleSum: 0,
-        lastAngle: startAngle,
-        centerX,
-        centerY,
         timer,
       };
       setArmedPanelTraceKey((key) => key + 1);
-      setArmedPanelArming("push");
+      setArmedPanelArming("cancel");
       event.currentTarget.setPointerCapture(event.pointerId);
     },
-    [armedCardKey, cancelArmedPanelHold, completeArmedPanelHold],
+    [applyFocus, armedCardKey, cancelArmedPanelHold, cancelCardHold, executionPending],
   );
 
   const handleArmedPanelPointerMove = useCallback(
-    (event: React.PointerEvent<HTMLElement>) => {
-      const hold = armedPanelHoldRef.current;
-      if (!hold || hold.pointerId !== event.pointerId) return;
-
-      const angle = Math.atan2(event.clientY - hold.centerY, event.clientX - hold.centerX);
-      hold.angleSum += normalizeAngleDelta(angle - hold.lastAngle);
-      hold.lastAngle = angle;
-
-      const ccwThreshold = -Math.PI / 3;
-      const cwThreshold = Math.PI / 6;
-
-      if (hold.angleSum < ccwThreshold && hold.mode !== "cancel") {
-        hold.mode = "cancel";
-        setArmedPanelArming("cancel");
-        restartArmedPanelTimer(event.pointerId);
-        return;
-      }
-
-      if (hold.angleSum > cwThreshold && hold.mode !== "push") {
-        hold.mode = "push";
-        setArmedPanelArming("push");
-        restartArmedPanelTimer(event.pointerId);
-      }
+    (_event: React.PointerEvent<HTMLElement>) => {
+      // Result-card cancel is hold-only — no clockwise/ccw mode switching.
     },
-    [restartArmedPanelTimer],
+    [],
   );
 
   useEffect(() => {
@@ -263,6 +243,10 @@ export function usePreviewMatrixCardPlay({
     armedPanelTraceKey,
     composerText,
     setComposerText,
+    executionPending,
+    executionResult,
+    setExecutionResult,
+    runCardExecution,
     cancelCardHold,
     cancelArmedPanelHold,
     resetCardPlay,
