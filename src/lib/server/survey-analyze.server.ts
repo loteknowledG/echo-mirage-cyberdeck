@@ -3,7 +3,10 @@
 
 import { SURVEY_SELECTED_TEXT_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
 import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
-import { defaultSurveyVisionModel } from "@/lib/cyberdeck/survey-vision-defaults";
+import {
+  defaultSurveyVisionModel,
+  SURVEY_OPENROUTER_VISION_MODELS,
+} from "@/lib/cyberdeck/survey-vision-defaults";
 import { isCodexCliAvailable } from "@/lib/server/cadre/adapters/codex-runtime-adapter.server";
 import { resolveServerProviderCredentials } from "@/lib/server/provider-credentials.server";
 import {
@@ -109,10 +112,47 @@ export type SurveyAnalyzeResult =
   | { ok: true; text: string; model: string; provider: string }
   | { ok: false; error: string };
 
+/** Retryable upstream failures — rate limit, quota, model gone/overloaded. */
+function isRetryableVisionFailure(error: string): boolean {
+  return /rate.?limit|429|402|quota|overloaded|unavailable|not found|no endpoints|capacity/i.test(
+    error,
+  );
+}
+
+/** Failover order for OpenRouter free VL models: selected model first, then the rest. */
+function openrouterVisionFailoverModels(selected: string): string[] {
+  const rest = SURVEY_OPENROUTER_VISION_MODELS.map((option) => option.id).filter(
+    (id) => id !== selected,
+  );
+  return [selected, ...rest];
+}
+
 async function analyzeSurveyCaptureViaApi(
   input: SurveyAnalyzeInput,
   provider: "openai" | "openrouter",
   pngList: string[],
+): Promise<SurveyAnalyzeResult> {
+  const selected = input.model?.trim() || resolveVisionModel(provider);
+  if (provider !== "openrouter") {
+    return analyzeSurveyCaptureViaApiModel(input, provider, pngList, selected);
+  }
+
+  // Free-tier models throttle independently — roll through the VL list until one answers.
+  const errors: string[] = [];
+  for (const model of openrouterVisionFailoverModels(selected)) {
+    const result = await analyzeSurveyCaptureViaApiModel(input, provider, pngList, model);
+    if (result.ok) return result;
+    errors.push(`${model}: ${result.error}`);
+    if (!isRetryableVisionFailure(result.error)) break;
+  }
+  return { ok: false, error: errors.join(" · ") };
+}
+
+async function analyzeSurveyCaptureViaApiModel(
+  input: SurveyAnalyzeInput,
+  provider: "openai" | "openrouter",
+  pngList: string[],
+  model: string,
 ): Promise<SurveyAnalyzeResult> {
   const endpoint = resolveChatEndpoint(provider);
   if (!endpoint) {
@@ -127,7 +167,6 @@ async function analyzeSurveyCaptureViaApi(
     return { ok: false, error: `No API key for ${provider}.` };
   }
 
-  const model = input.model?.trim() || resolveVisionModel(provider);
   const prompt = resolveCapturePrompt(input, pngList.length);
   const content: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
   for (const [index, png] of pngList.entries()) {
