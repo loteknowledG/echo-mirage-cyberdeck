@@ -512,32 +512,6 @@
   padding: 5px;
 }
 
-.powerfist-preview-root .cardBottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 10px;
-}
-
-.powerfist-preview-root .risk {
-  font-size: 10px;
-  border-radius: 999px;
-  padding: 4px 7px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-.powerfist-preview-root .risk.safe {
-  color: var(--pf-green);
-}
-
-.powerfist-preview-root .risk.caution {
-  color: var(--pf-amber);
-}
-
-.powerfist-preview-root .risk.restricted {
-  color: var(--pf-red);
-}
-
 .powerfist-preview-root .cardOpenViewport {
   position: absolute;
   inset: 0;

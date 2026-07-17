@@ -98,9 +98,6 @@ export function PreviewMatrixDeckCarousel({
                         ) : null}
                         <div className="cardPurpose">{card.purpose}</div>
                       </div>
-                      <div className="cardBottom">
-                        <span className={`risk ${card.risk}`}>{card.risk}</span>
-                      </div>
                     </div>
                   </article>
                 );

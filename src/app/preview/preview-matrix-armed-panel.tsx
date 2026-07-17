@@ -124,7 +124,6 @@ export function PreviewMatrixArmedPanel({
           </div>
           <h2 className="cardOpenViewportTitle">{armedCard.card.title}</h2>
         </div>
-        <span className={`risk ${armedCard.card.risk}`}>{armedCard.card.risk}</span>
       </div>
       <div className="cardOpenViewportBody">
         <div className="cardOpenViewportType">{armedCard.card.type}</div>
