@@ -105,6 +105,10 @@ export function usePreviewMatrixCarousels(
       return false;
     }
 
+    // Survey PowerFist decks are small (2 decks · 3 cards) — no wrap so card/deck
+    // position reads as a navigation cue instead of an endless loop.
+    const loopCarousels = embedSurface !== "survey";
+
     deckEmblaRef.current?.destroy();
     handEmblaRefs.current.forEach((embla) => embla?.destroy());
     handEmblaRefs.current = [];
@@ -115,11 +119,11 @@ export function usePreviewMatrixCarousels(
 
       const handEmbla = EmblaCarousel(handViewport, {
         axis: "x",
-        loop: true,
+        loop: loopCarousels,
         align: "center",
-        dragFree: true,
+        dragFree: loopCarousels,
         skipSnaps: false,
-        containScroll: false,
+        containScroll: loopCarousels ? false : "trimSnaps",
       });
 
       handEmblaRefs.current[deckIndex] = handEmbla;
@@ -143,10 +147,10 @@ export function usePreviewMatrixCarousels(
 
     const deckEmbla = EmblaCarousel(deckViewport, {
       axis: "y",
-      loop: true,
+      loop: loopCarousels,
       align: "center",
       dragFree: false,
-      containScroll: false,
+      containScroll: loopCarousels ? false : "trimSnaps",
       duration: 30,
     });
 
@@ -165,7 +169,7 @@ export function usePreviewMatrixCarousels(
     setActiveFocus(next.deckIndex, next.cardIndex);
 
     return true;
-  }, [activeDecks, setActiveFocus, syncFromEmbla]);
+  }, [activeDecks, embedSurface, setActiveFocus, syncFromEmbla]);
 
   useLayoutEffect(() => {
     let cancelled = false;

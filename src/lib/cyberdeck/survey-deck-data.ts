@@ -26,6 +26,79 @@ export type SurveyDeckCommandId =
   | (typeof SURVEY_ECHO_COMMAND)[keyof typeof SURVEY_ECHO_COMMAND]
   | (typeof SURVEY_MIRAGE_COMMAND)[keyof typeof SURVEY_MIRAGE_COMMAND];
 
+/** PowerFist Survey decks — focused screenshot + extension flows (own command router). */
+export const SURVEY_POWERFIST_DECK_COMMAND = {
+  ECHO_SCREENSHOT: SURVEY_ECHO_COMMAND.SCREENSHOT,
+  SOLVE_CAPTURE: "powerfist.solve-capture",
+  CLEAR_CAPTURE: "powerfist.clear-capture",
+  EXT_CAPTURE_ACTIVE_TAB: "powerfist.ext-capture-active-tab",
+  EXT_SOLVE: "powerfist.ext-solve",
+  EXT_CLEAR: "powerfist.ext-clear",
+} as const;
+
+export type SurveyPowerfistDeckCommandId =
+  (typeof SURVEY_POWERFIST_DECK_COMMAND)[keyof typeof SURVEY_POWERFIST_DECK_COMMAND];
+
+/** Two-deck PowerFist layout: Screenshot deck + Extension deck (3 cards each, no wrap). */
+export const SURVEY_POWERFIST_DECKS: PreviewDeckWithTarget[] = [
+  {
+    name: "Screenshot Deck",
+    badge: "echo capture",
+    targetPane: "operator",
+    cards: [
+      {
+        type: "echo",
+        title: "Echo Screenshot",
+        purpose: "Capture the Echo Mac display and stage it as a Mirage page.",
+        risk: "safe",
+        surveyCommand: SURVEY_POWERFIST_DECK_COMMAND.ECHO_SCREENSHOT,
+      },
+      {
+        type: "mirage",
+        title: "Solve",
+        purpose: "Run vision SOLVE on the staged screenshot page(s).",
+        risk: "caution",
+        surveyCommand: SURVEY_POWERFIST_DECK_COMMAND.SOLVE_CAPTURE,
+      },
+      {
+        type: "mirage",
+        title: "Clear",
+        purpose: "Clear the staged screenshot pages to start a fresh question.",
+        risk: "safe",
+        surveyCommand: SURVEY_POWERFIST_DECK_COMMAND.CLEAR_CAPTURE,
+      },
+    ],
+  },
+  {
+    name: "Extension Deck",
+    badge: "browser capture",
+    targetPane: "operator",
+    cards: [
+      {
+        type: "mirage",
+        title: "Capture Active Tab",
+        purpose: "Capture the active Chrome tab text via echo-extension and stage it.",
+        risk: "safe",
+        surveyCommand: SURVEY_POWERFIST_DECK_COMMAND.EXT_CAPTURE_ACTIVE_TAB,
+      },
+      {
+        type: "mirage",
+        title: "Solve",
+        purpose: "Run SOLVE on the captured page text.",
+        risk: "caution",
+        surveyCommand: SURVEY_POWERFIST_DECK_COMMAND.EXT_SOLVE,
+      },
+      {
+        type: "mirage",
+        title: "Clear",
+        purpose: "Clear the staged extension page to start fresh.",
+        risk: "safe",
+        surveyCommand: SURVEY_POWERFIST_DECK_COMMAND.EXT_CLEAR,
+      },
+    ],
+  },
+];
+
 /** Echo + Mirage command decks — Survey PowerFist tab when triple-linked. */
 export const SURVEY_TRIFORCE_DECKS: PreviewDeckWithTarget[] = [
   {

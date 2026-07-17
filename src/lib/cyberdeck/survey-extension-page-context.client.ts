@@ -110,6 +110,17 @@ export async function solveLastSurveyExtensionPage(): Promise<{ ok: boolean; mes
   return solveMirageSelectedTextAsync(snapshot.pageText);
 }
 
+/** Drop the staged extension page so the Extension deck can reset between questions. */
+export function clearSurveyExtensionPageContext(): { ok: boolean; message: string } {
+  const had = Boolean(status.lastSnapshot);
+  status = { lastSnapshot: null, deliveredAt: null, deliveryCount: 0 };
+  emitChanged();
+  return {
+    ok: true,
+    message: had ? "Extension page cleared." : "No extension page staged.",
+  };
+}
+
 export function readSurveyExtensionPageContextStatus(): SurveyExtensionPageContextStatus {
   return status;
 }
