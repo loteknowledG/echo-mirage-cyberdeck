@@ -16,7 +16,6 @@ import {
   SURVEY_RELAY_ECHO_CHANGED_EVENT,
 } from "@/lib/cyberdeck/survey-relay.client";
 import {
-  clearSurveyCaptureStack,
   readSurveyCaptureStack,
   removeSurveyCaptureStackPage,
   SURVEY_CAPTURE_STACK_CHANGED_EVENT,
@@ -25,6 +24,7 @@ import {
 } from "@/lib/cyberdeck/survey-capture-stack.client";
 import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 import {
+  clearSurveyScreenshotDisplay,
   resolveMiragePreviewContent,
   solveMirageCaptureAsync,
   SURVEY_MIRAGE_ITEM_CHANGED_EVENT,
@@ -209,11 +209,12 @@ export function SurveyMirageCapturePreview() {
   }, [canSolve, solveBusy, solving]);
 
   const handleClearPages = useCallback(() => {
-    clearSurveyCaptureStack();
+    const result = clearSurveyScreenshotDisplay();
     setActivePageId(null);
-    setDeckMessage("Capture pages cleared.");
+    setDeckMessage(result.message);
     bumpStack();
-  }, [bumpStack]);
+    bumpCapture();
+  }, [bumpCapture, bumpStack]);
 
   const handleRemovePage = useCallback(
     (pageId: string) => {

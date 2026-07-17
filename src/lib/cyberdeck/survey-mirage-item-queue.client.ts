@@ -15,8 +15,12 @@ import {
 } from "@/lib/cyberdeck/survey-analyze-status.client";
 import { appendSurveyChatMessage, notifySurveyMuthurArchive } from "@/lib/cyberdeck/survey-chat";
 import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
-import { surveyCaptureStackPngList } from "@/lib/cyberdeck/survey-capture-stack.client";
 import {
+  clearSurveyCaptureStack,
+  surveyCaptureStackPngList,
+} from "@/lib/cyberdeck/survey-capture-stack.client";
+import {
+  clearLastSurveyCapture,
   readLastSurveyCapture,
   readLastSurveySelection,
   storeLastSurveySelection,
@@ -286,6 +290,42 @@ export function getMirageQueueSnapshot(): {
   const items = readItems();
   const index = clampIndex(readIndex(), items.length);
   return { items, index, current: items[index] ?? null };
+}
+
+function clearCaptureImageStorage(itemId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(`${CAPTURE_IMAGE_PREFIX}${itemId}`);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Strip the capture image from the current Mirage queue item (display + storage). */
+export function clearMirageQueueItemCaptureImage(): void {
+  const { current, items, index } = getMirageQueueSnapshot();
+  if (!current || (!current.imageDataUrl && !current.imageRef)) return;
+
+  clearCaptureImageStorage(current.id);
+  if (current.imageRef && current.imageRef !== current.id) {
+    clearCaptureImageStorage(current.imageRef);
+  }
+
+  const next = [...items];
+  const { imageDataUrl: _dropUrl, imageRef: _dropRef, ...rest } = current;
+  next[index] = rest;
+  writeItems(next);
+}
+
+/**
+ * Clear screenshot pages + last-capture fallback + queue item image so the
+ * Mirage SCREENSHOT pane display goes blank.
+ */
+export function clearSurveyScreenshotDisplay(): { ok: true; message: string } {
+  clearSurveyCaptureStack();
+  clearLastSurveyCapture();
+  clearMirageQueueItemCaptureImage();
+  return { ok: true, message: "Screenshot pages and display image cleared." };
 }
 
 export function ingestMirageQueueItem(input: {

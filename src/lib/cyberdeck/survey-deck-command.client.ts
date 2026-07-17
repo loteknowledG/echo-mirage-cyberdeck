@@ -177,6 +177,26 @@ export function readLastSurveyCapture(): { pngBase64: string; at: string } | nul
   }
 }
 
+/** Drop the last Echo screenshot so Mirage preview cannot fall back to a stale image. */
+export function clearLastSurveyCapture(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(SURVEY_LAST_CAPTURE_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
+    window.sessionStorage.removeItem(SURVEY_LAST_CAPTURE_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(
+    new CustomEvent(SURVEY_LAST_CAPTURE_EVENT, {
+      detail: { cleared: true },
+    }),
+  );
+}
+
 export function storeLastSurveySelection(text: string): void {
   if (typeof window === "undefined") return;
   const trimmed = text.trim();

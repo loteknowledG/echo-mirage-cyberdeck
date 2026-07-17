@@ -9,9 +9,11 @@ import {
   takeSurveyScreenshot,
   type SurveyDeckCommandContext,
 } from "@/lib/cyberdeck/survey-deck-command.client";
-import { clearSurveyCaptureStack } from "@/lib/cyberdeck/survey-capture-stack.client";
 import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
-import { solveMirageCaptureAsync } from "@/lib/cyberdeck/survey-mirage-item-queue.client";
+import {
+  clearSurveyScreenshotDisplay,
+  solveMirageCaptureAsync,
+} from "@/lib/cyberdeck/survey-mirage-item-queue.client";
 import { captureEchoExtensionActiveTab } from "@/lib/cyberdeck/survey-echo-extension.client";
 import {
   clearSurveyExtensionPageContext,
@@ -45,10 +47,8 @@ export async function executeSurveyPowerfistDeckCommand(
       const result = await solveMirageCaptureAsync();
       return { ok: result.ok, message: result.message, answerText: result.answerText };
     }
-    case SURVEY_POWERFIST_DECK_COMMAND.CLEAR_CAPTURE: {
-      clearSurveyCaptureStack();
-      return { ok: true, message: "Screenshot pages cleared." };
-    }
+    case SURVEY_POWERFIST_DECK_COMMAND.CLEAR_CAPTURE:
+      return clearSurveyScreenshotDisplay();
     case SURVEY_POWERFIST_DECK_COMMAND.EXT_CAPTURE_ACTIVE_TAB: {
       const result = await captureEchoExtensionActiveTab(ctx);
       return { ok: result.ok, message: result.message };
