@@ -83,6 +83,24 @@ export function saveSurveyGatewayCredentials(
   });
 }
 
+/** Vision model chosen in Mirage for a gateway provider (shared with the gateway column). */
+export function readSurveyGatewayModel(
+  provider: SurveyGatewayProvider,
+): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(`ascii_model_${provider}`)?.trim() ?? "";
+}
+
+export function saveSurveyGatewayModel(
+  provider: SurveyGatewayProvider,
+  model: string,
+): void {
+  if (typeof window === "undefined") return;
+  const trimmed = model.trim();
+  if (!trimmed) return;
+  window.localStorage.setItem(`ascii_model_${provider}`, trimmed);
+}
+
 export function surveyImageDataUrlToBase64(imageDataUrl: string): string {
   const trimmed = imageDataUrl.trim();
   const comma = trimmed.indexOf(",");

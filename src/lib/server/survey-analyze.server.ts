@@ -2,6 +2,8 @@
 // Auto chain: Codex → OpenAI/OpenRouter → Cursor → MUTHUR (OpenCode Zen).
 
 import { SURVEY_SELECTED_TEXT_PROMPT } from "@/lib/cyberdeck/powerfist-mission.types";
+import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
+import { defaultSurveyVisionModel } from "@/lib/cyberdeck/survey-vision-defaults";
 import { isCodexCliAvailable } from "@/lib/server/cadre/adapters/codex-runtime-adapter.server";
 import { resolveServerProviderCredentials } from "@/lib/server/provider-credentials.server";
 import {
@@ -16,7 +18,6 @@ import {
   analyzeSurveyCaptureViaMuthur,
   analyzeSurveyTextViaMuthur,
 } from "@/lib/server/survey-analyze-muthur.server";
-import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -70,11 +71,12 @@ function listApiVisionFallbacks(input?: SurveyAnalyzeInput): Array<"openai" | "o
   // Only apply the client-supplied key to the provider it was saved for.
   const openaiKey = pref === "openai" ? input?.apiKey : undefined;
   const openrouterKey = pref === "openrouter" ? input?.apiKey : undefined;
-  if (resolveServerProviderCredentials("openai", openaiKey).apiKey) {
-    providers.push("openai");
-  }
+  // Prefer OpenRouter (Nemotron VL) — OpenAI quotas often run dry first.
   if (resolveServerProviderCredentials("openrouter", openrouterKey).apiKey) {
     providers.push("openrouter");
+  }
+  if (resolveServerProviderCredentials("openai", openaiKey).apiKey) {
+    providers.push("openai");
   }
   return providers;
 }
@@ -82,8 +84,7 @@ function listApiVisionFallbacks(input?: SurveyAnalyzeInput): Array<"openai" | "o
 function resolveVisionModel(provider: string): string {
   const fromEnv = process.env.SURVEY_VISION_MODEL?.trim();
   if (fromEnv) return fromEnv;
-  if (provider === "openrouter") return "openai/gpt-4o";
-  return "gpt-4o";
+  return defaultSurveyVisionModel(provider);
 }
 
 function resolveChatEndpoint(provider: string): string | null {
@@ -211,7 +212,7 @@ async function analyzeSurveySelectionViaApi(
     return { ok: false, error: `No API key for ${provider}.` };
   }
 
-  const model = input.model?.trim() || (provider === "openrouter" ? "openai/gpt-4o" : "gpt-4o");
+  const model = input.model?.trim() || resolveVisionModel(provider);
 
   try {
     const res = await fetch(endpoint, {
