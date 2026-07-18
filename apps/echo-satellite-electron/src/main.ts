@@ -1,3 +1,5 @@
+import { installEchoSttBridge } from "./stt";
+
 type WsRuntimeStatus = "disconnected" | "connecting" | "connected" | "error";
 
 type SpyMirageLink = {
@@ -39,6 +41,8 @@ type PairResult = {
 type SatellitePermissionStatus = {
   platform: string;
   screenRecording: boolean;
+  microphone?: boolean;
+  microphoneStatus?: string;
   hint?: string | null;
 };
 
@@ -114,6 +118,21 @@ type SatelliteApi = {
   onDisarm: (handler: () => void) => () => void;
   onStatusChanged: (handler: () => void) => () => void;
   onUpdateAvailable: (handler: (result: UpdateCheckResult) => void) => () => void;
+  onSttStart: (handler: (payload?: { lang?: string }) => void) => () => void;
+  onSttStop: (handler: (payload?: unknown) => void) => () => void;
+  reportStt: (report: {
+    interim?: string;
+    final?: string;
+    error?: string;
+    listening?: boolean;
+  }) => Promise<{ ok: boolean }>;
+  getListeningState: () => Promise<{
+    ok: boolean;
+    listening?: boolean;
+    interim?: string;
+    lastFinal?: string;
+    error?: string | null;
+  }>;
 };
 
 declare global {
@@ -251,15 +270,20 @@ async function refreshRelaySecretStatus(): Promise<void> {
 
 async function refreshPermissions(): Promise<void> {
   const perm = await api.checkPermissions();
-  if (perm.screenRecording) {
-    permissionResultEl.textContent = "Screen Recording: granted";
+  const micOk = perm.microphone !== false;
+  if (perm.screenRecording && micOk) {
+    permissionResultEl.textContent = "Screen Recording: granted · Microphone: ready";
     openScreenSettingsBtn.classList.remove("show");
-  } else {
+  } else if (!perm.screenRecording) {
     permissionResultEl.textContent =
       perm.hint ?? "Screen Recording not granted — required before missions.";
     if (perm.platform === "macos") {
       openScreenSettingsBtn.classList.add("show");
     }
+  } else {
+    permissionResultEl.textContent =
+      perm.hint ?? "Microphone not granted — required for Survey listening.";
+    openScreenSettingsBtn.classList.remove("show");
   }
 }
 
@@ -430,6 +454,7 @@ void refreshRelaySecretStatus();
 void refreshStatus();
 void refreshDiagnostics();
 void refreshUpdateCheck();
+installEchoSttBridge();
 window.setInterval(() => {
   void refreshStatus();
   void refreshSpyCodes();

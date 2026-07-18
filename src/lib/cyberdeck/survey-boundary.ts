@@ -34,7 +34,8 @@
  * │            → TRANSPORT B: cloud relay
  * │               fetchSurveyRelayBundle(teamId) → enterSurveyPairPinViaRelay
  * │               Echo Satellite pushes bundle to /api/survey/relay/* (Upstash/file store)
- * │               Requires saved echoNodeId (team ID) on first connect.
+ * │               Listening STT: Echo POSTs /api/survey/relay/listening-event; Mirage GETs /listening
+ * │               (Web Speech on Echo — network-dependent; not Whisper). Requires saved echoNodeId (team ID) on first connect.
  * │        └─ Third link (Mirage ↔ PowerFist) always:
  * │            → TRANSPORT C: Mirage hub / PowerFist remote socket
  * │               fetchPowerfistQrSession · completePowerfistPairFromPin · WS to Mirage

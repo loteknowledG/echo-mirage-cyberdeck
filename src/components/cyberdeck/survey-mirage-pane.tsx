@@ -6,6 +6,7 @@ import { SurveyMirageCapturePreview } from "@/components/cyberdeck/survey-mirage
 import { SurveyMirageExtCapturePanel } from "@/components/cyberdeck/survey-mirage-ext-capture-panel";
 import { SurveyMirageQueueTeamHost } from "@/components/cyberdeck/survey-mirage-queue-sync";
 import { SurveyPairPinForm } from "@/components/cyberdeck/survey-pair-pin-form";
+import { SurveyListeningPostStrip } from "@/components/cyberdeck/survey-listening-post-strip";
 import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-panel";
 import {
   SURVEY_ECHO_DISPLAY,
@@ -140,6 +141,8 @@ export function SurveyMiragePane() {
       ) : (
         <SurveyMirageExtCapturePanel />
       )}
+
+      <SurveyListeningPostStrip />
 
       <div className="border-t border-[#1c1c1c] pt-4">
         <SurveySolutionsPanel />

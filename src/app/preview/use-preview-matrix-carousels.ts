@@ -105,7 +105,7 @@ export function usePreviewMatrixCarousels(
       return false;
     }
 
-    // Survey PowerFist decks are small (2 decks · 3 cards) — no wrap so card/deck
+    // Survey PowerFist decks are small (3 decks · 3 cards) — no wrap so card/deck
     // position reads as a navigation cue instead of an endless loop.
     const loopCarousels = embedSurface !== "survey";
 

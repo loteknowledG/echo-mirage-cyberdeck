@@ -34,12 +34,15 @@ export const SURVEY_POWERFIST_DECK_COMMAND = {
   EXT_CAPTURE_ACTIVE_TAB: "powerfist.ext-capture-active-tab",
   EXT_SOLVE: "powerfist.ext-solve",
   EXT_CLEAR: "powerfist.ext-clear",
+  START_LISTENING: SURVEY_ECHO_COMMAND.START_LISTENING,
+  STOP_LISTENING: SURVEY_ECHO_COMMAND.STOP_LISTENING,
+  SAVE_RECORDING: SURVEY_ECHO_COMMAND.SAVE_RECORDING,
 } as const;
 
 export type SurveyPowerfistDeckCommandId =
   (typeof SURVEY_POWERFIST_DECK_COMMAND)[keyof typeof SURVEY_POWERFIST_DECK_COMMAND];
 
-/** Two-deck PowerFist layout: Screenshot deck + Extension deck (3 cards each, no wrap). */
+/** Three-deck PowerFist layout: Screenshot + Extension + Listening (3 cards each). */
 export const SURVEY_POWERFIST_DECKS: PreviewDeckWithTarget[] = [
   {
     name: "Screenshot Deck",
@@ -88,6 +91,31 @@ export const SURVEY_POWERFIST_DECKS: PreviewDeckWithTarget[] = [
         title: "Clear",
         purpose: "Clear the staged extension page to start fresh.",
         surveyCommand: SURVEY_POWERFIST_DECK_COMMAND.EXT_CLEAR,
+      },
+    ],
+  },
+  {
+    name: "Listening Deck",
+    badge: "echo mic",
+    targetPane: "operator",
+    cards: [
+      {
+        type: "echo",
+        title: "Start Listening",
+        purpose: "Arm Echo mic STT and stream interviewer speech to Mirage.",
+        surveyCommand: SURVEY_POWERFIST_DECK_COMMAND.START_LISTENING,
+      },
+      {
+        type: "echo",
+        title: "Stop Listening",
+        purpose: "Stop Echo microphone capture and Mirage transcript polling.",
+        surveyCommand: SURVEY_POWERFIST_DECK_COMMAND.STOP_LISTENING,
+      },
+      {
+        type: "echo",
+        title: "Save Recording",
+        purpose: "Finalize the listening session receipt on Echo (transcript length).",
+        surveyCommand: SURVEY_POWERFIST_DECK_COMMAND.SAVE_RECORDING,
       },
     ],
   },

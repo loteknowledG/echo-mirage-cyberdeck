@@ -60,7 +60,8 @@
       ],
       "artifactName": "Echo-Satellite_${version}_aarch64.${ext}",
       "extendInfo": {
-        "LSMinimumSystemVersion": "12.0"
+        "LSMinimumSystemVersion": "12.0",
+        "NSMicrophoneUsageDescription": "Echo Satellite listens to interview audio for speech-to-text when Survey starts listening."
       }
     },
     "dmg": {

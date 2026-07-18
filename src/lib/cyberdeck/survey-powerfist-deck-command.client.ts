@@ -19,6 +19,8 @@ import {
   clearSurveyExtensionPageContext,
   solveLastSurveyExtensionPage,
 } from "@/lib/cyberdeck/survey-extension-page-context.client";
+import { executeSurveyDeckCommand } from "@/lib/cyberdeck/survey-deck-command.client";
+import { SURVEY_ECHO_COMMAND } from "@/lib/cyberdeck/survey-deck-data";
 
 export type SurveyPowerfistDeckResult = {
   ok: boolean;
@@ -57,6 +59,18 @@ export async function executeSurveyPowerfistDeckCommand(
       return solveLastSurveyExtensionPage();
     case SURVEY_POWERFIST_DECK_COMMAND.EXT_CLEAR:
       return clearSurveyExtensionPageContext();
+    case SURVEY_POWERFIST_DECK_COMMAND.START_LISTENING: {
+      const result = await executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.START_LISTENING, ctx);
+      return { ok: result.ok, message: result.message };
+    }
+    case SURVEY_POWERFIST_DECK_COMMAND.STOP_LISTENING: {
+      const result = await executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.STOP_LISTENING, ctx);
+      return { ok: result.ok, message: result.message };
+    }
+    case SURVEY_POWERFIST_DECK_COMMAND.SAVE_RECORDING: {
+      const result = await executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.SAVE_RECORDING, ctx);
+      return { ok: result.ok, message: result.message };
+    }
     default: {
       const _exhaustive: never = command;
       return { ok: false, message: `Unknown deck command: ${String(_exhaustive)}` };

@@ -42,6 +42,11 @@ import {
   sendSurveyEchoCommandViaRelay,
 } from "@/lib/cyberdeck/survey-relay.client";
 import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
+import {
+  armSurveyListeningPost,
+  disarmSurveyListeningPost,
+  noteSurveyListeningCommandFailure,
+} from "@/lib/cyberdeck/survey-listening.client";
 
 export const SURVEY_LAST_CAPTURE_STORAGE_KEY = "echo-mirage-survey-last-capture-v1";
 export const SURVEY_LAST_CAPTURE_EVENT = "echo-mirage-survey-last-capture";
@@ -463,10 +468,20 @@ export async function executeSurveyDeckCommand(
   switch (command) {
     case SURVEY_ECHO_COMMAND.SCREENSHOT:
       return sendEchoRemoteCommand(SURVEY_ECHO_COMMAND.SCREENSHOT, ctx);
-    case SURVEY_ECHO_COMMAND.START_LISTENING:
-      return sendEchoRemoteCommand(SURVEY_ECHO_COMMAND.START_LISTENING, ctx);
-    case SURVEY_ECHO_COMMAND.STOP_LISTENING:
-      return sendEchoRemoteCommand(SURVEY_ECHO_COMMAND.STOP_LISTENING, ctx);
+    case SURVEY_ECHO_COMMAND.START_LISTENING: {
+      const result = await sendEchoRemoteCommand(SURVEY_ECHO_COMMAND.START_LISTENING, ctx);
+      if (result.ok) {
+        armSurveyListeningPost(result.message);
+      } else {
+        noteSurveyListeningCommandFailure(result.message);
+      }
+      return result;
+    }
+    case SURVEY_ECHO_COMMAND.STOP_LISTENING: {
+      const result = await sendEchoRemoteCommand(SURVEY_ECHO_COMMAND.STOP_LISTENING, ctx);
+      disarmSurveyListeningPost(result.message);
+      return result;
+    }
     case SURVEY_ECHO_COMMAND.SAVE_RECORDING:
       return sendEchoRemoteCommand(SURVEY_ECHO_COMMAND.SAVE_RECORDING, ctx);
     case SURVEY_ECHO_COMMAND.COPY_SELECTED:

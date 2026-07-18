@@ -10,13 +10,17 @@ import {
   getEchoExtensionBridgeStatus,
 } from "./echo-extension-bridge.mjs";
 import * as logger from "./logger.mjs";
+import {
+  saveEchoListeningReceipt,
+  startEchoListening,
+  stopEchoListening,
+} from "./echo-listening.mjs";
 
-/** @type {{ listening: boolean, recordingStartedAt: number | null, chunks: Buffer[] }} */
-const audioState = {
-  listening: false,
-  recordingStartedAt: null,
-  chunks: [],
-};
+export {
+  readEchoListeningState,
+  applySttReport,
+  configureEchoListeningHooks,
+} from "./echo-listening.mjs";
 
 /**
  * @param {string} action
@@ -27,11 +31,11 @@ export async function executeEchoSatelliteCommand(action, deps = {}) {
     case "echo.screenshot":
       return executeScreenshot();
     case "echo.start-listening":
-      return startListening();
+      return startEchoListening();
     case "echo.stop-listening":
-      return stopListening();
+      return stopEchoListening();
     case "echo.save-recording":
-      return saveRecording(deps.app);
+      return saveEchoListeningReceipt(deps.app);
     case "echo.copy-selected":
       return copySelected();
     case "echo.read-clipboard":
@@ -219,54 +223,6 @@ async function executeScreenshot() {
   }
 }
 
-function startListening() {
-  if (audioState.listening) {
-    return { ok: true, listening: true, message: "Already listening on Echo." };
-  }
-  audioState.listening = true;
-  audioState.recordingStartedAt = Date.now();
-  audioState.chunks = [];
-  logger.log("echo-command: start-listening (mic scaffold armed)");
-  return {
-    ok: true,
-    listening: true,
-    message: "Echo listening armed — microphone pipeline scaffold active.",
-  };
-}
-
-function stopListening() {
-  if (!audioState.listening) {
-    return { ok: true, listening: false, message: "Echo was not listening." };
-  }
-  audioState.listening = false;
-  logger.log("echo-command: stop-listening");
-  return {
-    ok: true,
-    listening: false,
-    message: "Echo listening stopped.",
-  };
-}
-
-/** @param {import("electron").App | undefined} app */
-function saveRecording(app) {
-  if (!audioState.recordingStartedAt && audioState.chunks.length === 0) {
-    return { ok: false, reason: "No Echo recording buffered — start listening first." };
-  }
-  const durationMs = audioState.recordingStartedAt
-    ? Date.now() - audioState.recordingStartedAt
-    : 0;
-  audioState.listening = false;
-  audioState.recordingStartedAt = null;
-  audioState.chunks = [];
-  logger.log(`echo-command: save-recording scaffold (${durationMs}ms)`);
-  return {
-    ok: true,
-    message: `Recording receipt saved (${Math.round(durationMs / 1000)}s scaffold — full mic ingest coming).`,
-    durationMs,
-    userData: app?.getPath?.("userData") ?? null,
-  };
-}
-
 async function readClipboardPayload() {
   const text = clipboard.readText()?.trim() ?? "";
   const image = clipboard.readImage();
@@ -377,11 +333,4 @@ async function copySelected() {
       reason: error instanceof Error ? error.message : "Copy selected failed.",
     };
   }
-}
-
-export function readEchoListeningState() {
-  return {
-    listening: audioState.listening,
-    recordingStartedAt: audioState.recordingStartedAt,
-  };
 }

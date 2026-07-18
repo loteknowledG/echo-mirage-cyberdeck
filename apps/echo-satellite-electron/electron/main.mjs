@@ -37,7 +37,7 @@ import {
   pushSurveyRelayBundle,
 } from "./survey-relay-client.mjs";
 import { completeSurveyPairEnterByPin } from "./spy-echo-pairing.mjs";
-import { executeEchoSatelliteCommand } from "./echo-commands.mjs";
+import { executeEchoSatelliteCommand, configureEchoListeningHooks, applySttReport, readEchoListeningState } from "./echo-commands.mjs";
 import {
   applySurveyRelayEnvFromDisk,
   loadSurveyRelaySecret,
@@ -171,6 +171,14 @@ function createMainWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+
+  const session = mainWindow.webContents.session;
+  session.setPermissionRequestHandler((_wc, permission, callback) => {
+    callback(permission === "media" || permission === "microphone");
+  });
+  session.setPermissionCheckHandler((_wc, permission) =>
+    permission === "media" || permission === "microphone",
+  );
 }
 
 function buildSpyStatusPayload() {
@@ -405,17 +413,39 @@ function registerIpc() {
 
   ipcMain.handle("satellite:check-permissions", () => {
     if (process.platform === "darwin") {
-      const granted = systemPreferences.getMediaAccessStatus("screen") === "granted";
+      const screenGranted = systemPreferences.getMediaAccessStatus("screen") === "granted";
+      const micStatus = systemPreferences.getMediaAccessStatus("microphone");
+      const micGranted = micStatus === "granted";
       return {
         platform: "macos",
-        screenRecording: granted,
-        hint: granted
-          ? null
+        screenRecording: screenGranted,
+        microphone: micGranted,
+        microphoneStatus: micStatus,
+        hint: screenGranted
+          ? micGranted
+            ? null
+            : "Grant Microphone in System Settings → Privacy & Security for Survey listening."
           : "Grant Screen Recording in System Settings → Privacy & Security.",
       };
     }
-    return { platform: process.platform, screenRecording: true, hint: null };
+    return {
+      platform: process.platform,
+      screenRecording: true,
+      microphone: true,
+      microphoneStatus: "granted",
+      hint: null,
+    };
   });
+
+  ipcMain.handle("satellite:stt-report", (_event, report) => {
+    applySttReport(report && typeof report === "object" ? report : {});
+    return { ok: true };
+  });
+
+  ipcMain.handle("satellite:get-listening-state", () => ({
+    ok: true,
+    ...readEchoListeningState(),
+  }));
 
   ipcMain.handle("satellite:open-screen-settings", async () => {
     if (process.platform === "darwin") {
@@ -455,6 +485,27 @@ function registerIpc() {
 app.whenReady().then(async () => {
   logger.beginSession(app, version);
   logger.step(1, 8, "electron main starting");
+
+  configureEchoListeningHooks({
+    sendToRenderer: (channel, payload) => {
+      if ((!mainWindow || mainWindow.isDestroyed()) && channel === "satellite:stt-start") {
+        createMainWindow();
+      }
+      sendToMainWindow(channel, payload);
+    },
+    getEchoNodeId: () => cachedSpyStatus?.echoNodeId?.trim() || null,
+    askMicrophoneAccess: async () => {
+      if (process.platform !== "darwin") return true;
+      try {
+        const status = systemPreferences.getMediaAccessStatus("microphone");
+        if (status === "granted") return true;
+        return await systemPreferences.askForMediaAccess("microphone");
+      } catch {
+        return false;
+      }
+    },
+  });
+
   registerIpc();
   createMainWindow();
   logger.step(2, 8, "browser window created");

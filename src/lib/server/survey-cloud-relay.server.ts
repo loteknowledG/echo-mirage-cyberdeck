@@ -7,6 +7,7 @@ import { resolveEchoTmpPath } from "@/lib/server/echo-runtime-paths.server";
 
 const REGISTRY_KEY = "__echoMirageSurveyCloudRelay";
 const BUNDLE_TTL_SEC = 15 * 60;
+const LISTENING_TTL_SEC = 10 * 60;
 const REQUEST_TTL_SEC = 5 * 60;
 const RESULT_TTL_SEC = 10 * 60;
 
@@ -80,10 +81,31 @@ export type SurveyRelayCommandResult = {
   completedAt: string;
 };
 
+export type SurveyRelayListeningFinal = {
+  text: string;
+  at: string;
+  seq: number;
+};
+
+/** Latest Echo listening / STT snapshot for Mirage poll. */
+export type SurveyRelayListeningSnapshot = {
+  echoNodeId: string;
+  listening: boolean;
+  kind: "started" | "stopped" | "partial" | "final" | "error";
+  interim: string;
+  lastFinal: string;
+  finals: SurveyRelayListeningFinal[];
+  seq: number;
+  error: string | null;
+  updatedAt: string;
+  expiresAt: string;
+};
+
 type RelayStore = {
   bundles: Record<string, SurveyRelayBundle>;
   /** Most recently pushed Echo team id — Mirage can recover from a stale saved id. */
   activeEchoNodeId?: string | null;
+  listening: Record<string, SurveyRelayListeningSnapshot>;
   requests: Record<string, SurveyRelayPairRequest>;
   results: Record<string, SurveyRelayPairResult>;
   requestIdsByEcho: Record<string, string[]>;
@@ -108,6 +130,7 @@ function memoryStore(): RelayStore {
     globalStore[REGISTRY_KEY] = {
       bundles: {},
       activeEchoNodeId: null,
+      listening: {},
       requests: {},
       results: {},
       requestIdsByEcho: {},
@@ -117,6 +140,7 @@ function memoryStore(): RelayStore {
     };
   }
   const store = globalStore[REGISTRY_KEY];
+  store.listening ??= {};
   store.commandRequests ??= {};
   store.commandResults ??= {};
   store.commandIdsByEcho ??= {};
@@ -136,6 +160,7 @@ async function readFileStore(): Promise<RelayStore> {
     const fromDisk: RelayStore = {
       bundles: parsed.bundles ?? {},
       activeEchoNodeId: parsed.activeEchoNodeId ?? null,
+      listening: parsed.listening ?? {},
       requests: parsed.requests ?? {},
       results: parsed.results ?? {},
       requestIdsByEcho: parsed.requestIdsByEcho ?? {},
@@ -290,10 +315,17 @@ function commandPendingListKey(echoNodeId: string): string {
   return `survey:relay:command-pending:${echoNodeId}`;
 }
 
+function listeningKey(echoNodeId: string): string {
+  return `survey:relay:listening:${echoNodeId}`;
+}
+
 function pruneStore(store: RelayStore): void {
   const now = Date.now();
   for (const [id, bundle] of Object.entries(store.bundles)) {
     if (Date.parse(bundle.expiresAt) <= now) delete store.bundles[id];
+  }
+  for (const [id, snap] of Object.entries(store.listening ?? {})) {
+    if (Date.parse(snap.expiresAt) <= now) delete store.listening[id];
   }
   for (const [id, request] of Object.entries(store.requests)) {
     if (request.status !== "pending") continue;
@@ -407,6 +439,109 @@ export async function resolveSurveyRelayBundle(
   }
   const active = await loadActiveSurveyRelayBundle();
   if (active) return { bundle: active, source: "active" };
+  return null;
+}
+
+export async function saveSurveyRelayListeningSnapshot(input: {
+  echoNodeId: string;
+  kind: SurveyRelayListeningSnapshot["kind"];
+  listening?: boolean;
+  interim?: string;
+  final?: string;
+  text?: string;
+  seq?: number;
+  error?: string | null;
+  finals?: SurveyRelayListeningFinal[];
+}): Promise<SurveyRelayListeningSnapshot> {
+  const echoNodeId = input.echoNodeId.trim();
+  const previous = (await loadSurveyRelayListeningSnapshot(echoNodeId)) ?? null;
+  const updatedAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + LISTENING_TTL_SEC * 1000).toISOString();
+  const lastFinal =
+    (typeof input.final === "string" && input.final.trim()) ||
+    (input.kind === "final" && typeof input.text === "string" ? input.text.trim() : "") ||
+    previous?.lastFinal ||
+    "";
+  const finals =
+    Array.isArray(input.finals) && input.finals.length > 0
+      ? input.finals.slice(-12)
+      : previous?.finals ?? [];
+  if (input.kind === "final" && lastFinal) {
+    const seq = typeof input.seq === "number" ? input.seq : (previous?.seq ?? 0) + 1;
+    const already = finals.some((f) => f.seq === seq && f.text === lastFinal);
+    if (!already) {
+      finals.push({ text: lastFinal, at: updatedAt, seq });
+    }
+  }
+
+  const record: SurveyRelayListeningSnapshot = {
+    echoNodeId,
+    listening: typeof input.listening === "boolean" ? input.listening : previous?.listening ?? false,
+    kind: input.kind,
+    interim: typeof input.interim === "string" ? input.interim : previous?.interim ?? "",
+    lastFinal,
+    finals: finals.slice(-12),
+    seq: typeof input.seq === "number" ? input.seq : previous?.seq ?? 0,
+    error: typeof input.error === "string" ? input.error : input.error === null ? null : previous?.error ?? null,
+    updatedAt,
+    expiresAt,
+  };
+
+  if (upstashConfigured()) {
+    await upstashSetJson(listeningKey(echoNodeId), record, LISTENING_TTL_SEC);
+    return record;
+  }
+
+  const store = await readFileStore();
+  pruneStore(store);
+  store.listening ??= {};
+  store.listening[echoNodeId] = record;
+  await writeFileStore(store);
+  return record;
+}
+
+export async function loadSurveyRelayListeningSnapshot(
+  echoNodeId: string,
+): Promise<SurveyRelayListeningSnapshot | null> {
+  const id = echoNodeId.trim();
+  if (!id) return null;
+
+  if (upstashConfigured()) {
+    const record = await upstashGetJson<SurveyRelayListeningSnapshot>(listeningKey(id));
+    if (!record) return null;
+    if (Date.parse(record.expiresAt) <= Date.now()) {
+      await upstashDel(listeningKey(id));
+      return null;
+    }
+    return record;
+  }
+
+  const store = await readFileStore();
+  pruneStore(store);
+  store.listening ??= {};
+  const record = store.listening[id] ?? null;
+  if (!record) return null;
+  if (Date.parse(record.expiresAt) <= Date.now()) {
+    delete store.listening[id];
+    await writeFileStore(store);
+    return null;
+  }
+  return record;
+}
+
+export async function resolveSurveyRelayListeningSnapshot(
+  preferredEchoNodeId?: string | null,
+): Promise<{ listening: SurveyRelayListeningSnapshot; source: "preferred" | "active" } | null> {
+  const preferred = preferredEchoNodeId?.trim() || "";
+  if (preferred) {
+    const exact = await loadSurveyRelayListeningSnapshot(preferred);
+    if (exact) return { listening: exact, source: "preferred" };
+  }
+  const activeId = await readActiveEchoNodeId();
+  if (activeId) {
+    const active = await loadSurveyRelayListeningSnapshot(activeId);
+    if (active) return { listening: active, source: "active" };
+  }
   return null;
 }
 

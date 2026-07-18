@@ -72,6 +72,46 @@ export async function pushSurveyRelayBundle(status) {
 }
 
 /**
+ * Echo pushes live listening / STT snapshot for Mirage to poll.
+ * @param {object} event
+ */
+export async function pushListeningEvent(event) {
+  const echoNodeId = event.echoNodeId?.trim();
+  if (!echoNodeId) {
+    return { ok: false, reason: "echoNodeId required for listening push." };
+  }
+
+  const url = `${relayBaseUrl()}/api/survey/relay/listening-event`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: relayHeaders(),
+      body: JSON.stringify({
+        echoNodeId,
+        kind: event.kind ?? "partial",
+        listening: event.listening !== false,
+        interim: event.interim ?? "",
+        final: event.final ?? event.text ?? "",
+        text: event.text ?? "",
+        seq: typeof event.seq === "number" ? event.seq : 0,
+        error: event.error ?? null,
+        finals: Array.isArray(event.finals) ? event.finals : [],
+      }),
+      signal: AbortSignal.timeout(8_000),
+    });
+    const payload = await res.json();
+    if (!res.ok || !payload.ok) {
+      return { ok: false, reason: payload.reason ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, ...payload };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    logger.log(`survey-relay listening push error — ${reason}`);
+    return { ok: false, reason };
+  }
+}
+
+/**
  * @param {string} echoNodeId
  * @param {(input: object) => Promise<object>} completePair
  */

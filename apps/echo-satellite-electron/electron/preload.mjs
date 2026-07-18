@@ -32,4 +32,16 @@ contextBridge.exposeInMainWorld("satellite", {
     ipcRenderer.on("satellite:update-available", listener);
     return () => ipcRenderer.removeListener("satellite:update-available", listener);
   },
+  onSttStart: (handler) => {
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on("satellite:stt-start", listener);
+    return () => ipcRenderer.removeListener("satellite:stt-start", listener);
+  },
+  onSttStop: (handler) => {
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on("satellite:stt-stop", listener);
+    return () => ipcRenderer.removeListener("satellite:stt-stop", listener);
+  },
+  reportStt: (report) => ipcRenderer.invoke("satellite:stt-report", report),
+  getListeningState: () => ipcRenderer.invoke("satellite:get-listening-state"),
 });

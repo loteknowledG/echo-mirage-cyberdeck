@@ -115,6 +115,56 @@ export async function fetchActiveSurveyRelayBundle(): Promise<
   }
 }
 
+export type SurveyRelayListeningClient = {
+  echoNodeId: string;
+  listening: boolean;
+  kind: "started" | "stopped" | "partial" | "final" | "error";
+  interim: string;
+  lastFinal: string;
+  finals: Array<{ text: string; at: string; seq: number }>;
+  seq: number;
+  error: string | null;
+  updatedAt: string;
+  expiresAt: string;
+};
+
+/** Mirage polls latest Echo listening / STT snapshot from the cloud relay. */
+export async function fetchSurveyRelayListening(
+  echoNodeId?: string | null,
+): Promise<
+  | { ok: true; listening: SurveyRelayListeningClient; source: "preferred" | "active" }
+  | { ok: false; reason: string }
+> {
+  const id = echoNodeId?.trim() || "";
+  const path = id
+    ? surveyRelayPath(`/api/survey/relay/listening?echoNodeId=${encodeURIComponent(id)}`)
+    : surveyRelayPath("/api/survey/relay/listening?active=1");
+  try {
+    const res = await fetch(path, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+    const payload = (await res.json()) as
+      | {
+          ok: true;
+          listening: SurveyRelayListeningClient;
+          source?: "preferred" | "active";
+        }
+      | { ok: false; reason?: string };
+    if (!payload.ok) {
+      return { ok: false, reason: payload.reason ?? "Listening snapshot not available." };
+    }
+    rememberSurveyRelayEchoNodeId(payload.listening.echoNodeId);
+    return {
+      ok: true,
+      listening: payload.listening,
+      source: payload.source === "active" ? "active" : "preferred",
+    };
+  } catch {
+    return { ok: false, reason: "Could not reach cloud relay for listening state." };
+  }
+}
+
 /** Resolve live Echo team id — auto-discovers; no manual team id required. */
 export async function ensureSurveyRelayEchoNodeId(
   preferred?: string | null,

@@ -10,7 +10,7 @@ import {
 import * as logger from "./logger.mjs";
 import { attachSurveyTeamHub } from "./survey-team-hub.mjs";
 import { takeEchoExtensionPendingCommand, completeEchoExtensionCommand, getEchoExtensionBridgeStatus } from "./echo-extension-bridge.mjs";
-import { executeEchoSatelliteCommand } from "./echo-commands.mjs";
+import { executeEchoSatelliteCommand, readEchoListeningState } from "./echo-commands.mjs";
 
 function applyCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -121,6 +121,13 @@ export function startPairServer(options) {
         });
         res.writeHead(result.ok ? 200 : 400, { "Content-Type": "application/json" });
         res.end(JSON.stringify(result));
+        return;
+      }
+
+      if (url.pathname === "/api/survey/echo/listening" && req.method === "GET") {
+        const state = readEchoListeningState();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, ...state }));
         return;
       }
 

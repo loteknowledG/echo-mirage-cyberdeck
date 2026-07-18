@@ -14,7 +14,7 @@ import { MUTHUR_PRESET } from "@/voice/muthurPreset";
 import type { MuthurVoiceDialState } from "@/voice/muthurVoiceSettings";
 
 const SWITCH_LEGACY_EMERALD =
-  "data-[state=checked]:bg-emerald-600 data-[state=unchecked]:bg-[#2a2a2a]";
+  "data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]";
 
 type VoiceHealth = "idle" | "backend" | "fallback" | "off";
 
