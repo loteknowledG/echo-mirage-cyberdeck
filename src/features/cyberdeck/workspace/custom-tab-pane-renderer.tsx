@@ -24,6 +24,7 @@ import type { ProviderLinkStatus } from "@/lib/cyberdeck/provider-connection";
 import type { Identity } from "@/lib/identity/identity-types";
 import type { OrchestrationBundle } from "@/lib/orchestration/orchestration-types";
 import type { Db8DeckSpeakLine } from "@/lib/db8-voice";
+import type { MuthurVoiceDialState } from "@/voice/muthurVoiceSettings";
 
 const ActivatedCyberdeckPane = dynamic(
   () =>
@@ -55,10 +56,13 @@ export type CustomTabPaneRendererProps = {
   deckSfxVolume: number;
   sonarVolume: number;
   voiceDialVolume: number;
+  voiceDial: MuthurVoiceDialState;
   speakDeckVoiceLine: Db8DeckSpeakLine;
   onVoiceToggle: () => void;
   onVoiceVolumeChange: (volume: number) => void;
+  onVoiceDialChange: (next: MuthurVoiceDialState) => void;
   onVoiceTest: () => void;
+  onSpeakPreview: (text: string) => void;
   onSonarVolumeChange: (volume: number) => void;
   onDeckSfxVolumeChange: (volume: number) => void;
   customTabBrowserNavigate: (tabId: string, nextUrl: string) => void;
@@ -88,10 +92,13 @@ function CustomTabPaneRendererInner({
   deckSfxVolume,
   sonarVolume,
   voiceDialVolume,
+  voiceDial,
   speakDeckVoiceLine,
   onVoiceToggle,
   onVoiceVolumeChange,
+  onVoiceDialChange,
   onVoiceTest,
+  onSpeakPreview,
   onSonarVolumeChange,
   onDeckSfxVolumeChange,
   customTabBrowserNavigate,
@@ -281,10 +288,11 @@ function CustomTabPaneRendererInner({
         kind="voice-lab"
         voiceEnabled={voiceEnabled}
         voiceHealth={voiceHealth}
-        voiceVolume={voiceDialVolume}
+        voiceDial={voiceDial}
         onVoiceToggle={onVoiceToggle}
-        onVoiceVolumeChange={onVoiceVolumeChange}
+        onVoiceDialChange={onVoiceDialChange}
         onVoiceTest={onVoiceTest}
+        onSpeakPreview={onSpeakPreview}
       />,
     );
   }

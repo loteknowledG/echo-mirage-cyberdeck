@@ -33,7 +33,6 @@ export type PreviewDeckWithTarget = PreviewDeck & {
 const PREVIEW_DECK_TARGET_BY_NAME: Record<string, CyberdeckPaneKind> = {
   "Execution Deck": "operator",
   "Diagnostics Deck": "diagnostics",
-  "Voice Deck": "voice-lab",
   "Quorum Deck": "db8",
   "Coding Deck": "cadre",
   "Operator Deck": "operator",
@@ -139,42 +138,6 @@ export const PREVIEW_DECKS: PreviewDeck[] = [
         type: "diagnostic",
         title: "Session Trace",
         purpose: "Capture a short trace of the current operator session.",
-      },
-    ],
-  },
-  {
-    name: "Voice Deck",
-    badge: "vox net",
-    cards: [
-      {
-        type: "voice",
-        title: "MUTHUR Voice",
-        purpose: "Load calm ship AI narration posture.",
-      },
-      {
-        type: "voice",
-        title: "Reviewer Voice",
-        purpose: "Load dry verification narration mode.",
-      },
-      {
-        type: "voice",
-        title: "Emergency Voice",
-        purpose: "Use short critical alert narration.",
-      },
-      {
-        type: "voice",
-        title: "Jeena Jacket Voice",
-        purpose: "Load calm ship AI narration posture.",
-      },
-      {
-        type: "voice",
-        title: "Cory Chase Voice",
-        purpose: "Load calm ship AI narration posture.",
-      },
-      {
-        type: "voice",
-        title: "Operator Brief",
-        purpose: "Switch to concise operator-facing narration.",
       },
     ],
   },
