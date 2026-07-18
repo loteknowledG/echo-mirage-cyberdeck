@@ -58,6 +58,7 @@ export type CustomTabPaneRendererProps = {
   speakDeckVoiceLine: Db8DeckSpeakLine;
   onVoiceToggle: () => void;
   onVoiceVolumeChange: (volume: number) => void;
+  onVoiceTest: () => void;
   onSonarVolumeChange: (volume: number) => void;
   onDeckSfxVolumeChange: (volume: number) => void;
   customTabBrowserNavigate: (tabId: string, nextUrl: string) => void;
@@ -90,6 +91,7 @@ function CustomTabPaneRendererInner({
   speakDeckVoiceLine,
   onVoiceToggle,
   onVoiceVolumeChange,
+  onVoiceTest,
   onSonarVolumeChange,
   onDeckSfxVolumeChange,
   customTabBrowserNavigate,
@@ -275,7 +277,15 @@ function CustomTabPaneRendererInner({
 
   if (tab.kind === "voice-lab") {
     return shell(
-      <ActivatedCyberdeckPane kind="voice-lab" voiceEnabled={voiceEnabled} onVoiceToggle={onVoiceToggle} />,
+      <ActivatedCyberdeckPane
+        kind="voice-lab"
+        voiceEnabled={voiceEnabled}
+        voiceHealth={voiceHealth}
+        voiceVolume={voiceDialVolume}
+        onVoiceToggle={onVoiceToggle}
+        onVoiceVolumeChange={onVoiceVolumeChange}
+        onVoiceTest={onVoiceTest}
+      />,
     );
   }
 

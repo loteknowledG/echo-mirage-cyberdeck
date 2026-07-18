@@ -268,6 +268,7 @@ export default function CyberdeckApp() {
     handleDeckSfxVolumeChange,
     handleVoiceVolumeChange,
     handleSonarVolumeChange,
+    playVoiceTest,
   } = useCyberdeckVoice({
     messages,
     isStreaming,
@@ -545,6 +546,7 @@ const operatorWorkspace = useOperatorWorkspaceState({
       speakDeckVoiceLine,
       onVoiceToggle: toggleVoiceEnabled,
       onVoiceVolumeChange: handleVoiceVolumeChange,
+      onVoiceTest: playVoiceTest,
       onSonarVolumeChange: handleSonarVolumeChange,
       onDeckSfxVolumeChange: handleDeckSfxVolumeChange,
       messageInputRef,
@@ -566,6 +568,7 @@ const operatorWorkspace = useOperatorWorkspaceState({
       operatorBrowserEngine,
       operatorBrowserRef,
       orchestration,
+      playVoiceTest,
       providerKeys,
       providerModelFetchStatus,
       sonarVolume,
