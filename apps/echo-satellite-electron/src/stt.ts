@@ -37,6 +37,7 @@ type SatelliteSttApi = {
 };
 
 let recognition: SpeechRecognitionLike | null = null;
+let mediaStream: MediaStream | null = null;
 let wantListening = false;
 let uninstallStart: (() => void) | null = null;
 let uninstallStop: (() => void) | null = null;
@@ -54,10 +55,23 @@ function report(payload: SttReport) {
   void api?.reportStt?.(payload);
 }
 
+function stopMediaStream() {
+  if (!mediaStream) return;
+  for (const track of mediaStream.getTracks()) {
+    try {
+      track.stop();
+    } catch {
+      /* ignore */
+    }
+  }
+  mediaStream = null;
+}
+
 function stopRecognition() {
   wantListening = false;
   const active = recognition;
   recognition = null;
+  stopMediaStream();
   if (!active) return;
   try {
     active.onresult = null;
@@ -74,7 +88,34 @@ function stopRecognition() {
   report({ listening: false, interim: "" });
 }
 
-function startRecognition(lang = "en-US") {
+async function ensureMicrophone(): Promise<boolean> {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    // Fall through — Web Speech may still open the mic itself.
+    return true;
+  }
+  try {
+    stopMediaStream();
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+      },
+      video: false,
+    });
+    return true;
+  } catch (error) {
+    report({
+      listening: false,
+      error:
+        error instanceof Error
+          ? `Microphone blocked: ${error.message}`
+          : "Microphone permission denied.",
+    });
+    return false;
+  }
+}
+
+async function startRecognition(lang = "en-US") {
   const Ctor = getSpeechRecognitionCtor();
   if (!Ctor) {
     report({
@@ -86,6 +127,13 @@ function startRecognition(lang = "en-US") {
 
   stopRecognition();
   wantListening = true;
+
+  const micOk = await ensureMicrophone();
+  if (!micOk || !wantListening) {
+    wantListening = false;
+    return;
+  }
+
   const next = new Ctor();
   recognition = next;
   next.continuous = true;
@@ -123,7 +171,7 @@ function startRecognition(lang = "en-US") {
       try {
         next.start();
       } catch {
-        startRecognition(lang);
+        void startRecognition(lang);
       }
     }, 120);
   };
@@ -134,6 +182,7 @@ function startRecognition(lang = "en-US") {
   } catch (error) {
     wantListening = false;
     recognition = null;
+    stopMediaStream();
     report({
       listening: false,
       error: error instanceof Error ? error.message : "Could not start speech recognition.",
@@ -150,7 +199,7 @@ export function installEchoSttBridge(): () => void {
   uninstallStart?.();
   uninstallStop?.();
   uninstallStart = api.onSttStart((payload) => {
-    startRecognition(payload?.lang || "en-US");
+    void startRecognition(payload?.lang || "en-US");
   });
   uninstallStop = api.onSttStop(() => {
     stopRecognition();

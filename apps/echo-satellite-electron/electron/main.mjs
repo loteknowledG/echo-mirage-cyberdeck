@@ -490,6 +490,13 @@ app.whenReady().then(async () => {
     sendToRenderer: (channel, payload) => {
       if ((!mainWindow || mainWindow.isDestroyed()) && channel === "satellite:stt-start") {
         createMainWindow();
+        const win = mainWindow;
+        if (win && !win.isDestroyed()) {
+          win.webContents.once("did-finish-load", () => {
+            sendToMainWindow(channel, payload);
+          });
+          return;
+        }
       }
       sendToMainWindow(channel, payload);
     },
