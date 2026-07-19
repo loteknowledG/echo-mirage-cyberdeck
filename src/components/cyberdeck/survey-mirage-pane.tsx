@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { CyberdeckFilterButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { SurveyMirageCapturePreview } from "@/components/cyberdeck/survey-mirage-capture-preview";
 import { SurveyMirageExtCapturePanel } from "@/components/cyberdeck/survey-mirage-ext-capture-panel";
+import { SurveyMirageListeningPanel } from "@/components/cyberdeck/survey-mirage-listening-panel";
 import { SurveyMirageQueueTeamHost } from "@/components/cyberdeck/survey-mirage-queue-sync";
 import { SurveyPairPinForm } from "@/components/cyberdeck/survey-pair-pin-form";
-import { SurveyListeningPostStrip } from "@/components/cyberdeck/survey-listening-post-strip";
 import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-panel";
 import {
   SURVEY_ECHO_DISPLAY,
@@ -22,14 +22,22 @@ import { isSurveyHttpsPairBlocked } from "@/lib/cyberdeck/survey-pairing-shared.
 import { notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 
-type SurveyMirageWorkflow = "screenshot" | "extension";
+type SurveyMirageWorkflow = "screenshot" | "extension" | "listening";
 
-const WORKFLOW_STORAGE_KEY = "echo-mirage-survey-mirage-workflow-v1";
+const WORKFLOW_STORAGE_KEY = "echo-mirage-survey-mirage-workflow-v2";
 
 function readStoredWorkflow(): SurveyMirageWorkflow {
   if (typeof window === "undefined") return "screenshot";
   const raw = window.localStorage.getItem(WORKFLOW_STORAGE_KEY);
-  return raw === "extension" ? "extension" : "screenshot";
+  if (raw === "extension" || raw === "listening" || raw === "screenshot") return raw;
+  // Migrate v1 key once.
+  try {
+    const legacy = window.localStorage.getItem("echo-mirage-survey-mirage-workflow-v1");
+    if (legacy === "extension") return "extension";
+  } catch {
+    /* ignore */
+  }
+  return "screenshot";
 }
 
 /**
@@ -134,15 +142,24 @@ export function SurveyMiragePane() {
         >
           EXTENSION
         </CyberdeckFilterButton>
+        <CyberdeckFilterButton
+          active={workflow === "listening"}
+          role="tab"
+          aria-selected={workflow === "listening"}
+          onClick={() => selectWorkflow("listening")}
+          data-testid="survey-mirage-workflow-listening"
+        >
+          LISTENING
+        </CyberdeckFilterButton>
       </div>
 
       {workflow === "screenshot" ? (
         <SurveyMirageCapturePreview />
-      ) : (
+      ) : workflow === "extension" ? (
         <SurveyMirageExtCapturePanel />
+      ) : (
+        <SurveyMirageListeningPanel />
       )}
-
-      <SurveyListeningPostStrip />
 
       <div className="border-t border-[#1c1c1c] pt-4">
         <SurveySolutionsPanel />

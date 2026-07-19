@@ -32,7 +32,13 @@ type UseSurveyDeckCommandsOptions = {
   setComposerText: (text: string) => void;
   onDeckCommand?: (
     command: string,
-  ) => Promise<{ ok: boolean; message: string; imageDataUrl?: string; answerText?: string }>;
+  ) => Promise<{
+    ok: boolean;
+    message: string;
+    imageDataUrl?: string;
+    answerText?: string;
+    keepArmed?: boolean;
+  }>;
   remoteSocketRef: RemoteSocketRef;
 };
 
@@ -92,7 +98,13 @@ export function useSurveyDeckCommands({
         }
 
         const result: SurveyDeckPushResult = onDeckCommand
-          ? await onDeckCommand(card.surveyCommand)
+          ? await onDeckCommand(card.surveyCommand).then((raw) => ({
+              ok: raw.ok,
+              message: raw.message,
+              imageDataUrl: raw.imageDataUrl,
+              answerText: raw.answerText,
+              keepArmed: raw.keepArmed,
+            }))
           : await executeSurveyDeckCommand(
               card.surveyCommand as SurveyDeckCommandId,
               resolveSurveyEchoDeckContext(),

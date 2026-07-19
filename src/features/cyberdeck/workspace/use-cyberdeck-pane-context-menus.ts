@@ -7,6 +7,15 @@ import { emitSignal } from "@/lib/cyberdeck/signal-router";
 import { contextMenuTargetIsTextField } from "@/features/cyberdeck/muthur/coding-verify-format";
 import type { ChatMessage } from "@/features/cyberdeck/muthur/muthur-chat-types";
 
+function contextMenuTargetIsPowerfistDeck(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      '.powerfist-preview-layout, [data-testid="preview-matrix"], [data-powerfist-deck], [data-preview-card]',
+    ),
+  );
+}
+
 export type UseCyberdeckPaneContextMenusOptions = {
   messages: ChatMessage[];
   streamText: string;
@@ -66,6 +75,12 @@ export function useCyberdeckPaneContextMenus({
   const handleMiragePaneContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
       if (contextMenuTargetIsTextField(event.target)) return;
+      // Phone long-press on PowerFist cards must complete the 3-lap hold — not open Mirage menu.
+      if (contextMenuTargetIsPowerfistDeck(event.target)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       openMirageContextMenu(event.clientX, event.clientY);
@@ -76,6 +91,11 @@ export function useCyberdeckPaneContextMenus({
   const handleGatewayPaneContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
       if (contextMenuTargetIsTextField(event.target)) return;
+      if (contextMenuTargetIsPowerfistDeck(event.target)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       openGatewayPaneContextMenu(event.clientX, event.clientY);

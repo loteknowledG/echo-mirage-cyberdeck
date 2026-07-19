@@ -126,6 +126,8 @@ export type SurveyRelayListeningClient = {
   error: string | null;
   updatedAt: string;
   expiresAt: string;
+  level?: number;
+  bands?: number[];
 };
 
 /** Mirage polls latest Echo listening / STT snapshot from the cloud relay. */

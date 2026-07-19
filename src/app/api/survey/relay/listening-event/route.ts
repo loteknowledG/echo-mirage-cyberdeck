@@ -29,6 +29,8 @@ type ListeningEventBody = {
   seq?: number;
   error?: string | null;
   finals?: Array<{ text: string; at: string; seq: number }>;
+  level?: number;
+  bands?: number[];
 };
 
 /** Echo pushes live STT / listening snapshot (HTTPS out). */
@@ -63,6 +65,8 @@ export async function POST(request: Request) {
     seq: body.seq,
     error: body.error,
     finals: body.finals,
+    level: body.level,
+    bands: body.bands,
   });
 
   return NextResponse.json(

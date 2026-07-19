@@ -22,7 +22,7 @@ export function SurveyListeningPostStrip() {
         className="rounded-sm border border-[#1c1c1c] bg-black/60 px-3 py-2 font-mono text-[9px] tracking-[0.06em] text-[#5f5f5f]"
         data-testid="survey-listening-post-idle"
       >
-        LISTENING POST // idle — use PowerFist Listening Deck → Start Listening
+        LISTENING POST // idle — Mirage LISTENING or PowerFist Listen card
       </div>
     );
   }

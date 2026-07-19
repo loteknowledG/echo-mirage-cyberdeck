@@ -125,6 +125,8 @@ type SatelliteApi = {
     final?: string;
     error?: string;
     listening?: boolean;
+    level?: number;
+    bands?: number[];
   }) => Promise<{ ok: boolean }>;
   getListeningState: () => Promise<{
     ok: boolean;
@@ -132,6 +134,8 @@ type SatelliteApi = {
     interim?: string;
     lastFinal?: string;
     error?: string | null;
+    level?: number;
+    bands?: number[];
   }>;
 };
 

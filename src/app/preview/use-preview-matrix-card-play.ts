@@ -33,6 +33,12 @@ type UsePreviewMatrixCardPlayOptions = {
     deckIndex: number,
     cardIndex: number,
   ) => Promise<CardExecutionResult | void> | CardExecutionResult | void;
+  /** Fired whenever the open/armed card is dismissed (hold cancel, Escape, keepArmed false). */
+  onArmedDismiss?: (armed: {
+    deckIndex: number;
+    cardIndex: number;
+    card: PreviewDeckWithTarget["cards"][number];
+  }) => void;
 };
 
 function isInteractiveArmedTarget(target: EventTarget | null): boolean {
@@ -50,6 +56,7 @@ export function usePreviewMatrixCardPlay({
   navigateCard,
   navigateDeck,
   onExecuteCard,
+  onArmedDismiss,
 }: UsePreviewMatrixCardPlayOptions) {
   const [composerText, setComposerText] = useState("");
   const [armingCardKey, setArmingCardKey] = useState<string | null>(null);
@@ -74,6 +81,8 @@ export function usePreviewMatrixCardPlay({
 
   const onExecuteCardRef = useRef(onExecuteCard);
   onExecuteCardRef.current = onExecuteCard;
+  const onArmedDismissRef = useRef(onArmedDismiss);
+  onArmedDismissRef.current = onArmedDismiss;
 
   const armedCard = useMemo((): ArmedCard | null => {
     if (!armedCardKey) return null;
@@ -82,6 +91,20 @@ export function usePreviewMatrixCardPlay({
     const card = deck?.cards[cardIndex];
     return deck && card ? { card, cardIndex, deck, deckIndex } : null;
   }, [activeDecks, armedCardKey]);
+
+  const dismissArmedCard = useCallback(
+    (openedCardKey: string | null) => {
+      if (!openedCardKey) return;
+      const [deckIndex, cardIndex] = openedCardKey.split(":").map(Number);
+      const deck = activeDecks[deckIndex];
+      const card = deck?.cards[cardIndex];
+      if (card) {
+        onArmedDismissRef.current?.({ deckIndex, cardIndex, card });
+      }
+      requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
+    },
+    [activeDecks, applyFocus],
+  );
 
   const cancelCardHold = useCallback(() => {
     const hold = cardHoldRef.current;
@@ -107,10 +130,8 @@ export function usePreviewMatrixCardPlay({
     setComposerText("");
     setExecutionPending(false);
     setExecutionResult(null);
-    if (!openedCardKey) return;
-    const [deckIndex, cardIndex] = openedCardKey.split(":").map(Number);
-    requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
-  }, [applyFocus, armedCardKey, cancelArmedPanelHold, cancelCardHold]);
+    dismissArmedCard(openedCardKey);
+  }, [armedCardKey, cancelArmedPanelHold, cancelCardHold, dismissArmedCard]);
 
   const runCardExecution = useCallback(async (deckIndex: number, cardIndex: number) => {
     setExecutionPending(true);
@@ -124,7 +145,7 @@ export function usePreviewMatrixCardPlay({
           setArmedCardKey(null);
           setComposerText("");
           setExecutionPending(false);
-          requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
+          dismissArmedCard(`${deckIndex}:${cardIndex}`);
           return result;
         }
       }
@@ -132,7 +153,7 @@ export function usePreviewMatrixCardPlay({
     } finally {
       setExecutionPending(false);
     }
-  }, [applyFocus]);
+  }, [dismissArmedCard]);
 
   const handleCardPointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>, deckIndex: number, cardIndex: number) => {
@@ -193,13 +214,13 @@ export function usePreviewMatrixCardPlay({
         if (!hold || hold.pointerId !== event.pointerId) return;
         armedPanelHoldRef.current = null;
         setArmedPanelArming(null);
-        // 3-lap hold on the result card = cancel / dismiss.
-        const [deckIndex, cardIndex] = armedCardKey.split(":").map(Number);
+        // 3-lap hold on the result card = cancel / dismiss (Listen: stop listening).
+        const openedCardKey = armedCardKey;
         cancelCardHold();
         setArmedCardKey(null);
         setComposerText("");
         setExecutionResult(null);
-        requestAnimationFrame(() => applyFocus(deckIndex, cardIndex));
+        dismissArmedCard(openedCardKey);
       }, CARD_PLAY_TRAIL_DURATION_MS);
 
       armedPanelHoldRef.current = {
@@ -210,7 +231,7 @@ export function usePreviewMatrixCardPlay({
       setArmedPanelArming("cancel");
       event.currentTarget.setPointerCapture(event.pointerId);
     },
-    [applyFocus, armedCardKey, cancelArmedPanelHold, cancelCardHold, executionPending],
+    [armedCardKey, cancelArmedPanelHold, cancelCardHold, dismissArmedCard, executionPending],
   );
 
   const handleArmedPanelPointerMove = useCallback(
@@ -242,6 +263,17 @@ export function usePreviewMatrixCardPlay({
       cancelArmedPanelHold();
     };
   }, [cancelArmedPanelHold, cancelCardHold]);
+
+  // Phone long-press fires `contextmenu`; swallow it while a 3-lap hold is in progress.
+  useEffect(() => {
+    if (!armingCardKey && !armedPanelArming) return;
+    const blockContextMenu = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    document.addEventListener("contextmenu", blockContextMenu, true);
+    return () => document.removeEventListener("contextmenu", blockContextMenu, true);
+  }, [armingCardKey, armedPanelArming]);
 
   return {
     armedCard,

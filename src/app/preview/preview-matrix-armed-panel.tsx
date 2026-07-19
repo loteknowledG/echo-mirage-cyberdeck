@@ -1,9 +1,11 @@
 "use client";
 
 import { FigletFontPreviewSlide } from "@/components/cyberdeck/figlet-font-preview-slide";
+import { SurveyListeningSpectrum } from "@/components/cyberdeck/survey-listening-spectrum";
 import type { PreviewDeckWithTarget } from "./preview-data";
-import { SURVEY_ECHO_COMMAND } from "@/lib/cyberdeck/survey-deck-data";
+import { SURVEY_ECHO_COMMAND, SURVEY_POWERFIST_DECK_COMMAND } from "@/lib/cyberdeck/survey-deck-data";
 import { useSurveyContinuousScreenshotStatus } from "@/lib/cyberdeck/survey-continuous-screenshot.client";
+import { useSurveyListeningStatus } from "@/lib/cyberdeck/survey-listening.client";
 import {
   CARD_PLAY_LAPS,
   CARD_PLAY_TRACE_PATH,
@@ -55,9 +57,15 @@ export function PreviewMatrixArmedPanel({
   onResetCardPlay,
 }: PreviewMatrixArmedPanelProps) {
   const continuous = useSurveyContinuousScreenshotStatus();
+  const listening = useSurveyListeningStatus();
   const isContinuousCard =
     armedCard.card.surveyCommand === SURVEY_ECHO_COMMAND.CONTINUOUS_SCREENSHOTS;
+  const isListenCard =
+    armedCard.card.surveyCommand === SURVEY_POWERFIST_DECK_COMMAND.LISTEN ||
+    armedCard.card.surveyCommand === SURVEY_ECHO_COMMAND.START_LISTENING;
   const continuousActive = isContinuousCard && continuous.running;
+  const listeningActive =
+    isListenCard && (listening.armed || listening.listening || executionResult?.ok === true);
   const needsComposer = cardNeedsComposer(armedCard.card);
   const showComposer = needsComposer && !executionResult && !executionPending;
 
@@ -77,26 +85,35 @@ export function PreviewMatrixArmedPanel({
 
   const statusLabel = continuousActive
     ? "Live // Continuous capture"
-    : armedPanelArming === "cancel"
-      ? `Canceling // Trace ×${CARD_PLAY_LAPS}`
-      : executionPending
-        ? "Executing…"
-        : executionResult
-          ? executionResult.ok
-            ? "Result // Complete"
-            : "Result // Failed"
-          : showComposer
-            ? "Prepared // Enter argument"
-            : "Prepared // Locked";
+    : listeningActive
+      ? armedPanelArming === "cancel"
+        ? `Stopping // Trace ×${CARD_PLAY_LAPS}`
+        : listening.listening
+          ? "Live // Listening"
+          : "Armed // Listening post"
+      : armedPanelArming === "cancel"
+        ? `Canceling // Trace ×${CARD_PLAY_LAPS}`
+        : executionPending
+          ? "Executing…"
+          : executionResult
+            ? executionResult.ok
+              ? "Result // Complete"
+              : "Result // Failed"
+            : showComposer
+              ? "Prepared // Enter argument"
+              : "Prepared // Locked";
+
+  // Continuous uses a Stop button; Listen keeps hold×3 so the phone can stop without a Stop card.
+  const holdEnabled = !continuousActive && !executionPending;
 
   return (
     <section
-      className={`cardOpenViewport${armedPanelArming === "cancel" ? " is-arming-cancel" : ""}${continuousActive ? " is-continuous-active" : ""}${executionPending ? " is-executing" : ""}${executionResult && !executionResult.ok ? " is-result-failed" : ""}${executionResult?.ok ? " is-result-ok" : ""}`}
+      className={`cardOpenViewport${armedPanelArming === "cancel" ? " is-arming-cancel" : ""}${continuousActive ? " is-continuous-active" : ""}${listeningActive ? " is-listening-active" : ""}${executionPending ? " is-executing" : ""}${executionResult && !executionResult.ok ? " is-result-failed" : ""}${executionResult?.ok && !listeningActive ? " is-result-ok" : ""}`}
       data-testid="powerfist-open-card"
-      onPointerDown={continuousActive || executionPending ? undefined : onArmedPanelPointerDown}
-      onPointerMove={continuousActive || executionPending ? undefined : onArmedPanelPointerMove}
-      onPointerUp={continuousActive || executionPending ? undefined : onCancelArmedPanelHold}
-      onPointerCancel={continuousActive || executionPending ? undefined : onCancelArmedPanelHold}
+      onPointerDown={holdEnabled ? onArmedPanelPointerDown : undefined}
+      onPointerMove={holdEnabled ? onArmedPanelPointerMove : undefined}
+      onPointerUp={holdEnabled ? onCancelArmedPanelHold : undefined}
+      onPointerCancel={holdEnabled ? onCancelArmedPanelHold : undefined}
     >
       {armedPanelArming ? (
         <svg
@@ -117,7 +134,7 @@ export function PreviewMatrixArmedPanel({
         <div>
           <div className="cardArmedPanelStatus">
             <span
-              className={`cardArmedPanelDot${armedPanelArming === "cancel" ? " is-cancel" : ""}${executionResult && !executionResult.ok ? " is-cancel" : ""}`}
+              className={`cardArmedPanelDot${armedPanelArming === "cancel" ? " is-cancel" : ""}${executionResult && !executionResult.ok ? " is-cancel" : ""}${listeningActive ? " is-live" : ""}`}
               aria-hidden
             />
             {statusLabel}
@@ -142,7 +159,35 @@ export function PreviewMatrixArmedPanel({
             {armedCard.card.preview.value}
           </pre>
         ) : null}
-        {executionPending ? (
+        {listeningActive ? (
+          <div className="survey-listening-live-panel" data-testid="survey-listening-live-panel">
+            <SurveyListeningSpectrum
+              active={listening.listening || listening.armed}
+              level={listening.level}
+              bands={listening.bands}
+            />
+            <p className="survey-listening-live-label">
+              {listening.listening ? "MIC // LIVE" : "MIC // ARMED"}
+              {listening.level > 0.02 ? ` · ${Math.round(listening.level * 100)}%` : ""}
+            </p>
+            <pre className="survey-listening-live-stt" data-armed-scroll data-testid="survey-listening-live-stt">
+              {listening.interim
+                ? `… ${listening.interim}`
+                : listening.lastFinal
+                  ? listening.lastFinal
+                  : "Waiting for speech…"}
+            </pre>
+            {listening.lastSuggestAnswer ? (
+              <pre className="survey-listening-live-suggest" data-armed-scroll>
+                {listening.lastSuggestAnswer.slice(0, 360)}
+                {listening.lastSuggestAnswer.length > 360 ? "…" : ""}
+              </pre>
+            ) : null}
+            {listening.error ? (
+              <p className="survey-listening-live-error">{listening.error}</p>
+            ) : null}
+          </div>
+        ) : executionPending ? (
           <p className="cardOpenViewportPurpose" data-testid="powerfist-execution-pending">
             Running {armedCard.card.title}…
           </p>
@@ -220,9 +265,11 @@ export function PreviewMatrixArmedPanel({
       <p className="cardOpenViewportGestureHint">
         {continuousActive
           ? "Continuous mode — Stop to disarm this card."
-          : executionPending
-            ? "Hold disabled while executing…"
-            : `Hold panel — runner ×${CARD_PLAY_LAPS} to cancel`}
+          : listeningActive
+            ? `Hold panel — runner ×${CARD_PLAY_LAPS} to stop listening`
+            : executionPending
+              ? "Hold disabled while executing…"
+              : `Hold panel — runner ×${CARD_PLAY_LAPS} to cancel`}
       </p>
       {continuousActive || showComposer ? (
         <div className="cardOpenViewportActions">

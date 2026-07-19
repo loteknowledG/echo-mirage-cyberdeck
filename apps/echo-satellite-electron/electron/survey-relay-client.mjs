@@ -96,6 +96,8 @@ export async function pushListeningEvent(event) {
         seq: typeof event.seq === "number" ? event.seq : 0,
         error: event.error ?? null,
         finals: Array.isArray(event.finals) ? event.finals : [],
+        level: typeof event.level === "number" ? event.level : undefined,
+        bands: Array.isArray(event.bands) ? event.bands : undefined,
       }),
       signal: AbortSignal.timeout(8_000),
     });

@@ -17,6 +17,8 @@ import { pushListeningEvent } from "./survey-relay-client.mjs";
  *   lastFinal: string,
  *   finals: ListeningFinal[],
  *   error: string | null,
+ *   level: number,
+ *   bands: number[],
  * }}
  */
 const audioState = {
@@ -27,6 +29,8 @@ const audioState = {
   lastFinal: "",
   finals: [],
   error: null,
+  level: 0,
+  bands: [],
 };
 
 /** @type {{
@@ -38,6 +42,7 @@ let hooks = null;
 
 const MAX_FINALS = 12;
 let lastInterimPushAt = 0;
+let lastLevelPushAt = 0;
 
 /**
  * @param {{
@@ -59,6 +64,8 @@ export function readEchoListeningState() {
     lastFinal: audioState.lastFinal,
     finals: audioState.finals.slice(-MAX_FINALS),
     error: audioState.error,
+    level: audioState.level,
+    bands: audioState.bands.slice(),
   };
 }
 
@@ -83,12 +90,14 @@ async function emitListeningEvent(event) {
     seq: snapshot.seq,
     error: event.error ?? snapshot.error,
     finals: snapshot.finals,
+    level: snapshot.level,
+    bands: snapshot.bands,
   });
 }
 
 /**
  * Renderer → main STT update.
- * @param {{ interim?: string, final?: string, error?: string, listening?: boolean }} report
+ * @param {{ interim?: string, final?: string, error?: string, listening?: boolean, level?: number, bands?: number[] }} report
  */
 export function applySttReport(report) {
   if (typeof report.listening === "boolean") {
@@ -97,6 +106,21 @@ export function applySttReport(report) {
   if (typeof report.error === "string" && report.error.trim()) {
     audioState.error = report.error.trim();
     void emitListeningEvent({ kind: "error", error: audioState.error });
+  }
+  if (typeof report.level === "number" && Number.isFinite(report.level)) {
+    audioState.level = Math.max(0, Math.min(1, report.level));
+  }
+  if (Array.isArray(report.bands)) {
+    audioState.bands = report.bands
+      .map((n) => Math.max(0, Math.min(1, Number(n) || 0)))
+      .slice(0, 32);
+  }
+  if (typeof report.level === "number" || Array.isArray(report.bands)) {
+    const now = Date.now();
+    if (audioState.listening && now - lastLevelPushAt >= 180) {
+      lastLevelPushAt = now;
+      void emitListeningEvent({ kind: "partial", text: audioState.interim });
+    }
   }
   if (typeof report.interim === "string") {
     audioState.interim = report.interim;
@@ -164,6 +188,8 @@ export function stopEchoListening() {
   }
   audioState.listening = false;
   audioState.interim = "";
+  audioState.level = 0;
+  audioState.bands = [];
   hooks?.sendToRenderer?.("satellite:stt-stop", {});
   logger.log("echo-command: stop-listening");
   void emitListeningEvent({ kind: "stopped" });

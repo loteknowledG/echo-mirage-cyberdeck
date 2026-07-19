@@ -12,7 +12,13 @@ type DeckMatrixEmbedProps = {
   decks?: PreviewDeckWithTarget[];
   onDeckCommand?: (
     command: string,
-  ) => Promise<{ ok: boolean; message: string; imageDataUrl?: string; answerText?: string }>;
+  ) => Promise<{
+    ok: boolean;
+    message: string;
+    imageDataUrl?: string;
+    answerText?: string;
+    keepArmed?: boolean;
+  }>;
 };
 
 /** Shared PreviewMatrix wrapper for Rola Dex and Survey PowerFist deck surfaces. */
@@ -23,7 +29,16 @@ export function DeckMatrixEmbed({
   onDeckCommand,
 }: DeckMatrixEmbedProps) {
   return (
-    <div className={`powerfist-preview-layout min-h-0 w-full overflow-hidden ${className}`.trim()}>
+    <div
+      className={`powerfist-preview-layout min-h-0 w-full overflow-hidden ${className}`.trim()}
+      data-powerfist-deck={embedSurface}
+      onContextMenu={(event) => {
+        // Block OS / cyberdeck context menus so phone long-press can finish the 3-lap card hold.
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      style={{ WebkitTouchCallout: "none", userSelect: "none", touchAction: "manipulation" }}
+    >
       <PreviewMatrix embedSurface={embedSurface} decks={decks} onDeckCommand={onDeckCommand} />
     </div>
   );

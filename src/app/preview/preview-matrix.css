@@ -2,6 +2,11 @@
 .powerfist-preview-layout {
   min-height: 100vh;
   width: 100%;
+  /* Phone: long-press must drive 3-lap card hold, not OS callout / context menu. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 
 .powerfist-preview-root {
@@ -917,6 +922,66 @@
 .powerfist-preview-root .cardOpenViewport.is-continuous-active {
   border-color: rgba(251, 191, 36, 0.45);
   box-shadow: inset 0 0 24px rgba(251, 191, 36, 0.08);
+}
+
+.powerfist-preview-root .cardOpenViewport.is-listening-active {
+  border-color: rgba(52, 211, 153, 0.45);
+  box-shadow: inset 0 0 24px rgba(16, 185, 129, 0.1);
+}
+
+.powerfist-preview-root .cardArmedPanelDot.is-live {
+  background: #34d399;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.7);
+}
+
+.survey-listening-live-panel {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  border-radius: 8px;
+  background: rgba(4, 16, 12, 0.85);
+  padding: 10px 12px;
+}
+
+.survey-listening-spectrum {
+  display: block;
+  width: 100%;
+  height: 56px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.survey-listening-live-label {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: rgba(110, 231, 183, 0.9);
+}
+
+.survey-listening-live-stt,
+.survey-listening-live-suggest {
+  margin: 0;
+  max-height: 7.5rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(216, 255, 229, 0.92);
+}
+
+.survey-listening-live-suggest {
+  color: rgba(167, 243, 208, 0.85);
+  border-top: 1px solid rgba(52, 211, 153, 0.18);
+  padding-top: 6px;
+}
+
+.survey-listening-live-error {
+  margin: 0;
+  font-size: 10px;
+  color: rgba(251, 113, 133, 0.9);
 }
 
 .survey-continuous-shot-panel {

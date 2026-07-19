@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ensureSurveyRelayEchoNodeId, fetchSurveyRelayListening } from "@/lib/cyberdeck/survey-relay.client";
 import { solveMirageSelectedTextAsync } from "@/lib/cyberdeck/survey-mirage-item-queue.client";
 import { appendSurveyChatMessage } from "@/lib/cyberdeck/survey-chat";
@@ -24,6 +25,10 @@ export type SurveyListeningClientState = {
   banner: string | null;
   seq: number;
   updatedAt: string | null;
+  /** 0–1 mic level from Echo (volume modulation). */
+  level: number;
+  /** Optional analyser bands 0–1. */
+  bands: number[];
 };
 
 const DEFAULT_STATE: SurveyListeningClientState = {
@@ -37,6 +42,8 @@ const DEFAULT_STATE: SurveyListeningClientState = {
   banner: null,
   seq: 0,
   updatedAt: null,
+  level: 0,
+  bands: [],
 };
 
 let state: SurveyListeningClientState = { ...DEFAULT_STATE };
@@ -73,6 +80,8 @@ async function fetchLanListeningSnapshot(): Promise<{
   lastFinal?: string;
   seq?: number;
   error?: string | null;
+  level?: number;
+  bands?: number[];
   finals?: Array<{ text: string; at: string; seq: number }>;
   reason?: string;
 } | null> {
@@ -98,6 +107,8 @@ async function fetchLanListeningSnapshot(): Promise<{
       lastFinal?: string;
       seq?: number;
       error?: string | null;
+      level?: number;
+      bands?: number[];
       finals?: Array<{ text: string; at: string; seq: number }>;
       reason?: string;
     };
@@ -175,6 +186,8 @@ async function pollOnce() {
         error: relay.listening.error,
         finals: relay.listening.finals,
         updatedAt: relay.listening.updatedAt,
+        level: relay.listening.level ?? 0,
+        bands: relay.listening.bands ?? [],
       }
     : lan?.ok
       ? {
@@ -185,6 +198,8 @@ async function pollOnce() {
           error: lan.error ?? null,
           finals: lan.finals ?? [],
           updatedAt: new Date().toISOString(),
+          level: typeof lan.level === "number" ? lan.level : 0,
+          bands: Array.isArray(lan.bands) ? lan.bands : [],
         }
       : null;
 
@@ -203,6 +218,8 @@ async function pollOnce() {
     seq: snapshot.seq,
     error: snapshot.error,
     updatedAt: snapshot.updatedAt,
+    level: snapshot.level,
+    bands: snapshot.bands,
     banner: snapshot.listening
       ? snapshot.interim
         ? "LISTENING // interim…"
@@ -251,6 +268,8 @@ export function disarmSurveyListeningPost(message?: string) {
     armed: false,
     listening: false,
     interim: "",
+    level: 0,
+    bands: [],
     banner: message ?? "Listening stopped.",
   });
 }
@@ -260,4 +279,57 @@ export function noteSurveyListeningCommandFailure(reason: string) {
     error: reason,
     banner: null,
   });
+}
+
+export function isSurveyListeningArmed(): boolean {
+  return state.armed || state.listening;
+}
+
+/** Clear transcript / suggest buffers without stopping Echo (Clear card). */
+export function clearSurveyListeningTranscript(): { ok: true; message: string } {
+  lastHandledFinalSeq = state.seq;
+  setState({
+    interim: "",
+    lastFinal: "",
+    lastSuggestText: "",
+    lastSuggestAnswer: "",
+    error: null,
+    banner: state.armed || state.listening ? "LISTENING // cleared" : "Listening post cleared.",
+  });
+  return { ok: true, message: "Listening transcript cleared." };
+}
+
+/** SOLVE against the latest listening final (or interim fallback). */
+export async function solveSurveyListeningTranscript(): Promise<{
+  ok: boolean;
+  message: string;
+  answerText?: string;
+}> {
+  const text = (state.lastFinal || state.interim || state.lastSuggestText).trim();
+  if (!text) {
+    return { ok: false, message: "No listening transcript to solve yet." };
+  }
+  setState({ banner: "SOLVE // listening transcript…" });
+  const result = await solveMirageSelectedTextAsync(text);
+  if (result.ok) {
+    setState({
+      lastSuggestText: text,
+      lastSuggestAnswer: result.answerText ?? "",
+      banner: "SOLVE // answer ready",
+      error: null,
+    });
+  } else {
+    setState({ banner: null, error: result.message });
+  }
+  return result;
+}
+
+export function useSurveyListeningStatus(): SurveyListeningClientState {
+  const [snapshot, setSnapshot] = useState<SurveyListeningClientState>(() =>
+    readSurveyListeningState(),
+  );
+
+  useEffect(() => subscribeSurveyListening(setSnapshot), []);
+
+  return snapshot;
 }

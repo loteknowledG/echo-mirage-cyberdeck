@@ -21,15 +21,20 @@ import {
 } from "@/lib/cyberdeck/survey-extension-page-context.client";
 import { executeSurveyDeckCommand } from "@/lib/cyberdeck/survey-deck-command.client";
 import { SURVEY_ECHO_COMMAND } from "@/lib/cyberdeck/survey-deck-data";
+import {
+  clearSurveyListeningTranscript,
+  solveSurveyListeningTranscript,
+} from "@/lib/cyberdeck/survey-listening.client";
 
 export type SurveyPowerfistDeckResult = {
   ok: boolean;
   message: string;
   imageDataUrl?: string;
   answerText?: string;
+  keepArmed?: boolean;
 };
 
-/** Route a PowerFist Screenshot/Extension deck card to its Survey action. */
+/** Route a PowerFist Screenshot/Extension/Listening deck card to its Survey action. */
 export async function executeSurveyPowerfistDeckCommand(
   command: SurveyPowerfistDeckCommandId,
   ctx: SurveyDeckCommandContext,
@@ -59,18 +64,21 @@ export async function executeSurveyPowerfistDeckCommand(
       return solveLastSurveyExtensionPage();
     case SURVEY_POWERFIST_DECK_COMMAND.EXT_CLEAR:
       return clearSurveyExtensionPageContext();
-    case SURVEY_POWERFIST_DECK_COMMAND.START_LISTENING: {
+    case SURVEY_POWERFIST_DECK_COMMAND.LISTEN: {
       const result = await executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.START_LISTENING, ctx);
-      return { ok: result.ok, message: result.message };
+      return {
+        ok: result.ok,
+        message: result.message,
+        // Stay on the open Listen card for spectrum + STT; hold ×3 stops.
+        keepArmed: result.ok,
+      };
     }
-    case SURVEY_POWERFIST_DECK_COMMAND.STOP_LISTENING: {
-      const result = await executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.STOP_LISTENING, ctx);
-      return { ok: result.ok, message: result.message };
+    case SURVEY_POWERFIST_DECK_COMMAND.SOLVE_LISTENING: {
+      const result = await solveSurveyListeningTranscript();
+      return { ok: result.ok, message: result.message, answerText: result.answerText };
     }
-    case SURVEY_POWERFIST_DECK_COMMAND.SAVE_RECORDING: {
-      const result = await executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.SAVE_RECORDING, ctx);
-      return { ok: result.ok, message: result.message };
-    }
+    case SURVEY_POWERFIST_DECK_COMMAND.CLEAR_LISTENING:
+      return clearSurveyListeningTranscript();
     default: {
       const _exhaustive: never = command;
       return { ok: false, message: `Unknown deck command: ${String(_exhaustive)}` };

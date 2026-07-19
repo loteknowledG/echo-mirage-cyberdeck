@@ -12,6 +12,15 @@ import { usePreviewMatrixCarousels } from "./use-preview-matrix-carousels";
 import { usePreviewMatrixCardPlay } from "./use-preview-matrix-card-play";
 import { useSurveyDeckCommands } from "./use-survey-deck-commands";
 import { stopSurveyContinuousScreenshot } from "@/lib/cyberdeck/survey-continuous-screenshot.client";
+import {
+  executeSurveyDeckCommand,
+  resolveSurveyEchoDeckContext,
+} from "@/lib/cyberdeck/survey-deck-command.client";
+import { SURVEY_ECHO_COMMAND, SURVEY_POWERFIST_DECK_COMMAND } from "@/lib/cyberdeck/survey-deck-data";
+import {
+  disarmSurveyListeningPost,
+  isSurveyListeningArmed,
+} from "@/lib/cyberdeck/survey-listening.client";
 import "./preview-matrix.css";
 
 export function PreviewMatrix({
@@ -23,7 +32,13 @@ export function PreviewMatrix({
   decks?: PreviewDeckWithTarget[];
   onDeckCommand?: (
     command: string,
-  ) => Promise<{ ok: boolean; message: string; imageDataUrl?: string; answerText?: string }>;
+  ) => Promise<{
+    ok: boolean;
+    message: string;
+    imageDataUrl?: string;
+    answerText?: string;
+    keepArmed?: boolean;
+  }>;
 }) {
   const paneRef = useRef<HTMLElement>(null);
   const activeDecks = decks ?? ALL_PREVIEW_DECKS;
@@ -82,6 +97,19 @@ export function PreviewMatrix({
     navigateCard,
     navigateDeck,
     onExecuteCard: (deckIndex, cardIndex) => handlePushCardRef.current(deckIndex, cardIndex),
+    onArmedDismiss: ({ card }) => {
+      stopSurveyContinuousScreenshot();
+      const isListenCard =
+        card.surveyCommand === SURVEY_POWERFIST_DECK_COMMAND.LISTEN ||
+        card.surveyCommand === SURVEY_ECHO_COMMAND.START_LISTENING;
+      if (!isListenCard || !isSurveyListeningArmed()) return;
+      void executeSurveyDeckCommand(
+        SURVEY_ECHO_COMMAND.STOP_LISTENING,
+        resolveSurveyEchoDeckContext(),
+      ).catch(() => {
+        disarmSurveyListeningPost("Listening stopped locally.");
+      });
+    },
   });
 
   const { handlePushCard } = useSurveyDeckCommands({
@@ -148,7 +176,6 @@ export function PreviewMatrix({
                     return result;
                   }}
                   onResetCardPlay={() => {
-                    stopSurveyContinuousScreenshot();
                     resetCardPlay();
                   }}
                 />

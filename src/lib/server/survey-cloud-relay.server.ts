@@ -99,6 +99,10 @@ export type SurveyRelayListeningSnapshot = {
   error: string | null;
   updatedAt: string;
   expiresAt: string;
+  /** 0–1 mic level for PowerFist spectrum. */
+  level?: number;
+  /** Optional analyser bands 0–1. */
+  bands?: number[];
 };
 
 type RelayStore = {
@@ -452,6 +456,8 @@ export async function saveSurveyRelayListeningSnapshot(input: {
   seq?: number;
   error?: string | null;
   finals?: SurveyRelayListeningFinal[];
+  level?: number;
+  bands?: number[];
 }): Promise<SurveyRelayListeningSnapshot> {
   const echoNodeId = input.echoNodeId.trim();
   const previous = (await loadSurveyRelayListeningSnapshot(echoNodeId)) ?? null;
@@ -485,6 +491,13 @@ export async function saveSurveyRelayListeningSnapshot(input: {
     error: typeof input.error === "string" ? input.error : input.error === null ? null : previous?.error ?? null,
     updatedAt,
     expiresAt,
+    level:
+      typeof input.level === "number" && Number.isFinite(input.level)
+        ? Math.max(0, Math.min(1, input.level))
+        : previous?.level,
+    bands: Array.isArray(input.bands)
+      ? input.bands.map((n) => Math.max(0, Math.min(1, Number(n) || 0))).slice(0, 32)
+      : previous?.bands,
   };
 
   if (upstashConfigured()) {

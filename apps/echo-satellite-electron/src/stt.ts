@@ -1,6 +1,7 @@
 /**
  * Renderer-side continuous Web Speech STT for Echo Survey listening.
  * Driven by main-process satellite:stt-start / satellite:stt-stop IPC.
+ * Also meters mic volume for PowerFist Listen spectrum.
  */
 
 type SttReport = {
@@ -8,6 +9,8 @@ type SttReport = {
   final?: string;
   error?: string;
   listening?: boolean;
+  level?: number;
+  bands?: number[];
 };
 
 type SpeechRecognitionLike = {
@@ -36,11 +39,17 @@ type SatelliteSttApi = {
   reportStt: (report: SttReport) => Promise<{ ok: boolean }>;
 };
 
+const BAND_COUNT = 16;
+
 let recognition: SpeechRecognitionLike | null = null;
 let mediaStream: MediaStream | null = null;
+let audioContext: AudioContext | null = null;
+let analyser: AnalyserNode | null = null;
+let meterRaf: number | null = null;
 let wantListening = false;
 let uninstallStart: (() => void) | null = null;
 let uninstallStop: (() => void) | null = null;
+let lastLevelPushAt = 0;
 
 function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   const w = window as Window & {
@@ -55,7 +64,22 @@ function report(payload: SttReport) {
   void api?.reportStt?.(payload);
 }
 
+function stopMeter() {
+  if (meterRaf != null) {
+    window.cancelAnimationFrame(meterRaf);
+    meterRaf = null;
+  }
+  try {
+    void audioContext?.close();
+  } catch {
+    /* ignore */
+  }
+  audioContext = null;
+  analyser = null;
+}
+
 function stopMediaStream() {
+  stopMeter();
   if (!mediaStream) return;
   for (const track of mediaStream.getTracks()) {
     try {
@@ -85,7 +109,62 @@ function stopRecognition() {
       /* ignore */
     }
   }
-  report({ listening: false, interim: "" });
+  report({ listening: false, interim: "", level: 0, bands: [] });
+}
+
+function startMeter(stream: MediaStream) {
+  stopMeter();
+  try {
+    const Ctx =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    audioContext = new Ctx();
+    const source = audioContext.createMediaStreamSource(stream);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 64;
+    analyser.smoothingTimeConstant = 0.7;
+    source.connect(analyser);
+  } catch {
+    return;
+  }
+
+  const time = new Uint8Array(analyser.fftSize);
+  const freq = new Uint8Array(analyser.frequencyBinCount);
+
+  const tick = () => {
+    if (!analyser || !wantListening) return;
+    analyser.getByteTimeDomainData(time);
+    let sum = 0;
+    for (let i = 0; i < time.length; i += 1) {
+      const v = (time[i] - 128) / 128;
+      sum += v * v;
+    }
+    const rms = Math.sqrt(sum / time.length);
+    const level = Math.max(0, Math.min(1, rms * 3.2));
+
+    analyser.getByteFrequencyData(freq);
+    const bands: number[] = [];
+    const step = Math.max(1, Math.floor(freq.length / BAND_COUNT));
+    for (let i = 0; i < BAND_COUNT; i += 1) {
+      let acc = 0;
+      const start = i * step;
+      for (let j = start; j < start + step && j < freq.length; j += 1) {
+        acc += freq[j] ?? 0;
+      }
+      bands.push(Math.max(0, Math.min(1, acc / step / 255)));
+    }
+
+    const now = Date.now();
+    if (now - lastLevelPushAt >= 90) {
+      lastLevelPushAt = now;
+      report({ level, bands, listening: true });
+    }
+
+    meterRaf = window.requestAnimationFrame(tick);
+  };
+
+  meterRaf = window.requestAnimationFrame(tick);
 }
 
 async function ensureMicrophone(): Promise<boolean> {
@@ -102,6 +181,7 @@ async function ensureMicrophone(): Promise<boolean> {
       },
       video: false,
     });
+    startMeter(mediaStream);
     return true;
   } catch (error) {
     report({
