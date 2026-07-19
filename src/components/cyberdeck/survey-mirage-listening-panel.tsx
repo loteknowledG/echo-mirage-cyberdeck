@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { LiveAudioVisualizer } from "react-audio-visualize";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
+import { LiveAudioVisualizer } from "@/components/cyberdeck/live-audio-visualizer";
 import { solveMirageSelectedTextAsync } from "@/lib/cyberdeck/survey-mirage-item-queue.client";
 import { useMirageLocalListening } from "@/lib/cyberdeck/use-mirage-local-listening";
 
@@ -81,19 +81,17 @@ export function SurveyMirageListeningPanel() {
 
         <div className="mb-3 overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80 px-2 py-3">
           {mediaRecorder && active ? (
-            <div className="flex justify-center" data-testid="mirage-live-audio-visualizer">
-              <LiveAudioVisualizer
-                mediaRecorder={mediaRecorder}
-                width={480}
-                height={72}
-                barWidth={3}
-                gap={2}
-                barColor="#34d399"
-                backgroundColor="#050807"
-                fftSize={256}
-                smoothingTimeConstant={0.5}
-              />
-            </div>
+            <LiveAudioVisualizer
+              mediaRecorder={mediaRecorder}
+              width={480}
+              height={72}
+              barWidth={3}
+              gap={2}
+              barColor="#34d399"
+              backgroundColor="#050807"
+              fftSize={256}
+              smoothingTimeConstant={0.5}
+            />
           ) : (
             <div
               className="flex h-[72px] items-center justify-center text-[9px] tracking-[0.1em] text-[#4a4a4a]"

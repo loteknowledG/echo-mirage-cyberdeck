@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { CyberdeckFilterButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { SurveyMirageCapturePreview } from "@/components/cyberdeck/survey-mirage-capture-preview";
 import { SurveyMirageExtCapturePanel } from "@/components/cyberdeck/survey-mirage-ext-capture-panel";
-import { SurveyMirageListeningPanel } from "@/components/cyberdeck/survey-mirage-listening-panel";
 import { SurveyMirageQueueTeamHost } from "@/components/cyberdeck/survey-mirage-queue-sync";
 import { SurveyPairPinForm } from "@/components/cyberdeck/survey-pair-pin-form";
 import { SurveySolutionsPanel } from "@/components/cyberdeck/survey-solutions-panel";
@@ -21,6 +21,20 @@ import {
 import { isSurveyHttpsPairBlocked } from "@/lib/cyberdeck/survey-pairing-shared.client";
 import { notifySurveyTeamStatusChanged } from "@/lib/cyberdeck/survey-team-status";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
+
+/** Lazy so Survey pane chunk never hard-depends on listening/mic UI. */
+const SurveyMirageListeningPanel = dynamic(
+  () =>
+    import("@/components/cyberdeck/survey-mirage-listening-panel").then((m) => ({
+      default: m.SurveyMirageListeningPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-[9px] tracking-[0.08em] text-[#5f5f5f]">LISTENING // loading…</p>
+    ),
+  },
+);
 
 type SurveyMirageWorkflow = "screenshot" | "extension" | "listening";
 
