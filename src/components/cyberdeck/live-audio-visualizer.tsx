@@ -3,7 +3,10 @@
 import { useEffect, useRef } from "react";
 
 type LiveAudioVisualizerProps = {
-  mediaRecorder: MediaRecorder;
+  /** Preferred — AnalyserNode from the live mic stream. */
+  mediaStream?: MediaStream | null;
+  /** Legacy react-audio-visualize-style prop. */
+  mediaRecorder?: MediaRecorder | null;
   width?: number;
   height?: number;
   barWidth?: number;
@@ -17,10 +20,10 @@ type LiveAudioVisualizerProps = {
 };
 
 /**
- * Live mic spectrum for Mirage Listening — same role as react-audio-visualize
- * LiveAudioVisualizer, but uses this app's React (no bundled ReactCurrentOwner).
+ * Live mic spectrum for Mirage Listening — uses MediaStream (no MediaRecorder required).
  */
 export function LiveAudioVisualizer({
+  mediaStream,
   mediaRecorder,
   width = 480,
   height = 72,
@@ -34,10 +37,10 @@ export function LiveAudioVisualizer({
   smoothingTimeConstant = 0.45,
 }: LiveAudioVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const stream = mediaStream ?? mediaRecorder?.stream ?? null;
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const stream = mediaRecorder.stream;
     if (!canvas || !stream) return;
 
     const audioContext = new AudioContext();
@@ -52,6 +55,11 @@ export function LiveAudioVisualizer({
     analyser.minDecibels = minDecibels;
     analyser.smoothingTimeConstant = Math.max(0, Math.min(1, smoothingTimeConstant));
     source.connect(analyser);
+
+    // Resume if browser started the context suspended (common on first gesture path).
+    if (audioContext.state === "suspended") {
+      void audioContext.resume();
+    }
 
     const freq = new Uint8Array(analyser.frequencyBinCount);
     let raf = 0;
@@ -98,7 +106,7 @@ export function LiveAudioVisualizer({
       void audioContext.close();
     };
   }, [
-    mediaRecorder,
+    stream,
     barWidth,
     gap,
     backgroundColor,

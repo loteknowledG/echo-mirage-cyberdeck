@@ -24,11 +24,15 @@ export function useMirageLocalListening() {
     interim: snapshot.interim,
     transcript: snapshot.transcript,
     error: snapshot.error,
-    mediaRecorder: snapshot.mediaRecorder,
+    mediaStream: snapshot.mediaStream,
     start: startMirageLocalListening,
     stop: stopMirageLocalListening,
     clearTranscript: clearMirageLocalListeningTranscript,
-    displayText: mirageLocalListeningDisplayText() ||
-      [snapshot.transcript, snapshot.interim].filter(Boolean).join(snapshot.interim ? " … " : "").trim(),
+    displayText:
+      mirageLocalListeningDisplayText() ||
+      [snapshot.transcript, snapshot.interim]
+        .filter(Boolean)
+        .join(snapshot.interim ? " … " : "")
+        .trim(),
   };
 }

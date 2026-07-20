@@ -208,9 +208,9 @@ export function PreviewMatrixArmedPanel({
         ) : null}
         {listeningActive ? (
           <div className="survey-listening-live-panel" data-testid="survey-listening-live-panel">
-            {listeningSource === "mirage" && mirageListening.mediaRecorder ? (
+            {listeningSource === "mirage" && mirageListening.mediaStream ? (
               <LiveAudioVisualizer
-                mediaRecorder={mirageListening.mediaRecorder}
+                mediaStream={mirageListening.mediaStream}
                 width={320}
                 height={56}
                 barWidth={3}

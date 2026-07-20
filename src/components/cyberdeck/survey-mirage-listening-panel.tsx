@@ -137,9 +137,9 @@ export function SurveyMirageListeningPanel() {
         </p>
 
         <div className="mb-3 overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80 px-2 py-3">
-          {source === "mirage" && mirage.mediaRecorder && mirage.active ? (
+          {source === "mirage" && mirage.mediaStream && mirage.active ? (
             <LiveAudioVisualizer
-              mediaRecorder={mirage.mediaRecorder}
+              mediaStream={mirage.mediaStream}
               width={480}
               height={72}
               barWidth={3}
