@@ -21,6 +21,11 @@ import {
   disarmSurveyListeningPost,
   isSurveyListeningArmed,
 } from "@/lib/cyberdeck/survey-listening.client";
+import { readSurveyListeningSource } from "@/lib/cyberdeck/survey-listening-source.client";
+import {
+  isMirageLocalListeningActive,
+  stopMirageLocalListening,
+} from "@/lib/cyberdeck/mirage-local-listening.client";
 import "./preview-matrix.css";
 
 export function PreviewMatrix({
@@ -102,13 +107,19 @@ export function PreviewMatrix({
       const isListenCard =
         card.surveyCommand === SURVEY_POWERFIST_DECK_COMMAND.LISTEN ||
         card.surveyCommand === SURVEY_ECHO_COMMAND.START_LISTENING;
-      if (!isListenCard || !isSurveyListeningArmed()) return;
-      void executeSurveyDeckCommand(
-        SURVEY_ECHO_COMMAND.STOP_LISTENING,
-        resolveSurveyEchoDeckContext(),
-      ).catch(() => {
-        disarmSurveyListeningPost("Listening stopped locally.");
-      });
+      if (!isListenCard) return;
+
+      if (readSurveyListeningSource() === "mirage" || isMirageLocalListeningActive()) {
+        stopMirageLocalListening();
+      }
+      if (isSurveyListeningArmed()) {
+        void executeSurveyDeckCommand(
+          SURVEY_ECHO_COMMAND.STOP_LISTENING,
+          resolveSurveyEchoDeckContext(),
+        ).catch(() => {
+          disarmSurveyListeningPost("Listening stopped locally.");
+        });
+      }
     },
   });
 

@@ -1,11 +1,23 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { FigletFontPreviewSlide } from "@/components/cyberdeck/figlet-font-preview-slide";
+import { LiveAudioVisualizer } from "@/components/cyberdeck/live-audio-visualizer";
 import { SurveyListeningSpectrum } from "@/components/cyberdeck/survey-listening-spectrum";
+import { SurveyListeningSourceToggle } from "@/components/cyberdeck/survey-listening-source-toggle";
 import type { PreviewDeckWithTarget } from "./preview-data";
 import { SURVEY_ECHO_COMMAND, SURVEY_POWERFIST_DECK_COMMAND } from "@/lib/cyberdeck/survey-deck-data";
 import { useSurveyContinuousScreenshotStatus } from "@/lib/cyberdeck/survey-continuous-screenshot.client";
 import { useSurveyListeningStatus } from "@/lib/cyberdeck/survey-listening.client";
+import {
+  subscribeSurveyListeningSource,
+  type SurveyListeningSource,
+} from "@/lib/cyberdeck/survey-listening-source.client";
+import {
+  readMirageLocalListeningState,
+  subscribeMirageLocalListening,
+  type MirageLocalListeningState,
+} from "@/lib/cyberdeck/mirage-local-listening.client";
 import {
   CARD_PLAY_LAPS,
   CARD_PLAY_TRACE_PATH,
@@ -57,15 +69,28 @@ export function PreviewMatrixArmedPanel({
   onResetCardPlay,
 }: PreviewMatrixArmedPanelProps) {
   const continuous = useSurveyContinuousScreenshotStatus();
-  const listening = useSurveyListeningStatus();
+  const echoListening = useSurveyListeningStatus();
+  const [listeningSource, setListeningSource] = useState<SurveyListeningSource>("echo");
+  const [mirageListening, setMirageListening] = useState<MirageLocalListeningState>(() =>
+    readMirageLocalListeningState(),
+  );
+
+  useEffect(() => subscribeSurveyListeningSource(setListeningSource), []);
+  useEffect(() => subscribeMirageLocalListening(setMirageListening), []);
+
   const isContinuousCard =
     armedCard.card.surveyCommand === SURVEY_ECHO_COMMAND.CONTINUOUS_SCREENSHOTS;
   const isListenCard =
     armedCard.card.surveyCommand === SURVEY_POWERFIST_DECK_COMMAND.LISTEN ||
     armedCard.card.surveyCommand === SURVEY_ECHO_COMMAND.START_LISTENING;
   const continuousActive = isContinuousCard && continuous.running;
+  const echoLive = echoListening.armed || echoListening.listening;
+  const mirageLive = mirageListening.active;
   const listeningActive =
-    isListenCard && (listening.armed || listening.listening || executionResult?.ok === true);
+    isListenCard &&
+    (listeningSource === "mirage"
+      ? mirageLive || executionResult?.ok === true
+      : echoLive || executionResult?.ok === true);
   const needsComposer = cardNeedsComposer(armedCard.card);
   const showComposer = needsComposer && !executionResult && !executionPending;
 
@@ -83,14 +108,17 @@ export function PreviewMatrixArmedPanel({
     onResetCardPlay();
   };
 
+  const liveNow =
+    listeningSource === "mirage" ? mirageListening.active : echoListening.listening;
+
   const statusLabel = continuousActive
     ? "Live // Continuous capture"
     : listeningActive
       ? armedPanelArming === "cancel"
         ? `Stopping // Trace ×${CARD_PLAY_LAPS}`
-        : listening.listening
-          ? "Live // Listening"
-          : "Armed // Listening post"
+        : liveNow
+          ? `Live // ${listeningSource === "mirage" ? "Mirage mic" : "Echo mic"}`
+          : `Armed // ${listeningSource === "mirage" ? "Mirage" : "Echo"} listening`
       : armedPanelArming === "cancel"
         ? `Canceling // Trace ×${CARD_PLAY_LAPS}`
         : executionPending
@@ -103,8 +131,17 @@ export function PreviewMatrixArmedPanel({
               ? "Prepared // Enter argument"
               : "Prepared // Locked";
 
-  // Continuous uses a Stop button; Listen keeps hold×3 so the phone can stop without a Stop card.
   const holdEnabled = !continuousActive && !executionPending;
+  const sourceLocked = listeningActive && (mirageLive || echoLive);
+
+  const sttText =
+    listeningSource === "mirage"
+      ? mirageListening.interim
+        ? `… ${mirageListening.interim}`
+        : mirageListening.transcript || "Waiting for speech…"
+      : echoListening.interim
+        ? `… ${echoListening.interim}`
+        : echoListening.lastFinal || "Waiting for speech…";
 
   return (
     <section
@@ -144,6 +181,16 @@ export function PreviewMatrixArmedPanel({
       </div>
       <div className="cardOpenViewportBody">
         <div className="cardOpenViewportType">{armedCard.card.type}</div>
+        {isListenCard ? (
+          <div className="mb-2" data-armed-scroll>
+            <SurveyListeningSourceToggle compact disabled={sourceLocked} />
+            {!listeningActive ? (
+              <p className="mt-1 text-[8px] tracking-[0.04em] text-[#5f5f5f]">
+                Pick source, then hold Listen to arm. After switching source, hold Listen again.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         {armedCard.card.preview?.kind === "figlet" ? (
           <div className="cardOpenViewportArtifact">
             <FigletFontPreviewSlide
@@ -161,30 +208,45 @@ export function PreviewMatrixArmedPanel({
         ) : null}
         {listeningActive ? (
           <div className="survey-listening-live-panel" data-testid="survey-listening-live-panel">
-            <SurveyListeningSpectrum
-              active={listening.listening || listening.armed}
-              level={listening.level}
-              bands={listening.bands}
-            />
+            {listeningSource === "mirage" && mirageListening.mediaRecorder ? (
+              <LiveAudioVisualizer
+                mediaRecorder={mirageListening.mediaRecorder}
+                width={320}
+                height={56}
+                barWidth={3}
+                gap={2}
+                barColor="#34d399"
+                backgroundColor="#050807"
+                fftSize={256}
+                smoothingTimeConstant={0.5}
+              />
+            ) : (
+              <SurveyListeningSpectrum
+                active={echoListening.listening || echoListening.armed}
+                level={echoListening.level}
+                bands={echoListening.bands}
+              />
+            )}
             <p className="survey-listening-live-label">
-              {listening.listening ? "MIC // LIVE" : "MIC // ARMED"}
-              {listening.level > 0.02 ? ` · ${Math.round(listening.level * 100)}%` : ""}
+              {liveNow ? "MIC // LIVE" : "MIC // ARMED"}
+              {listeningSource === "echo" && echoListening.level > 0.02
+                ? ` · ${Math.round(echoListening.level * 100)}%`
+                : ""}
+              {` · ${listeningSource.toUpperCase()}`}
             </p>
             <pre className="survey-listening-live-stt" data-armed-scroll data-testid="survey-listening-live-stt">
-              {listening.interim
-                ? `… ${listening.interim}`
-                : listening.lastFinal
-                  ? listening.lastFinal
-                  : "Waiting for speech…"}
+              {sttText}
             </pre>
-            {listening.lastSuggestAnswer ? (
+            {listeningSource === "echo" && echoListening.lastSuggestAnswer ? (
               <pre className="survey-listening-live-suggest" data-armed-scroll>
-                {listening.lastSuggestAnswer.slice(0, 360)}
-                {listening.lastSuggestAnswer.length > 360 ? "…" : ""}
+                {echoListening.lastSuggestAnswer.slice(0, 360)}
+                {echoListening.lastSuggestAnswer.length > 360 ? "…" : ""}
               </pre>
             ) : null}
-            {listening.error ? (
-              <p className="survey-listening-live-error">{listening.error}</p>
+            {(listeningSource === "mirage" ? mirageListening.error : echoListening.error) ? (
+              <p className="survey-listening-live-error">
+                {listeningSource === "mirage" ? mirageListening.error : echoListening.error}
+              </p>
             ) : null}
           </div>
         ) : executionPending ? (
@@ -274,7 +336,12 @@ export function PreviewMatrixArmedPanel({
       {continuousActive || showComposer ? (
         <div className="cardOpenViewportActions">
           {continuousActive ? (
-            <button type="button" className="push is-stop" onClick={handleStop} data-testid="survey-continuous-stop">
+            <button
+              type="button"
+              className="push is-stop"
+              onClick={handleStop}
+              data-testid="survey-continuous-stop"
+            >
               Stop
             </button>
           ) : (

@@ -1,47 +1,98 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { LiveAudioVisualizer } from "@/components/cyberdeck/live-audio-visualizer";
+import { SurveyListeningSourceToggle } from "@/components/cyberdeck/survey-listening-source-toggle";
+import { SurveyListeningSpectrum } from "@/components/cyberdeck/survey-listening-spectrum";
+import {
+  executeSurveyDeckCommand,
+  resolveSurveyEchoDeckContext,
+} from "@/lib/cyberdeck/survey-deck-command.client";
+import { SURVEY_ECHO_COMMAND } from "@/lib/cyberdeck/survey-deck-data";
+import {
+  clearSurveyListeningTranscript,
+  useSurveyListeningStatus,
+} from "@/lib/cyberdeck/survey-listening.client";
+import {
+  subscribeSurveyListeningSource,
+  type SurveyListeningSource,
+} from "@/lib/cyberdeck/survey-listening-source.client";
 import { solveMirageSelectedTextAsync } from "@/lib/cyberdeck/survey-mirage-item-queue.client";
 import { useMirageLocalListening } from "@/lib/cyberdeck/use-mirage-local-listening";
+import { stopMirageLocalListening } from "@/lib/cyberdeck/mirage-local-listening.client";
+import { SURVEY_ECHO_DISPLAY } from "@/lib/cyberdeck/survey-mode";
 
 /**
- * Mirage Survey LISTENING tab — Start/Stop mic, live waveform, STT text, Solve → advice.
+ * Mirage Survey LISTENING tab — Start/Stop, source toggle (Echo | Mirage), STT, Solve.
  */
 export function SurveyMirageListeningPanel() {
-  const {
-    active,
-    interim,
-    transcript,
-    error,
-    mediaRecorder,
-    displayText,
-    start,
-    stop,
-    clearTranscript,
-  } = useMirageLocalListening();
+  const mirage = useMirageLocalListening();
+  const echo = useSurveyListeningStatus();
+  const [source, setSource] = useState<SurveyListeningSource>("echo");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [advice, setAdvice] = useState("");
   const [solveError, setSolveError] = useState("");
 
+  useEffect(() => subscribeSurveyListeningSource(setSource), []);
+
+  const active = source === "mirage" ? mirage.active : echo.armed || echo.listening;
+  const transcript =
+    source === "mirage"
+      ? mirage.displayText || mirage.transcript
+      : [echo.lastFinal, echo.interim].filter(Boolean).join(echo.interim ? " … " : "").trim();
+  const interim = source === "mirage" ? mirage.interim : echo.interim;
+  const finals = source === "mirage" ? mirage.transcript : echo.lastFinal;
+  const error = source === "mirage" ? mirage.error : echo.error;
+
   const handleStart = useCallback(async () => {
     setBusy(true);
     setSolveError("");
-    setStatus("Requesting microphone…");
-    const result = await start();
+    if (source === "mirage") {
+      setStatus("Requesting Mirage microphone…");
+      void executeSurveyDeckCommand(
+        SURVEY_ECHO_COMMAND.STOP_LISTENING,
+        resolveSurveyEchoDeckContext(),
+      ).catch(() => undefined);
+      const result = await mirage.start();
+      setBusy(false);
+      setStatus(result.message);
+      return;
+    }
+    setStatus(`Arming ${SURVEY_ECHO_DISPLAY} listening…`);
+    stopMirageLocalListening();
+    const result = await executeSurveyDeckCommand(
+      SURVEY_ECHO_COMMAND.START_LISTENING,
+      resolveSurveyEchoDeckContext(),
+    );
+    setBusy(false);
+    if (!result.ok) {
+      setSolveError(result.message);
+      setStatus("");
+      return;
+    }
+    setStatus(result.message);
+  }, [mirage, source]);
+
+  const handleStop = useCallback(async () => {
+    setBusy(true);
+    if (source === "mirage") {
+      const result = mirage.stop();
+      setBusy(false);
+      setStatus(result.message);
+      return;
+    }
+    const result = await executeSurveyDeckCommand(
+      SURVEY_ECHO_COMMAND.STOP_LISTENING,
+      resolveSurveyEchoDeckContext(),
+    );
     setBusy(false);
     setStatus(result.message);
-  }, [start]);
-
-  const handleStop = useCallback(() => {
-    const result = stop();
-    setStatus(result.message);
-  }, [stop]);
+  }, [mirage, source]);
 
   const handleSolve = useCallback(async () => {
-    const text = displayText || transcript;
+    const text = transcript;
     if (!text.trim()) {
       setSolveError("No transcript yet — start listening and speak first.");
       setAdvice("");
@@ -59,30 +110,36 @@ export function SurveyMirageListeningPanel() {
     }
     setAdvice(result.answerText?.trim() || result.message);
     setStatus(result.message || "Advice ready.");
-  }, [displayText, transcript]);
+  }, [transcript]);
 
   const handleClear = useCallback(() => {
-    clearTranscript();
+    if (source === "mirage") {
+      mirage.clearTranscript();
+    } else {
+      clearSurveyListeningTranscript();
+    }
     setAdvice("");
     setSolveError("");
     setStatus("Transcript cleared.");
-  }, [clearTranscript]);
+  }, [mirage, source]);
 
   return (
     <div className="flex flex-col gap-3" data-testid="survey-mirage-listening-panel">
       <div className="rounded-sm border border-[#1c1c1c] bg-black/70 p-3">
         <div className="mb-2 text-[9px] tracking-[0.08em] text-[#8a8a8a]">
-          MIRAGE LISTENING // mic → live STT → solve advice
+          LISTENING // source → live STT → solve advice
         </div>
+        <SurveyListeningSourceToggle className="mb-3" disabled={busy || active} />
         <p className="mb-3 text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
-          Start Listening opens this device&apos;s microphone, shows a live volume waveform, and runs
-          continuous speech-to-text. Solve reads the transcript and returns interview advice.
+          {source === "mirage"
+            ? "MIRAGE uses this device microphone and browser speech recognition."
+            : `ECHO uses ${SURVEY_ECHO_DISPLAY} Satellite mic STT (relay / LAN poll).`}
         </p>
 
         <div className="mb-3 overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80 px-2 py-3">
-          {mediaRecorder && active ? (
+          {source === "mirage" && mirage.mediaRecorder && mirage.active ? (
             <LiveAudioVisualizer
-              mediaRecorder={mediaRecorder}
+              mediaRecorder={mirage.mediaRecorder}
               width={480}
               height={72}
               barWidth={3}
@@ -91,6 +148,12 @@ export function SurveyMirageListeningPanel() {
               backgroundColor="#050807"
               fftSize={256}
               smoothingTimeConstant={0.5}
+            />
+          ) : source === "echo" && (echo.armed || echo.listening) ? (
+            <SurveyListeningSpectrum
+              active={echo.listening || echo.armed}
+              level={echo.level}
+              bands={echo.bands}
             />
           ) : (
             <div
@@ -101,7 +164,7 @@ export function SurveyMirageListeningPanel() {
             </div>
           )}
           <p className="mt-2 text-center text-[9px] tracking-[0.1em] text-[#6a6a6a]">
-            {active ? "MIC // LIVE" : "MIC // STANDBY"}
+            {active ? `MIC // LIVE · ${source.toUpperCase()}` : "MIC // STANDBY"}
           </p>
         </div>
 
@@ -115,13 +178,13 @@ export function SurveyMirageListeningPanel() {
           </CyberdeckActionButton>
           <CyberdeckActionButton
             disabled={busy || !active}
-            onClick={handleStop}
+            onClick={() => void handleStop()}
             data-testid="survey-mirage-listening-stop"
           >
             STOP LISTENING
           </CyberdeckActionButton>
           <CyberdeckActionButton
-            disabled={busy || !(displayText || transcript)}
+            disabled={busy || !transcript}
             onClick={() => void handleSolve()}
             data-testid="survey-mirage-listening-solve"
           >
@@ -152,8 +215,8 @@ export function SurveyMirageListeningPanel() {
         <div className="mb-2 text-[9px] tracking-[0.1em] text-[#8a8a8a]">STT OUTPUT</div>
         <pre className="min-h-[4.5rem] whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-[#c8c8c8]">
           {interim
-            ? `${transcript ? `${transcript}\n` : ""}… ${interim}`
-            : transcript || "— waiting for speech —"}
+            ? `${finals ? `${finals}\n` : ""}… ${interim}`
+            : finals || "— waiting for speech —"}
         </pre>
       </div>
 

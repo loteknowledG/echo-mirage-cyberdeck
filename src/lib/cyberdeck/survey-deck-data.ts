@@ -97,14 +97,14 @@ export const SURVEY_POWERFIST_DECKS: PreviewDeckWithTarget[] = [
   },
   {
     name: "Listening Deck",
-    badge: "echo mic",
+    badge: "mic stt",
     targetPane: "operator",
     cards: [
       {
         type: "echo",
         title: "Listen",
         purpose:
-          "Arm Echo mic STT. Active card shows volume spectrum + live transcript — hold ×3 to stop.",
+          "Arm mic STT (Echo Satellite or this device — use SOURCE toggle). Hold ×3 on open card to stop.",
         surveyCommand: SURVEY_POWERFIST_DECK_COMMAND.LISTEN,
       },
       {

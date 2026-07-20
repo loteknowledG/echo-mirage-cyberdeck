@@ -13,6 +13,7 @@ import { surveyCaptureDataUrl } from "@/lib/cyberdeck/survey-capture-mime";
 import {
   clearSurveyScreenshotDisplay,
   solveMirageCaptureAsync,
+  solveMirageSelectedTextAsync,
 } from "@/lib/cyberdeck/survey-mirage-item-queue.client";
 import { captureEchoExtensionActiveTab } from "@/lib/cyberdeck/survey-echo-extension.client";
 import {
@@ -25,6 +26,13 @@ import {
   clearSurveyListeningTranscript,
   solveSurveyListeningTranscript,
 } from "@/lib/cyberdeck/survey-listening.client";
+import { readSurveyListeningSource } from "@/lib/cyberdeck/survey-listening-source.client";
+import {
+  clearMirageLocalListeningTranscript,
+  mirageLocalListeningDisplayText,
+  startMirageLocalListening,
+  stopMirageLocalListening,
+} from "@/lib/cyberdeck/mirage-local-listening.client";
 
 export type SurveyPowerfistDeckResult = {
   ok: boolean;
@@ -65,20 +73,42 @@ export async function executeSurveyPowerfistDeckCommand(
     case SURVEY_POWERFIST_DECK_COMMAND.EXT_CLEAR:
       return clearSurveyExtensionPageContext();
     case SURVEY_POWERFIST_DECK_COMMAND.LISTEN: {
+      if (readSurveyListeningSource() === "mirage") {
+        // Stop Echo post if it was running so we don't mix sources.
+        void executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.STOP_LISTENING, ctx).catch(() => undefined);
+        const result = await startMirageLocalListening();
+        return {
+          ok: result.ok,
+          message: result.message,
+          keepArmed: result.ok,
+        };
+      }
+      stopMirageLocalListening();
       const result = await executeSurveyDeckCommand(SURVEY_ECHO_COMMAND.START_LISTENING, ctx);
       return {
         ok: result.ok,
         message: result.message,
-        // Stay on the open Listen card for spectrum + STT; hold ×3 stops.
         keepArmed: result.ok,
       };
     }
     case SURVEY_POWERFIST_DECK_COMMAND.SOLVE_LISTENING: {
+      if (readSurveyListeningSource() === "mirage") {
+        const text = mirageLocalListeningDisplayText();
+        if (!text) {
+          return { ok: false, message: "No Mirage transcript to solve yet." };
+        }
+        const result = await solveMirageSelectedTextAsync(text);
+        return { ok: result.ok, message: result.message, answerText: result.answerText };
+      }
       const result = await solveSurveyListeningTranscript();
       return { ok: result.ok, message: result.message, answerText: result.answerText };
     }
-    case SURVEY_POWERFIST_DECK_COMMAND.CLEAR_LISTENING:
+    case SURVEY_POWERFIST_DECK_COMMAND.CLEAR_LISTENING: {
+      if (readSurveyListeningSource() === "mirage") {
+        return clearMirageLocalListeningTranscript();
+      }
       return clearSurveyListeningTranscript();
+    }
     default: {
       const _exhaustive: never = command;
       return { ok: false, message: `Unknown deck command: ${String(_exhaustive)}` };
