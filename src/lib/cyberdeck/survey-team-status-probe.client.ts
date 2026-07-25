@@ -25,21 +25,20 @@ function formatPowerfistLinkDetail(deviceId: string, echoHost?: string | null): 
   return `${prefix}device ${deviceId.slice(0, 8)}…`;
 }
 
-async function fetchAuthoritativeEchoStatus(input: {
-  echoHost: string | null;
-  echoHttpPort: number;
-}): Promise<EchoSurveyStatus | null> {
-  const echoLocal = await fetchEchoSurveyStatus();
-  if (echoLocal.ok) return echoLocal;
-
-  if (!input.echoHost) return null;
-
-  const remote = await fetchEchoRemoteSurveyStatusClient(input.echoHost, input.echoHttpPort);
-  return remote.ok ? remote : null;
-}
-
 /** Single probe used by team status UI and hub connect guards. */
 export async function probeSurveyTeamStatus(): Promise<SurveyTeamStatus> {
+  const result = await probeSurveyTeamStatusDetailed();
+  return result.team;
+}
+
+export type SurveyTeamStatusProbeResult = {
+  team: SurveyTeamStatus;
+  echo: EchoSurveyStatus | null;
+  echoFetchFailedReason: string | null;
+};
+
+/** One coordinated network pass for team + echo snapshot consumers. */
+export async function probeSurveyTeamStatusDetailed(): Promise<SurveyTeamStatusProbeResult> {
   const mirageCreds = readSurveyMiragePairCredentials();
   const powerfistCreds = readSurveyPowerfistPairCredentials();
   const echoHost = mirageCreds?.echoHost ?? powerfistCreds?.echoHost ?? null;
@@ -52,10 +51,19 @@ export async function probeSurveyTeamStatus(): Promise<SurveyTeamStatus> {
     "Enter Mirage hub code on PowerFist tab, or scan hub QR.",
   );
 
-  const authoritative = await fetchAuthoritativeEchoStatus({
-    echoHost,
-    echoHttpPort,
-  });
+  const echoLocal = await fetchEchoSurveyStatus();
+  let authoritative: EchoSurveyStatus | null = echoLocal.ok ? echoLocal : null;
+  let echoFetchFailedReason: string | null = echoLocal.ok ? null : echoLocal.reason;
+
+  if (!authoritative && echoHost) {
+    const remote = await fetchEchoRemoteSurveyStatusClient(echoHost, echoHttpPort);
+    if (remote.ok) {
+      authoritative = remote;
+      echoFetchFailedReason = null;
+    } else if (!echoFetchFailedReason) {
+      echoFetchFailedReason = remote.reason;
+    }
+  }
 
   if (authoritative) {
     const mirages = normalizePairedMirages(authoritative);
@@ -85,10 +93,14 @@ export async function probeSurveyTeamStatus(): Promise<SurveyTeamStatus> {
   }
 
   return {
-    echoMirage,
-    echoPowerfist,
-    miragePowerfist,
-    echoHost: authoritative?.echoHost ?? echoHost,
-    loading: false,
+    team: {
+      echoMirage,
+      echoPowerfist,
+      miragePowerfist,
+      echoHost: authoritative?.echoHost ?? echoHost,
+      loading: false,
+    },
+    echo: authoritative,
+    echoFetchFailedReason,
   };
 }

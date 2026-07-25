@@ -14,8 +14,7 @@ import {
   subscribeDesktopAppUpdateEvents,
   syncRunningReleaseVersion,
 } from "@/lib/app-update-client";
-
-const VERSION_CHECK_MS = 5 * 60_000;
+import { subscribeAppVersionPoll } from "@/lib/app-version-poll.client";
 
 export function AppUpdatePrompt() {
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
@@ -76,27 +75,20 @@ export function AppUpdatePrompt() {
     void checkForUpdate();
 
     const onFocus = () => {
+      if (document.visibilityState !== "visible") return;
       void checkForUpdate();
     };
 
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void checkForUpdate();
-      }
-    };
-
-    const intervalId = window.setInterval(() => {
+    const unsubPoll = subscribeAppVersionPoll(() => {
       void checkForUpdate();
-    }, VERSION_CHECK_MS);
+    });
 
     window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       unsubscribeDesktop();
-      window.clearInterval(intervalId);
+      unsubPoll();
       window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [checkForUpdate, showUpdate]);
 

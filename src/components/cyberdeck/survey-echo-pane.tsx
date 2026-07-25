@@ -11,16 +11,23 @@ import {
 } from "@/lib/cyberdeck/survey-mode";
 import { startSurveyCaptureDeck } from "@/lib/cyberdeck/survey-capture-deck";
 import {
-  fetchEchoSurveyCodes,
-  fetchEchoSurveyStatus,
   formatCodeExpiry,
   normalizePairedMirages,
   regenerateEchoSurveyCodes,
+  type EchoSurveyStatus,
 } from "@/lib/cyberdeck/survey-pairing-client";
 import { SATELLITE_GITHUB_RELEASES_URL } from "@/lib/electron/desktop-install.client";
 import { readPowerfistCaptureCredentials } from "@/lib/cyberdeck/powerfist-capture-client";
 import { SurveyPairPinDisplay } from "@/components/cyberdeck/survey-pair-pin-display";
 import { isSurveyHubEnabled } from "@/lib/cyberdeck/survey-boundary";
+import {
+  getSurveyEchoSnapshot,
+  SURVEY_ECHO_SNAPSHOT_CHANGED_EVENT,
+} from "@/lib/cyberdeck/survey-echo-snapshot-store.client";
+import {
+  refreshSurveyTeamStatusPoll,
+  subscribeSurveyTeamStatusPoll,
+} from "@/lib/cyberdeck/survey-team-status-poll.client";
 
 function PairPinBlock({
   label,
@@ -79,20 +86,10 @@ export function SurveyEchoPane() {
   const [relayBusy, setRelayBusy] = useState(false);
   const hasLoadedOnceRef = useRef(false);
 
-  const refresh = useCallback(async () => {
-    const showLoading = !hasLoadedOnceRef.current;
-    if (showLoading) setLoading(true);
-    setError(null);
-    const status = await fetchEchoSurveyStatus();
-    if (showLoading) setLoading(false);
-    if (!status.ok) {
-      setNotEchoMachine(true);
-      setStatusSource(null);
-      setError(status.reason);
-      return;
-    }
+  const applyEchoStatus = useCallback((status: EchoSurveyStatus) => {
     hasLoadedOnceRef.current = true;
     setNotEchoMachine(false);
+    setLoading(false);
     setStatusSource(status.source);
     setEchoHost(status.echoHost);
     setHttpPort(status.httpPort);
@@ -105,13 +102,41 @@ export function SurveyEchoPane() {
     setSatelliteArmed(status.armed ?? null);
     setSatelliteWsStatus(status.wsStatus ?? null);
     setCaptureMirage(status.captureMirage ?? null);
+    setError(null);
   }, []);
 
+  const syncFromSnapshot = useCallback(() => {
+    const snapshot = getSurveyEchoSnapshot();
+    if (snapshot.ok) {
+      applyEchoStatus(snapshot.status);
+      return;
+    }
+    if (!hasLoadedOnceRef.current) {
+      setLoading(true);
+    }
+    setNotEchoMachine(true);
+    setStatusSource(null);
+    setError(snapshot.reason);
+    setLoading(false);
+  }, [applyEchoStatus]);
+
+  const refresh = useCallback(async () => {
+    if (!hasLoadedOnceRef.current) setLoading(true);
+    setError(null);
+    await refreshSurveyTeamStatusPoll();
+    syncFromSnapshot();
+  }, [syncFromSnapshot]);
+
   useEffect(() => {
-    void refresh();
-    const interval = window.setInterval(() => void refresh(), 5000);
-    return () => window.clearInterval(interval);
-  }, [refresh]);
+    syncFromSnapshot();
+    const unsubPoll = subscribeSurveyTeamStatusPoll(syncFromSnapshot);
+    const onSnapshot = () => syncFromSnapshot();
+    window.addEventListener(SURVEY_ECHO_SNAPSHOT_CHANGED_EVENT, onSnapshot);
+    return () => {
+      unsubPoll();
+      window.removeEventListener(SURVEY_ECHO_SNAPSHOT_CHANGED_EVENT, onSnapshot);
+    };
+  }, [syncFromSnapshot]);
 
   const handleRefreshStatus = useCallback(async () => {
     setBusy(true);

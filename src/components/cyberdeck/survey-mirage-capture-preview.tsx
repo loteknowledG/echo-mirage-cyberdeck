@@ -12,7 +12,6 @@ import {
   takeSurveyScreenshot,
 } from "@/lib/cyberdeck/survey-deck-command.client";
 import {
-  ensureSurveyRelayEchoNodeId,
   SURVEY_RELAY_ECHO_CHANGED_EVENT,
 } from "@/lib/cyberdeck/survey-relay.client";
 import {
@@ -31,6 +30,7 @@ import {
 } from "@/lib/cyberdeck/survey-mirage-item-queue.client";
 import { SURVEY_ECHO_DISPLAY } from "@/lib/cyberdeck/survey-mode";
 import { useSurveyAnalyzeStatus } from "@/lib/cyberdeck/survey-analyze-status.client";
+import { subscribeSurveyRelayDiscovery } from "@/lib/cyberdeck/survey-relay-discovery-poll.client";
 import { useSurveyTeamStatus } from "@/lib/cyberdeck/use-survey-team-status";
 import { SURVEY_PAIR_PIN_DRAFT_EVENT } from "@/lib/cyberdeck/survey-pair-pin-draft";
 import { isSurveyHttpsPairBlocked } from "@/lib/cyberdeck/survey-pairing-shared.client";
@@ -71,28 +71,20 @@ export function SurveyMirageCapturePreview() {
       setRelayWaitHint(null);
       return;
     }
-    let cancelled = false;
-    const discover = () => {
-      void ensureSurveyRelayEchoNodeId(resolveSurveyRelayEchoNodeId()).then((result) => {
-        if (cancelled) return;
-        if (result.ok) {
-          setRelayLiveId(result.echoNodeId);
-          setRelayWaitHint(null);
-          bumpEndpoint();
-          return;
-        }
-        setRelayLiveId(null);
-        setRelayWaitHint(
+    const sync = (result: { ok: boolean; echoNodeId?: string; reason?: string }) => {
+      if (result.ok && result.echoNodeId) {
+        setRelayLiveId(result.echoNodeId);
+        setRelayWaitHint(null);
+        bumpEndpoint();
+        return;
+      }
+      setRelayLiveId(null);
+      setRelayWaitHint(
+        result.reason ??
           "Waiting for Echo — open Satellite on the Mac (Screen Recording on). No secret or team id needed.",
-        );
-      });
+      );
     };
-    discover();
-    const timer = window.setInterval(discover, 20_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
+    return subscribeSurveyRelayDiscovery(sync);
   }, [pwaBlocked, bumpEndpoint]);
 
   useEffect(() => {

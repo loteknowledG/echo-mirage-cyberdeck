@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createBackgroundPoll } from "@/lib/client/background-poll.client";
+import { isSurveyRelayPollingEnabled } from "@/lib/cyberdeck/survey-boundary";
 import { ensureSurveyRelayEchoNodeId, fetchSurveyRelayListening } from "@/lib/cyberdeck/survey-relay.client";
 import { solveMirageSelectedTextAsync } from "@/lib/cyberdeck/survey-mirage-item-queue.client";
 import { appendSurveyChatMessage } from "@/lib/cyberdeck/survey-chat";
@@ -47,10 +49,27 @@ const DEFAULT_STATE: SurveyListeningClientState = {
 };
 
 let state: SurveyListeningClientState = { ...DEFAULT_STATE };
-let pollTimer: number | null = null;
 let suggestInFlight = false;
 let lastHandledFinalSeq = 0;
 let lastSuggestAt = 0;
+let listeningPollUnsub: (() => void) | null = null;
+
+const LISTENING_ACTIVE_INTERVAL_MS = 5_000;
+const LISTENING_ARMED_IDLE_INTERVAL_MS = 30_000;
+
+function resolveListeningPollIntervalMs(): number {
+  return state.listening ? LISTENING_ACTIVE_INTERVAL_MS : LISTENING_ARMED_IDLE_INTERVAL_MS;
+}
+
+function attachListeningPoll() {
+  if (listeningPollUnsub) return;
+  listeningPollUnsub = surveyListeningPoll.subscribe();
+}
+
+function detachListeningPoll() {
+  listeningPollUnsub?.();
+  listeningPollUnsub = null;
+}
 
 function emit() {
   if (typeof window === "undefined") return;
@@ -167,15 +186,20 @@ async function maybeSuggestFromFinal(text: string, seq: number) {
   }
 }
 
-async function pollOnce() {
+async function pollOnce(signal?: AbortSignal) {
   if (!state.armed) return;
+  if (signal?.aborted) return;
 
   const resolved = await ensureSurveyRelayEchoNodeId(
     readSurveyMiragePairCredentials()?.echoNodeId,
   );
+  if (signal?.aborted) return;
   const echoNodeId = resolved.ok ? resolved.echoNodeId : "";
 
-  const relay = await fetchSurveyRelayListening(echoNodeId || undefined);
+  const relay = isSurveyRelayPollingEnabled()
+    ? await fetchSurveyRelayListening(echoNodeId || undefined)
+    : { ok: false as const, reason: "Relay polling disabled on hosted demo." };
+  if (signal?.aborted) return;
   const lan = relay.ok ? null : await fetchLanListeningSnapshot();
   const snapshot = relay.ok
     ? {
@@ -239,12 +263,14 @@ async function pollOnce() {
   }
 }
 
-function clearPollTimer() {
-  if (pollTimer != null) {
-    window.clearInterval(pollTimer);
-    pollTimer = null;
-  }
-}
+const surveyListeningPoll = createBackgroundPoll({
+  id: "survey-listening",
+  tick: (signal) => pollOnce(signal),
+  getBaseIntervalMs: resolveListeningPollIntervalMs,
+  minIntervalMs: LISTENING_ACTIVE_INTERVAL_MS,
+  maxBackoffMs: 5 * 60_000,
+  isEnabled: () => state.armed,
+});
 
 /** Start Mirage-side poll after Echo Start Listening succeeds. */
 export function armSurveyListeningPost(message?: string) {
@@ -254,16 +280,13 @@ export function armSurveyListeningPost(message?: string) {
     error: null,
     banner: message ?? "ARMED // polling Echo transcript…",
   });
-  clearPollTimer();
-  void pollOnce();
-  pollTimer = window.setInterval(() => {
-    void pollOnce();
-  }, 300);
+  attachListeningPoll();
+  void surveyListeningPoll.refresh();
 }
 
 /** Stop Mirage poll after Echo Stop Listening. */
 export function disarmSurveyListeningPost(message?: string) {
-  clearPollTimer();
+  detachListeningPoll();
   setState({
     armed: false,
     listening: false,
@@ -323,6 +346,12 @@ export async function solveSurveyListeningTranscript(): Promise<{
   }
   return result;
 }
+
+export function getSurveyListeningPollState() {
+  return surveyListeningPoll.getState();
+}
+
+export const SURVEY_LISTENING_MIN_POLL_MS = LISTENING_ACTIVE_INTERVAL_MS;
 
 export function useSurveyListeningStatus(): SurveyListeningClientState {
   const [snapshot, setSnapshot] = useState<SurveyListeningClientState>(() =>

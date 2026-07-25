@@ -5,19 +5,18 @@ import { requestSurveyHubConnect } from "@/lib/cyberdeck/survey-connect-request.
 import { SURVEY_ECHO_LINK_CHANNEL } from "@/lib/cyberdeck/survey-mode";
 import {
   ECHO_SURVEY_TERMINATED_MESSAGE,
-  fetchEchoSurveyLinkStatus,
   readSurveyMiragePairCredentials,
   readSurveyPowerfistPairCredentials,
   type SurveyMiragePairCredentials,
   type SurveyPowerfistPairCredentials,
 } from "@/lib/cyberdeck/survey-pairing-client";
-import { traceSurveyPairing } from "@/lib/cyberdeck/survey-pairing-trace";
-
-const LINK_POLL_MS = 2500;
-
-function requestSurveyAutoReconnect(): void {
-  requestSurveyHubConnect({ force: true });
-}
+import {
+  getSurveyLinkWatchEntry,
+  markSurveyLinkWatchTerminated,
+  resetSurveyLinkWatchEntry,
+  SURVEY_LINK_WATCH_CHANGED_EVENT,
+} from "@/lib/cyberdeck/survey-link-watch-store.client";
+import { subscribeSurveyTeamStatusPoll } from "@/lib/cyberdeck/survey-team-status-poll.client";
 
 type SurveyEchoLinkRole = "mirage" | "powerfist";
 
@@ -45,56 +44,23 @@ export function useSurveyEchoLinkWatch(role: SurveyEchoLinkRole): {
   terminatedMessage: string | null;
   resetLinkWatch: () => void;
 } {
-  const [paired, setPaired] = useState(() => readCredentials(role));
-  const [terminated, setTerminated] = useState(false);
-  const [terminatedMessage, setTerminatedMessage] = useState<string | null>(null);
+  const [entry, setEntry] = useState(() => getSurveyLinkWatchEntry(role));
 
-  const handleStaleLink = useCallback(
-    (message: string) => {
-      traceSurveyPairing(`Echo link stale — keeping saved creds for auto-reconnect · ${message}`);
-      setTerminated(true);
-      setTerminatedMessage(message);
-      requestSurveyAutoReconnect();
-    },
-    [],
-  );
+  const sync = useCallback(() => {
+    setEntry(getSurveyLinkWatchEntry(role));
+  }, [role]);
 
-  const pollLink = useCallback(async () => {
-    const creds = readCredentials(role);
-    if (!creds) {
-      setPaired(null);
-      return;
-    }
-
-    setPaired(creds);
-
-    const status = await fetchEchoSurveyLinkStatus({
-      echoNodeId: creds.echoNodeId,
-      role,
-      sessionEpoch: creds.sessionEpoch ?? 0,
-      nodeId: role === "mirage" ? (creds as SurveyMiragePairCredentials).nodeId : undefined,
-      deviceId: role === "powerfist" ? (creds as SurveyPowerfistPairCredentials).deviceId : undefined,
-      echoHost: creds.echoHost,
-      httpPort: creds.httpPort,
-    });
-
-    if (!status.ok) {
-      traceSurveyPairing(`link poll skipped — ${status.reason}`);
-      return;
-    }
-
-    if (!status.active) {
-      handleStaleLink(status.message);
-      return;
-    }
-
-    setTerminated(false);
-    setTerminatedMessage(null);
-  }, [handleStaleLink, role]);
+  const handleStaleLink = useCallback((message: string) => {
+    markSurveyLinkWatchTerminated(role, message);
+    requestSurveyHubConnect({ force: true });
+    sync();
+  }, [role, sync]);
 
   useEffect(() => {
-    void pollLink();
-    const interval = window.setInterval(() => void pollLink(), LINK_POLL_MS);
+    sync();
+    const unsubPoll = subscribeSurveyTeamStatusPoll(sync);
+    const onChanged = () => sync();
+    window.addEventListener(SURVEY_LINK_WATCH_CHANGED_EVENT, onChanged);
 
     const onBroadcast = (event: MessageEvent) => {
       const data = event.data as { type?: string } | null;
@@ -117,18 +83,23 @@ export function useSurveyEchoLinkWatch(role: SurveyEchoLinkRole): {
     window.addEventListener(SURVEY_ECHO_LINK_CHANNEL, onCustomEvent);
 
     return () => {
-      window.clearInterval(interval);
+      unsubPoll();
+      window.removeEventListener(SURVEY_LINK_WATCH_CHANGED_EVENT, onChanged);
       channel?.removeEventListener("message", onBroadcast);
       channel?.close();
       window.removeEventListener(SURVEY_ECHO_LINK_CHANNEL, onCustomEvent);
     };
-  }, [handleStaleLink, pollLink]);
+  }, [handleStaleLink, role, sync]);
 
   const resetLinkWatch = useCallback(() => {
-    setTerminated(false);
-    setTerminatedMessage(null);
-    setPaired(readCredentials(role));
-  }, [role]);
+    resetSurveyLinkWatchEntry(role);
+    sync();
+  }, [role, sync]);
 
-  return { paired, terminated, terminatedMessage, resetLinkWatch };
+  return {
+    paired: entry.paired ?? readCredentials(role),
+    terminated: entry.terminated,
+    terminatedMessage: entry.terminatedMessage,
+    resetLinkWatch,
+  };
 }

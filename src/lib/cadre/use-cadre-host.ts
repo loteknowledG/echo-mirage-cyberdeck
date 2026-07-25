@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { connectManagedEventSource } from "@/lib/client/sse-reconnect.client";
 import { isCadreEvent } from "@/lib/cadre/cadre-events";
 import { ingestCadreEvent } from "@/lib/cadre/cadre-event-bus";
 import type { CadreRuntime } from "@/lib/cadre/runtime-registry";
@@ -137,136 +138,152 @@ export function useCadreHost() {
 
     void boot();
 
-    const source = new EventSource("/api/cadre/stream");
-    source.addEventListener("ready", () => {
-      if (!cancelled) {
-        setConnected(true);
-        ingestCadreEvent({
-          type: "stream_connected",
-          actor: "CADRE",
-          message: "Cadre activity stream connected",
-          severity: "info",
-          archive: false,
-        });
-      }
-    });
-    source.addEventListener("cadre_event", (event) => {
-      try {
-        const payload = JSON.parse(event.data) as { event?: unknown };
-        if (payload.event && isCadreEvent(payload.event)) {
-          ingestCadreEvent(payload.event);
+    const stream = connectManagedEventSource({
+      url: "/api/cadre/stream",
+      onOpen: () => {
+        if (!cancelled) {
+          setConnected(true);
+          ingestCadreEvent({
+            type: "stream_connected",
+            actor: "CADRE",
+            message: "Cadre activity stream connected",
+            severity: "info",
+            archive: false,
+          });
         }
-      } catch {
-        /* ignore malformed cadre event */
-      }
-    });
-    source.addEventListener("snapshot", (event) => {
-      try {
-        const payload = JSON.parse(event.data) as {
-          runtimeId?: string;
-          stdout?: string;
-          stderr?: string;
-          status?: CadreRuntime["status"];
-          readiness?: CadreRuntime["readiness"];
-          readinessReason?: string;
-          lastReadinessAt?: string | null;
-        };
-        if (!payload.runtimeId) return;
-        setOutputById((prev) => ({
-          ...prev,
-          [payload.runtimeId!]: {
-            stdout: payload.stdout ?? prev[payload.runtimeId!]?.stdout ?? "",
-            stderr: payload.stderr ?? prev[payload.runtimeId!]?.stderr ?? "",
-          },
-        }));
-        if (payload.status || payload.readiness) {
-          setRuntimes((prev) =>
-            prev.map((entry) =>
-              entry.id === payload.runtimeId
-                ? {
-                    ...entry,
-                    ...(payload.status ? { status: payload.status } : {}),
-                    ...(payload.readiness ? { readiness: payload.readiness } : {}),
-                    ...(payload.readinessReason ? { readinessReason: payload.readinessReason } : {}),
-                    ...(payload.lastReadinessAt !== undefined
-                      ? { lastReadinessAt: payload.lastReadinessAt }
-                      : {}),
-                  }
-                : entry,
-            ),
-          );
+      },
+      onError: () => {
+        if (!cancelled) {
+          setConnected(false);
+          ingestCadreEvent({
+            type: "stream_disconnected",
+            actor: "CADRE",
+            message: "Cadre activity stream disconnected",
+            severity: "warning",
+            archive: false,
+          });
         }
-      } catch {
-        /* ignore malformed snapshot */
-      }
+      },
+      eventHandlers: {
+        ready: () => {
+          if (!cancelled) {
+            setConnected(true);
+            ingestCadreEvent({
+              type: "stream_connected",
+              actor: "CADRE",
+              message: "Cadre activity stream connected",
+              severity: "info",
+              archive: false,
+            });
+          }
+        },
+        cadre_event: (event) => {
+          try {
+            const payload = JSON.parse(event.data) as { event?: unknown };
+            if (payload.event && isCadreEvent(payload.event)) {
+              ingestCadreEvent(payload.event);
+            }
+          } catch {
+            /* ignore malformed cadre event */
+          }
+        },
+        snapshot: (event) => {
+          try {
+            const payload = JSON.parse(event.data) as {
+              runtimeId?: string;
+              stdout?: string;
+              stderr?: string;
+              status?: CadreRuntime["status"];
+              readiness?: CadreRuntime["readiness"];
+              readinessReason?: string;
+              lastReadinessAt?: string | null;
+            };
+            if (!payload.runtimeId) return;
+            setOutputById((prev) => ({
+              ...prev,
+              [payload.runtimeId!]: {
+                stdout: payload.stdout ?? prev[payload.runtimeId!]?.stdout ?? "",
+                stderr: payload.stderr ?? prev[payload.runtimeId!]?.stderr ?? "",
+              },
+            }));
+            if (payload.status || payload.readiness) {
+              setRuntimes((prev) =>
+                prev.map((entry) =>
+                  entry.id === payload.runtimeId
+                    ? {
+                        ...entry,
+                        ...(payload.status ? { status: payload.status } : {}),
+                        ...(payload.readiness ? { readiness: payload.readiness } : {}),
+                        ...(payload.readinessReason ? { readinessReason: payload.readinessReason } : {}),
+                        ...(payload.lastReadinessAt !== undefined
+                          ? { lastReadinessAt: payload.lastReadinessAt }
+                          : {}),
+                      }
+                    : entry,
+                ),
+              );
+            }
+          } catch {
+            /* ignore malformed snapshot */
+          }
+        },
+        output: (event) => {
+          try {
+            const payload = JSON.parse(event.data) as {
+              runtimeId?: string;
+              stream?: "stdout" | "stderr";
+              line?: string;
+            };
+            if (!payload.runtimeId || !payload.stream || !payload.line) return;
+            appendOutput(payload.runtimeId, payload.stream, payload.line);
+          } catch {
+            /* ignore malformed output */
+          }
+        },
+        status: (event) => {
+          try {
+            const payload = JSON.parse(event.data) as {
+              runtimeId?: string;
+              status?: CadreRuntime["status"];
+              pid?: number | null;
+              readiness?: CadreRuntime["readiness"];
+              readinessReason?: string;
+              lastReadinessAt?: string | null;
+            };
+            if (!payload.runtimeId || !payload.status) return;
+            setRuntimes((prev) =>
+              prev.map((entry) =>
+                entry.id === payload.runtimeId
+                  ? {
+                      ...entry,
+                      status: payload.status!,
+                      pid: payload.pid ?? entry.pid,
+                      readiness: payload.readiness ?? entry.readiness,
+                      readinessReason: payload.readinessReason ?? entry.readinessReason,
+                      lastReadinessAt:
+                        payload.lastReadinessAt !== undefined
+                          ? payload.lastReadinessAt
+                          : entry.lastReadinessAt,
+                      startedAt:
+                        payload.status === "running"
+                          ? entry.startedAt ?? new Date().toISOString()
+                          : payload.status === "stopped"
+                            ? null
+                            : entry.startedAt,
+                    }
+                  : entry,
+              ),
+            );
+          } catch {
+            /* ignore malformed status */
+          }
+        },
+      },
     });
-    source.addEventListener("output", (event) => {
-      try {
-        const payload = JSON.parse(event.data) as {
-          runtimeId?: string;
-          stream?: "stdout" | "stderr";
-          line?: string;
-        };
-        if (!payload.runtimeId || !payload.stream || !payload.line) return;
-        appendOutput(payload.runtimeId, payload.stream, payload.line);
-      } catch {
-        /* ignore malformed output */
-      }
-    });
-    source.addEventListener("status", (event) => {
-      try {
-        const payload = JSON.parse(event.data) as {
-          runtimeId?: string;
-          status?: CadreRuntime["status"];
-          pid?: number | null;
-          readiness?: CadreRuntime["readiness"];
-          readinessReason?: string;
-          lastReadinessAt?: string | null;
-        };
-        if (!payload.runtimeId || !payload.status) return;
-        setRuntimes((prev) =>
-          prev.map((entry) =>
-            entry.id === payload.runtimeId
-              ? {
-                  ...entry,
-                  status: payload.status!,
-                  pid: payload.pid ?? entry.pid,
-                  readiness: payload.readiness ?? entry.readiness,
-                  readinessReason: payload.readinessReason ?? entry.readinessReason,
-                  lastReadinessAt:
-                    payload.lastReadinessAt !== undefined
-                      ? payload.lastReadinessAt
-                      : entry.lastReadinessAt,
-                  startedAt:
-                    payload.status === "running"
-                      ? entry.startedAt ?? new Date().toISOString()
-                      : payload.status === "stopped"
-                        ? null
-                        : entry.startedAt,
-                }
-              : entry,
-          ),
-        );
-      } catch {
-        /* ignore malformed status */
-      }
-    });
-    source.onerror = () => {
-      if (!cancelled) {
-        setConnected(false);
-        ingestCadreEvent({
-          type: "stream_disconnected",
-          actor: "CADRE",
-          message: "Cadre activity stream disconnected",
-          severity: "warning",
-          archive: false,
-        });
-      }
-    };
 
     return () => {
       cancelled = true;
-      source.close();
+      stream.close();
       setConnected(false);
       ingestCadreEvent({
         type: "stream_disconnected",

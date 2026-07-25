@@ -2,40 +2,40 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  EMPTY_SURVEY_TEAM_STATUS,
   LEGACY_SPY_TEAM_STATUS_CHANGED_EVENT,
   SURVEY_TEAM_STATUS_CHANGED_EVENT,
   type SurveyTeamStatus,
 } from "@/lib/cyberdeck/survey-team-status";
 import {
-  applySurveyTeamStatusSnapshot,
-  getSurveyTeamStatusSnapshot,
-} from "@/lib/cyberdeck/survey-team-status-store.client";
-import { probeSurveyTeamStatus } from "@/lib/cyberdeck/survey-team-status-probe.client";
-
-const REFRESH_MS = 3000;
+  refreshSurveyTeamStatusPoll,
+  subscribeSurveyTeamStatusPoll,
+} from "@/lib/cyberdeck/survey-team-status-poll.client";
+import { getSurveyTeamStatusSnapshot } from "@/lib/cyberdeck/survey-team-status-store.client";
 
 export function useSurveyTeamStatus(): SurveyTeamStatus & { refresh: () => Promise<void> } {
   const [status, setStatus] = useState<SurveyTeamStatus>(() => getSurveyTeamStatusSnapshot());
 
-  const refresh = useCallback(async () => {
-    const next = await probeSurveyTeamStatus();
-    applySurveyTeamStatusSnapshot(next);
-    setStatus(next);
+  const sync = useCallback(() => {
+    setStatus(getSurveyTeamStatusSnapshot());
   }, []);
 
+  const refresh = useCallback(async () => {
+    await refreshSurveyTeamStatusPoll();
+    sync();
+  }, [sync]);
+
   useEffect(() => {
-    void refresh();
-    const interval = window.setInterval(() => void refresh(), REFRESH_MS);
-    const onChanged = () => void refresh();
+    sync();
+    const unsubPoll = subscribeSurveyTeamStatusPoll(sync);
+    const onChanged = () => sync();
     window.addEventListener(SURVEY_TEAM_STATUS_CHANGED_EVENT, onChanged);
     window.addEventListener(LEGACY_SPY_TEAM_STATUS_CHANGED_EVENT, onChanged);
     return () => {
-      window.clearInterval(interval);
+      unsubPoll();
       window.removeEventListener(SURVEY_TEAM_STATUS_CHANGED_EVENT, onChanged);
       window.removeEventListener(LEGACY_SPY_TEAM_STATUS_CHANGED_EVENT, onChanged);
     };
-  }, [refresh]);
+  }, [sync]);
 
   return { ...status, refresh };
 }

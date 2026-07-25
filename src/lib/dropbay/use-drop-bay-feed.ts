@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { connectManagedEventSource } from "@/lib/client/sse-reconnect.client";
 import type { Drop } from "@/lib/dropbay/dropbay-types";
 
 type UseDropBayFeedOptions = {
@@ -14,6 +15,7 @@ export function useDropBayFeed(options: UseDropBayFeedOptions = {}) {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const limitRef = useRef(limit);
+  const streamRef = useRef<ReturnType<typeof connectManagedEventSource> | null>(null);
 
   useEffect(() => {
     limitRef.current = limit;
@@ -47,25 +49,31 @@ export function useDropBayFeed(options: UseDropBayFeedOptions = {}) {
 
     void loadInitial();
 
-    const source = new EventSource("/api/drops/stream");
-    source.onopen = () => {
-      if (!cancelled) setConnected(true);
-    };
-    source.onmessage = (event) => {
-      try {
-        const drop = JSON.parse(event.data) as Drop;
-        if (drop?.id) prependDrop(drop);
-      } catch {
-        /* ignore malformed SSE payloads */
-      }
-    };
-    source.onerror = () => {
-      if (!cancelled) setConnected(false);
-    };
+    streamRef.current?.close();
+    streamRef.current = connectManagedEventSource({
+      url: "/api/drops/stream",
+      onOpen: () => {
+        if (!cancelled) setConnected(true);
+      },
+      onError: () => {
+        if (!cancelled) setConnected(false);
+      },
+      eventHandlers: {
+        message: (event) => {
+          try {
+            const drop = JSON.parse(event.data) as Drop;
+            if (drop?.id) prependDrop(drop);
+          } catch {
+            /* ignore malformed SSE payloads */
+          }
+        },
+      },
+    });
 
     return () => {
       cancelled = true;
-      source.close();
+      streamRef.current?.close();
+      streamRef.current = null;
       setConnected(false);
     };
   }, [prependDrop]);

@@ -125,3 +125,38 @@ export function isSurveyHubEnabled(): boolean {
 export function isSurveyAutoPairEnabled(): boolean {
   return isSurveyHubEnabled();
 }
+
+const SURVEY_RELAY_POLLING_STORAGE_KEY = "survey-relay-polling";
+
+/** Hosted Vercel demo shell — LAN/Echo relay polling is opt-in only. */
+export function isVercelDemoDeployment(): boolean {
+  if (typeof window === "undefined") {
+    return process.env.VERCEL === "1" || process.env.NEXT_PUBLIC_VERCEL_DEMO === "1";
+  }
+  if (process.env.NEXT_PUBLIC_VERCEL_DEMO === "1") return true;
+  const host = window.location.hostname;
+  return host.endsWith(".vercel.app");
+}
+
+/**
+ * Cloud relay + listening polls hit edge routes. On Vercel demo they stay off until the
+ * operator explicitly enables relay polling in localStorage.
+ */
+export function isSurveyRelayPollingEnabled(): boolean {
+  if (!isVercelDemoDeployment()) return true;
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(SURVEY_RELAY_POLLING_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function enableSurveyRelayPollingForDemo(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SURVEY_RELAY_POLLING_STORAGE_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}

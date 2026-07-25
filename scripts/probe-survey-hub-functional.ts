@@ -89,12 +89,12 @@ function probeHubUsesSharedTripleLinkProbe(): void {
 
   const hookSource = readFileSync(resolve("src/lib/cyberdeck/use-survey-team-status.ts"), "utf8");
   assert.ok(
-    hookSource.includes("probeSurveyTeamStatus"),
-    "useSurveyTeamStatus must use shared probe",
+    hookSource.includes("subscribeSurveyTeamStatusPoll"),
+    "useSurveyTeamStatus must subscribe to shared poll loop",
   );
   assert.ok(
-    !hookSource.includes("fetchEchoSurveyLinkStatus"),
-    "useSurveyTeamStatus must not duplicate link probe logic",
+    !hookSource.includes("setInterval"),
+    "useSurveyTeamStatus must not create its own interval",
   );
 
   const panelSource = readFileSync(resolve("src/components/cyberdeck/survey-hub-panel.tsx"), "utf8");
@@ -197,7 +197,7 @@ function probePreviewMatrixSplit(): void {
   );
 
   const play = readFileSync(resolve("src/app/preview/preview-matrix-play.ts"), "utf8");
-  assert.ok(play.includes("CARD_PLAY_LAPS = 2"), "play module owns card arm timing");
+  assert.ok(play.includes("CARD_PLAY_LAPS = 3"), "play module owns card arm timing");
 }
 
 function probeHubResultFormatting(): void {
@@ -372,9 +372,14 @@ function probeCyberdeckAppBoundary(): void {
     source.includes("useSurveyMuthurMissionHandlers"),
     "cyberdeck-app must use useSurveyMuthurMissionHandlers hook",
   );
+
+  const gatewayTabs = readFileSync(
+    resolve("src/features/cyberdeck/gateway/use-cyberdeck-gateway-tabs.tsx"),
+    "utf8",
+  );
   assert.ok(
-    source.includes("survey-tab-lifecycle"),
-    "cyberdeck-app must use survey-tab-lifecycle bridge",
+    gatewayTabs.includes("survey-tab-lifecycle"),
+    "gateway tabs must use survey-tab-lifecycle bridge",
   );
 }
 
@@ -412,9 +417,17 @@ function probeHubOnlyUi(): void {
     "PowerFist pane must short-circuit when Survey Hub is on",
   );
 
+  const paneBody = readFileSync(resolve("src/components/cyberdeck/survey-pane-body.tsx"), "utf8");
+  assert.ok(
+    paneBody.includes('activeSubPane !== "mirage"'),
+    "Survey pane body keeps hub chrome off the Mirage sub-pane",
+  );
+
   const mirage = readFileSync(resolve("src/components/cyberdeck/survey-mirage-pane.tsx"), "utf8");
-  assert.ok(mirage.includes("!hubEnabled"), "Mirage pane hides hub QR panel when Survey Hub is on");
-  assert.ok(mirage.includes("SurveyHubSubPaneHint"), "Mirage pane uses hub retry hint");
+  assert.ok(
+    !mirage.includes("SurveyMirageHubPanel"),
+    "Mirage sub-pane must not mount legacy hub QR panel (hub lives on Echo/PowerFist)",
+  );
 
   const echo = readFileSync(resolve("src/components/cyberdeck/survey-echo-pane.tsx"), "utf8");
   assert.ok(echo.includes("!hubEnabled"), "Echo pane hides legacy PIN UI when Survey Hub is on");

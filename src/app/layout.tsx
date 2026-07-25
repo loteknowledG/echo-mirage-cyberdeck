@@ -10,6 +10,7 @@ import { ThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { AppUpdatePrompt } from '@/components/providers/app-update-prompt';
 import { ChunkReload } from '@/components/providers/chunk-reload';
+import { ClientRequestInstrumentation } from '@/components/providers/client-request-instrumentation';
 import { RuntimeWindowTitle } from '@/components/providers/runtime-window-title';
 
 const SignatureScript = Mrs_Saint_Delafield({
@@ -61,6 +62,7 @@ export default async function RootLayout({
             <div className="app-min-width-wrapper min-h-screen bg-background">
               <RuntimeWindowTitle />
               <ChunkReload />
+              <ClientRequestInstrumentation />
               <AppUpdatePrompt />
               {children}
               <script suppressHydrationWarning={true} />
