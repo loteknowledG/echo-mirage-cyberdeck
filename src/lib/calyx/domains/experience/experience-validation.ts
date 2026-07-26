@@ -135,3 +135,22 @@ export function validatePromoteCandidateInput(
     },
   };
 }
+
+export function validateExperienceEventsQuery(
+  input: unknown,
+): ValidationResult<{ candidateId?: string }> {
+  if (input == null) return { ok: true, value: {} };
+  if (typeof input !== "object") {
+    return { ok: false, errors: ["Query payload must be an object"] };
+  }
+  const payload = input as Record<string, unknown>;
+  const candidateIdRaw = payload.candidateId;
+  if (candidateIdRaw == null) return { ok: true, value: {} };
+  if (typeof candidateIdRaw !== "string" || !candidateIdRaw.trim()) {
+    return { ok: false, errors: ["candidateId must be a non-empty string when provided"] };
+  }
+  if (candidateIdRaw.length > MAX_MEDIUM) {
+    return { ok: false, errors: ["candidateId exceeds maximum length"] };
+  }
+  return { ok: true, value: { candidateId: candidateIdRaw.trim() } };
+}

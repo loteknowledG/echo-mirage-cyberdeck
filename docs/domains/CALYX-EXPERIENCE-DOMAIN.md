@@ -64,6 +64,23 @@ Rules:
 
 Deferred to later slices: lesson retraction, review UI, policy promotion (L-CALYX-112), Career cross-links, live Synapse streaming.
 
+## Slice 5 — observability and lineage
+
+Read-only observability over the governed lifecycle:
+
+* `GET /candidates/[id]` — candidate detail with `traceRef`
+* `GET /candidates/[id]/lineage` — candidate → trace artifact summary → optional lesson + audit events
+* `GET /lessons/[id]` — lesson detail
+* `GET /lessons/[id]/lineage` — lesson → candidate → trace + audit events
+* `GET /events` — merged review and promotion audit history (optional `candidateId` filter)
+* `GET /status` — infrastructure config plus operational metrics (counts, open conflicts, event totals)
+
+Rules:
+
+* no new mutation routes in this slice
+* trace artifact summaries expose digest and presence only — no filesystem paths or secrets
+* lineage and metrics survive idempotent ingest replay and repository recreation
+
 ## Core invariant
 
 > **No experience record may exist without a verifiable source trace.**
@@ -126,6 +143,12 @@ Persisted candidate `id` and `dedupeKey` both equal `ExperienceCandidateID`.
 * `GET /api/calyx/experience/candidates/[id]/audit` — returns `{ audit }`
 * `POST /api/calyx/experience/candidates/[id]/promote` — returns `{ outcome, lesson, candidate, auditEntry }`
 * `GET /api/calyx/experience/lessons` — returns `{ lessons }`
+* `GET /api/calyx/experience/candidates/[id]` — returns `{ candidate }`
+* `GET /api/calyx/experience/candidates/[id]/lineage` — returns `{ lineage }`
+* `GET /api/calyx/experience/lessons/[id]` — returns `{ lesson }`
+* `GET /api/calyx/experience/lessons/[id]/lineage` — returns `{ lineage }`
+* `GET /api/calyx/experience/events?candidateId=` — returns `{ events }`
+* `GET /api/calyx/experience/status` — includes operational `metrics`
 
 ## Configuration
 

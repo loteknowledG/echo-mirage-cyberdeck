@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress (Slice 4 complete; retraction and UI deferred)
+In Progress (Slice 5 complete; ledger closure next)
 
 ## Product
 

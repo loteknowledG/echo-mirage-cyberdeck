@@ -4,11 +4,13 @@ import type {
   ExperienceIngestConflict,
   ExperienceIngestResult,
   ExperienceLesson,
+  ExperienceOperationalMetrics,
   ExperiencePromotionAuditEntry,
   ExperiencePromotionResult,
   ExperienceReviewAction,
   ExperienceReviewAuditEntry,
   ExperienceReviewResult,
+  ExperienceTraceArtifactSummary,
 } from "./experience-types";
 import type { SynapseTraceEnvelopeV1 } from "./experience-trace.server";
 
@@ -65,5 +67,12 @@ export interface ExperienceRepository {
     ownerId: string,
     candidateId?: string,
   ): Promise<ExperiencePromotionAuditEntry[]>;
+  getCandidate(ownerId: string, candidateId: string): Promise<ExperienceCandidate>;
+  getLesson(ownerId: string, lessonId: string): Promise<ExperienceLesson>;
+  getTraceArtifactSummary(
+    ownerId: string,
+    traceId: string,
+  ): Promise<ExperienceTraceArtifactSummary>;
+  getOperationalMetrics(ownerId: string): Promise<ExperienceOperationalMetrics>;
   getCandidateSnapshot(ownerId: string): Promise<ExperienceCandidateSnapshot>;
 }

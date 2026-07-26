@@ -1,3 +1,5 @@
+import type { ExperienceOperationalMetrics } from "./experience-types";
+
 export type ApiResponse<T> =
   | { ok: true; data: T }
   | {
@@ -16,4 +18,5 @@ export type ExperienceStatusPayload = {
   repositoryAvailable: boolean;
   ingestConfigured: boolean;
   traceContractVersion: string;
+  metrics: ExperienceOperationalMetrics;
 };

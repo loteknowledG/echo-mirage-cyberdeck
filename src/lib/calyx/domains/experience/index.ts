@@ -12,12 +12,14 @@ export type {
   ExperiencePromotionAuditEntry,
   ExperiencePromotionOutcome,
   ExperiencePromotionResult,
+  ExperienceOperationalMetrics,
   ExperienceReviewAction,
   ExperienceReviewAuditEntry,
   ExperienceReviewOutcome,
   ExperienceReviewResult,
   ExperienceStorageMode,
   ExperienceTraceRef,
+  ExperienceTraceArtifactSummary,
 } from "./experience-types";
 
 export type { ApiResponse, ExperienceStatusPayload } from "./experience-api-types";
@@ -40,6 +42,20 @@ export {
   assertPromotionEligible,
   isPromotionEligible,
 } from "./experience-promotion";
+
+export type {
+  ExperienceCandidateLineage,
+  ExperienceDomainEvent,
+  ExperienceLessonLineage,
+} from "./experience-lineage";
+
+export {
+  buildCandidateLineage,
+  buildLessonLineage,
+  enrichTraceArtifactSummary,
+  mergeExperienceDomainEvents,
+  sortExperienceDomainEvents,
+} from "./experience-lineage";
 
 export { digestTraceEnvelope, envelopesMateriallyEqual } from "./experience-content";
 

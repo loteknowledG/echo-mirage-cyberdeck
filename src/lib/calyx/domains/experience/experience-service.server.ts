@@ -4,11 +4,21 @@ import type {
   ExperienceIngestConflict,
   ExperienceIngestResult,
   ExperienceLesson,
+  ExperienceOperationalMetrics,
   ExperiencePromotionAuditEntry,
   ExperiencePromotionResult,
   ExperienceReviewAuditEntry,
   ExperienceReviewResult,
 } from "./experience-types";
+import {
+  buildCandidateLineage,
+  buildLessonLineage,
+  enrichTraceArtifactSummary,
+  mergeExperienceDomainEvents,
+  type ExperienceCandidateLineage,
+  type ExperienceDomainEvent,
+  type ExperienceLessonLineage,
+} from "./experience-lineage";
 import { CalyxExperienceRepositoryUnavailableError } from "./experience-calyx-repository.server";
 import { getExperienceRepository } from "./experience-repository-factory.server";
 import {
@@ -135,6 +145,79 @@ export async function getExperienceCandidateSnapshot(
   ownerId: string,
 ): Promise<ExperienceCandidateSnapshot> {
   return getExperienceRepository().getCandidateSnapshot(ownerId);
+}
+
+export async function getExperienceCandidate(
+  ownerId: string,
+  candidateId: string,
+): Promise<ExperienceCandidate> {
+  return getExperienceRepository().getCandidate(ownerId, candidateId);
+}
+
+export async function getExperienceLesson(
+  ownerId: string,
+  lessonId: string,
+): Promise<ExperienceLesson> {
+  return getExperienceRepository().getLesson(ownerId, lessonId);
+}
+
+export async function getExperienceOperationalMetrics(
+  ownerId: string,
+): Promise<ExperienceOperationalMetrics> {
+  return getExperienceRepository().getOperationalMetrics(ownerId);
+}
+
+async function loadCandidateLineageParts(ownerId: string, candidateId: string) {
+  const repo = getExperienceRepository();
+  const candidate = await repo.getCandidate(ownerId, candidateId);
+  const [traceSummary, reviewEvents, promotionEvents, lessons] = await Promise.all([
+    repo.getTraceArtifactSummary(ownerId, candidate.traceRef.traceId),
+    repo.listReviewAudit(ownerId, candidateId),
+    repo.listPromotionAudit(ownerId, candidateId),
+    repo.listLessons(ownerId),
+  ]);
+  const lesson = lessons.find((record) => record.candidateId === candidateId) ?? null;
+  const trace = enrichTraceArtifactSummary(traceSummary, candidate.traceRef);
+  return { candidate, trace, lesson, reviewEvents, promotionEvents };
+}
+
+export async function getExperienceCandidateLineage(
+  ownerId: string,
+  candidateId: string,
+): Promise<ExperienceCandidateLineage> {
+  const parts = await loadCandidateLineageParts(ownerId, candidateId);
+  return buildCandidateLineage(parts);
+}
+
+export async function getExperienceLessonLineage(
+  ownerId: string,
+  lessonId: string,
+): Promise<ExperienceLessonLineage> {
+  const repo = getExperienceRepository();
+  const lesson = await repo.getLesson(ownerId, lessonId);
+  const parts = await loadCandidateLineageParts(ownerId, lesson.candidateId);
+  if (parts.lesson && parts.lesson.id !== lessonId) {
+    throw new ExperienceNotFoundError("Experience lesson lineage is inconsistent");
+  }
+  return buildLessonLineage({
+    lesson: parts.lesson ?? lesson,
+    candidate: parts.candidate,
+    trace: parts.trace,
+    reviewEvents: parts.reviewEvents,
+    promotionEvents: parts.promotionEvents,
+  });
+}
+
+export async function listExperienceDomainEvents(
+  ownerId: string,
+  candidateId?: string,
+): Promise<ExperienceDomainEvent[]> {
+  const repo = getExperienceRepository();
+  const [reviewEvents, promotionEvents] = await Promise.all([
+    repo.listReviewAudit(ownerId, candidateId),
+    repo.listPromotionAudit(ownerId, candidateId),
+  ]);
+  return mergeExperienceDomainEvents({ reviewEvents, promotionEvents, candidateId });
 }
 
 export function mapExperienceServiceError(error: unknown): {

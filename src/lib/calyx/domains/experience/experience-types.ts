@@ -21,6 +21,16 @@ export type ExperienceTraceRef = {
   contractVersion: typeof SYNAPSE_TRACE_ENVELOPE_CONTRACT;
 };
 
+export type ExperienceTraceArtifactSummary = {
+  traceId: string;
+  contractVersion: typeof SYNAPSE_TRACE_ENVELOPE_CONTRACT;
+  artifactPresent: boolean;
+  envelopeDigest?: string;
+  sessionId?: string;
+  runId?: string;
+  ingestedAt?: string;
+};
+
 export type ExperienceCandidate = {
   id: string;
   ownerId: string;
@@ -168,4 +178,18 @@ export type ExperiencePromotionResult = {
   lesson: ExperienceLesson;
   candidate: ExperienceCandidate;
   auditEntry: ExperiencePromotionAuditEntry;
+};
+
+export type ExperienceOperationalMetrics = {
+  candidateCount: number;
+  draftCount: number;
+  verifiedCount: number;
+  disputedCount: number;
+  rejectedCount: number;
+  archivedCount: number;
+  lessonCount: number;
+  openConflictCount: number;
+  totalConflictCount: number;
+  reviewEventCount: number;
+  promotionEventCount: number;
 };

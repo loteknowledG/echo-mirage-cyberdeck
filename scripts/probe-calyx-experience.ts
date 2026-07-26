@@ -1,5 +1,5 @@
 /**
- * L-CALYX-110 — Experience candidate ingest probe (slices 1–4).
+ * L-CALYX-110 — Experience candidate ingest probe (slices 1–5).
  * Run: pnpm probe:calyx-experience
  */
 import assert from "node:assert/strict";
@@ -27,8 +27,13 @@ import {
 } from "../src/lib/calyx/domains/experience/experience-repository-factory.server";
 import { ExperienceTraceArtifactMutationError } from "../src/lib/calyx/domains/experience/experience-repository";
 import {
+  getExperienceCandidate,
+  getExperienceCandidateLineage,
   getExperienceCandidateSnapshot,
+  getExperienceLessonLineage,
+  getExperienceOperationalMetrics,
   ingestExperienceTrace,
+  listExperienceDomainEvents,
   listExperienceIngestConflicts,
   listExperienceLessons,
   listExperiencePromotionAudit,
@@ -651,6 +656,160 @@ async function testOpenConflictsRemainAfterPromotion() {
   });
 }
 
+async function testCandidateLineageLinksTraceAndLesson() {
+  await withTempRepository(async () => {
+    const candidate = await ingestProbeCandidate();
+    const promoted = await promoteExperienceCandidate(TEST_OWNER, candidate.id, {
+      reason: "Lineage probe promotion",
+      lesson: "Validated lineage lesson text.",
+      promotionCommandId: "lineage-promote-001",
+    });
+
+    const lineage = await getExperienceCandidateLineage(TEST_OWNER, candidate.id);
+    assert.equal(lineage.candidate.id, candidate.id);
+    assert.equal(lineage.trace.traceId, candidate.traceRef.traceId);
+    assert.equal(lineage.trace.artifactPresent, true);
+    assert.ok(lineage.trace.envelopeDigest);
+    assert.equal(lineage.trace.ingestedAt, candidate.traceRef.ingestedAt);
+    assert.equal(lineage.lesson?.id, promoted.lesson.id);
+    assert.equal(lineage.promotionEvents.length, 1);
+
+    const lessonLineage = await getExperienceLessonLineage(
+      TEST_OWNER,
+      promoted.lesson.id,
+    );
+    assert.equal(lessonLineage.lesson.candidateId, candidate.id);
+    assert.equal(lessonLineage.candidate.id, candidate.id);
+    assert.equal(lessonLineage.trace.traceId, candidate.traceRef.traceId);
+  });
+}
+
+async function testDomainEventsMergeReviewAndPromotionPortfolio() {
+  await withTempRepository(async () => {
+    const reviewed = await ingestProbeCandidate();
+    await reviewExperienceCandidate(TEST_OWNER, reviewed.id, {
+      action: "reject",
+      reason: "Portfolio event probe reject",
+      reviewCommandId: "lineage-review-portfolio",
+    });
+
+    const promotedCandidate = await ingestProbeCandidate();
+    await promoteExperienceCandidate(TEST_OWNER, promotedCandidate.id, {
+      reason: "Portfolio event probe promote",
+      promotionCommandId: "lineage-promote-portfolio",
+    });
+
+    const allEvents = await listExperienceDomainEvents(TEST_OWNER);
+    assert.equal(allEvents.length, 2);
+    assert.equal(allEvents.some((event) => event.kind === "review"), true);
+    assert.equal(allEvents.some((event) => event.kind === "promotion"), true);
+
+    const reviewOnly = await listExperienceDomainEvents(TEST_OWNER, reviewed.id);
+    assert.equal(reviewOnly.length, 1);
+    assert.equal(reviewOnly[0]?.kind, "review");
+  });
+}
+
+async function testDomainEventsMergeReviewAndPromotionDraftPath() {
+  await withTempRepository(async () => {
+    const candidate = await ingestProbeCandidate();
+    await promoteExperienceCandidate(TEST_OWNER, candidate.id, {
+      reason: "Promotion event probe",
+      promotionCommandId: "lineage-promote-events-002",
+    });
+
+    const allEvents = await listExperienceDomainEvents(TEST_OWNER);
+    assert.equal(allEvents.length, 1);
+    assert.equal(allEvents[0]?.kind, "promotion");
+
+    const candidateEvents = await listExperienceDomainEvents(TEST_OWNER, candidate.id);
+    assert.equal(candidateEvents.length, 1);
+    assert.equal(candidateEvents[0]?.entry.candidateId, candidate.id);
+  });
+}
+
+async function testOperationalMetricsReflectPersistedState() {
+  await withTempRepository(async () => {
+    const candidate = await ingestProbeCandidate();
+    await reviewExperienceCandidate(TEST_OWNER, candidate.id, {
+      action: "reject",
+      reason: "Metrics probe reject",
+    });
+    const promotedCandidate = await ingestProbeCandidate();
+    await promoteExperienceCandidate(TEST_OWNER, promotedCandidate.id, {
+      reason: "Metrics probe promote",
+    });
+
+    const payload = baseEnvelopePayload();
+    const envelope = buildSignedSynapseTraceEnvelope(payload, TEST_HMAC_SECRET);
+    await ingestExperienceTrace(TEST_OWNER, envelope);
+    const divergent = buildSignedSynapseTraceEnvelope(
+      { ...payload, summary: "Metrics conflict probe" },
+      TEST_HMAC_SECRET,
+    );
+    await ingestExperienceTrace(TEST_OWNER, divergent);
+
+    const metrics = await getExperienceOperationalMetrics(TEST_OWNER);
+    assert.equal(metrics.candidateCount, 3);
+    assert.equal(metrics.rejectedCount, 1);
+    assert.equal(metrics.verifiedCount, 1);
+    assert.equal(metrics.draftCount, 1);
+    assert.equal(metrics.lessonCount, 1);
+    assert.equal(metrics.openConflictCount, 1);
+    assert.equal(metrics.totalConflictCount, 1);
+    assert.equal(metrics.promotionEventCount, 1);
+    assert.equal(metrics.reviewEventCount, 1);
+  });
+}
+
+async function testLineageSurvivesIdempotentIngestReplay() {
+  await withTempRepository(async () => {
+    probeCandidateSeq += 1;
+    const payload: SynapseTraceEnvelopePayload = {
+      ...baseEnvelopePayload(),
+      traceId: `synapse-trace-lineage-replay-${probeCandidateSeq}`,
+      runId: `run-lineage-replay-${probeCandidateSeq}`,
+    };
+    const envelope = buildSignedSynapseTraceEnvelope(payload, TEST_HMAC_SECRET);
+    const created = await ingestExperienceTrace(TEST_OWNER, envelope);
+    await promoteExperienceCandidate(TEST_OWNER, created.candidate.id, {
+      reason: "Lineage replay probe",
+      promotionCommandId: "lineage-replay-promote",
+    });
+
+    const replay = await ingestExperienceTrace(TEST_OWNER, envelope);
+    assert.equal(replay.outcome, "existing");
+
+    const lineage = await getExperienceCandidateLineage(TEST_OWNER, created.candidate.id);
+    assert.equal(lineage.lesson?.candidateId, created.candidate.id);
+    assert.equal(lineage.trace.artifactPresent, true);
+
+    const fetched = await getExperienceCandidate(TEST_OWNER, created.candidate.id);
+    assert.equal(fetched.status, "VERIFIED");
+  });
+}
+
+async function testLineageSurvivesRepositoryRecreation() {
+  await withTempRepository(async (_repo, root) => {
+    const candidate = await ingestProbeCandidate();
+    const promoted = await promoteExperienceCandidate(TEST_OWNER, candidate.id, {
+      reason: "Persistence lineage probe",
+      promotionCommandId: "lineage-persist-promote",
+    });
+
+    const recreated = new LocalExperienceRepository(root);
+    setExperienceRepositoryForTests(recreated, root);
+
+    const lineage = await getExperienceCandidateLineage(TEST_OWNER, candidate.id);
+    assert.equal(lineage.lesson?.id, promoted.lesson.id);
+    assert.equal(lineage.trace.traceId, candidate.traceRef.traceId);
+
+    const metrics = await getExperienceOperationalMetrics(TEST_OWNER);
+    assert.equal(metrics.lessonCount, 1);
+    assert.equal(metrics.promotionEventCount, 1);
+  });
+}
+
 async function main() {
   testIdentityAndActionHash();
   testTraceVerification();
@@ -673,6 +832,12 @@ async function main() {
   await testPromotionRejectedForNonDraftCandidates();
   await testPromotionAuditIsAppendOnly();
   await testOpenConflictsRemainAfterPromotion();
+  await testCandidateLineageLinksTraceAndLesson();
+  await testDomainEventsMergeReviewAndPromotionPortfolio();
+  await testDomainEventsMergeReviewAndPromotionDraftPath();
+  await testOperationalMetricsReflectPersistedState();
+  await testLineageSurvivesIdempotentIngestReplay();
+  await testLineageSurvivesRepositoryRecreation();
   console.log("[probe:calyx-experience] PASS");
 }
 

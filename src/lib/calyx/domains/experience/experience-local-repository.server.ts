@@ -35,6 +35,7 @@ import {
   type ExperienceIngestResult,
   type ExperienceLesson,
   type ExperienceLessonCollectionFile,
+  type ExperienceOperationalMetrics,
   type ExperiencePromotionAuditCollectionFile,
   type ExperiencePromotionAuditEntry,
   type ExperiencePromotionResult,
@@ -42,6 +43,7 @@ import {
   type ExperienceReviewAuditCollectionFile,
   type ExperienceReviewAuditEntry,
   type ExperienceReviewResult,
+  type ExperienceTraceArtifactSummary,
 } from "./experience-types";
 
 const CANDIDATES_FILE = "candidates.json";
@@ -716,6 +718,71 @@ export class LocalExperienceRepository implements ExperienceRepository {
     const file = await this.readPromotionAudit(ownerId);
     if (!candidateId) return file.records;
     return file.records.filter((entry) => entry.candidateId === candidateId);
+  }
+
+  async getCandidate(ownerId: string, candidateId: string): Promise<ExperienceCandidate> {
+    const file = await this.readCandidates(ownerId);
+    const candidate = file.records.find((record) => record.id === candidateId);
+    if (!candidate) {
+      throw new ExperienceNotFoundError("Experience candidate not found");
+    }
+    return candidate;
+  }
+
+  async getLesson(ownerId: string, lessonId: string): Promise<ExperienceLesson> {
+    const file = await this.readLessons(ownerId);
+    const lesson = file.records.find((record) => record.id === lessonId);
+    if (!lesson) {
+      throw new ExperienceNotFoundError("Experience lesson not found");
+    }
+    return lesson;
+  }
+
+  async getTraceArtifactSummary(
+    ownerId: string,
+    traceId: string,
+  ): Promise<ExperienceTraceArtifactSummary> {
+    const artifact = await this.readTraceArtifact(ownerId, traceId);
+    if (!artifact) {
+      return {
+        traceId,
+        contractVersion: SYNAPSE_TRACE_ENVELOPE_CONTRACT,
+        artifactPresent: false,
+      };
+    }
+
+    return {
+      traceId: artifact.traceId,
+      contractVersion: SYNAPSE_TRACE_ENVELOPE_CONTRACT,
+      artifactPresent: true,
+      envelopeDigest: digestTraceEnvelope(artifact),
+      sessionId: artifact.sessionId,
+      runId: artifact.runId,
+      ingestedAt: undefined,
+    };
+  }
+
+  async getOperationalMetrics(ownerId: string): Promise<ExperienceOperationalMetrics> {
+    const [snapshot, conflicts, reviewAudit, promotionAudit] = await Promise.all([
+      this.getCandidateSnapshot(ownerId),
+      this.listIngestConflicts(ownerId),
+      this.listReviewAudit(ownerId),
+      this.listPromotionAudit(ownerId),
+    ]);
+
+    return {
+      candidateCount: snapshot.summary.candidateCount,
+      draftCount: snapshot.summary.draftCount,
+      verifiedCount: snapshot.summary.verifiedCount,
+      disputedCount: snapshot.summary.disputedCount,
+      rejectedCount: snapshot.summary.rejectedCount,
+      archivedCount: snapshot.summary.archivedCount,
+      lessonCount: snapshot.summary.lessonCount,
+      openConflictCount: snapshot.summary.openConflictCount,
+      totalConflictCount: conflicts.length,
+      reviewEventCount: reviewAudit.length,
+      promotionEventCount: promotionAudit.length,
+    };
   }
 
   async listCandidates(ownerId: string, status?: string): Promise<ExperienceCandidate[]> {

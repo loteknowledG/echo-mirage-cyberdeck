@@ -60,6 +60,22 @@ export class CalyxExperienceRepository implements ExperienceRepository {
     return Promise.reject(this.unavailable());
   }
 
+  getCandidate(_ownerId: string, _candidateId: string): Promise<never> {
+    return Promise.reject(this.unavailable());
+  }
+
+  getLesson(_ownerId: string, _lessonId: string): Promise<never> {
+    return Promise.reject(this.unavailable());
+  }
+
+  getTraceArtifactSummary(_ownerId: string, _traceId: string): Promise<never> {
+    return Promise.reject(this.unavailable());
+  }
+
+  getOperationalMetrics(_ownerId: string): Promise<never> {
+    return Promise.reject(this.unavailable());
+  }
+
   getCandidateSnapshot(_ownerId: string): Promise<never> {
     return Promise.reject(this.unavailable());
   }
