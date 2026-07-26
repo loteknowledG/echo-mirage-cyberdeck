@@ -1,5 +1,7 @@
 # CALYX Experience Domain (L-CALYX-110)
 
+**Ledger status:** Closed (`deab04e`)
+
 ## Slice 1 — ingest → verify → candidate
 
 * experience domain models

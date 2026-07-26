@@ -2,7 +2,47 @@
 
 ## Status
 
-In Progress (Slice 5 complete; ledger closure next)
+Closed
+
+**Implemented through:** `deab04e`
+
+## Closure
+
+### Completed scope
+
+* signed trace validation
+* deterministic candidate identity
+* idempotent ingestion
+* conflict and provenance hardening
+* candidate review workflow
+* explicit lesson promotion
+* lineage and observability
+
+### Explicit deferrals
+
+These are follow-up ledgers and product work — not incomplete acceptance criteria for L-CALYX-110:
+
+* retraction semantics
+* operator review UI
+* external Synapse adapter / real-time ingest
+
+### Architectural conclusion
+
+> L-CALYX-110 establishes governed experience ingestion from verifiable Synapse traces through explicit lesson promotion. It does not implement automatic learning, model retraining, implicit MUTHUR belief mutation, or live external ingestion.
+
+### Implementation audit chain
+
+```text
+053a3f0  Slice 1 — executable ingest path
+45f214e  Slice 2 — replay/provenance hardening
+bc64780  Slice 3 — candidate review workflow
+c396339  Slice 4 — explicit lesson promotion
+deab04e  Slice 5 — lineage and observability
+```
+
+Trace contract at closure: `synapse-trace-envelope/v1` (HMAC ingest boundary). Ingest remains pull/batch via server-side API; no live Synapse streaming in this ledger.
+
+Verification: `pnpm probe:calyx-experience` PASS (slices 1–5); `pnpm probe:calyx-career` PASS (no regression).
 
 ## Product
 
