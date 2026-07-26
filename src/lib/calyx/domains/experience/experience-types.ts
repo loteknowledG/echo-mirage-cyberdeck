@@ -46,5 +46,37 @@ export type ExperienceCandidateSnapshot = {
   summary: {
     candidateCount: number;
     draftCount: number;
+    openConflictCount: number;
   };
+};
+
+export type ExperienceIngestReplayOutcome = "created" | "existing" | "conflict";
+
+export type ExperienceIngestConflictStatus = "OPEN";
+
+export type ExperienceIngestConflictReason = "CANDIDATE_CONTENT_DIVERGENCE";
+
+export type ExperienceIngestConflict = {
+  id: string;
+  ownerId: string;
+  candidateId: string;
+  traceId: string;
+  reason: ExperienceIngestConflictReason;
+  existingEnvelopeDigest: string;
+  incomingEnvelopeDigest: string;
+  status: ExperienceIngestConflictStatus;
+  createdAt: string;
+};
+
+export type ExperienceIngestConflictCollectionFile = {
+  schemaVersion: 1;
+  ownerId: string;
+  updatedAt: string;
+  records: ExperienceIngestConflict[];
+};
+
+export type ExperienceIngestResult = {
+  outcome: ExperienceIngestReplayOutcome;
+  candidate: ExperienceCandidate;
+  conflict?: ExperienceIngestConflict;
 };

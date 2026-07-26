@@ -1,14 +1,29 @@
-# CALYX Experience Domain (L-CALYX-110 Slice 1)
+# CALYX Experience Domain (L-CALYX-110)
 
-## Scope
-
-Slice 1 implements the **ingest → verify → candidate** vertical slice only:
+## Slice 1 — ingest → verify → candidate
 
 * experience domain models
 * signed trace envelope verification (HMAC at Calyx ingest boundary)
 * deterministic `ExperienceCandidateID`
 * local persistence of reviewable `DRAFT` candidates
 * trace artifact retention for provenance
+
+## Slice 2 — replay safety
+
+Explicit ingest replay outcomes:
+
+| Condition | Outcome |
+|---|---|
+| same identity + same content | `existing` |
+| same identity + changed content | `conflict` |
+| same traceId + mutation, no matching candidate | rejected (`TRACE_ARTIFACT_MUTATION`) |
+| new valid identity | `created` |
+
+Rules:
+
+* trace artifacts under `traces/{traceId}.json` are immutable
+* conflicting replays never overwrite candidates or trace artifacts
+* conflict records are persisted in `conflicts.json` with incoming envelopes in `conflict-incoming/{conflictId}.json`
 
 Deferred to later slices: lesson promotion, reject/dispute/archive UI, Career cross-links, live Synapse streaming.
 
@@ -56,13 +71,16 @@ Persisted candidate `id` and `dedupeKey` both equal `ExperienceCandidateID`.
 ```text
 <CALYX_HOME>/echo-mirage-domains/experience/<ownerId>/
   candidates.json
+  conflicts.json
   traces/<traceId>.json
+  conflict-incoming/<conflictId>.json
 ```
 
-## API (slice 1)
+## API
 
-* `POST /api/calyx/experience/ingest`
+* `POST /api/calyx/experience/ingest` — returns `{ outcome, candidate, conflict? }`
 * `GET /api/calyx/experience/candidates`
+* `GET /api/calyx/experience/conflicts`
 * `GET /api/calyx/experience/status`
 
 ## Configuration

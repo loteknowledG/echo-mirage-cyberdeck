@@ -1,5 +1,5 @@
 /**
- * L-CALYX-110 Slice 1 — Experience candidate ingest probe.
+ * L-CALYX-110 — Experience candidate ingest probe (slices 1–2).
  * Run: pnpm probe:calyx-experience
  */
 import assert from "node:assert/strict";
@@ -25,9 +25,11 @@ import {
   resolveExperienceStorageMode,
   setExperienceRepositoryForTests,
 } from "../src/lib/calyx/domains/experience/experience-repository-factory.server";
+import { ExperienceTraceArtifactMutationError } from "../src/lib/calyx/domains/experience/experience-repository";
 import {
   getExperienceCandidateSnapshot,
   ingestExperienceTrace,
+  listExperienceIngestConflicts,
   mapExperienceServiceError,
 } from "../src/lib/calyx/domains/experience/experience-service.server";
 import { experienceError } from "../src/lib/calyx/domains/experience/experience-api.server";
@@ -155,15 +157,16 @@ async function testIngestCreatesDraftCandidate() {
       baseEnvelopePayload(),
       TEST_HMAC_SECRET,
     );
-    const candidate = await ingestExperienceTrace(TEST_OWNER, envelope);
-    assert.equal(candidate.status, "DRAFT");
-    assert.equal(candidate.dedupeKey, candidate.id);
-    assert.equal(candidate.traceRef.traceId, envelope.traceId);
-    assert.equal(candidate.traceRef.contractVersion, SYNAPSE_TRACE_ENVELOPE_CONTRACT);
+    const result = await ingestExperienceTrace(TEST_OWNER, envelope);
+    assert.equal(result.outcome, "created");
+    assert.equal(result.candidate.status, "DRAFT");
+    assert.equal(result.candidate.dedupeKey, result.candidate.id);
+    assert.equal(result.candidate.traceRef.traceId, envelope.traceId);
 
     const snapshot = await getExperienceCandidateSnapshot(TEST_OWNER);
     assert.equal(snapshot.summary.candidateCount, 1);
     assert.equal(snapshot.summary.draftCount, 1);
+    assert.equal(snapshot.summary.openConflictCount, 0);
   });
 }
 
@@ -174,8 +177,11 @@ async function testIdempotentIngestAndPersistence() {
       TEST_HMAC_SECRET,
     );
     const first = await ingestExperienceTrace(TEST_OWNER, envelope);
+    assert.equal(first.outcome, "created");
+
     const second = await ingestExperienceTrace(TEST_OWNER, envelope);
-    assert.equal(first.id, second.id);
+    assert.equal(second.outcome, "existing");
+    assert.equal(first.candidate.id, second.candidate.id);
 
     const snapshot = await getExperienceCandidateSnapshot(TEST_OWNER);
     assert.equal(snapshot.candidates.length, 1);
@@ -188,8 +194,74 @@ async function testIdempotentIngestAndPersistence() {
     const recreated = new LocalExperienceRepository(root);
     setExperienceRepositoryForTests(recreated, root);
     const persisted = await recreated.getCandidateSnapshot(TEST_OWNER);
-    assert.equal(persisted.candidates[0]?.id, first.id);
+    assert.equal(persisted.candidates[0]?.id, first.candidate.id);
     assert.equal(persisted.candidates[0]?.status, "DRAFT");
+  });
+}
+
+async function testDivergentReplaySameIdentitySurfacesConflict() {
+  await withTempRepository(async (repo, root) => {
+    const payload = baseEnvelopePayload();
+    const firstEnvelope = buildSignedSynapseTraceEnvelope(payload, TEST_HMAC_SECRET);
+    const created = await ingestExperienceTrace(TEST_OWNER, firstEnvelope);
+    assert.equal(created.outcome, "created");
+
+    const divergentPayload = {
+      ...payload,
+      summary: "Divergent summary for the same identity.",
+    };
+    const divergentEnvelope = buildSignedSynapseTraceEnvelope(
+      divergentPayload,
+      TEST_HMAC_SECRET,
+    );
+    const conflict = await ingestExperienceTrace(TEST_OWNER, divergentEnvelope);
+    assert.equal(conflict.outcome, "conflict");
+    assert.equal(conflict.candidate.id, created.candidate.id);
+    assert.equal(conflict.candidate.summary, created.candidate.summary);
+    assert.ok(conflict.conflict);
+    assert.equal(conflict.conflict?.reason, "CANDIDATE_CONTENT_DIVERGENCE");
+
+    const snapshot = await getExperienceCandidateSnapshot(TEST_OWNER);
+    assert.equal(snapshot.candidates.length, 1);
+    assert.equal(snapshot.summary.openConflictCount, 1);
+
+    const conflicts = await listExperienceIngestConflicts(TEST_OWNER);
+    assert.equal(conflicts.length, 1);
+
+    const incomingPath = path.join(
+      root,
+      TEST_OWNER,
+      "conflict-incoming",
+      `${conflicts[0]!.id}.json`,
+    );
+    const incomingRaw = await readFile(incomingPath, "utf8");
+    assert.ok(incomingRaw.includes("Divergent summary"));
+  });
+}
+
+async function testTraceArtifactMutationRejected() {
+  await withTempRepository(async () => {
+    const first = buildSignedSynapseTraceEnvelope(baseEnvelopePayload(), TEST_HMAC_SECRET);
+    await ingestExperienceTrace(TEST_OWNER, first);
+
+    const mutatedPayload = {
+      ...baseEnvelopePayload(),
+      action: {
+        tool: "browser_type",
+        target: "input-field",
+        parameters: { text: "hello" },
+      },
+    };
+    const mutated = buildSignedSynapseTraceEnvelope(mutatedPayload, TEST_HMAC_SECRET);
+
+    await assert.rejects(
+      () => ingestExperienceTrace(TEST_OWNER, mutated),
+      ExperienceTraceArtifactMutationError,
+    );
+
+    const snapshot = await getExperienceCandidateSnapshot(TEST_OWNER);
+    assert.equal(snapshot.candidates.length, 1);
+    assert.equal(snapshot.summary.openConflictCount, 0);
   });
 }
 
@@ -199,7 +271,8 @@ async function testOwnerIsolation() {
       baseEnvelopePayload(),
       TEST_HMAC_SECRET,
     );
-    await repo.ingestTraceCandidate(TEST_OWNER, envelope);
+    const result = await repo.ingestTraceCandidate(TEST_OWNER, envelope);
+    assert.equal(result.outcome, "created");
 
     const ownerA = await repo.getCandidateSnapshot(TEST_OWNER);
     const ownerB = await repo.getCandidateSnapshot(OTHER_OWNER);
@@ -229,6 +302,12 @@ function testApiEnvelopesAndPathLeak() {
   assert.equal(mapped.code, "TRACE_VERIFICATION_FAILED");
   const body = JSON.stringify(mapped);
   assert.doesNotMatch(body, /\\\\|\/tmp\/|\.calyx|probe-experience-hmac-secret/);
+
+  const mutation = mapExperienceServiceError(
+    new ExperienceTraceArtifactMutationError("Trace artifact is immutable"),
+  );
+  assert.equal(mutation.code, "TRACE_ARTIFACT_MUTATION");
+  assert.equal(mutation.status, 409);
 
   const internal = mapExperienceServiceError(new Error("ENOENT: /secret/path/trace.json"));
   assert.equal(internal.code, "INTERNAL_ERROR");
@@ -267,8 +346,8 @@ async function testCandidateIdRecomputation() {
   });
 
   await withTempRepository(async () => {
-    const candidate = await ingestExperienceTrace(TEST_OWNER, envelope);
-    assert.equal(candidate.id, expectedId);
+    const result = await ingestExperienceTrace(TEST_OWNER, envelope);
+    assert.equal(result.candidate.id, expectedId);
   });
 }
 
@@ -289,6 +368,8 @@ async function main() {
   await testUnavailableCalyxRepository();
   await testIngestCreatesDraftCandidate();
   await testIdempotentIngestAndPersistence();
+  await testDivergentReplaySameIdentitySurfacesConflict();
+  await testTraceArtifactMutationRejected();
   await testOwnerIsolation();
   await testIngestRequiresSecret();
   await testCandidateIdRecomputation();

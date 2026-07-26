@@ -2,6 +2,9 @@ export type {
   ExperienceCandidate,
   ExperienceCandidateSnapshot,
   ExperienceCandidateStatus,
+  ExperienceIngestConflict,
+  ExperienceIngestReplayOutcome,
+  ExperienceIngestResult,
   ExperienceOutcome,
   ExperienceStorageMode,
   ExperienceTraceRef,
@@ -16,6 +19,8 @@ export {
   computeExperienceCandidateId,
   deriveCandidateSummary,
 } from "./experience-identity";
+
+export { digestTraceEnvelope, envelopesMateriallyEqual } from "./experience-content";
 
 export type { ExperienceRepository } from "./experience-repository";
 

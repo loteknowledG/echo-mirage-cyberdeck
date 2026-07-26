@@ -1,4 +1,4 @@
-import { experienceCreated } from "@/lib/calyx/domains/experience/experience-api.server";
+import { experienceCreated, experienceJson } from "@/lib/calyx/domains/experience/experience-api.server";
 import { resolveExperienceOwnerId } from "@/lib/calyx/domains/experience/experience-owner.server";
 import {
   handleExperienceRouteError,
@@ -13,8 +13,16 @@ export async function POST(request: Request) {
   try {
     const ownerId = resolveExperienceOwnerId();
     const body = await parseJsonBody(request);
-    const candidate = await ingestExperienceTrace(ownerId, body);
-    return experienceCreated(candidate);
+    const result = await ingestExperienceTrace(ownerId, body);
+
+    if (result.outcome === "created") {
+      return experienceCreated(result);
+    }
+    if (result.outcome === "conflict") {
+      return experienceJson(result, 409);
+    }
+
+    return experienceJson(result);
   } catch (error) {
     return handleExperienceRouteError(error);
   }

@@ -1,9 +1,15 @@
-import type { ExperienceCandidate, ExperienceCandidateSnapshot } from "./experience-types";
+import type {
+  ExperienceCandidate,
+  ExperienceCandidateSnapshot,
+  ExperienceIngestConflict,
+  ExperienceIngestResult,
+} from "./experience-types";
 import { CalyxExperienceRepositoryUnavailableError } from "./experience-calyx-repository.server";
 import { getExperienceRepository } from "./experience-repository-factory.server";
 import {
   ExperienceConflictError,
   ExperienceNotFoundError,
+  ExperienceTraceArtifactMutationError,
 } from "./experience-repository";
 import {
   ExperienceTraceVerificationError,
@@ -28,7 +34,7 @@ export class ExperienceIngestUnavailableError extends Error {
 export async function ingestExperienceTrace(
   ownerId: string,
   envelopeInput: unknown,
-): Promise<ExperienceCandidate> {
+): Promise<ExperienceIngestResult> {
   const secret = resolveExperienceIngestHmacSecret();
   if (!secret) {
     throw new ExperienceIngestUnavailableError();
@@ -45,6 +51,12 @@ export async function listExperienceCandidates(
   return getExperienceRepository().listCandidates(ownerId, status);
 }
 
+export async function listExperienceIngestConflicts(
+  ownerId: string,
+): Promise<ExperienceIngestConflict[]> {
+  return getExperienceRepository().listIngestConflicts(ownerId);
+}
+
 export async function getExperienceCandidateSnapshot(
   ownerId: string,
 ): Promise<ExperienceCandidateSnapshot> {
@@ -56,6 +68,7 @@ export function mapExperienceServiceError(error: unknown): {
   code: string;
   message: string;
   details?: string[];
+  conflictId?: string;
 } {
   if (error instanceof ExperienceValidationError) {
     return {
@@ -82,8 +95,20 @@ export function mapExperienceServiceError(error: unknown): {
   if (error instanceof ExperienceNotFoundError) {
     return { status: 404, code: "NOT_FOUND", message: error.message };
   }
+  if (error instanceof ExperienceTraceArtifactMutationError) {
+    return {
+      status: 409,
+      code: "TRACE_ARTIFACT_MUTATION",
+      message: error.message,
+    };
+  }
   if (error instanceof ExperienceConflictError) {
-    return { status: 409, code: "CONFLICT", message: error.message };
+    return {
+      status: 409,
+      code: "CONFLICT",
+      message: error.message,
+      conflictId: error.conflictId,
+    };
   }
   if (error instanceof CalyxExperienceRepositoryUnavailableError) {
     return { status: 503, code: "REPOSITORY_UNAVAILABLE", message: error.message };
@@ -94,6 +119,7 @@ export function mapExperienceServiceError(error: unknown): {
 export {
   ExperienceConflictError,
   ExperienceNotFoundError,
+  ExperienceTraceArtifactMutationError,
   ExperienceTraceVerificationError,
   CalyxExperienceRepositoryUnavailableError,
 };

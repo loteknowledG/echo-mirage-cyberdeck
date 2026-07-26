@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress (Slice 1 — ingest & reviewable candidates)
+In Progress (Slice 2 — replay safety & conflict surfacing)
 
 ## Product
 

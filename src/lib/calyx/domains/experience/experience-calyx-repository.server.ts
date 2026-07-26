@@ -22,6 +22,10 @@ export class CalyxExperienceRepository implements ExperienceRepository {
     return Promise.reject(this.unavailable());
   }
 
+  listIngestConflicts(_ownerId: string): Promise<never> {
+    return Promise.reject(this.unavailable());
+  }
+
   getCandidateSnapshot(_ownerId: string): Promise<never> {
     return Promise.reject(this.unavailable());
   }

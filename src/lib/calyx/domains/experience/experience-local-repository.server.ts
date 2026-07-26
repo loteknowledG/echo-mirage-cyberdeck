@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { digestTraceEnvelope } from "./experience-content";
 import {
   computeActionHash,
   computeExperienceCandidateId,
@@ -12,19 +13,23 @@ import {
   resolveOwnerTraceArtifactPath,
 } from "./experience-paths.server";
 import {
+  ExperienceTraceArtifactMutationError,
   type ExperienceRepository,
 } from "./experience-repository";
-import type {
-  SynapseTraceEnvelopeV1,
-} from "./experience-trace.server";
+import type { SynapseTraceEnvelopeV1 } from "./experience-trace.server";
 import {
   SYNAPSE_TRACE_ENVELOPE_CONTRACT,
   type ExperienceCandidate,
   type ExperienceCandidateCollectionFile,
   type ExperienceCandidateSnapshot,
+  type ExperienceIngestConflict,
+  type ExperienceIngestConflictCollectionFile,
+  type ExperienceIngestResult,
 } from "./experience-types";
 
 const CANDIDATES_FILE = "candidates.json";
+const CONFLICTS_FILE = "conflicts.json";
+const CONFLICT_INCOMING_DIR = "conflict-incoming";
 
 const ownerLocks = new Map<string, Promise<void>>();
 
@@ -70,6 +75,15 @@ function emptyCandidatesFile(ownerId: string): ExperienceCandidateCollectionFile
   };
 }
 
+function emptyConflictsFile(ownerId: string): ExperienceIngestConflictCollectionFile {
+  return {
+    schemaVersion: 1,
+    ownerId,
+    updatedAt: nowIso(),
+    records: [],
+  };
+}
+
 export class LocalExperienceRepository implements ExperienceRepository {
   constructor(private readonly experienceRootOverride?: string) {}
 
@@ -100,6 +114,16 @@ export class LocalExperienceRepository implements ExperienceRepository {
     return resolveOwnerTraceArtifactPath(ownerId, traceId);
   }
 
+  private resolveConflictIncomingPath(ownerId: string, conflictId: string): string {
+    const ownerDir = this.resolveOwnerDir(ownerId);
+    const incomingDir = path.resolve(ownerDir, CONFLICT_INCOMING_DIR);
+    const artifactPath = path.resolve(incomingDir, `${conflictId}.json`);
+    if (!artifactPath.startsWith(`${incomingDir}${path.sep}`)) {
+      throw new Error("Invalid conflict incoming path");
+    }
+    return artifactPath;
+  }
+
   private async readCandidates(ownerId: string): Promise<ExperienceCandidateCollectionFile> {
     const ownerDir = this.resolveOwnerDir(ownerId);
     const filePath = path.join(ownerDir, CANDIDATES_FILE);
@@ -109,6 +133,20 @@ export class LocalExperienceRepository implements ExperienceRepository {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return emptyCandidatesFile(ownerId);
+      }
+      throw error;
+    }
+  }
+
+  private async readConflicts(ownerId: string): Promise<ExperienceIngestConflictCollectionFile> {
+    const ownerDir = this.resolveOwnerDir(ownerId);
+    const filePath = path.join(ownerDir, CONFLICTS_FILE);
+    try {
+      const raw = await fs.readFile(filePath, "utf8");
+      return JSON.parse(raw) as ExperienceIngestConflictCollectionFile;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return emptyConflictsFile(ownerId);
       }
       throw error;
     }
@@ -129,26 +167,126 @@ export class LocalExperienceRepository implements ExperienceRepository {
     await atomicWriteJson(filePath, file);
   }
 
-  private async persistTraceArtifact(
+  private async writeConflicts(
+    ownerId: string,
+    records: ExperienceIngestConflict[],
+  ): Promise<void> {
+    const ownerDir = this.resolveOwnerDir(ownerId);
+    const filePath = path.join(ownerDir, CONFLICTS_FILE);
+    const file: ExperienceIngestConflictCollectionFile = {
+      schemaVersion: 1,
+      ownerId,
+      updatedAt: nowIso(),
+      records,
+    };
+    await atomicWriteJson(filePath, file);
+  }
+
+  private async readTraceArtifact(
+    ownerId: string,
+    traceId: string,
+  ): Promise<SynapseTraceEnvelopeV1 | null> {
+    const artifactPath = this.resolveTraceArtifactPath(ownerId, traceId);
+    try {
+      const raw = await fs.readFile(artifactPath, "utf8");
+      return JSON.parse(raw) as SynapseTraceEnvelopeV1;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async writeTraceArtifact(
     ownerId: string,
     envelope: SynapseTraceEnvelopeV1,
   ): Promise<void> {
     const artifactPath = this.resolveTraceArtifactPath(ownerId, envelope.traceId);
-    try {
-      await fs.access(artifactPath);
-      return;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw error;
-      }
-    }
     await atomicWriteJson(artifactPath, envelope);
+  }
+
+  private async persistIncomingConflictEnvelope(
+    ownerId: string,
+    conflictId: string,
+    envelope: SynapseTraceEnvelopeV1,
+  ): Promise<void> {
+    const incomingPath = this.resolveConflictIncomingPath(ownerId, conflictId);
+    await atomicWriteJson(incomingPath, envelope);
+  }
+
+  private buildCandidate(
+    ownerId: string,
+    envelope: SynapseTraceEnvelopeV1,
+    candidateId: string,
+    timestamp: string,
+  ): ExperienceCandidate {
+    return {
+      id: candidateId,
+      ownerId,
+      dedupeKey: candidateId,
+      traceRef: {
+        traceId: envelope.traceId,
+        sessionId: envelope.sessionId,
+        runId: envelope.runId,
+        source: "synapse",
+        signature: envelope.signature,
+        ingestedAt: timestamp,
+        contractVersion: SYNAPSE_TRACE_ENVELOPE_CONTRACT,
+      },
+      summary: deriveCandidateSummary({
+        tool: envelope.action.tool,
+        target: envelope.action.target,
+        outcome: envelope.outcome,
+        summary: envelope.summary,
+      }),
+      outcome: envelope.outcome,
+      tags: envelope.tags,
+      status: "DRAFT",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+  }
+
+  private async recordContentConflict(
+    ownerId: string,
+    candidateId: string,
+    envelope: SynapseTraceEnvelopeV1,
+    existingArtifact: SynapseTraceEnvelopeV1,
+    existingCandidate: ExperienceCandidate,
+  ): Promise<ExperienceIngestResult> {
+    const incomingDigest = digestTraceEnvelope(envelope);
+    const existingDigest = digestTraceEnvelope(existingArtifact);
+    const conflictId = randomUUID();
+    const timestamp = nowIso();
+
+    const conflict: ExperienceIngestConflict = {
+      id: conflictId,
+      ownerId,
+      candidateId,
+      traceId: envelope.traceId,
+      reason: "CANDIDATE_CONTENT_DIVERGENCE",
+      existingEnvelopeDigest: existingDigest,
+      incomingEnvelopeDigest: incomingDigest,
+      status: "OPEN",
+      createdAt: timestamp,
+    };
+
+    const conflicts = await this.readConflicts(ownerId);
+    await this.persistIncomingConflictEnvelope(ownerId, conflictId, envelope);
+    await this.writeConflicts(ownerId, [...conflicts.records, conflict]);
+
+    return {
+      outcome: "conflict",
+      candidate: existingCandidate,
+      conflict,
+    };
   }
 
   async ingestTraceCandidate(
     ownerId: string,
     envelope: SynapseTraceEnvelopeV1,
-  ): Promise<ExperienceCandidate> {
+  ): Promise<ExperienceIngestResult> {
     return withOwnerLock(ownerId, async () => {
       const actionHash = computeActionHash(envelope.action);
       const candidateId = computeExperienceCandidateId({
@@ -158,44 +296,49 @@ export class LocalExperienceRepository implements ExperienceRepository {
         policyVersion: envelope.policyVersion,
         observationWindow: envelope.observationWindow,
       });
+      const incomingDigest = digestTraceEnvelope(envelope);
 
       const file = await this.readCandidates(ownerId);
-      const existing = file.records.find((record) => record.id === candidateId);
-      if (existing) {
-        await this.persistTraceArtifact(ownerId, envelope);
-        return existing;
+      const existingCandidate = file.records.find((record) => record.id === candidateId);
+      const existingArtifact = await this.readTraceArtifact(ownerId, envelope.traceId);
+
+      if (existingArtifact) {
+        const storedDigest = digestTraceEnvelope(existingArtifact);
+        if (storedDigest !== incomingDigest) {
+          if (existingCandidate) {
+            return this.recordContentConflict(
+              ownerId,
+              candidateId,
+              envelope,
+              existingArtifact,
+              existingCandidate,
+            );
+          }
+          throw new ExperienceTraceArtifactMutationError(
+            "Trace artifact is immutable; replay rejected because content diverges for the same traceId",
+          );
+        }
+      }
+
+      if (existingCandidate) {
+        return {
+          outcome: "existing",
+          candidate: existingCandidate,
+        };
       }
 
       const timestamp = nowIso();
-      const candidate: ExperienceCandidate = {
-        id: candidateId,
-        ownerId,
-        dedupeKey: candidateId,
-        traceRef: {
-          traceId: envelope.traceId,
-          sessionId: envelope.sessionId,
-          runId: envelope.runId,
-          source: "synapse",
-          signature: envelope.signature,
-          ingestedAt: timestamp,
-          contractVersion: SYNAPSE_TRACE_ENVELOPE_CONTRACT,
-        },
-        summary: deriveCandidateSummary({
-          tool: envelope.action.tool,
-          target: envelope.action.target,
-          outcome: envelope.outcome,
-          summary: envelope.summary,
-        }),
-        outcome: envelope.outcome,
-        tags: envelope.tags,
-        status: "DRAFT",
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      };
+      const candidate = this.buildCandidate(ownerId, envelope, candidateId, timestamp);
 
-      await this.persistTraceArtifact(ownerId, envelope);
+      if (!existingArtifact) {
+        await this.writeTraceArtifact(ownerId, envelope);
+      }
       await this.writeCandidates(ownerId, [...file.records, candidate]);
-      return candidate;
+
+      return {
+        outcome: "created",
+        candidate,
+      };
     });
   }
 
@@ -205,13 +348,22 @@ export class LocalExperienceRepository implements ExperienceRepository {
     return file.records.filter((record) => record.status === status);
   }
 
+  async listIngestConflicts(ownerId: string): Promise<ExperienceIngestConflict[]> {
+    const file = await this.readConflicts(ownerId);
+    return file.records;
+  }
+
   async getCandidateSnapshot(ownerId: string): Promise<ExperienceCandidateSnapshot> {
-    const candidates = await this.listCandidates(ownerId);
+    const [candidates, conflicts] = await Promise.all([
+      this.listCandidates(ownerId),
+      this.listIngestConflicts(ownerId),
+    ]);
     return {
       candidates,
       summary: {
         candidateCount: candidates.length,
         draftCount: candidates.filter((record) => record.status === "DRAFT").length,
+        openConflictCount: conflicts.filter((record) => record.status === "OPEN").length,
       },
     };
   }
