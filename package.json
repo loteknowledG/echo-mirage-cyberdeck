@@ -57,6 +57,7 @@
     "probe:pi-computer-use": "tsx scripts/probe-pi-computer-use.ts",
     "probe:calyx-smoke": "tsx scripts/probe-calyx-smoke.ts",
     "probe:calyx-career": "tsx scripts/probe-calyx-career.ts",
+    "probe:calyx-experience": "tsx scripts/probe-calyx-experience.ts",
     "seed:career-portfolio": "node scripts/seed-career-portfolio.mjs",
     "calyx:ingest-echo-mirage": "tsx scripts/ingest-echo-mirage-calyx.ts",
     "probe:pi-windows-use": "node scripts/pi/run-windows-use-probe.mjs",

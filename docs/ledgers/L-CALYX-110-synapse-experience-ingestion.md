@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+In Progress (Slice 1 — ingest & reviewable candidates)
 
 ## Product
 

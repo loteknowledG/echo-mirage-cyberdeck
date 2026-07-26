@@ -1,0 +1,77 @@
+# CALYX Experience Domain (L-CALYX-110 Slice 1)
+
+## Scope
+
+Slice 1 implements the **ingest → verify → candidate** vertical slice only:
+
+* experience domain models
+* signed trace envelope verification (HMAC at Calyx ingest boundary)
+* deterministic `ExperienceCandidateID`
+* local persistence of reviewable `DRAFT` candidates
+* trace artifact retention for provenance
+
+Deferred to later slices: lesson promotion, reject/dispute/archive UI, Career cross-links, live Synapse streaming.
+
+## Core invariant
+
+> **No experience record may exist without a verifiable source trace.**
+
+Candidates are created only from envelopes that pass contract validation and HMAC verification. Raw envelopes are stored under `traces/{traceId}.json` per owner.
+
+## Trace contract
+
+Contract version: `synapse-trace-envelope/v1`
+
+Synapse MCP does **not** yet emit native cryptographic signatures. Slice 1 uses an **ingest HMAC boundary**:
+
+* Envelope fields are canonicalized to JSON (excluding `signature`)
+* `signature = HMAC-SHA256(CALYX_EXPERIENCE_INGEST_HMAC_SECRET, canonical_payload)` hex-encoded
+* Verification uses timing-safe comparison
+
+When Synapse exposes native signed exports (L-CALYX-114), the contract version can advance without breaking stored trace references.
+
+## Experience candidate identity
+
+```text
+ExperienceCandidateID =
+  SHA-256(
+    signed_trace_id +
+    "\n" +
+    action_hash +
+    "\n" +
+    actor +
+    "\n" +
+    policy_version +
+    "\n" +
+    observation_window
+  )
+```
+
+`action_hash = SHA-256(canonical JSON of action.tool, action.target, sorted action.parameters)`.
+
+Persisted candidate `id` and `dedupeKey` both equal `ExperienceCandidateID`.
+
+## Persistence layout
+
+```text
+<CALYX_HOME>/echo-mirage-domains/experience/<ownerId>/
+  candidates.json
+  traces/<traceId>.json
+```
+
+## API (slice 1)
+
+* `POST /api/calyx/experience/ingest`
+* `GET /api/calyx/experience/candidates`
+* `GET /api/calyx/experience/status`
+
+## Configuration
+
+* `CALYX_EXPERIENCE_STORAGE=local|calyx` (default `local`)
+* `CALYX_EXPERIENCE_INGEST_HMAC_SECRET` — required for ingest; not exposed via API
+
+## Verification
+
+```bash
+pnpm probe:calyx-experience
+```

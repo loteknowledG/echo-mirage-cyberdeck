@@ -1,0 +1,21 @@
+{
+  "contractVersion": "synapse-trace-envelope/v1",
+  "traceId": "synapse-trace-example-001",
+  "sessionId": "session-example-001",
+  "runId": "run-example-001",
+  "actor": "muthur-operator",
+  "policyVersion": "experience-policy/v1",
+  "observationWindow": "2026-07-26T00:00:00.000Z/2026-07-26T00:05:00.000Z",
+  "action": {
+    "tool": "browser_click",
+    "target": "submit-button",
+    "parameters": {
+      "ref": "btn-submit"
+    }
+  },
+  "outcome": "success",
+  "summary": "Clicked submit button after form validation passed.",
+  "tags": ["computer-use", "example"],
+  "observedAt": "2026-07-26T00:04:12.000Z",
+  "signature": "replace-with-hmac-from-probe-or-seed-script"
+}
