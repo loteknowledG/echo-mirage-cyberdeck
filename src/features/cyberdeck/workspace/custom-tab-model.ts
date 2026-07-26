@@ -22,7 +22,6 @@ export const CUSTOM_TAB_KINDS = [
   "photoshop",
   "db8",
   "cadre",
-  "install",
   "survey",
   "career",
   "catelog",
@@ -78,7 +77,6 @@ export const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Pi", kind: "pi", action: "convert" },
   { label: "DB8", kind: "db8", action: "convert" },
   { label: "Cadre", kind: "cadre", action: "convert" },
-  { label: "Install", kind: "install", action: "convert" },
   { label: "Settings", action: "settings-pane" },
 ] as CustomTabContextMenuAction[]).sort((a, b) =>
   a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
@@ -97,6 +95,14 @@ export function migrateLegacyTestPaneKind(kind: string): string {
   if (kind === "test-pane" || kind === "test_pane" || kind === "test") {
     return "rola-dex";
   }
+  if (
+    kind === "install" ||
+    kind === "install-desktop" ||
+    kind === "install_desktop" ||
+    kind === "desktop-install"
+  ) {
+    return "survey";
+  }
   return kind;
 }
 
@@ -106,10 +112,11 @@ export function sanitizeCustomTabs(value: unknown): CustomTab[] {
     if (!item || typeof item !== "object") return [];
     const tab = item as Partial<CustomTab>;
     const id = typeof tab.id === "string" && tab.id.trim() ? tab.id.trim() : "";
-    const label = typeof tab.label === "string" && tab.label.trim() ? tab.label.trim() : "TAB";
     const kindRaw = typeof tab.kind === "string" ? tab.kind : "blank";
     const migratedKind = migrateLegacyTestPaneKind(kindRaw);
     const kind = isCustomTabKind(migratedKind) ? migratedKind : "blank";
+    const rawLabel = typeof tab.label === "string" && tab.label.trim() ? tab.label.trim() : "TAB";
+    const label = kindRaw !== migratedKind && migratedKind === "survey" ? "Survey" : rawLabel;
     const rawGlyph = typeof tab.glyph === "string" && tab.glyph.trim() ? tab.glyph.trim() : "□";
     const glyph =
       kind === "rola-dex"
@@ -218,14 +225,6 @@ export function normalizeCustomTabKind(kind: string) {
     return "cadre" as CustomTabKind;
   }
   if (
-    nextKind === "install" ||
-    nextKind === "install-desktop" ||
-    nextKind === "install_desktop" ||
-    nextKind === "desktop-install"
-  ) {
-    return "install" as CustomTabKind;
-  }
-  if (
     nextKind === "call-center" ||
     nextKind === "call_center" ||
     nextKind === "callcenter"
@@ -260,7 +259,6 @@ export function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "photoshop") return "Ps";
   if (kind === "db8") return "8";
   if (kind === "cadre") return "C";
-  if (kind === "install") return "I";
   if (kind === "career") return "Cr";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
@@ -279,7 +277,6 @@ export function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "photoshop") return "PHOTOSHOP";
   if (kind === "db8") return "DB8";
   if (kind === "cadre") return "CADRE";
-  if (kind === "install") return "INSTALL";
   if (kind === "career") return "CAREER";
   return kind.toUpperCase();
 }

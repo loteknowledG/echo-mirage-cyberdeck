@@ -92,6 +92,7 @@
     "probe:muthur-open-operator": "tsx scripts/probe-muthur-open-operator.ts",
     "probe:powerfist-muthur-tools": "tsx scripts/probe-powerfist-muthur-tools.ts",
     "probe:survey-hub": "tsx scripts/probe-survey-hub-functional.ts && tsx scripts/probe-survey-connect-boundary.ts",
+    "probe:survey-install-consolidation": "tsx scripts/probe-survey-install-consolidation.ts",
     "probe:survey-hub-functional": "tsx scripts/probe-survey-hub-functional.ts",
     "probe:survey-connect-boundary": "tsx scripts/probe-survey-connect-boundary.ts",
     "probe:survey-go-relay": "tsx scripts/probe-survey-go-relay.ts",

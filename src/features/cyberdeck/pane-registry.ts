@@ -19,7 +19,6 @@ export const CYBERDECK_PANE_KINDS = [
   "photoshop",
   "db8",
   "cadre",
-  "install",
   "survey",
   "career",
 ] as const;
@@ -63,7 +62,6 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   photoshop: { label: "PHOTOSHOP", fetchHints: ["CANVAS", "LAYERS", "EXPORT"] },
   db8: { label: "DB8", fetchHints: ["CHAMBER", "DEBATE ROUND", "CONSENSUS"] },
   cadre: { label: "CADRE", fetchHints: ["TERMINAL HOST", "RUNTIME REGISTRY", "OUTPUT STREAM"] },
-  install: { label: "INSTALL", fetchHints: ["DESKTOP SHELL", "INSTALLER", "RELEASE"] },
   survey: { label: "SURVEY", fetchHints: ["ECHO", "MIRAGE", "POWERFIST", "PAIRING"] },
   career: { label: "CAREER", fetchHints: ["PORTFOLIO", "TIMELINE", "EVIDENCE"] },
 };
@@ -80,6 +78,10 @@ const TAB_KIND_ALIASES: Record<string, CyberdeckPaneKind> = {
   tunes: "tunes",
   spy: "survey",
   espionage: "survey",
+  install: "survey",
+  "install-desktop": "survey",
+  "install_desktop": "survey",
+  "desktop-install": "survey",
 };
 
 export function normalizeCyberdeckPaneKind(kind: string): CyberdeckPaneKind | null {

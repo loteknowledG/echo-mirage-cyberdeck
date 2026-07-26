@@ -24,8 +24,8 @@ export function SettingsSilentModeSection() {
         {!available ? (
           <div className="space-y-3 border-t border-[#1c1c1c] pt-3">
             <p className="text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
-              Open the <span className="text-[#8a8a8a]">INSTALL</span> tab on the server rail to
-              download the desktop cyberdeck shell.
+              Open <span className="text-[#8a8a8a]">SURVEY → MIRAGE</span> to find the optional
+              desktop and offline Cyberdeck distribution.
             </p>
             <div className="space-y-2 border-t border-[#1c1c1c] pt-3">
               <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">SILENT MODE</div>

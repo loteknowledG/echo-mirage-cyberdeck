@@ -34,13 +34,13 @@ function isMobileUserAgent(): boolean {
 function spyInstallHint(activeSubPane: SurveySubPane): string {
   switch (activeSubPane) {
     case "echo":
-      return `${SURVEY_ECHO_DISPLAY} capture needs the lightweight Echo Satellite tray agent (~MB) — not the full cyberdeck and not a browser tab.`;
+      return `${SURVEY_ECHO_DISPLAY} is the lightweight local Satellite for capture, browser bridging, background presence, and machine control. Hosted Mirage does not require the full desktop Cyberdeck.`;
     case "mirage":
-      return `${SURVEY_MIRAGE_DISPLAY} can pair from PWA, but the desktop cyberdeck is recommended on the solver laptop for MUTHUR, hub QRs, and local disk.`;
+      return `${SURVEY_MIRAGE_DISPLAY} runs fully as the hosted browser application. The bundled desktop Cyberdeck is optional for offline, self-hosted, development, or local-disk workflows.`;
     case "powerfist":
       return isMobileUserAgent()
         ? `${SURVEY_POWERFIST_LABEL} runs on your phone — install the PWA for quick access, or use the mobile browser.`
-        : `${SURVEY_POWERFIST_LABEL} pairs from any device. Install the desktop cyberdeck if this machine is ${SURVEY_MIRAGE_DISPLAY}.`;
+        : `${SURVEY_POWERFIST_LABEL} pairs from any device. Desktop-level capture and control require a paired ${SURVEY_ECHO_DISPLAY} Satellite; the full Cyberdeck remains optional.`;
     default: {
       const exhaustive: never = activeSubPane;
       return exhaustive;
@@ -52,7 +52,7 @@ type SurveyDesktopInstallPanelProps = {
   activeSubPane: SurveySubPane;
 };
 
-/** Survey tab — install Echo Satellite (Echo) or cyberdeck (Mirage). */
+/** Canonical lifecycle surface for Echo Satellite plus the optional full desktop distribution. */
 export function SurveyDesktopInstallPanel({ activeSubPane }: SurveyDesktopInstallPanelProps) {
   const echoPane = activeSubPane === "echo";
   const [desktopInfo, setDesktopInfo] = useState<DesktopInstallInfo | null>(null);
@@ -148,7 +148,7 @@ export function SurveyDesktopInstallPanel({ activeSubPane }: SurveyDesktopInstal
   const installLabel = installInfo?.installerAvailable
     ? echoPane
       ? "Install or update Echo Satellite"
-      : "Install desktop cyberdeck"
+      : "Install optional desktop cyberdeck"
     : echoPane
       ? "Download Echo Satellite"
       : "Download desktop installer";
@@ -164,7 +164,7 @@ export function SurveyDesktopInstallPanel({ activeSubPane }: SurveyDesktopInstal
   return (
     <div className={`border-b border-[#1c1c1c] px-4 py-3 font-mono ${accentClass}`}>
       <p className="mb-1 text-[9px] tracking-[0.08em] text-[#9a9a9a]">
-        {SURVEY_MODE_TITLE} // setup
+        {SURVEY_MODE_TITLE} // {echoPane ? "echo setup" : "optional distribution"}
       </p>
       <p className="mb-3 text-[8px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
         {spyInstallHint(activeSubPane)}

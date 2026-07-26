@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject, type R
 import { toast } from "sonner";
 import { loadWorkspaceState } from "@/lib/workspace-state";
 import { useCyberdeckTabStore } from "@/lib/cyberdeck-tab-store";
-import { isEchoMirageDesktopShell } from "@/lib/electron/desktop-install.client";
 import { ENABLE_AUTOMATION } from "@/lib/cyberdeck/automation-config";
 import { playDeckSystemSound } from "@/features/cyberdeck/runtime/defer-deck-audio";
 import {
@@ -140,28 +139,6 @@ export function useCyberdeckWorkspaceHydration({
       setDeckUiHydrated(true);
     }
   }, []);
-
-  useEffect(() => {
-    if (!deckUiHydrated) return;
-    if (isEchoMirageDesktopShell()) {
-      useCyberdeckTabStore.getState().setCustomTabs((prev) =>
-        prev.filter((tab) => tab.kind !== "install"),
-      );
-      return;
-    }
-    useCyberdeckTabStore.getState().setCustomTabs((prev) => {
-      if (prev.some((tab) => tab.kind === "install")) return prev;
-      return [
-        {
-          id: "echo-install-pane",
-          label: "INSTALL",
-          glyph: "I",
-          kind: "install",
-        },
-        ...prev,
-      ];
-    });
-  }, [deckUiHydrated]);
 
   const buildCyberdeckUiPayload = useCallback(
     (): CyberdeckUiState => {

@@ -309,10 +309,6 @@ function CustomTabPaneRendererInner({
     return shell(<ActivatedCyberdeckPane kind="cadre" />);
   }
 
-  if (tab.kind === "install") {
-    return shell(<ActivatedCyberdeckPane kind="install" />);
-  }
-
   if (tab.kind === "glyph-channel") {
     return (
       <div

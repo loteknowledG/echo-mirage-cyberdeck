@@ -66,7 +66,7 @@ export function CyberdeckSurveyPaneBody() {
             <SurveyPowerfistPane key="survey-powerfist-active" />
           </div>
         ) : null}
-        {activeSubPane !== "mirage" && !powerfistDeckMode ? (
+        {!powerfistDeckMode ? (
           <SurveyDesktopInstallPanel activeSubPane={activeSubPane} />
         ) : null}
       </div>
