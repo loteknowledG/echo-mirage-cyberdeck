@@ -46,6 +46,9 @@ export type ExperienceCandidateSnapshot = {
   summary: {
     candidateCount: number;
     draftCount: number;
+    disputedCount: number;
+    rejectedCount: number;
+    archivedCount: number;
     openConflictCount: number;
   };
 };
@@ -79,4 +82,34 @@ export type ExperienceIngestResult = {
   outcome: ExperienceIngestReplayOutcome;
   candidate: ExperienceCandidate;
   conflict?: ExperienceIngestConflict;
+};
+
+export type ExperienceReviewAction = "reject" | "dispute" | "archive";
+
+export type ExperienceReviewOutcome = "applied" | "existing";
+
+export type ExperienceReviewAuditEntry = {
+  id: string;
+  ownerId: string;
+  candidateId: string;
+  action: ExperienceReviewAction;
+  previousStatus: ExperienceCandidateStatus;
+  nextStatus: ExperienceCandidateStatus;
+  actor: string;
+  reason: string;
+  reviewCommandId?: string;
+  createdAt: string;
+};
+
+export type ExperienceReviewAuditCollectionFile = {
+  schemaVersion: 1;
+  ownerId: string;
+  updatedAt: string;
+  records: ExperienceReviewAuditEntry[];
+};
+
+export type ExperienceReviewResult = {
+  outcome: ExperienceReviewOutcome;
+  candidate: ExperienceCandidate;
+  auditEntry: ExperienceReviewAuditEntry;
 };

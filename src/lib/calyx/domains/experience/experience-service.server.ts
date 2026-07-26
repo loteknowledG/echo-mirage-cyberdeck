@@ -3,6 +3,8 @@ import type {
   ExperienceCandidateSnapshot,
   ExperienceIngestConflict,
   ExperienceIngestResult,
+  ExperienceReviewAuditEntry,
+  ExperienceReviewResult,
 } from "./experience-types";
 import { CalyxExperienceRepositoryUnavailableError } from "./experience-calyx-repository.server";
 import { getExperienceRepository } from "./experience-repository-factory.server";
@@ -11,11 +13,17 @@ import {
   ExperienceNotFoundError,
   ExperienceTraceArtifactMutationError,
 } from "./experience-repository";
+import { ExperienceInvalidReviewTransitionError } from "./experience-review";
 import {
   ExperienceTraceVerificationError,
   resolveExperienceIngestHmacSecret,
   verifySynapseTraceEnvelope,
 } from "./experience-trace.server";
+import {
+  validateReviewCandidateInput,
+  type ValidationResult,
+} from "./experience-validation";
+import { resolveExperienceOwnerId } from "./experience-owner.server";
 
 export class ExperienceValidationError extends Error {
   constructor(public readonly details: string[]) {
@@ -31,6 +39,15 @@ export class ExperienceIngestUnavailableError extends Error {
   }
 }
 
+function assertValidation<T>(
+  result: ValidationResult<T>,
+): T {
+  if (!result.ok) {
+    throw new ExperienceValidationError(result.errors);
+  }
+  return result.value;
+}
+
 export async function ingestExperienceTrace(
   ownerId: string,
   envelopeInput: unknown,
@@ -44,6 +61,23 @@ export async function ingestExperienceTrace(
   return getExperienceRepository().ingestTraceCandidate(ownerId, envelope);
 }
 
+export async function reviewExperienceCandidate(
+  ownerId: string,
+  candidateId: string,
+  input: unknown,
+): Promise<ExperienceReviewResult> {
+  const value = assertValidation(validateReviewCandidateInput(input));
+  const actor = resolveExperienceOwnerId();
+  return getExperienceRepository().reviewCandidate(
+    ownerId,
+    candidateId,
+    value.action,
+    actor,
+    value.reason,
+    value.reviewCommandId,
+  );
+}
+
 export async function listExperienceCandidates(
   ownerId: string,
   status?: string,
@@ -55,6 +89,13 @@ export async function listExperienceIngestConflicts(
   ownerId: string,
 ): Promise<ExperienceIngestConflict[]> {
   return getExperienceRepository().listIngestConflicts(ownerId);
+}
+
+export async function listExperienceReviewAudit(
+  ownerId: string,
+  candidateId?: string,
+): Promise<ExperienceReviewAuditEntry[]> {
+  return getExperienceRepository().listReviewAudit(ownerId, candidateId);
 }
 
 export async function getExperienceCandidateSnapshot(
@@ -95,6 +136,13 @@ export function mapExperienceServiceError(error: unknown): {
   if (error instanceof ExperienceNotFoundError) {
     return { status: 404, code: "NOT_FOUND", message: error.message };
   }
+  if (error instanceof ExperienceInvalidReviewTransitionError) {
+    return {
+      status: 409,
+      code: "INVALID_REVIEW_TRANSITION",
+      message: error.message,
+    };
+  }
   if (error instanceof ExperienceTraceArtifactMutationError) {
     return {
       status: 409,
@@ -121,5 +169,6 @@ export {
   ExperienceNotFoundError,
   ExperienceTraceArtifactMutationError,
   ExperienceTraceVerificationError,
+  ExperienceInvalidReviewTransitionError,
   CalyxExperienceRepositoryUnavailableError,
 };

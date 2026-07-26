@@ -18,11 +18,26 @@ export class CalyxExperienceRepository implements ExperienceRepository {
     return Promise.reject(this.unavailable());
   }
 
+  reviewCandidate(
+    _ownerId: string,
+    _candidateId: string,
+    _action: unknown,
+    _actor: string,
+    _reason: string,
+    _reviewCommandId?: string,
+  ): Promise<never> {
+    return Promise.reject(this.unavailable());
+  }
+
   listCandidates(_ownerId: string, _status?: string): Promise<never> {
     return Promise.reject(this.unavailable());
   }
 
   listIngestConflicts(_ownerId: string): Promise<never> {
+    return Promise.reject(this.unavailable());
+  }
+
+  listReviewAudit(_ownerId: string, _candidateId?: string): Promise<never> {
     return Promise.reject(this.unavailable());
   }
 

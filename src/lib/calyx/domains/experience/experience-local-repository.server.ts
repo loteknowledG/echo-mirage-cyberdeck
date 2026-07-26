@@ -13,6 +13,11 @@ import {
   resolveOwnerTraceArtifactPath,
 } from "./experience-paths.server";
 import {
+  assertReviewTransitionAllowed,
+  resolveReviewTargetStatus,
+} from "./experience-review";
+import {
+  ExperienceNotFoundError,
   ExperienceTraceArtifactMutationError,
   type ExperienceRepository,
 } from "./experience-repository";
@@ -25,10 +30,15 @@ import {
   type ExperienceIngestConflict,
   type ExperienceIngestConflictCollectionFile,
   type ExperienceIngestResult,
+  type ExperienceReviewAction,
+  type ExperienceReviewAuditCollectionFile,
+  type ExperienceReviewAuditEntry,
+  type ExperienceReviewResult,
 } from "./experience-types";
 
 const CANDIDATES_FILE = "candidates.json";
 const CONFLICTS_FILE = "conflicts.json";
+const REVIEW_AUDIT_FILE = "review-audit.json";
 const CONFLICT_INCOMING_DIR = "conflict-incoming";
 
 const ownerLocks = new Map<string, Promise<void>>();
@@ -67,6 +77,15 @@ function nowIso(): string {
 }
 
 function emptyCandidatesFile(ownerId: string): ExperienceCandidateCollectionFile {
+  return {
+    schemaVersion: 1,
+    ownerId,
+    updatedAt: nowIso(),
+    records: [],
+  };
+}
+
+function emptyReviewAuditFile(ownerId: string): ExperienceReviewAuditCollectionFile {
   return {
     schemaVersion: 1,
     ownerId,
@@ -136,6 +155,43 @@ export class LocalExperienceRepository implements ExperienceRepository {
       }
       throw error;
     }
+  }
+
+  private async readReviewAudit(ownerId: string): Promise<ExperienceReviewAuditCollectionFile> {
+    const ownerDir = this.resolveOwnerDir(ownerId);
+    const filePath = path.join(ownerDir, REVIEW_AUDIT_FILE);
+    try {
+      const raw = await fs.readFile(filePath, "utf8");
+      return JSON.parse(raw) as ExperienceReviewAuditCollectionFile;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return emptyReviewAuditFile(ownerId);
+      }
+      throw error;
+    }
+  }
+
+  private async appendReviewAudit(
+    ownerId: string,
+    entry: ExperienceReviewAuditEntry,
+  ): Promise<void> {
+    const file = await this.readReviewAudit(ownerId);
+    await this.writeReviewAudit(ownerId, [...file.records, entry]);
+  }
+
+  private async writeReviewAudit(
+    ownerId: string,
+    records: ExperienceReviewAuditEntry[],
+  ): Promise<void> {
+    const ownerDir = this.resolveOwnerDir(ownerId);
+    const filePath = path.join(ownerDir, REVIEW_AUDIT_FILE);
+    const file: ExperienceReviewAuditCollectionFile = {
+      schemaVersion: 1,
+      ownerId,
+      updatedAt: nowIso(),
+      records,
+    };
+    await atomicWriteJson(filePath, file);
   }
 
   private async readConflicts(ownerId: string): Promise<ExperienceIngestConflictCollectionFile> {
@@ -342,6 +398,100 @@ export class LocalExperienceRepository implements ExperienceRepository {
     });
   }
 
+  async reviewCandidate(
+    ownerId: string,
+    candidateId: string,
+    action: ExperienceReviewAction,
+    actor: string,
+    reason: string,
+    reviewCommandId?: string,
+  ): Promise<ExperienceReviewResult> {
+    return withOwnerLock(ownerId, async () => {
+      const file = await this.readCandidates(ownerId);
+      const index = file.records.findIndex((record) => record.id === candidateId);
+      if (index < 0) {
+        throw new ExperienceNotFoundError("Experience candidate not found");
+      }
+
+      const candidate = file.records[index]!;
+      const targetStatus = resolveReviewTargetStatus(action);
+      const auditFile = await this.readReviewAudit(ownerId);
+
+      if (reviewCommandId) {
+        const existingAudit = auditFile.records.find(
+          (entry) =>
+            entry.candidateId === candidateId && entry.reviewCommandId === reviewCommandId,
+        );
+        if (existingAudit) {
+          return {
+            outcome: "existing",
+            candidate,
+            auditEntry: existingAudit,
+          };
+        }
+      }
+
+      if (candidate.status === targetStatus) {
+        const existingAudit = [...auditFile.records]
+          .reverse()
+          .find(
+            (entry) =>
+              entry.candidateId === candidateId && entry.nextStatus === targetStatus,
+          );
+        if (!existingAudit) {
+          throw new Error("Candidate review state is inconsistent with audit history");
+        }
+        return {
+          outcome: "existing",
+          candidate,
+          auditEntry: existingAudit,
+        };
+      }
+
+      assertReviewTransitionAllowed(candidate.status, action);
+
+      const timestamp = nowIso();
+      const auditEntry: ExperienceReviewAuditEntry = {
+        id: randomUUID(),
+        ownerId,
+        candidateId,
+        action,
+        previousStatus: candidate.status,
+        nextStatus: targetStatus,
+        actor,
+        reason,
+        reviewCommandId,
+        createdAt: timestamp,
+      };
+
+      const updatedCandidate: ExperienceCandidate = {
+        ...candidate,
+        status: targetStatus,
+        updatedAt: timestamp,
+      };
+      const records = [...file.records];
+      records[index] = updatedCandidate;
+
+      await this.writeCandidates(ownerId, records);
+      await this.appendReviewAudit(ownerId, auditEntry);
+
+      return {
+        outcome: "applied",
+        candidate: updatedCandidate,
+        auditEntry,
+      };
+    });
+  }
+
+  async listReviewAudit(
+    ownerId: string,
+    candidateId?: string,
+  ): Promise<ExperienceReviewAuditEntry[]> {
+    const file = await this.readReviewAudit(ownerId);
+    if (!candidateId) return file.records;
+    return file.records.filter((entry) => entry.candidateId === candidateId);
+  }
+
   async listCandidates(ownerId: string, status?: string): Promise<ExperienceCandidate[]> {
     const file = await this.readCandidates(ownerId);
     if (!status) return file.records;
@@ -363,6 +513,9 @@ export class LocalExperienceRepository implements ExperienceRepository {
       summary: {
         candidateCount: candidates.length,
         draftCount: candidates.filter((record) => record.status === "DRAFT").length,
+        disputedCount: candidates.filter((record) => record.status === "DISPUTED").length,
+        rejectedCount: candidates.filter((record) => record.status === "REJECTED").length,
+        archivedCount: candidates.filter((record) => record.status === "ARCHIVED").length,
         openConflictCount: conflicts.filter((record) => record.status === "OPEN").length,
       },
     };

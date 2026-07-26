@@ -3,6 +3,9 @@ import type {
   ExperienceCandidateSnapshot,
   ExperienceIngestConflict,
   ExperienceIngestResult,
+  ExperienceReviewAction,
+  ExperienceReviewAuditEntry,
+  ExperienceReviewResult,
 } from "./experience-types";
 import type { SynapseTraceEnvelopeV1 } from "./experience-trace.server";
 
@@ -35,7 +38,16 @@ export interface ExperienceRepository {
     ownerId: string,
     envelope: SynapseTraceEnvelopeV1,
   ): Promise<ExperienceIngestResult>;
+  reviewCandidate(
+    ownerId: string,
+    candidateId: string,
+    action: ExperienceReviewAction,
+    actor: string,
+    reason: string,
+    reviewCommandId?: string,
+  ): Promise<ExperienceReviewResult>;
   listCandidates(ownerId: string, status?: string): Promise<ExperienceCandidate[]>;
   listIngestConflicts(ownerId: string): Promise<ExperienceIngestConflict[]>;
+  listReviewAudit(ownerId: string, candidateId?: string): Promise<ExperienceReviewAuditEntry[]>;
   getCandidateSnapshot(ownerId: string): Promise<ExperienceCandidateSnapshot>;
 }

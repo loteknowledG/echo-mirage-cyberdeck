@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress (Slice 2 — replay safety & conflict surfacing)
+In Progress (Slice 3 complete; Slice 4 lesson promotion next)
 
 ## Product
 

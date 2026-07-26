@@ -6,6 +6,10 @@ export type {
   ExperienceIngestReplayOutcome,
   ExperienceIngestResult,
   ExperienceOutcome,
+  ExperienceReviewAction,
+  ExperienceReviewAuditEntry,
+  ExperienceReviewOutcome,
+  ExperienceReviewResult,
   ExperienceStorageMode,
   ExperienceTraceRef,
 } from "./experience-types";
@@ -19,6 +23,12 @@ export {
   computeExperienceCandidateId,
   deriveCandidateSummary,
 } from "./experience-identity";
+
+export {
+  assertReviewTransitionAllowed,
+  isReviewTransitionAllowed,
+  resolveReviewTargetStatus,
+} from "./experience-review";
 
 export { digestTraceEnvelope, envelopesMateriallyEqual } from "./experience-content";
 

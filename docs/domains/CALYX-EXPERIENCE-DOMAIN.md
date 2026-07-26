@@ -25,7 +25,24 @@ Rules:
 * conflicting replays never overwrite candidates or trace artifacts
 * conflict records are persisted in `conflicts.json` with incoming envelopes in `conflict-incoming/{conflictId}.json`
 
-Deferred to later slices: lesson promotion, reject/dispute/archive UI, Career cross-links, live Synapse streaming.
+Deferred to later slices: lesson promotion, review UI, Career cross-links, live Synapse streaming.
+
+## Slice 3 — review workflow
+
+Explicit review transitions (no lesson promotion):
+
+| From | Allowed actions |
+|---|---|
+| `DRAFT` | reject → `REJECTED`, dispute → `DISPUTED`, archive → `ARCHIVED` |
+| `DISPUTED` | reject → `REJECTED`, archive → `ARCHIVED` |
+| `REJECTED`, `ARCHIVED`, `VERIFIED` | none |
+
+Rules:
+
+* append-only `review-audit.json` (actor, timestamp, reason, previous/next status)
+* invalid transitions return `INVALID_REVIEW_TRANSITION` (409)
+* idempotent review via optional `reviewCommandId` or already-at-target status
+* signed trace artifacts remain immutable; open ingest conflicts stay `OPEN`
 
 ## Core invariant
 
@@ -72,6 +89,7 @@ Persisted candidate `id` and `dedupeKey` both equal `ExperienceCandidateID`.
 <CALYX_HOME>/echo-mirage-domains/experience/<ownerId>/
   candidates.json
   conflicts.json
+  review-audit.json
   traces/<traceId>.json
   conflict-incoming/<conflictId>.json
 ```
@@ -82,6 +100,8 @@ Persisted candidate `id` and `dedupeKey` both equal `ExperienceCandidateID`.
 * `GET /api/calyx/experience/candidates`
 * `GET /api/calyx/experience/conflicts`
 * `GET /api/calyx/experience/status`
+* `POST /api/calyx/experience/candidates/[id]/review` — returns `{ outcome, candidate, auditEntry }`
+* `GET /api/calyx/experience/candidates/[id]/audit` — returns `{ audit }`
 
 ## Configuration
 

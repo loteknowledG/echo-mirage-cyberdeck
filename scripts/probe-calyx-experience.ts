@@ -1,5 +1,5 @@
 /**
- * L-CALYX-110 — Experience candidate ingest probe (slices 1–2).
+ * L-CALYX-110 — Experience candidate ingest probe (slices 1–3).
  * Run: pnpm probe:calyx-experience
  */
 import assert from "node:assert/strict";
@@ -30,9 +30,12 @@ import {
   getExperienceCandidateSnapshot,
   ingestExperienceTrace,
   listExperienceIngestConflicts,
+  listExperienceReviewAudit,
   mapExperienceServiceError,
+  reviewExperienceCandidate,
 } from "../src/lib/calyx/domains/experience/experience-service.server";
 import { experienceError } from "../src/lib/calyx/domains/experience/experience-api.server";
+import { ExperienceInvalidReviewTransitionError } from "../src/lib/calyx/domains/experience/experience-review";
 import {
   buildSignedSynapseTraceEnvelope,
   ExperienceTraceVerificationError,
@@ -46,6 +49,7 @@ import { validateOwnerId } from "../src/lib/calyx/domains/experience/experience-
 const TEST_OWNER = "experience-probe-owner";
 const OTHER_OWNER = "experience-probe-other";
 const TEST_HMAC_SECRET = "probe-experience-hmac-secret";
+let probeCandidateSeq = 0;
 
 function baseEnvelopePayload(): SynapseTraceEnvelopePayload {
   return {
@@ -358,6 +362,157 @@ function testSignatureDeterministic() {
   assert.equal(a, b);
 }
 
+async function ingestProbeCandidate(ownerId = TEST_OWNER) {
+  probeCandidateSeq += 1;
+  const payload: SynapseTraceEnvelopePayload = {
+    ...baseEnvelopePayload(),
+    traceId: `synapse-trace-probe-review-${probeCandidateSeq}`,
+    runId: `run-probe-review-${probeCandidateSeq}`,
+  };
+  const envelope = buildSignedSynapseTraceEnvelope(payload, TEST_HMAC_SECRET);
+  const result = await ingestExperienceTrace(ownerId, envelope);
+  assert.equal(result.outcome, "created");
+  return result.candidate;
+}
+
+async function testReviewWorkflowTransitions() {
+  await withTempRepository(async (repo, root) => {
+    const candidate = await ingestProbeCandidate();
+
+    const rejected = await reviewExperienceCandidate(TEST_OWNER, candidate.id, {
+      action: "reject",
+      reason: "Insufficient evidence for promotion review.",
+      reviewCommandId: "review-cmd-reject-001",
+    });
+    assert.equal(rejected.outcome, "applied");
+    assert.equal(rejected.candidate.status, "REJECTED");
+    assert.equal(rejected.auditEntry.previousStatus, "DRAFT");
+    assert.equal(rejected.auditEntry.nextStatus, "REJECTED");
+    assert.equal(rejected.auditEntry.actor, "local-operator");
+
+    const rejectedAgain = await reviewExperienceCandidate(TEST_OWNER, candidate.id, {
+      action: "reject",
+      reason: "Insufficient evidence for promotion review.",
+      reviewCommandId: "review-cmd-reject-001",
+    });
+    assert.equal(rejectedAgain.outcome, "existing");
+    assert.equal(rejectedAgain.auditEntry.id, rejected.auditEntry.id);
+
+    await assert.rejects(
+      () =>
+        reviewExperienceCandidate(TEST_OWNER, candidate.id, {
+          action: "dispute",
+          reason: "Too late to dispute.",
+        }),
+      ExperienceInvalidReviewTransitionError,
+    );
+
+    const disputedCandidate = await ingestProbeCandidate();
+    const disputed = await reviewExperienceCandidate(TEST_OWNER, disputedCandidate.id, {
+      action: "dispute",
+      reason: "Needs operator clarification.",
+    });
+    assert.equal(disputed.candidate.status, "DISPUTED");
+
+    const archivedFromDispute = await reviewExperienceCandidate(
+      TEST_OWNER,
+      disputedCandidate.id,
+      {
+        action: "archive",
+        reason: "Withdrawn from active review.",
+      },
+    );
+    assert.equal(archivedFromDispute.candidate.status, "ARCHIVED");
+
+    const disputedForReject = await ingestProbeCandidate();
+    await reviewExperienceCandidate(TEST_OWNER, disputedForReject.id, {
+      action: "dispute",
+      reason: "Escalated for second opinion.",
+    });
+    const rejectedFromDispute = await reviewExperienceCandidate(
+      TEST_OWNER,
+      disputedForReject.id,
+      {
+        action: "reject",
+        reason: "Dispute resolved as reject.",
+      },
+    );
+    assert.equal(rejectedFromDispute.candidate.status, "REJECTED");
+
+    const draftArchived = await ingestProbeCandidate();
+    const archived = await reviewExperienceCandidate(TEST_OWNER, draftArchived.id, {
+      action: "archive",
+      reason: "Not relevant to current portfolio.",
+    });
+    assert.equal(archived.candidate.status, "ARCHIVED");
+
+    const audit = await listExperienceReviewAudit(TEST_OWNER, candidate.id);
+    assert.equal(audit.length, 1);
+
+    const tracePath = path.join(root, TEST_OWNER, "traces", `${candidate.traceRef.traceId}.json`);
+    const traceBefore = await readFile(tracePath, "utf8");
+    const traceCheckCandidate = await ingestProbeCandidate();
+    await reviewExperienceCandidate(TEST_OWNER, traceCheckCandidate.id, {
+      action: "reject",
+      reason: "trace immutability check",
+      reviewCommandId: "review-cmd-trace-check",
+    });
+    const traceAfter = await readFile(tracePath, "utf8");
+    assert.equal(traceBefore, traceAfter);
+
+    const conflicts = await listExperienceIngestConflicts(TEST_OWNER);
+    assert.equal(conflicts.length, 0);
+  });
+}
+
+async function testReviewAuditIsAppendOnly() {
+  await withTempRepository(async () => {
+    const candidate = await ingestProbeCandidate();
+    await reviewExperienceCandidate(TEST_OWNER, candidate.id, {
+      action: "dispute",
+      reason: "First review action",
+      reviewCommandId: "audit-append-001",
+    });
+    const midAudit = await listExperienceReviewAudit(TEST_OWNER, candidate.id);
+    assert.equal(midAudit.length, 1);
+
+    await reviewExperienceCandidate(TEST_OWNER, candidate.id, {
+      action: "archive",
+      reason: "Second review action",
+      reviewCommandId: "audit-append-002",
+    });
+    const finalAudit = await listExperienceReviewAudit(TEST_OWNER, candidate.id);
+    assert.equal(finalAudit.length, 2);
+    assert.equal(finalAudit[0]?.id, midAudit[0]?.id);
+    assert.notEqual(finalAudit[0]?.id, finalAudit[1]?.id);
+  });
+}
+
+async function testOpenConflictsRemainAfterReview() {
+  await withTempRepository(async () => {
+    const payload = baseEnvelopePayload();
+    const firstEnvelope = buildSignedSynapseTraceEnvelope(payload, TEST_HMAC_SECRET);
+    const created = await ingestExperienceTrace(TEST_OWNER, firstEnvelope);
+    assert.equal(created.outcome, "created");
+
+    const divergent = buildSignedSynapseTraceEnvelope(
+      { ...payload, summary: "Conflicting summary for review slice." },
+      TEST_HMAC_SECRET,
+    );
+    const conflict = await ingestExperienceTrace(TEST_OWNER, divergent);
+    assert.equal(conflict.outcome, "conflict");
+
+    await reviewExperienceCandidate(TEST_OWNER, created.candidate.id, {
+      action: "archive",
+      reason: "Archive despite open ingest conflict elsewhere.",
+    });
+
+    const conflicts = await listExperienceIngestConflicts(TEST_OWNER);
+    assert.equal(conflicts.length, 1);
+    assert.equal(conflicts[0]?.status, "OPEN");
+  });
+}
+
 async function main() {
   testIdentityAndActionHash();
   testTraceVerification();
@@ -373,6 +528,9 @@ async function main() {
   await testOwnerIsolation();
   await testIngestRequiresSecret();
   await testCandidateIdRecomputation();
+  await testReviewWorkflowTransitions();
+  await testReviewAuditIsAppendOnly();
+  await testOpenConflictsRemainAfterReview();
   console.log("[probe:calyx-experience] PASS");
 }
 

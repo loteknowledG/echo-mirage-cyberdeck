@@ -41,3 +41,47 @@ export function validateCandidateListQuery(input: unknown): ValidationResult<{ s
   }
   return { ok: true, value: { status: statusRaw.trim() } };
 }
+
+const REVIEW_ACTIONS = new Set(["reject", "dispute", "archive"]);
+
+export type ReviewCandidateInput = {
+  action: "reject" | "dispute" | "archive";
+  reason: string;
+  reviewCommandId?: string;
+};
+
+export function validateReviewCandidateInput(input: unknown): ValidationResult<ReviewCandidateInput> {
+  if (!input || typeof input !== "object") {
+    return { ok: false, errors: ["Review payload must be an object"] };
+  }
+  const payload = input as Record<string, unknown>;
+  const errors: string[] = [];
+  const actionRaw = payload.action;
+  if (typeof actionRaw !== "string" || !REVIEW_ACTIONS.has(actionRaw)) {
+    errors.push("action must be reject, dispute, or archive");
+  }
+  const reasonRaw = payload.reason;
+  if (typeof reasonRaw !== "string" || !reasonRaw.trim()) {
+    errors.push("reason is required");
+  } else if (reasonRaw.trim().length > MAX_MEDIUM) {
+    errors.push("reason exceeds maximum length");
+  }
+  const reviewCommandIdRaw = payload.reviewCommandId;
+  if (
+    reviewCommandIdRaw != null &&
+    (typeof reviewCommandIdRaw !== "string" || !reviewCommandIdRaw.trim())
+  ) {
+    errors.push("reviewCommandId must be a non-empty string when provided");
+  }
+  if (errors.length) return { ok: false, errors };
+
+  return {
+    ok: true,
+    value: {
+      action: actionRaw as ReviewCandidateInput["action"],
+      reason: (reasonRaw as string).trim(),
+      reviewCommandId:
+        typeof reviewCommandIdRaw === "string" ? reviewCommandIdRaw.trim() : undefined,
+    },
+  };
+}
