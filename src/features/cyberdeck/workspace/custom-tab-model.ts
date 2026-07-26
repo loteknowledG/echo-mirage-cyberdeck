@@ -24,6 +24,7 @@ export const CUSTOM_TAB_KINDS = [
   "cadre",
   "install",
   "survey",
+  "career",
   "catelog",
 ] as const;
 
@@ -70,6 +71,7 @@ export const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Kit", action: "kit-pane" },
   { label: "Survey", kind: "survey", action: "convert" },
+  { label: "Career", kind: "career", action: "convert" },
   { label: "Powerfist", kind: "rola-dex", action: "convert" },
   { label: "Tunes", kind: "tunes", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
@@ -259,6 +261,7 @@ export function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "db8") return "8";
   if (kind === "cadre") return "C";
   if (kind === "install") return "I";
+  if (kind === "career") return "Cr";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
@@ -277,6 +280,7 @@ export function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "db8") return "DB8";
   if (kind === "cadre") return "CADRE";
   if (kind === "install") return "INSTALL";
+  if (kind === "career") return "CAREER";
   return kind.toUpperCase();
 }
 

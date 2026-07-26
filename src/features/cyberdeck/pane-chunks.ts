@@ -27,6 +27,7 @@ const PANE_IMPORTS: Record<CyberdeckPaneKind, () => Promise<CyberdeckPaneModule>
   cadre: () => import("@/features/cyberdeck/pane-loaders/cadre"),
   install: () => import("@/features/cyberdeck/pane-loaders/install"),
   survey: () => import("@/features/cyberdeck/pane-loaders/survey"),
+  career: () => import("@/features/cyberdeck/pane-loaders/career"),
 };
 
 export function importCyberdeckPane(kind: string): Promise<CyberdeckPaneModule> {

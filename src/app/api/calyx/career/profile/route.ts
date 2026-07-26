@@ -1,0 +1,21 @@
+import { careerJson } from "@/lib/calyx/domains/career/career-api.server";
+import { resolveCareerOwnerId } from "@/lib/calyx/domains/career/career-owner.server";
+import {
+  handleCareerRouteError,
+  parseJsonBody,
+} from "@/lib/calyx/domains/career/career-route-utils.server";
+import { updateCareerProfile } from "@/lib/calyx/domains/career/career-service.server";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function PATCH(request: Request) {
+  try {
+    const ownerId = resolveCareerOwnerId();
+    const body = await parseJsonBody(request);
+    const profile = await updateCareerProfile(ownerId, body);
+    return careerJson(profile);
+  } catch (error) {
+    return handleCareerRouteError(error);
+  }
+}

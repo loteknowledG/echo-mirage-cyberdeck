@@ -19,7 +19,7 @@ test.describe("L-CYBERDECK-001 extraction smoke", () => {
   test("boot: /cyberdeck rail and chat shell render", async ({ page }) => {
     await openCyberdeck(page);
 
-    await expect(page.locator("cyberdeck-rail-tab")).toHaveCount(3, { timeout: 10000 });
+    await expect(page.locator("cyberdeck-rail-tab")).toHaveCount(4, { timeout: 10000 });
     await expect(page.locator(".cyberdeck-chat-app")).toBeVisible({ timeout: 10000 });
     await expect(page.locator(COMPOSER)).toBeVisible({ timeout: 10000 });
     await expect(page.getByLabel("Gateway")).toBeVisible({ timeout: 10000 });
@@ -29,7 +29,7 @@ test.describe("L-CYBERDECK-001 extraction smoke", () => {
   test("P1: custom tab create via deck command", async ({ page }) => {
     await openCyberdeck(page);
     await createCustomTab(page, "extraction-probe", "X");
-    await expect(page.locator("cyberdeck-rail-tab")).toHaveCount(4, { timeout: 10000 });
+    await expect(page.locator("cyberdeck-rail-tab")).toHaveCount(5, { timeout: 10000 });
   });
 
   test("P1: custom tab context menu opens assigned surface", async ({ page }) => {

@@ -177,6 +177,9 @@ dist
 # Calyx vault data (local association DB)
 .calyx/
 
+# Career private seed data
+data/private/
+
 # Property Manager case evidence (runtime; folder scaffold stays tracked)
 data/property-manager/cases/*
 !data/property-manager/cases/.gitkeep

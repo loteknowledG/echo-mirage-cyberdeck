@@ -21,6 +21,7 @@ export const CYBERDECK_PANE_KINDS = [
   "cadre",
   "install",
   "survey",
+  "career",
 ] as const;
 
 export type CyberdeckPaneKind = (typeof CYBERDECK_PANE_KINDS)[number];
@@ -64,6 +65,7 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   cadre: { label: "CADRE", fetchHints: ["TERMINAL HOST", "RUNTIME REGISTRY", "OUTPUT STREAM"] },
   install: { label: "INSTALL", fetchHints: ["DESKTOP SHELL", "INSTALLER", "RELEASE"] },
   survey: { label: "SURVEY", fetchHints: ["ECHO", "MIRAGE", "POWERFIST", "PAIRING"] },
+  career: { label: "CAREER", fetchHints: ["PORTFOLIO", "TIMELINE", "EVIDENCE"] },
 };
 
 const TAB_KIND_ALIASES: Record<string, CyberdeckPaneKind> = {

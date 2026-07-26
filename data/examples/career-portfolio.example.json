@@ -1,0 +1,63 @@
+{
+  "profile": {
+    "displayName": "Alex Rivera",
+    "headline": "Principal Platform Engineer",
+    "summary": "Fictional example portfolio for Echo Mirage Career Intelligence development.",
+    "location": "Remote"
+  },
+  "employers": [
+    {
+      "name": "Consulting Company",
+      "title": "Senior Consultant",
+      "employmentType": "Contract",
+      "startDate": "2021-03-01",
+      "endDate": "2024-12-31",
+      "current": false,
+      "summary": "Led client delivery engagements across retail and enterprise accounts."
+    }
+  ],
+  "engagements": [
+    {
+      "employerName": "Consulting Company",
+      "clientName": "Example Client",
+      "title": "Lead Engineer",
+      "startDate": "2022-01-01",
+      "endDate": "2023-06-30",
+      "current": false,
+      "summary": "Modernized customer-facing platform services."
+    }
+  ],
+  "projects": [
+    {
+      "engagementClientName": "Example Client",
+      "name": "Platform Modernization",
+      "businessChallenge": "Legacy release cycle blocked product experiments.",
+      "solution": "Introduced modular services and automated deployment pipelines.",
+      "impact": "Reduced release lead time for the client team."
+    }
+  ],
+  "accomplishments": [
+    {
+      "projectName": "Platform Modernization",
+      "statement": "Delivered modular platform architecture for Example Client.",
+      "category": "ARCHITECTURE",
+      "metric": "Release lead time reduced from 6 weeks to 2 weeks (client reported)"
+    }
+  ],
+  "skills": [
+    {
+      "skill": "TypeScript",
+      "proficiency": "ADVANCED",
+      "confidence": "USER_CONFIRMED",
+      "years": 6
+    }
+  ],
+  "evidence": [
+    {
+      "sourceType": "USER_ENTRY",
+      "sourceName": "Delivery retrospective notes",
+      "confidence": "USER_CONFIRMED",
+      "excerpt": "Client confirmed improved release cadence after platform rollout."
+    }
+  ]
+}

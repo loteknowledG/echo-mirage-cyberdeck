@@ -346,6 +346,10 @@ function CustomTabPaneRendererInner({
     );
   }
 
+  if (tab.kind === "career") {
+    return shell(<ActivatedCyberdeckPane kind="career" />);
+  }
+
   if (tab.kind === "tunes" || String(tab.kind) === "sound-profile") {
     return (
       <div
