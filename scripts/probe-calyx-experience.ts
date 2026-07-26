@@ -1,5 +1,5 @@
 /**
- * L-CALYX-110 — Experience candidate ingest probe (slices 1–3).
+ * L-CALYX-110 — Experience candidate ingest probe (slices 1–4).
  * Run: pnpm probe:calyx-experience
  */
 import assert from "node:assert/strict";
@@ -30,11 +30,15 @@ import {
   getExperienceCandidateSnapshot,
   ingestExperienceTrace,
   listExperienceIngestConflicts,
+  listExperienceLessons,
+  listExperiencePromotionAudit,
   listExperienceReviewAudit,
   mapExperienceServiceError,
+  promoteExperienceCandidate,
   reviewExperienceCandidate,
 } from "../src/lib/calyx/domains/experience/experience-service.server";
 import { experienceError } from "../src/lib/calyx/domains/experience/experience-api.server";
+import { ExperiencePromotionNotAllowedError } from "../src/lib/calyx/domains/experience/experience-promotion";
 import { ExperienceInvalidReviewTransitionError } from "../src/lib/calyx/domains/experience/experience-review";
 import {
   buildSignedSynapseTraceEnvelope,
@@ -170,6 +174,8 @@ async function testIngestCreatesDraftCandidate() {
     const snapshot = await getExperienceCandidateSnapshot(TEST_OWNER);
     assert.equal(snapshot.summary.candidateCount, 1);
     assert.equal(snapshot.summary.draftCount, 1);
+    assert.equal(snapshot.summary.verifiedCount, 0);
+    assert.equal(snapshot.summary.lessonCount, 0);
     assert.equal(snapshot.summary.openConflictCount, 0);
   });
 }
@@ -513,6 +519,138 @@ async function testOpenConflictsRemainAfterReview() {
   });
 }
 
+async function testExplicitPromotionCreatesLesson() {
+  await withTempRepository(async (repo, root) => {
+    const candidate = await ingestProbeCandidate();
+
+    const promoted = await promoteExperienceCandidate(TEST_OWNER, candidate.id, {
+      reason: "Operator verified this trace as reusable guidance.",
+      lesson: "Click submit only after form validation passes.",
+      promotionCommandId: "promote-cmd-001",
+    });
+    assert.equal(promoted.outcome, "promoted");
+    assert.equal(promoted.candidate.status, "VERIFIED");
+    assert.equal(promoted.lesson.candidateId, candidate.id);
+    assert.equal(promoted.lesson.traceRef.traceId, candidate.traceRef.traceId);
+    assert.equal(promoted.lesson.approvedBy, "operator");
+    assert.equal(promoted.auditEntry.actor, "local-operator");
+    assert.equal(promoted.auditEntry.previousCandidateStatus, "DRAFT");
+
+    const promotedAgain = await promoteExperienceCandidate(TEST_OWNER, candidate.id, {
+      reason: "Operator verified this trace as reusable guidance.",
+      lesson: "Click submit only after form validation passes.",
+      promotionCommandId: "promote-cmd-001",
+    });
+    assert.equal(promotedAgain.outcome, "existing");
+    assert.equal(promotedAgain.lesson.id, promoted.lesson.id);
+    assert.equal(promotedAgain.auditEntry.id, promoted.auditEntry.id);
+
+    const lessons = await listExperienceLessons(TEST_OWNER);
+    assert.equal(lessons.length, 1);
+
+    const snapshot = await getExperienceCandidateSnapshot(TEST_OWNER);
+    assert.equal(snapshot.summary.verifiedCount, 1);
+    assert.equal(snapshot.summary.lessonCount, 1);
+    assert.equal(snapshot.summary.draftCount, 0);
+
+    const tracePath = path.join(root, TEST_OWNER, "traces", `${candidate.traceRef.traceId}.json`);
+    const traceBefore = await readFile(tracePath, "utf8");
+    const otherCandidate = await ingestProbeCandidate();
+    await promoteExperienceCandidate(TEST_OWNER, otherCandidate.id, {
+      reason: "Second promotion trace check",
+      promotionCommandId: "promote-cmd-trace-check",
+    });
+    const traceAfter = await readFile(tracePath, "utf8");
+    assert.equal(traceBefore, traceAfter);
+
+    const reviewAuditBefore = await listExperienceReviewAudit(TEST_OWNER, candidate.id);
+    await promoteExperienceCandidate(TEST_OWNER, otherCandidate.id, {
+      reason: "duplicate idempotency check",
+      promotionCommandId: "promote-cmd-other-check",
+    });
+    const reviewAuditAfter = await listExperienceReviewAudit(TEST_OWNER, candidate.id);
+    assert.equal(reviewAuditBefore.length, reviewAuditAfter.length);
+  });
+}
+
+async function testPromotionRejectedForNonDraftCandidates() {
+  await withTempRepository(async () => {
+    const candidate = await ingestProbeCandidate();
+    await reviewExperienceCandidate(TEST_OWNER, candidate.id, {
+      action: "reject",
+      reason: "Not promotable.",
+    });
+
+    await assert.rejects(
+      () =>
+        promoteExperienceCandidate(TEST_OWNER, candidate.id, {
+          reason: "Too late to promote.",
+        }),
+      ExperiencePromotionNotAllowedError,
+    );
+
+    const disputed = await ingestProbeCandidate();
+    await reviewExperienceCandidate(TEST_OWNER, disputed.id, {
+      action: "dispute",
+      reason: "Under dispute.",
+    });
+    await assert.rejects(
+      () =>
+        promoteExperienceCandidate(TEST_OWNER, disputed.id, {
+          reason: "Cannot promote disputed candidate.",
+        }),
+      ExperiencePromotionNotAllowedError,
+    );
+  });
+}
+
+async function testPromotionAuditIsAppendOnly() {
+  await withTempRepository(async () => {
+    const first = await ingestProbeCandidate();
+    const second = await ingestProbeCandidate();
+
+    await promoteExperienceCandidate(TEST_OWNER, first.id, {
+      reason: "First lesson promotion",
+      promotionCommandId: "promote-audit-001",
+    });
+    const midAudit = await listExperiencePromotionAudit(TEST_OWNER);
+    assert.equal(midAudit.length, 1);
+
+    await promoteExperienceCandidate(TEST_OWNER, second.id, {
+      reason: "Second lesson promotion",
+      promotionCommandId: "promote-audit-002",
+    });
+    const finalAudit = await listExperiencePromotionAudit(TEST_OWNER);
+    assert.equal(finalAudit.length, 2);
+    assert.equal(finalAudit[0]?.id, midAudit[0]?.id);
+    assert.notEqual(finalAudit[0]?.id, finalAudit[1]?.id);
+  });
+}
+
+async function testOpenConflictsRemainAfterPromotion() {
+  await withTempRepository(async () => {
+    const payload = baseEnvelopePayload();
+    const firstEnvelope = buildSignedSynapseTraceEnvelope(payload, TEST_HMAC_SECRET);
+    const created = await ingestExperienceTrace(TEST_OWNER, firstEnvelope);
+    assert.equal(created.outcome, "created");
+
+    const divergent = buildSignedSynapseTraceEnvelope(
+      { ...payload, summary: "Conflicting summary for promotion slice." },
+      TEST_HMAC_SECRET,
+    );
+    const conflict = await ingestExperienceTrace(TEST_OWNER, divergent);
+    assert.equal(conflict.outcome, "conflict");
+
+    await promoteExperienceCandidate(TEST_OWNER, created.candidate.id, {
+      reason: "Promote despite open ingest conflict elsewhere.",
+    });
+
+    const conflicts = await listExperienceIngestConflicts(TEST_OWNER);
+    assert.equal(conflicts.length, 1);
+    assert.equal(conflicts[0]?.status, "OPEN");
+  });
+}
+
 async function main() {
   testIdentityAndActionHash();
   testTraceVerification();
@@ -531,6 +669,10 @@ async function main() {
   await testReviewWorkflowTransitions();
   await testReviewAuditIsAppendOnly();
   await testOpenConflictsRemainAfterReview();
+  await testExplicitPromotionCreatesLesson();
+  await testPromotionRejectedForNonDraftCandidates();
+  await testPromotionAuditIsAppendOnly();
+  await testOpenConflictsRemainAfterPromotion();
   console.log("[probe:calyx-experience] PASS");
 }
 

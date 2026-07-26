@@ -5,7 +5,13 @@ export type {
   ExperienceIngestConflict,
   ExperienceIngestReplayOutcome,
   ExperienceIngestResult,
+  ExperienceLesson,
+  ExperienceLessonApprovedBy,
+  ExperienceLessonStatus,
   ExperienceOutcome,
+  ExperiencePromotionAuditEntry,
+  ExperiencePromotionOutcome,
+  ExperiencePromotionResult,
   ExperienceReviewAction,
   ExperienceReviewAuditEntry,
   ExperienceReviewOutcome,
@@ -29,6 +35,11 @@ export {
   isReviewTransitionAllowed,
   resolveReviewTargetStatus,
 } from "./experience-review";
+
+export {
+  assertPromotionEligible,
+  isPromotionEligible,
+} from "./experience-promotion";
 
 export { digestTraceEnvelope, envelopesMateriallyEqual } from "./experience-content";
 

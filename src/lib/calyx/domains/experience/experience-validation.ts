@@ -85,3 +85,53 @@ export function validateReviewCandidateInput(input: unknown): ValidationResult<R
     },
   };
 }
+
+export type PromoteCandidateInput = {
+  reason: string;
+  lesson?: string;
+  promotionCommandId?: string;
+};
+
+export function validatePromoteCandidateInput(
+  input: unknown,
+): ValidationResult<PromoteCandidateInput> {
+  if (!input || typeof input !== "object") {
+    return { ok: false, errors: ["Promotion payload must be an object"] };
+  }
+  const payload = input as Record<string, unknown>;
+  const errors: string[] = [];
+  const reasonRaw = payload.reason;
+  if (typeof reasonRaw !== "string" || !reasonRaw.trim()) {
+    errors.push("reason is required");
+  } else if (reasonRaw.trim().length > MAX_MEDIUM) {
+    errors.push("reason exceeds maximum length");
+  }
+  const lessonRaw = payload.lesson;
+  if (lessonRaw != null) {
+    if (typeof lessonRaw !== "string" || !lessonRaw.trim()) {
+      errors.push("lesson must be a non-empty string when provided");
+    } else if (lessonRaw.trim().length > MAX_MEDIUM) {
+      errors.push("lesson exceeds maximum length");
+    }
+  }
+  const promotionCommandIdRaw = payload.promotionCommandId;
+  if (
+    promotionCommandIdRaw != null &&
+    (typeof promotionCommandIdRaw !== "string" || !promotionCommandIdRaw.trim())
+  ) {
+    errors.push("promotionCommandId must be a non-empty string when provided");
+  }
+  if (errors.length) return { ok: false, errors };
+
+  return {
+    ok: true,
+    value: {
+      reason: (reasonRaw as string).trim(),
+      lesson: typeof lessonRaw === "string" ? lessonRaw.trim() : undefined,
+      promotionCommandId:
+        typeof promotionCommandIdRaw === "string"
+          ? promotionCommandIdRaw.trim()
+          : undefined,
+    },
+  };
+}

@@ -41,14 +41,40 @@ export type ExperienceCandidateCollectionFile = {
   records: ExperienceCandidate[];
 };
 
+export type ExperienceLessonStatus = "VERIFIED";
+
+export type ExperienceLessonApprovedBy = "operator" | "policy";
+
+export type ExperienceLesson = {
+  id: string;
+  ownerId: string;
+  candidateId: string;
+  traceRef: ExperienceTraceRef;
+  lesson: string;
+  approvedBy: ExperienceLessonApprovedBy;
+  approvedAt: string;
+  status: ExperienceLessonStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ExperienceLessonCollectionFile = {
+  schemaVersion: 1;
+  ownerId: string;
+  updatedAt: string;
+  records: ExperienceLesson[];
+};
+
 export type ExperienceCandidateSnapshot = {
   candidates: ExperienceCandidate[];
   summary: {
     candidateCount: number;
     draftCount: number;
+    verifiedCount: number;
     disputedCount: number;
     rejectedCount: number;
     archivedCount: number;
+    lessonCount: number;
     openConflictCount: number;
   };
 };
@@ -112,4 +138,34 @@ export type ExperienceReviewResult = {
   outcome: ExperienceReviewOutcome;
   candidate: ExperienceCandidate;
   auditEntry: ExperienceReviewAuditEntry;
+};
+
+export type ExperiencePromotionOutcome = "promoted" | "existing";
+
+export type ExperiencePromotionAuditEntry = {
+  id: string;
+  ownerId: string;
+  candidateId: string;
+  lessonId: string;
+  actor: string;
+  approvedBy: ExperienceLessonApprovedBy;
+  reason: string;
+  previousCandidateStatus: ExperienceCandidateStatus;
+  promotionCommandId?: string;
+  promotedAt: string;
+  createdAt: string;
+};
+
+export type ExperiencePromotionAuditCollectionFile = {
+  schemaVersion: 1;
+  ownerId: string;
+  updatedAt: string;
+  records: ExperiencePromotionAuditEntry[];
+};
+
+export type ExperiencePromotionResult = {
+  outcome: ExperiencePromotionOutcome;
+  lesson: ExperienceLesson;
+  candidate: ExperienceCandidate;
+  auditEntry: ExperiencePromotionAuditEntry;
 };

@@ -3,6 +3,9 @@ import type {
   ExperienceCandidateSnapshot,
   ExperienceIngestConflict,
   ExperienceIngestResult,
+  ExperienceLesson,
+  ExperiencePromotionAuditEntry,
+  ExperiencePromotionResult,
   ExperienceReviewAuditEntry,
   ExperienceReviewResult,
 } from "./experience-types";
@@ -14,12 +17,14 @@ import {
   ExperienceTraceArtifactMutationError,
 } from "./experience-repository";
 import { ExperienceInvalidReviewTransitionError } from "./experience-review";
+import { ExperiencePromotionNotAllowedError } from "./experience-promotion";
 import {
   ExperienceTraceVerificationError,
   resolveExperienceIngestHmacSecret,
   verifySynapseTraceEnvelope,
 } from "./experience-trace.server";
 import {
+  validatePromoteCandidateInput,
   validateReviewCandidateInput,
   type ValidationResult,
 } from "./experience-validation";
@@ -78,6 +83,23 @@ export async function reviewExperienceCandidate(
   );
 }
 
+export async function promoteExperienceCandidate(
+  ownerId: string,
+  candidateId: string,
+  input: unknown,
+): Promise<ExperiencePromotionResult> {
+  const value = assertValidation(validatePromoteCandidateInput(input));
+  const actor = resolveExperienceOwnerId();
+  return getExperienceRepository().promoteCandidate(
+    ownerId,
+    candidateId,
+    actor,
+    value.reason,
+    value.lesson,
+    value.promotionCommandId,
+  );
+}
+
 export async function listExperienceCandidates(
   ownerId: string,
   status?: string,
@@ -96,6 +118,17 @@ export async function listExperienceReviewAudit(
   candidateId?: string,
 ): Promise<ExperienceReviewAuditEntry[]> {
   return getExperienceRepository().listReviewAudit(ownerId, candidateId);
+}
+
+export async function listExperienceLessons(ownerId: string): Promise<ExperienceLesson[]> {
+  return getExperienceRepository().listLessons(ownerId);
+}
+
+export async function listExperiencePromotionAudit(
+  ownerId: string,
+  candidateId?: string,
+): Promise<ExperiencePromotionAuditEntry[]> {
+  return getExperienceRepository().listPromotionAudit(ownerId, candidateId);
 }
 
 export async function getExperienceCandidateSnapshot(
@@ -143,6 +176,13 @@ export function mapExperienceServiceError(error: unknown): {
       message: error.message,
     };
   }
+  if (error instanceof ExperiencePromotionNotAllowedError) {
+    return {
+      status: 409,
+      code: "PROMOTION_NOT_ALLOWED",
+      message: error.message,
+    };
+  }
   if (error instanceof ExperienceTraceArtifactMutationError) {
     return {
       status: 409,
@@ -170,5 +210,6 @@ export {
   ExperienceTraceArtifactMutationError,
   ExperienceTraceVerificationError,
   ExperienceInvalidReviewTransitionError,
+  ExperiencePromotionNotAllowedError,
   CalyxExperienceRepositoryUnavailableError,
 };

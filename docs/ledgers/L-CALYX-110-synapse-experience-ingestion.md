@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress (Slice 3 complete; Slice 4 lesson promotion next)
+In Progress (Slice 4 complete; retraction and UI deferred)
 
 ## Product
 

@@ -44,6 +44,26 @@ Rules:
 * idempotent review via optional `reviewCommandId` or already-at-target status
 * signed trace artifacts remain immutable; open ingest conflicts stay `OPEN`
 
+## Slice 4 — explicit lesson promotion
+
+Explicit promotion only — no auto-promote on ingest or review:
+
+```text
+DRAFT candidate
+        ↓ POST …/candidates/[id]/promote
+ExperienceLesson (immutable) + candidate → VERIFIED
+```
+
+Rules:
+
+* only `DRAFT` candidates may be promoted (`PROMOTION_NOT_ALLOWED` otherwise)
+* append-only `lessons.json` and `promotion-audit.json`
+* idempotent promotion via optional `promotionCommandId` or already-`VERIFIED` candidate
+* every lesson retains `candidateId`, copied `traceRef`, `approvedBy`, `approvedAt`, and promotion audit lineage
+* signed trace artifacts, review audit, and open ingest conflicts remain unchanged
+
+Deferred to later slices: lesson retraction, review UI, policy promotion (L-CALYX-112), Career cross-links, live Synapse streaming.
+
 ## Core invariant
 
 > **No experience record may exist without a verifiable source trace.**
@@ -90,6 +110,8 @@ Persisted candidate `id` and `dedupeKey` both equal `ExperienceCandidateID`.
   candidates.json
   conflicts.json
   review-audit.json
+  promotion-audit.json
+  lessons.json
   traces/<traceId>.json
   conflict-incoming/<conflictId>.json
 ```
@@ -102,6 +124,8 @@ Persisted candidate `id` and `dedupeKey` both equal `ExperienceCandidateID`.
 * `GET /api/calyx/experience/status`
 * `POST /api/calyx/experience/candidates/[id]/review` — returns `{ outcome, candidate, auditEntry }`
 * `GET /api/calyx/experience/candidates/[id]/audit` — returns `{ audit }`
+* `POST /api/calyx/experience/candidates/[id]/promote` — returns `{ outcome, lesson, candidate, auditEntry }`
+* `GET /api/calyx/experience/lessons` — returns `{ lessons }`
 
 ## Configuration
 

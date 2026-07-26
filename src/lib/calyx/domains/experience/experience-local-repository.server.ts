@@ -13,6 +13,9 @@ import {
   resolveOwnerTraceArtifactPath,
 } from "./experience-paths.server";
 import {
+  assertPromotionEligible,
+} from "./experience-promotion";
+import {
   assertReviewTransitionAllowed,
   resolveReviewTargetStatus,
 } from "./experience-review";
@@ -30,6 +33,11 @@ import {
   type ExperienceIngestConflict,
   type ExperienceIngestConflictCollectionFile,
   type ExperienceIngestResult,
+  type ExperienceLesson,
+  type ExperienceLessonCollectionFile,
+  type ExperiencePromotionAuditCollectionFile,
+  type ExperiencePromotionAuditEntry,
+  type ExperiencePromotionResult,
   type ExperienceReviewAction,
   type ExperienceReviewAuditCollectionFile,
   type ExperienceReviewAuditEntry,
@@ -39,6 +47,8 @@ import {
 const CANDIDATES_FILE = "candidates.json";
 const CONFLICTS_FILE = "conflicts.json";
 const REVIEW_AUDIT_FILE = "review-audit.json";
+const PROMOTION_AUDIT_FILE = "promotion-audit.json";
+const LESSONS_FILE = "lessons.json";
 const CONFLICT_INCOMING_DIR = "conflict-incoming";
 
 const ownerLocks = new Map<string, Promise<void>>();
@@ -95,6 +105,24 @@ function emptyReviewAuditFile(ownerId: string): ExperienceReviewAuditCollectionF
 }
 
 function emptyConflictsFile(ownerId: string): ExperienceIngestConflictCollectionFile {
+  return {
+    schemaVersion: 1,
+    ownerId,
+    updatedAt: nowIso(),
+    records: [],
+  };
+}
+
+function emptyLessonsFile(ownerId: string): ExperienceLessonCollectionFile {
+  return {
+    schemaVersion: 1,
+    ownerId,
+    updatedAt: nowIso(),
+    records: [],
+  };
+}
+
+function emptyPromotionAuditFile(ownerId: string): ExperiencePromotionAuditCollectionFile {
   return {
     schemaVersion: 1,
     ownerId,
@@ -236,6 +264,84 @@ export class LocalExperienceRepository implements ExperienceRepository {
       records,
     };
     await atomicWriteJson(filePath, file);
+  }
+
+  private async readLessons(ownerId: string): Promise<ExperienceLessonCollectionFile> {
+    const ownerDir = this.resolveOwnerDir(ownerId);
+    const filePath = path.join(ownerDir, LESSONS_FILE);
+    try {
+      const raw = await fs.readFile(filePath, "utf8");
+      return JSON.parse(raw) as ExperienceLessonCollectionFile;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return emptyLessonsFile(ownerId);
+      }
+      throw error;
+    }
+  }
+
+  private async writeLessons(ownerId: string, records: ExperienceLesson[]): Promise<void> {
+    const ownerDir = this.resolveOwnerDir(ownerId);
+    const filePath = path.join(ownerDir, LESSONS_FILE);
+    const file: ExperienceLessonCollectionFile = {
+      schemaVersion: 1,
+      ownerId,
+      updatedAt: nowIso(),
+      records,
+    };
+    await atomicWriteJson(filePath, file);
+  }
+
+  private async readPromotionAudit(
+    ownerId: string,
+  ): Promise<ExperiencePromotionAuditCollectionFile> {
+    const ownerDir = this.resolveOwnerDir(ownerId);
+    const filePath = path.join(ownerDir, PROMOTION_AUDIT_FILE);
+    try {
+      const raw = await fs.readFile(filePath, "utf8");
+      return JSON.parse(raw) as ExperiencePromotionAuditCollectionFile;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return emptyPromotionAuditFile(ownerId);
+      }
+      throw error;
+    }
+  }
+
+  private async appendPromotionAudit(
+    ownerId: string,
+    entry: ExperiencePromotionAuditEntry,
+  ): Promise<void> {
+    const file = await this.readPromotionAudit(ownerId);
+    await this.writePromotionAudit(ownerId, [...file.records, entry]);
+  }
+
+  private async writePromotionAudit(
+    ownerId: string,
+    records: ExperiencePromotionAuditEntry[],
+  ): Promise<void> {
+    const ownerDir = this.resolveOwnerDir(ownerId);
+    const filePath = path.join(ownerDir, PROMOTION_AUDIT_FILE);
+    const file: ExperiencePromotionAuditCollectionFile = {
+      schemaVersion: 1,
+      ownerId,
+      updatedAt: nowIso(),
+      records,
+    };
+    await atomicWriteJson(filePath, file);
+  }
+
+  private buildExistingPromotionResult(
+    candidate: ExperienceCandidate,
+    lesson: ExperienceLesson,
+    auditEntry: ExperiencePromotionAuditEntry,
+  ): ExperiencePromotionResult {
+    return {
+      outcome: "existing",
+      lesson,
+      candidate,
+      auditEntry,
+    };
   }
 
   private async readTraceArtifact(
@@ -492,6 +598,126 @@ export class LocalExperienceRepository implements ExperienceRepository {
     return file.records.filter((entry) => entry.candidateId === candidateId);
   }
 
+  async promoteCandidate(
+    ownerId: string,
+    candidateId: string,
+    actor: string,
+    reason: string,
+    lessonText?: string,
+    promotionCommandId?: string,
+  ): Promise<ExperiencePromotionResult> {
+    return withOwnerLock(ownerId, async () => {
+      const file = await this.readCandidates(ownerId);
+      const index = file.records.findIndex((record) => record.id === candidateId);
+      if (index < 0) {
+        throw new ExperienceNotFoundError("Experience candidate not found");
+      }
+
+      const candidate = file.records[index]!;
+      const lessonsFile = await this.readLessons(ownerId);
+      const auditFile = await this.readPromotionAudit(ownerId);
+      const existingLesson = lessonsFile.records.find(
+        (record) => record.candidateId === candidateId,
+      );
+
+      if (promotionCommandId) {
+        const existingAudit = auditFile.records.find(
+          (entry) =>
+            entry.candidateId === candidateId &&
+            entry.promotionCommandId === promotionCommandId,
+        );
+        if (existingAudit) {
+          const lesson =
+            existingLesson ??
+            lessonsFile.records.find((record) => record.id === existingAudit.lessonId);
+          if (!lesson) {
+            throw new Error("Promotion audit references a missing lesson record");
+          }
+          const currentCandidate = file.records[index]!;
+          return this.buildExistingPromotionResult(currentCandidate, lesson, existingAudit);
+        }
+      }
+
+      if (candidate.status === "VERIFIED") {
+        if (!existingLesson) {
+          throw new Error("Candidate is VERIFIED but no lesson record exists");
+        }
+        const existingAudit = [...auditFile.records]
+          .reverse()
+          .find((entry) => entry.candidateId === candidateId);
+        if (!existingAudit) {
+          throw new Error("Candidate promotion state is inconsistent with audit history");
+        }
+        return this.buildExistingPromotionResult(candidate, existingLesson, existingAudit);
+      }
+
+      assertPromotionEligible(candidate.status);
+
+      const timestamp = nowIso();
+      const lessonId = randomUUID();
+      const lessonContent = lessonText?.trim() || candidate.summary;
+      const lesson: ExperienceLesson = {
+        id: lessonId,
+        ownerId,
+        candidateId,
+        traceRef: { ...candidate.traceRef },
+        lesson: lessonContent,
+        approvedBy: "operator",
+        approvedAt: timestamp,
+        status: "VERIFIED",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+
+      const auditEntry: ExperiencePromotionAuditEntry = {
+        id: randomUUID(),
+        ownerId,
+        candidateId,
+        lessonId,
+        actor,
+        approvedBy: "operator",
+        reason,
+        previousCandidateStatus: candidate.status,
+        promotionCommandId,
+        promotedAt: timestamp,
+        createdAt: timestamp,
+      };
+
+      const updatedCandidate: ExperienceCandidate = {
+        ...candidate,
+        status: "VERIFIED",
+        updatedAt: timestamp,
+      };
+      const records = [...file.records];
+      records[index] = updatedCandidate;
+
+      await this.writeCandidates(ownerId, records);
+      await this.writeLessons(ownerId, [...lessonsFile.records, lesson]);
+      await this.appendPromotionAudit(ownerId, auditEntry);
+
+      return {
+        outcome: "promoted",
+        lesson,
+        candidate: updatedCandidate,
+        auditEntry,
+      };
+    });
+  }
+
+  async listLessons(ownerId: string): Promise<ExperienceLesson[]> {
+    const file = await this.readLessons(ownerId);
+    return file.records;
+  }
+
+  async listPromotionAudit(
+    ownerId: string,
+    candidateId?: string,
+  ): Promise<ExperiencePromotionAuditEntry[]> {
+    const file = await this.readPromotionAudit(ownerId);
+    if (!candidateId) return file.records;
+    return file.records.filter((entry) => entry.candidateId === candidateId);
+  }
+
   async listCandidates(ownerId: string, status?: string): Promise<ExperienceCandidate[]> {
     const file = await this.readCandidates(ownerId);
     if (!status) return file.records;
@@ -504,18 +730,21 @@ export class LocalExperienceRepository implements ExperienceRepository {
   }
 
   async getCandidateSnapshot(ownerId: string): Promise<ExperienceCandidateSnapshot> {
-    const [candidates, conflicts] = await Promise.all([
+    const [candidates, conflicts, lessons] = await Promise.all([
       this.listCandidates(ownerId),
       this.listIngestConflicts(ownerId),
+      this.listLessons(ownerId),
     ]);
     return {
       candidates,
       summary: {
         candidateCount: candidates.length,
         draftCount: candidates.filter((record) => record.status === "DRAFT").length,
+        verifiedCount: candidates.filter((record) => record.status === "VERIFIED").length,
         disputedCount: candidates.filter((record) => record.status === "DISPUTED").length,
         rejectedCount: candidates.filter((record) => record.status === "REJECTED").length,
         archivedCount: candidates.filter((record) => record.status === "ARCHIVED").length,
+        lessonCount: lessons.length,
         openConflictCount: conflicts.filter((record) => record.status === "OPEN").length,
       },
     };

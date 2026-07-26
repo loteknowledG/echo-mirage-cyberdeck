@@ -3,6 +3,9 @@ import type {
   ExperienceCandidateSnapshot,
   ExperienceIngestConflict,
   ExperienceIngestResult,
+  ExperienceLesson,
+  ExperiencePromotionAuditEntry,
+  ExperiencePromotionResult,
   ExperienceReviewAction,
   ExperienceReviewAuditEntry,
   ExperienceReviewResult,
@@ -49,5 +52,18 @@ export interface ExperienceRepository {
   listCandidates(ownerId: string, status?: string): Promise<ExperienceCandidate[]>;
   listIngestConflicts(ownerId: string): Promise<ExperienceIngestConflict[]>;
   listReviewAudit(ownerId: string, candidateId?: string): Promise<ExperienceReviewAuditEntry[]>;
+  promoteCandidate(
+    ownerId: string,
+    candidateId: string,
+    actor: string,
+    reason: string,
+    lessonText?: string,
+    promotionCommandId?: string,
+  ): Promise<ExperiencePromotionResult>;
+  listLessons(ownerId: string): Promise<ExperienceLesson[]>;
+  listPromotionAudit(
+    ownerId: string,
+    candidateId?: string,
+  ): Promise<ExperiencePromotionAuditEntry[]>;
   getCandidateSnapshot(ownerId: string): Promise<ExperienceCandidateSnapshot>;
 }
