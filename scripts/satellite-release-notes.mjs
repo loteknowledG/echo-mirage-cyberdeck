@@ -18,7 +18,7 @@ Minimal capture drone for the **Echo** screenshot machine — tray on Windows, s
 2. If macOS blocks it: right-click the \`.pkg\` → **Open** → **Open**
 3. Click through the installer — updates in place, no uninstall
 
-If macOS still warns about an unidentified developer, the release was built without Apple signing secrets — see [\`MACOS_SIGNING.md\`](https://github.com/loteknowledG/echo-mirage-cyberdeck/blob/main/apps/echo-satellite/MACOS_SIGNING.md).
+If macOS still warns about an unidentified developer, the release was built without Apple signing secrets — see [\`MACOS_SIGNING.md\`](https://github.com/loteknowledG/echo-mirage-cyberdeck/blob/main/apps/echo-probe/MACOS_SIGNING.md).
 
 Grant **Screen Recording** on first launch, then pair from Mirage Spy → Echo QR on port **3050**.
 

@@ -118,7 +118,7 @@ async function probeEchoEndpoint(host: string, port: number): Promise<boolean> {
         if (path === "/health") return true;
         const payload = (await res.json()) as { ok?: boolean; echoNodeId?: string; source?: string };
         if (payload.ok === true) return true;
-        if (payload.source === "echo-satellite") return true;
+        if (payload.source === "echo-satellite" || payload.source === "echo-probe") return true;
         if (typeof payload.echoNodeId === "string" && payload.echoNodeId.length > 0) return true;
       } catch {
         /* try next path */

@@ -9,7 +9,7 @@ APP=""
 for candidate in \
   "$ROOT/apps/echo-satellite-electron/release/mac-arm64/Echo Satellite.app" \
   "$ROOT/apps/echo-satellite-electron/release/mac/Echo Satellite.app" \
-  "$ROOT/apps/echo-satellite/src-tauri/target/release/bundle/macos/Echo-Satellite.app"; do
+  "$ROOT/apps/echo-probe/src-tauri/target/release/bundle/macos/Echo-Probe.app"; do
   if [ -d "$candidate" ]; then
     APP="$candidate"
     break

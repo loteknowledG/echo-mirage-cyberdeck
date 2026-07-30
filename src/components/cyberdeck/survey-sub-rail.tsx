@@ -34,14 +34,20 @@ export function SurveySubRail({ active, onSelect }: SurveySubRailProps) {
         <div className="survey-emp-rail-tabs flex w-full flex-col items-center max-[768px]:w-auto max-[768px]:flex-row max-[768px]:items-end max-[768px]:gap-1">
           {SUB_PANES.map((pane) => (
             <CyberdeckRailTabTooltip key={pane.id} label={pane.label}>
-              <div className="cyberdeck-rail-tab">
+              <cyberdeck-rail-tab data-survey-sub-pane={pane.id}>
                 <RailAsciiButton
                   glyph={pane.glyph}
                   isPushed={active === pane.id}
                   className={`ascii-btn${active === pane.id ? " is-pushed" : ""}`}
                   onClick={() => onSelect(pane.id)}
+                  style={{
+                    margin: 0,
+                    cursor: "pointer",
+                    width: "100%",
+                    height: "100%",
+                  }}
                 />
-              </div>
+              </cyberdeck-rail-tab>
             </CyberdeckRailTabTooltip>
           ))}
         </div>

@@ -1,5 +1,5 @@
 {
-  "name": "echo-satellite",
+  "name": "echo-probe",
   "private": true,
   "version": "0.1.9",
   "type": "module",

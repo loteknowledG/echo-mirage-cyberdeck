@@ -1,10 +1,10 @@
-; Echo Satellite NSIS hooks — quiet in-place upgrades on Windows.
+; Echo Probe NSIS hooks — quiet in-place upgrades on Windows.
 ; Included before MUI finish-page constants in Tauri's installer.nsi.
 
 !include "LogicLib.nsh"
 
 ; Do not auto-launch or auto-create shortcuts on the finish page.
-; User opens Echo Satellite from Start menu after install completes.
+; User opens Echo Probe from Start menu after install completes.
 !define MUI_FINISHPAGE_RUN_NOTCHECKED
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
 
@@ -26,7 +26,7 @@
       Goto satellite_close_done
     ${EndIf}
     IntOp $1 $1 + 1
-    DetailPrint "Closing Echo Satellite for upgrade ($1/4)…"
+    DetailPrint "Closing Echo Probe for upgrade ($1/4)…"
     !if "${INSTALLMODE}" == "currentUser"
       nsis_tauri_utils::KillProcessCurrentUser "${MAINBINARYNAME}.exe"
     !else

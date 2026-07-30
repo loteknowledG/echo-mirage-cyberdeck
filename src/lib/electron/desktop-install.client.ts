@@ -4,6 +4,7 @@ import type {
   DesktopInstallInfo,
   DesktopInstallPlatform,
 } from "@/lib/electron/desktop-install-info.server";
+import type { ProbeInstallInfo } from "@/lib/electron/probe-install-info.server";
 import type { SatelliteInstallInfo } from "@/lib/electron/satellite-install-info.server";
 
 export const DESKTOP_INSTALL_DISMISS_KEY = "echo-mirage-desktop-install-dismissed-v1";
@@ -12,6 +13,9 @@ export const DEFAULT_LOCAL_CYBERDECK_ORIGIN = "http://127.0.0.1:3050";
 /** Echo Satellite releases only — not cyberdeck desktop `releases/latest`. */
 export const SATELLITE_GITHUB_RELEASES_URL =
   "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases?q=satellite-v";
+/** Echo Probe (Tauri) releases. */
+export const PROBE_GITHUB_RELEASES_URL =
+  "https://github.com/loteknowledG/echo-mirage-cyberdeck/releases?q=probe-v";
 
 export type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -107,9 +111,22 @@ function fallbackDesktopInstallerUrl(platform: DesktopInstallPlatform): string |
   }
 }
 
+export async function fetchProbeInstallInfo(): Promise<ProbeInstallInfo | null> {
+  try {
+    const platform = resolveClientDesktopPlatform();
+    const query =
+      platform === "unsupported" ? "" : `?platform=${encodeURIComponent(platform)}`;
+    const res = await fetch(`/api/probe-install${query}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as ProbeInstallInfo;
+  } catch {
+    return null;
+  }
+}
+
 export function openInstallDownload(
   info: Pick<
-    DesktopInstallInfo | SatelliteInstallInfo,
+    DesktopInstallInfo | SatelliteInstallInfo | ProbeInstallInfo,
     "platform" | "fileName" | "installerAvailable" | "downloadUrl" | "releasePageUrl"
   >,
 ): void {
@@ -139,6 +156,10 @@ export function openDesktopInstaller(info: DesktopInstallInfo): void {
 }
 
 export function openSatelliteInstaller(info: SatelliteInstallInfo): void {
+  openInstallDownload(info);
+}
+
+export function openProbeInstaller(info: ProbeInstallInfo): void {
   openInstallDownload(info);
 }
 

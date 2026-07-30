@@ -53,7 +53,7 @@ pub fn permission_status() -> PermissionStatus {
         None
     } else {
         Some(
-            "Grant Screen Recording for Echo Satellite in System Settings → Privacy & Security."
+            "Grant Screen Recording for Echo Probe in System Settings → Privacy & Security."
                 .to_string(),
         )
     };

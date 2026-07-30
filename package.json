@@ -30,6 +30,8 @@
     "electron:pack:mac:dir": "node scripts/prepare-electron-standalone.mjs && electron-builder --mac --dir",
     "satellite:dev": "pnpm --dir apps/echo-satellite-electron dev",
     "satellite:build": "pnpm --dir apps/echo-satellite-electron build",
+    "probe:dev": "pnpm --dir apps/echo-probe tauri:dev",
+    "probe:build": "pnpm --dir apps/echo-probe tauri:build",
     "survey:extension:icons": "node apps/echo-mirage-survey-extension/scripts/generate-icons.mjs",
     "survey:local": "node scripts/survey-local-dev.mjs",
     "survey:emp": "node scripts/survey-emp-ignition.mjs",

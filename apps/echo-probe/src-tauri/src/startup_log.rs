@@ -55,22 +55,22 @@ fn default_log_path() -> PathBuf {
     #[cfg(target_os = "macos")]
     {
         if let Some(home) = std::env::var_os("HOME") {
-            return PathBuf::from(home).join("Library/Logs/Echo-Satellite/startup.log");
+            return PathBuf::from(home).join("Library/Logs/Echo-Probe/startup.log");
         }
     }
 
     #[cfg(target_os = "windows")]
     {
         if let Some(appdata) = std::env::var_os("APPDATA") {
-            return PathBuf::from(appdata).join("Echo-Satellite/logs/startup.log");
+            return PathBuf::from(appdata).join("Echo-Probe/logs/startup.log");
         }
     }
 
     if let Some(temp) = std::env::var_os("TEMP").or_else(|| std::env::var_os("TMPDIR")) {
-        return PathBuf::from(temp).join("echo-satellite-startup.log");
+        return PathBuf::from(temp).join("echo-probe-startup.log");
     }
 
-    PathBuf::from("echo-satellite-startup.log")
+    PathBuf::from("echo-probe-startup.log")
 }
 
 fn now_unix() -> u64 {
@@ -92,7 +92,7 @@ pub fn tray_mode_label() -> &'static str {
 }
 
 fn append_log_line(line: &str) {
-    eprintln!("[echo-satellite] {line}");
+    eprintln!("[echo-probe] {line}");
 
     let path = log_file_path();
     if let Some(parent) = path.parent() {

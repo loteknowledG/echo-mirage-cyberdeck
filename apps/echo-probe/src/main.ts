@@ -85,7 +85,7 @@ const diagLogTailEl = document.querySelector<HTMLElement>("#diag-log-tail")!;
 
 function formatDiagnostics(report: DiagnosticsReport): string {
   return [
-    `Echo Satellite diagnostics`,
+    `Echo Probe diagnostics`,
     `version: ${report.version}`,
     `platform: ${report.platform}`,
     `trayMode: ${report.trayMode}`,

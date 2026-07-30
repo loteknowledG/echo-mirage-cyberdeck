@@ -1,12 +1,12 @@
 [package]
-name = "echo-satellite"
+name = "echo-probe"
 version = "0.1.9"
-description = "Echo Mirage capture satellite — silent screenshots on PowerFist signal"
+description = "Echo Probe — Tauri capture drone, silent screenshots on PowerFist signal"
 authors = ["Craftwerk Corp"]
 edition = "2021"
 
 [lib]
-name = "echo_satellite_lib"
+name = "echo_probe_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
@@ -21,9 +21,12 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 axum = "0.8"
 base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
 futures-util = "0.3"
+get_if_addrs = "0.5"
 image = { version = "0.25", default-features = false, features = ["png"] }
 parking_lot = "0.12"
+rand = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -31,6 +34,7 @@ tauri = { version = "2", features = [] }
 thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = "0.26"
+tower-http = { version = "0.6", features = ["cors"] }
 url = "2"
 uuid = { version = "1", features = ["v4"] }
 xcap = "0.3"
