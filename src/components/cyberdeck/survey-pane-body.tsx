@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { playDeckSystemSound } from "@/features/cyberdeck/runtime/defer-deck-audio";
 import { SurveyHubPanel } from "@/components/cyberdeck/survey-hub-panel";
 import { SurveySubRail } from "@/components/cyberdeck/survey-sub-rail";
 import { SurveyLegacyNotice } from "@/components/cyberdeck/survey-legacy-notice";
@@ -30,22 +31,33 @@ export function CyberdeckSurveyPaneBody() {
   /** Mirage tab stays capture + answers; Hub/TEAM LINKS live on Echo / PowerFist. */
   const showSurveyHubChrome = activeSubPane !== "mirage" && !powerfistDeckMode;
 
+  const handleSelectSubPane = useCallback((pane: SurveySubPane) => {
+    setActiveSubPane((prev) => {
+      if (prev === pane) {
+        playDeckSystemSound("click", 0.02);
+        return prev;
+      }
+      playDeckSystemSound("chirp", 0.03);
+      return pane;
+    });
+  }, []);
+
   useEffect(() => {
     const fromUrl = parseSurveyEmpSubPaneFromLocation();
     if (fromUrl) setActiveSubPane(fromUrl);
 
     const onSubPane = (event: Event) => {
       const subPane = (event as CustomEvent<{ subPane: SurveySubPane }>).detail?.subPane;
-      if (subPane) setActiveSubPane(subPane);
+      if (subPane) handleSelectSubPane(subPane);
     };
     window.addEventListener(SURVEY_EMP_SUBPANE_EVENT, onSubPane);
     return () => window.removeEventListener(SURVEY_EMP_SUBPANE_EVENT, onSubPane);
-  }, []);
+  }, [handleSelectSubPane]);
 
   return (
     <div className="cyberdeck-survey-pane flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-black min-[769px]:flex-row">
       <SurveyHubMiragePowerfistAutoRestore />
-      <SurveySubRail active={activeSubPane} onSelect={setActiveSubPane} />
+      <SurveySubRail active={activeSubPane} onSelect={handleSelectSubPane} />
       <div
         className={
           powerfistDeckMode

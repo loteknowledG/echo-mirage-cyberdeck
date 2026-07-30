@@ -546,7 +546,7 @@ body:has([data-registry-showroom]) .app-min-width-wrapper {
   min-height: 0;
 }
 
-.survey-emp-rail .survey-emp-rail-tabs .cyberdeck-rail-tab {
+.survey-emp-rail .survey-emp-rail-tabs cyberdeck-rail-tab {
   flex-shrink: 0;
 }
 
