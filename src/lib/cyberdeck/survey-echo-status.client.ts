@@ -26,7 +26,13 @@ export function normalizePairedMirages(status: {
   return [];
 }
 
-export type EchoSurveyStatusSource = "cyberdeck" | "local-cyberdeck" | "satellite";
+export type EchoSurveyStatusSource = "cyberdeck" | "local-cyberdeck" | "satellite" | "probe";
+
+function mapEchoAgentSource(payload: { source?: string }): EchoSurveyStatusSource {
+  if (payload.source === "echo-probe") return "probe";
+  if (payload.source === "echo-satellite") return "satellite";
+  return "satellite";
+}
 
 export type EchoSurveyStatus = {
   ok: true;
@@ -106,10 +112,10 @@ export async function fetchEchoRemoteSurveyStatusClient(
   if (!status.ok) {
     return status;
   }
-  return { ...status, source: "satellite" };
+  return { ...status, source: mapEchoAgentSource(status) };
 }
 
-/** Load full Echo Survey pairing state from Echo Satellite (preferred for remote link checks). */
+/** Load full Echo Survey pairing state from Echo Probe or Satellite (preferred for remote link checks). */
 export async function fetchEchoRemoteSurveyCodesClient(
   echoHost: string,
   echoHttpPort: number,
@@ -124,7 +130,7 @@ export async function fetchEchoRemoteSurveyCodesClient(
       `/api/survey/echo/remote-status?echoHost=${encodeURIComponent(endpoint.host)}&echoHttpPort=${endpoint.port}`,
     );
     if (proxy.ok) {
-      return { ...proxy, source: "satellite" };
+      return { ...proxy, source: mapEchoAgentSource(proxy) };
     }
     return proxy;
   }
@@ -133,10 +139,10 @@ export async function fetchEchoRemoteSurveyCodesClient(
   if (!status.ok) {
     return status;
   }
-  return { ...status, source: "satellite" };
+  return { ...status, source: mapEchoAgentSource(status) };
 }
 
-/** Load Echo Spy status from cyberdeck, local dev server, or Echo Satellite tray agent. */
+/** Load Echo Spy status from cyberdeck, local dev server, or Echo Probe/Satellite tray agent. */
 export async function fetchEchoSurveyStatus(): Promise<EchoSurveyStatus | { ok: false; reason: string }> {
   const direct = await readEchoSurveyPayload("/api/survey/echo/codes");
   if (direct.ok) {
@@ -152,12 +158,12 @@ export async function fetchEchoSurveyStatus(): Promise<EchoSurveyStatus | { ok: 
 
   const satellite = await readEchoSurveyPayload(SATELLITE_CODES_URL);
   if (satellite.ok) {
-    return { ...satellite, source: "satellite" };
+    return { ...satellite, source: mapEchoAgentSource(satellite) };
   }
 
   const satelliteStatus = await readEchoSurveyPayload(SATELLITE_STATUS_URL);
   if (satelliteStatus.ok) {
-    return { ...satelliteStatus, source: "satellite" };
+    return { ...satelliteStatus, source: mapEchoAgentSource(satelliteStatus) };
   }
 
   return direct;

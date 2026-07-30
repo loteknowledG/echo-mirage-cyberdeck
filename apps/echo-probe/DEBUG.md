@@ -39,6 +39,24 @@ Launch from Terminal to also print logs to stderr:
 "/Applications/Echo-Probe.app/Contents/MacOS/Echo-Probe"
 ```
 
+## Survey HTTP (v0.1.9+, parity with Echo Satellite P0)
+
+Echo Probe listens on **0.0.0.0:3050** with the same core Survey routes as Electron Satellite:
+
+| Route | Purpose |
+|-------|---------|
+| `GET /health` | Liveness |
+| `GET /spy/status` | Spy pane status (`source: echo-probe`) |
+| `GET/POST /api/survey/echo/codes` | 6-digit Mirage/PowerFist pairing codes |
+| `POST /api/survey/pair/enter` | Complete PIN pairing |
+| `POST /api/survey/echo/command` | Remote commands (screenshot, ext capture, …) |
+| `GET/POST /api/survey/echo/extension/*` | echo-mirage-survey-extension bridge |
+| `GET /powerfist/capture-pair` | QR capture-deck pairing |
+
+**Not on Probe yet:** clipboard, Codex solve, STT/listening, cloud relay secret UI, Survey team hub Socket.IO. Use Echo Satellite (Electron) for those.
+
+Pairing state file: app data dir → `echo-spy-pairing.json`
+
 ## macOS install (unsigned build)
 
 ```bash

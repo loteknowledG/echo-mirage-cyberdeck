@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import type { DesktopInstallInfo } from "@/lib/electron/desktop-install-info.server";
+import type { ProbeInstallInfo } from "@/lib/electron/probe-install-info.server";
 import type { SatelliteInstallInfo } from "@/lib/electron/satellite-install-info.server";
 import {
   SURVEY_ECHO_DISPLAY,
@@ -13,12 +14,15 @@ import {
 } from "@/lib/cyberdeck/survey-mode";
 import {
   fetchDesktopInstallInfo,
+  fetchProbeInstallInfo,
   fetchSatelliteInstallInfo,
   isEchoMirageDesktopShell,
   isPwaStandaloneSession,
   openDesktopCyberdeckApp,
   openDesktopInstaller,
+  openProbeInstaller,
   openSatelliteInstaller,
+  PROBE_GITHUB_RELEASES_URL,
   probeLocalDesktopShell,
   SATELLITE_GITHUB_RELEASES_URL,
   promptPwaInstall,
@@ -34,7 +38,7 @@ function isMobileUserAgent(): boolean {
 function spyInstallHint(activeSubPane: SurveySubPane): string {
   switch (activeSubPane) {
     case "echo":
-      return `${SURVEY_ECHO_DISPLAY} is the lightweight local Satellite for capture, browser bridging, background presence, and machine control. Hosted Mirage does not require the full desktop Cyberdeck.`;
+      return `${SURVEY_ECHO_DISPLAY} is the lightweight local Echo agent for capture, browser bridging, background presence, and machine control. Install Echo Probe (Tauri, smaller) or Echo Satellite (Electron, full features). Hosted Mirage does not require the full desktop Cyberdeck.`;
     case "mirage":
       return `${SURVEY_MIRAGE_DISPLAY} runs fully as the hosted browser application. The bundled desktop Cyberdeck is optional for offline, self-hosted, development, or local-disk workflows.`;
     case "powerfist":
@@ -57,6 +61,7 @@ export function SurveyDesktopInstallPanel({ activeSubPane }: SurveyDesktopInstal
   const echoPane = activeSubPane === "echo";
   const [desktopInfo, setDesktopInfo] = useState<DesktopInstallInfo | null>(null);
   const [satelliteInfo, setSatelliteInfo] = useState<SatelliteInstallInfo | null>(null);
+  const [probeInfo, setProbeInfo] = useState<ProbeInstallInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [localShell, setLocalShell] = useState<Awaited<ReturnType<typeof probeLocalDesktopShell>> | null>(
     null,
@@ -77,7 +82,12 @@ export function SurveyDesktopInstallPanel({ activeSubPane }: SurveyDesktopInstal
       const probe = await probeLocalDesktopShell();
       setLocalShell(probe);
       if (echoPane) {
-        setSatelliteInfo(await fetchSatelliteInstallInfo());
+        const [satellite, probe] = await Promise.all([
+          fetchSatelliteInstallInfo(),
+          fetchProbeInstallInfo(),
+        ]);
+        setSatelliteInfo(satellite);
+        setProbeInfo(probe);
       } else {
         setDesktopInfo(await fetchDesktopInstallInfo());
       }
@@ -88,6 +98,14 @@ export function SurveyDesktopInstallPanel({ activeSubPane }: SurveyDesktopInstal
     if (isEchoMirageDesktopShell()) return;
     return subscribePwaInstallPrompt((event) => setPwaPrompt(event));
   }, []);
+
+  const handleInstallProbe = useCallback(() => {
+    if (!probeInfo) {
+      window.open(PROBE_GITHUB_RELEASES_URL, "_blank", "noopener,noreferrer");
+      return;
+    }
+    openProbeInstaller(probeInfo);
+  }, [probeInfo]);
 
   const handleInstallSatellite = useCallback(() => {
     if (!satelliteInfo) {
@@ -138,7 +156,7 @@ export function SurveyDesktopInstallPanel({ activeSubPane }: SurveyDesktopInstal
     return (
       <div className="border-b border-[#1c1c1c] px-4 py-3">
         <p className="font-mono text-[9px] tracking-[0.04em] text-[#5f5f5f]">
-          {echoPane ? "Checking Echo Satellite…" : "Checking desktop cyberdeck…"}
+          {echoPane ? "Checking Echo Probe / Satellite…" : "Checking desktop cyberdeck…"}
         </p>
       </div>
     );
@@ -173,12 +191,8 @@ export function SurveyDesktopInstallPanel({ activeSubPane }: SurveyDesktopInstal
 
       {echoPane ? (
         <p className="mb-2 text-[8px] leading-relaxed text-[#5a5a5a]">
-          {satelliteInfo?.platform === "mac"
-            ? "Double-click the downloaded .pkg — it updates in place over any older Echo Satellite. No uninstall, no Terminal."
-            : satelliteInfo?.platform === "win"
-              ? "Double-click the downloaded .exe — it updates in place and closes any running Echo Satellite automatically."
-              : "Double-click the downloaded installer — it updates in place over older Echo Satellite builds."}{" "}
-          Then grant Screen Recording (macOS), pair via Mirage Echo QR on port{" "}
+          Double-click the downloaded installer — Echo Probe (.dmg) or Echo Satellite (.pkg/.exe). Updates
+          in place. Grant Screen Recording (macOS), pair via Mirage Echo QR on port{" "}
           <strong className="text-[#7a7a7a]">3050</strong>.
         </p>
       ) : null}
@@ -196,9 +210,14 @@ export function SurveyDesktopInstallPanel({ activeSubPane }: SurveyDesktopInstal
         {showDesktopActions ? (
           <>
             {echoPane ? (
-              <CyberdeckActionButton variant="accent" onClick={handleInstallSatellite}>
-                {satelliteInfo?.supported ? installLabel : "View satellite releases"}
-              </CyberdeckActionButton>
+              <>
+                <CyberdeckActionButton variant="accent" onClick={handleInstallProbe}>
+                  {probeInfo?.supported ? "Install Echo Probe (Tauri)" : "View probe releases"}
+                </CyberdeckActionButton>
+                <CyberdeckActionButton onClick={handleInstallSatellite}>
+                  {satelliteInfo?.supported ? "Install Echo Satellite (Electron)" : "View satellite releases"}
+                </CyberdeckActionButton>
+              </>
             ) : (
               <>
                 <CyberdeckActionButton variant="accent" onClick={handleOpenDesktop}>
@@ -218,12 +237,23 @@ export function SurveyDesktopInstallPanel({ activeSubPane }: SurveyDesktopInstal
         ) : null}
       </div>
 
-      {showDesktopActions && installInfo?.fileName ? (
+      {showDesktopActions && echoPane && (probeInfo?.fileName || satelliteInfo?.fileName) ? (
         <p className="mt-2 text-[8px] tracking-[0.04em] text-[#5f5f5f]">
-          Latest {platformLabel} {echoPane ? "satellite" : "build"} · v{installInfo.version}
+          Latest {platformLabel} builds · Probe v{probeInfo?.version ?? "—"} · Satellite v
+          {satelliteInfo?.version ?? "—"}
         </p>
       ) : null}
-      {showDesktopActions && installInfo?.statusMessage ? (
+      {showDesktopActions && !echoPane && installInfo?.fileName ? (
+        <p className="mt-2 text-[8px] tracking-[0.04em] text-[#5f5f5f]">
+          Latest {platformLabel} build · v{installInfo.version}
+        </p>
+      ) : null}
+      {showDesktopActions && echoPane && (probeInfo?.statusMessage || satelliteInfo?.statusMessage) ? (
+        <p className="mt-2 text-[8px] leading-relaxed text-[#6a5a40]">
+          {probeInfo?.statusMessage ?? satelliteInfo?.statusMessage}
+        </p>
+      ) : null}
+      {showDesktopActions && !echoPane && installInfo?.statusMessage ? (
         <p className="mt-2 text-[8px] leading-relaxed text-[#6a5a40]">{installInfo.statusMessage}</p>
       ) : null}
       {status ? <p className="mt-2 text-[9px] text-emerald-300/80">{status}</p> : null}

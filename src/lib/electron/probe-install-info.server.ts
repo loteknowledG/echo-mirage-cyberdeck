@@ -1,0 +1,249 @@
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+
+import {
+  parseDesktopInstallPlatformParam,
+  resolveDesktopInstallPlatform,
+  type DesktopInstallPlatform,
+} from "@/lib/electron/desktop-install-info.server";
+
+export type ProbeInstallInfo = {
+  product: "probe";
+  version: string;
+  platform: DesktopInstallPlatform;
+  supported: boolean;
+  installerAvailable: boolean;
+  downloadUrl: string | null;
+  fileName: string | null;
+  releasePageUrl: string;
+  statusMessage: string | null;
+  features: string[];
+};
+
+const GITHUB_REPO = "loteknowledG/echo-mirage-cyberdeck";
+const GITHUB_RELEASES = `https://github.com/${GITHUB_REPO}/releases`;
+const PROBE_TAG_PREFIX = "probe-v";
+
+export const PROBE_GITHUB_RELEASES_URL = `${GITHUB_RELEASES}?q=${PROBE_TAG_PREFIX}`;
+
+type GitHubReleaseAsset = {
+  name: string;
+  browser_download_url: string;
+};
+
+type GitHubRelease = {
+  tag_name?: string;
+  html_url?: string;
+  assets?: GitHubReleaseAsset[];
+};
+
+function readProbeVersion(): string {
+  try {
+    const raw = readFileSync(
+      path.join(process.cwd(), "apps/echo-probe/src-tauri/Cargo.toml"),
+      "utf8",
+    );
+    const match = /^version\s*=\s*"([^"]+)"/m.exec(raw);
+    return match?.[1]?.trim() || "0.1.0";
+  } catch {
+    return "0.1.0";
+  }
+}
+
+function parseProbeVersionFromTag(tag: string | undefined): string | null {
+  if (!tag?.startsWith(PROBE_TAG_PREFIX)) return null;
+  const version = tag.slice(PROBE_TAG_PREFIX.length).trim();
+  return version || null;
+}
+
+function probeInstallerFileName(
+  version: string,
+  platform: DesktopInstallPlatform,
+): string | null {
+  switch (platform) {
+    case "win":
+      return `Echo-Probe_${version}_x64-setup.exe`;
+    case "mac":
+      return `Echo-Probe_${version}_aarch64.dmg`;
+    default:
+      return null;
+  }
+}
+
+function probeInstallerFileCandidates(
+  version: string,
+  platform: DesktopInstallPlatform,
+): string[] {
+  const primary = probeInstallerFileName(version, platform);
+  if (!primary) return [];
+  switch (platform) {
+    case "win":
+      return [primary, `Echo-Probe-${version}-setup.exe`, `Echo-Probe_${version}_x64-setup.msi`];
+    case "mac":
+      return [
+        primary,
+        `Echo-Probe_${version}_aarch64.pkg`,
+        `Echo-Probe-${version}.dmg`,
+        `Echo Probe_${version}_aarch64.dmg`,
+      ];
+    default:
+      return [primary];
+  }
+}
+
+function githubRequestHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "echo-mirage-cyberdeck",
+  };
+  const token = process.env.GITHUB_TOKEN?.trim();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+async function fetchGitHubReleases(): Promise<GitHubRelease[]> {
+  const listRes = await fetch(
+    `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=40`,
+    { headers: githubRequestHeaders(), signal: AbortSignal.timeout(10_000) },
+  );
+  if (!listRes.ok) {
+    return [];
+  }
+  return (await listRes.json()) as GitHubRelease[];
+}
+
+async function fetchLatestProbeRelease(): Promise<GitHubRelease | null> {
+  try {
+    const releases = await fetchGitHubReleases();
+    return releases.find((release) => release.tag_name?.startsWith(PROBE_TAG_PREFIX)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveAssetFromRelease(
+  release: GitHubRelease,
+  version: string,
+  platform: DesktopInstallPlatform,
+): string | null {
+  const candidates = new Set(probeInstallerFileCandidates(version, platform));
+  for (const name of candidates) {
+    const asset = release.assets?.find((entry) => entry.name === name);
+    if (asset?.browser_download_url) return asset.browser_download_url;
+  }
+  return null;
+}
+
+async function resolveProbeAssetUrl(
+  version: string,
+  platform: DesktopInstallPlatform,
+  latestRelease: GitHubRelease | null,
+): Promise<string | null> {
+  const fileName = probeInstallerFileName(version, platform);
+  if (!fileName) return null;
+
+  if (latestRelease) {
+    const latestVersion = parseProbeVersionFromTag(latestRelease.tag_name);
+    if (latestVersion === version) {
+      const hit = resolveAssetFromRelease(latestRelease, version, platform);
+      if (hit) return hit;
+    }
+  }
+
+  const tag = `${PROBE_TAG_PREFIX}${version}`;
+  try {
+    const tagRes = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${tag}`,
+      { headers: githubRequestHeaders(), signal: AbortSignal.timeout(10_000) },
+    );
+    if (tagRes.ok) {
+      const release = (await tagRes.json()) as GitHubRelease;
+      const hit = resolveAssetFromRelease(release, version, platform);
+      if (hit) return hit;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  try {
+    const releases = await fetchGitHubReleases();
+    for (const release of releases) {
+      if (!release.tag_name?.startsWith(PROBE_TAG_PREFIX)) continue;
+      const hit = resolveAssetFromRelease(release, version, platform);
+      if (hit) return hit;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+export async function getProbeInstallInfo(
+  userAgent: string,
+  platformOverride?: DesktopInstallPlatform | null,
+): Promise<ProbeInstallInfo> {
+  const repoVersion = readProbeVersion();
+  const latestRelease = await fetchLatestProbeRelease();
+  const version =
+    parseProbeVersionFromTag(latestRelease?.tag_name) ?? repoVersion;
+  const platform =
+    platformOverride ?? resolveDesktopInstallPlatform(userAgent);
+  const supported = platform === "win" || platform === "mac";
+  const fileName = probeInstallerFileName(version, platform);
+  const releasePageUrl =
+    latestRelease?.html_url ??
+    `${GITHUB_RELEASES}/tag/${PROBE_TAG_PREFIX}${version}`;
+
+  let downloadUrl: string | null = null;
+  let installerAvailable = false;
+  let statusMessage: string | null = null;
+
+  if (supported && fileName) {
+    const localInstaller = path.join(
+      process.cwd(),
+      "public",
+      "downloads",
+      fileName,
+    );
+    if (existsSync(localInstaller)) {
+      downloadUrl = `/downloads/${fileName}`;
+      installerAvailable = true;
+    } else {
+      const publishedUrl = await resolveProbeAssetUrl(
+        version,
+        platform,
+        latestRelease,
+      );
+      if (publishedUrl) {
+        downloadUrl = publishedUrl;
+        installerAvailable = true;
+      } else {
+        statusMessage =
+          "Echo Probe installer is not published yet. Wait for the probe-installer workflow or build locally with pnpm probe:build.";
+      }
+    }
+  }
+
+  return {
+    product: "probe",
+    version,
+    platform,
+    supported,
+    installerAvailable,
+    downloadUrl,
+    fileName,
+    releasePageUrl,
+    statusMessage,
+    features: [
+      "Lightweight Tauri capture drone (~smaller footprint than Electron Satellite)",
+      "Survey HTTP on port 3050 — extension bridge, pairing codes, remote commands",
+      "Screenshot on PowerFist signal",
+      "Pairs with Mirage Echo QR on /powerfist/capture-pair",
+    ],
+  };
+}
+
+export { parseDesktopInstallPlatformParam };

@@ -74,7 +74,7 @@ async function probeEchoHost(host: string, port: number): Promise<boolean> {
         if (payload.ok === true && typeof payload.echoNodeId === "string" && payload.echoNodeId.length > 0) {
           return true;
         }
-        if (payload.source === "echo-satellite") return true;
+        if (payload.source === "echo-satellite" || payload.source === "echo-probe") return true;
       } catch {
         /* try next path */
       }

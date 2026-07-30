@@ -1,9 +1,12 @@
 mod capture;
 mod config;
+mod echo_commands;
+mod echo_extension_bridge;
 mod mission;
 mod pair;
 mod pair_server;
 mod permissions;
+mod spy_echo_pairing;
 mod spy_links;
 mod startup_log;
 mod ws_client;
@@ -12,6 +15,7 @@ use config::{
     clear_credentials, get_or_create_node_id, load_credentials, save_credentials,
     SatelliteCredentials, SatelliteStatus, WsRuntimeStatus, DEFAULT_PAIR_HTTP_PORT,
 };
+use echo_extension_bridge::EchoExtensionBridge;
 use mission::TestCaptureResult;
 use pair::{complete_capture_pair, parse_capture_pair_url, PairParams, PairResult};
 use permissions::{
@@ -21,10 +25,10 @@ use permissions::{
 };
 use pair_server::{spawn_pair_http_server, PairHttpServer};
 use parking_lot::Mutex;
-use spy_links::{fetch_spy_mirage_links, SpyLinksSnapshot};
+use serde_json::{json, Value};
+use spy_echo_pairing::{get_echo_survey_pairing_status, get_linked_spy_mirages, init_spy_echo_pairing};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 use tauri::{AppHandle, Manager, RunEvent, State, WindowEvent};
 use ws_client::{spawn_capture_deck_loop, WsController, WsSharedState};
 
@@ -42,7 +46,7 @@ struct AppState {
     ws_shared: Arc<WsSharedState>,
     ws_controller: Mutex<Option<WsController>>,
     pair_server: Mutex<Option<PairHttpServer>>,
-    spy_links: Mutex<SpyLinksSnapshot>,
+    extension_bridge: EchoExtensionBridge,
 }
 
 impl AppState {
@@ -55,13 +59,14 @@ impl AppState {
             ws_shared: Arc::new(WsSharedState::new()),
             ws_controller: Mutex::new(None),
             pair_server: Mutex::new(None),
-            spy_links: Mutex::new(SpyLinksSnapshot::default()),
+            extension_bridge: EchoExtensionBridge::new(),
         }
     }
 
     fn status_snapshot(&self, app: &AppHandle) -> SatelliteStatus {
         let credentials = load_credentials(app);
-        let spy_links = self.spy_links.lock().clone();
+        let spy_mirages = get_linked_spy_mirages();
+        let spy_links_reachable = get_echo_survey_pairing_status().is_ok();
         SatelliteStatus {
             armed: self.armed.load(Ordering::SeqCst),
             ws_status: self.ws_shared.ws_status.lock().clone(),
@@ -70,13 +75,35 @@ impl AppState {
             last_error: self.ws_shared.last_error.lock().clone(),
             last_mission_id: self.ws_shared.last_mission_id.lock().clone(),
             missions_handled: self.ws_shared.missions_handled.load(Ordering::SeqCst),
-            spy_mirages: spy_links.mirages,
-            spy_links_reachable: spy_links.reachable,
+            spy_mirages,
+            spy_links_reachable,
             capture_mirage: credentials.map(|creds| config::CaptureMirageLink {
                 host: creds.mirage_host,
                 port: creds.mirage_http_port,
             }),
         }
+    }
+
+    fn build_spy_status_payload(&self, app: &AppHandle) -> Value {
+        let snapshot = self.status_snapshot(app);
+        let spy = get_echo_survey_pairing_status().ok();
+        json!({
+            "ok": true,
+            "source": "echo-probe",
+            "echoHost": spy.as_ref().map(|s| s.echo_host.clone()).unwrap_or_else(|| "127.0.0.1".to_string()),
+            "httpPort": spy.as_ref().map(|s| s.http_port).unwrap_or(DEFAULT_PAIR_HTTP_PORT),
+            "miragePin": spy.as_ref().and_then(|s| s.mirage_pin.clone()),
+            "powerfistPin": spy.as_ref().and_then(|s| s.powerfist_pin.clone()),
+            "mirageExpiresAt": spy.as_ref().and_then(|s| s.mirage_expires_at.clone()),
+            "powerfistExpiresAt": spy.as_ref().and_then(|s| s.powerfist_expires_at.clone()),
+            "pairedMirages": snapshot.spy_mirages,
+            "pairedMirage": snapshot.spy_mirages.first().cloned(),
+            "pairedPowerfist": spy.and_then(|s| s.paired_powerfist),
+            "armed": snapshot.armed,
+            "wsStatus": snapshot.ws_status,
+            "captureMirage": snapshot.capture_mirage,
+            "surveyLinksReachable": snapshot.spy_links_reachable,
+        })
     }
 
     fn stop_ws(&self) {
@@ -137,13 +164,18 @@ fn ensure_pair_server(app: AppHandle, state: Arc<AppState>) {
     let port = state.pair_http_port;
     let app_for_pair = app.clone();
     let state_for_pair = state.clone();
+    let bridge = state.extension_bridge.clone();
 
     let on_paired = Arc::new(move |creds: SatelliteCredentials| {
         startup_log::log("pair-server: credentials received from Mirage");
         let _ = arm_with_credentials(&app_for_pair, &state_for_pair, creds, true);
     });
 
-    let server = spawn_pair_http_server(app.clone(), port, on_paired);
+    let app_for_status = app.clone();
+    let state_for_status = state.clone();
+    let build_spy_status = Arc::new(move || state_for_status.build_spy_status_payload(&app_for_status));
+
+    let server = spawn_pair_http_server(app.clone(), port, bridge, on_paired, build_spy_status);
     *state.pair_server.lock() = Some(server);
     startup_log::step("boot", 5, 8, "pair HTTP server task spawned");
 }
@@ -223,6 +255,7 @@ fn initialize_after_ready(app: &AppHandle) {
 
     startup_log::step("boot", 4, 8, "AppState acquired");
 
+    init_spy_echo_pairing(app.clone());
     ensure_pair_server(app.clone(), state.clone());
 
     if let Some(creds) = load_credentials(app) {
@@ -245,16 +278,6 @@ fn initialize_after_ready(app: &AppHandle) {
     startup_log::step("boot", 8, 8, "showing setup window");
     show_main_window(app);
     startup_log::mark_session_ok("[boot 8/8] setup window shown — startup complete");
-
-    let state_for_spy = state.clone();
-    tauri::async_runtime::spawn(async move {
-        let client = reqwest::Client::new();
-        loop {
-            let snapshot = fetch_spy_mirage_links(&client).await;
-            *state_for_spy.spy_links.lock() = snapshot;
-            tokio::time::sleep(Duration::from_secs(5)).await;
-        }
-    });
 }
 
 #[tauri::command]
