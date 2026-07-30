@@ -181,7 +181,7 @@ fn setup_system_tray(app: &AppHandle, state: &AppState) {
     if TrayIconBuilder::new()
         .icon(icon.clone())
         .menu(&tray_menu)
-        .tooltip("Echo Satellite")
+        .tooltip("Echo Probe")
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main_window(&app),
             "disarm" => {

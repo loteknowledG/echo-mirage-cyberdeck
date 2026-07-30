@@ -40,7 +40,7 @@
   ],
   "exclude": [
     "node_modules",
-    "apps/echo-satellite",
+    "apps/echo-probe",
     "apps/echo-satellite-electron",
     ".history",
     ".memory",

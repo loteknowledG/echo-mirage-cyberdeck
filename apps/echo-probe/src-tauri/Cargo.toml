@@ -1,12 +1,12 @@
 [package]
-name = "echo-satellite"
+name = "echo-probe"
 version = "0.1.9"
-description = "Echo Mirage capture satellite — silent screenshots on PowerFist signal"
+description = "Echo Probe — Tauri capture drone, silent screenshots on PowerFist signal"
 authors = ["Craftwerk Corp"]
 edition = "2021"
 
 [lib]
-name = "echo_satellite_lib"
+name = "echo_probe_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
