@@ -14,7 +14,7 @@ type TransientOperatorState = "ROUTING" | "REVIEWING" | "MEMORY_SYNC" | "ACKNOWL
 
 type CommandRoute = {
   keywords: string[];
-  target?: "memory-atlas" | "catalog" | "operators" | "flight-log" | "voice-lab" | "settings";
+  target?: "memory-atlas" | "flight-log" | "settings";
   responder: string;
   action: string;
 };
@@ -27,16 +27,10 @@ const commandRoutes: CommandRoute[] = [
     action: "topology surface prepared",
   },
   {
-    keywords: ["catalog", "craftwerk", "echo"],
-    target: "catalog",
+    keywords: ["catalog", "craftwerk", "echo", "registry", "kit"],
+    target: "settings",
     responder: "Cursor // Dev",
-    action: "configuration surface prepared",
-  },
-  {
-    keywords: ["operator", "crew"],
-    target: "operators",
-    responder: "ChatGPT // Lead",
-    action: "crew register synced",
+    action: "registry surface prepared",
   },
   {
     keywords: ["log", "blackbox", "flight"],
@@ -46,7 +40,7 @@ const commandRoutes: CommandRoute[] = [
   },
   {
     keywords: ["voice", "audio", "muthur"],
-    target: "voice-lab",
+    target: "settings",
     responder: "Samus-Manus // Memory",
     action: "vocal pipeline armed",
   },
@@ -85,9 +79,6 @@ function toUpperActor(callsign: string): string {
 function prettyTarget(target: string): string {
   if (target === "memory-atlas") return "Memory Atlas";
   if (target === "flight-log") return "Flight Log";
-  if (target === "voice-lab") return "Voice Lab";
-  if (target === "catalog") return "Catalog";
-  if (target === "operators") return "Operators";
   if (target === "settings") return "Settings";
   if (target === "command") return "Command";
   return target;

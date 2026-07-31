@@ -8,23 +8,17 @@ export const CUSTOM_TAB_KINDS = [
   "connection",
   "pi",
   "diagnostics",
-  "catalog",
-  "operators",
   "memory-atlas",
-  "voice-lab",
   "flight-log",
   "drop-bay",
   "glyph-channel",
   "rola-dex",
-  "tunes",
   "realmorphism-kit",
   "call-center",
   "photoshop",
   "db8",
-  "cadre",
   "survey",
   "career",
-  "catelog",
 ] as const;
 
 export type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -59,10 +53,7 @@ export type CustomTabContextMenuAction =
 export const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Document", kind: "document", action: "convert" },
   { label: "Web", kind: "web", action: "convert" },
-  { label: "Catalog", kind: "catalog", action: "convert" },
-  { label: "Operators", kind: "operators", action: "convert" },
   { label: "Memory Atlas", kind: "memory-atlas", action: "convert" },
-  { label: "Voice Lab", kind: "voice-lab", action: "convert" },
   { label: "Flight Log", kind: "flight-log", action: "convert" },
   { label: "Call Center", kind: "call-center", action: "convert" },
   { label: "Photoshop", kind: "photoshop", action: "convert" },
@@ -72,11 +63,9 @@ export const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Survey", kind: "survey", action: "convert" },
   { label: "Career", kind: "career", action: "convert" },
   { label: "Powerfist", kind: "rola-dex", action: "convert" },
-  { label: "Tunes", kind: "tunes", action: "convert" },
   { label: "Diagnostics", kind: "diagnostics", action: "convert" },
   { label: "Pi", kind: "pi", action: "convert" },
   { label: "DB8", kind: "db8", action: "convert" },
-  { label: "Cadre", kind: "cadre", action: "convert" },
   { label: "Settings", action: "settings-pane" },
 ] as CustomTabContextMenuAction[]).sort((a, b) =>
   a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
@@ -106,6 +95,33 @@ export function migrateLegacyTestPaneKind(kind: string): string {
   return kind;
 }
 
+/** Retired P2 demo panes — remap saved tab kinds on load. */
+export function migrateRetiredDemoPaneKind(kind: string): string {
+  if (kind === "catalog" || kind === "catelog") {
+    return "realmorphism-kit";
+  }
+  if (kind === "voice-lab" || kind === "voicelab" || kind === "voice_lab") {
+    return "settings";
+  }
+  if (kind === "operators") {
+    return "blank";
+  }
+  if (
+    kind === "tunes" ||
+    kind === "music" ||
+    kind === "dj" ||
+    kind === "sound-profile" ||
+    kind === "sound_profile" ||
+    kind === "soundprofile"
+  ) {
+    return "blank";
+  }
+  if (kind === "cadre" || kind === "terminal-host" || kind === "terminal_host") {
+    return "blank";
+  }
+  return kind;
+}
+
 export function sanitizeCustomTabs(value: unknown): CustomTab[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
@@ -113,10 +129,20 @@ export function sanitizeCustomTabs(value: unknown): CustomTab[] {
     const tab = item as Partial<CustomTab>;
     const id = typeof tab.id === "string" && tab.id.trim() ? tab.id.trim() : "";
     const kindRaw = typeof tab.kind === "string" ? tab.kind : "blank";
-    const migratedKind = migrateLegacyTestPaneKind(kindRaw);
+    const migratedKind = migrateRetiredDemoPaneKind(migrateLegacyTestPaneKind(kindRaw));
     const kind = isCustomTabKind(migratedKind) ? migratedKind : "blank";
     const rawLabel = typeof tab.label === "string" && tab.label.trim() ? tab.label.trim() : "TAB";
-    const label = kindRaw !== migratedKind && migratedKind === "survey" ? "Survey" : rawLabel;
+    let label = kindRaw !== migratedKind && migratedKind === "survey" ? "Survey" : rawLabel;
+    if (
+      kindRaw !== migratedKind &&
+      migratedKind === "realmorphism-kit" &&
+      (kindRaw === "catalog" || kindRaw === "catelog")
+    ) {
+      label = "Registry";
+    }
+    if (kindRaw !== migratedKind && migratedKind === "settings" && kindRaw.includes("voice")) {
+      label = "Settings";
+    }
     const rawGlyph = typeof tab.glyph === "string" && tab.glyph.trim() ? tab.glyph.trim() : "□";
     const glyph =
       kind === "rola-dex"
@@ -151,13 +177,7 @@ export function normalizeCustomTabGlyph(label: string, glyph?: string) {
 }
 
 export function normalizeCustomTabKind(kind: string) {
-  const nextKind = migrateLegacyTestPaneKind(kind.trim().toLowerCase());
-  if (nextKind === "catelog") {
-    return "catalog" as CustomTabKind;
-  }
-  if (nextKind === "catalog") {
-    return "catalog" as CustomTabKind;
-  }
+  const nextKind = migrateRetiredDemoPaneKind(migrateLegacyTestPaneKind(kind.trim().toLowerCase()));
   if (nextKind === "diagnostic") {
     return "diagnostics" as CustomTabKind;
   }
@@ -171,9 +191,6 @@ export function normalizeCustomTabKind(kind: string) {
   }
   if (nextKind === "memoryatlas" || nextKind === "memory_atlas") {
     return "memory-atlas" as CustomTabKind;
-  }
-  if (nextKind === "voicelab" || nextKind === "voice_lab") {
-    return "voice-lab" as CustomTabKind;
   }
   if (nextKind === "flightlog" || nextKind === "flight_log") {
     return "flight-log" as CustomTabKind;
@@ -201,28 +218,17 @@ export function normalizeCustomTabKind(kind: string) {
     return "survey" as CustomTabKind;
   }
   if (
-    nextKind === "sound-profile" ||
-    nextKind === "sound_profile" ||
-    nextKind === "soundprofile"
-  ) {
-    return "tunes" as CustomTabKind;
-  }
-  if (nextKind === "tunes" || nextKind === "music" || nextKind === "dj") {
-    return "tunes" as CustomTabKind;
-  }
-  if (
     nextKind === "realmorphism-kit" ||
     nextKind === "realmorphism_kit" ||
     nextKind === "realmorphismkit" ||
-    nextKind === "realmorphism"
+    nextKind === "realmorphism" ||
+    nextKind === "registry" ||
+    nextKind === "kit"
   ) {
     return "realmorphism-kit" as CustomTabKind;
   }
   if (nextKind === "debate" || nextKind === "debate-forum" || nextKind === "debate_forum") {
     return "db8" as CustomTabKind;
-  }
-  if (nextKind === "cadre" || nextKind === "terminal-host" || nextKind === "terminal_host") {
-    return "cadre" as CustomTabKind;
   }
   if (
     nextKind === "call-center" ||
@@ -245,20 +251,16 @@ export function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "document") return "D";
   if (kind === "settings") return "S";
   if (kind === "connection") return "C";
-  if (kind === "catalog") return "K";
-  if (kind === "operators") return "O";
   if (kind === "memory-atlas") return "M";
-  if (kind === "voice-lab") return "V";
   if (kind === "flight-log") return "F";
   if (kind === "drop-bay") return "⬇";
   if (kind === "glyph-channel") return "⟁";
   if (kind === "rola-dex") return "#";
   if (kind === "survey") return "◉";
-  if (kind === "tunes") return "♫";
+  if (kind === "realmorphism-kit") return "K";
   if (kind === "call-center") return "CC";
   if (kind === "photoshop") return "Ps";
   if (kind === "db8") return "8";
-  if (kind === "cadre") return "C";
   if (kind === "career") return "Cr";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
@@ -266,17 +268,15 @@ export function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
 
 export function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "memory-atlas") return "MEMORY ATLAS";
-  if (kind === "voice-lab") return "VOICE LAB";
   if (kind === "flight-log") return "FLIGHT LOG";
   if (kind === "drop-bay") return "DROP BAY";
   if (kind === "glyph-channel") return "⟁ GLYPH";
   if (kind === "rola-dex") return "Rola Dex";
   if (kind === "survey") return "Survey";
-  if (kind === "tunes") return "Tunes";
+  if (kind === "realmorphism-kit") return "Registry";
   if (kind === "call-center") return "CALL CENTER";
   if (kind === "photoshop") return "PHOTOSHOP";
   if (kind === "db8") return "DB8";
-  if (kind === "cadre") return "CADRE";
   if (kind === "career") return "CAREER";
   return kind.toUpperCase();
 }
@@ -320,7 +320,7 @@ export function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|catelog|catalog|operators|memory-atlas|voice-lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|spy|espionage|sound-profile|soundprofile|tunes|music|test-pane|test|call-center|callcenter|call_center|photoshop|photo-shop|photo_shop)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|memory-atlas|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|spy|espionage|realmorphism-kit|kit|registry|survey|career|test-pane|test|call-center|callcenter|call_center|photoshop|photo-shop|photo_shop)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");

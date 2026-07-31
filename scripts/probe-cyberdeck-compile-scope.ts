@@ -20,8 +20,6 @@ const FORBIDDEN_STATIC_IMPORTS = [
   "glyph-channel-pane-body",
   "photoshop-pane-body",
   "db8-pane-body",
-  "tunes-pane-body",
-  "cadre-pane-body",
   "pane-loaders/",
   "@monaco-editor",
   "xterm",

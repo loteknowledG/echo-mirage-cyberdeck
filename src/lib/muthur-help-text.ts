@@ -132,9 +132,9 @@ convert tab to <kind>
 clear tab · reset tab state
 delete tab · close tab
 
-Kinds: document, web, settings, voice-lab, glyph-channel,
-memory-atlas, flight-log, diagnostics, pi, db8, catalog, operators,
-rola-dex, tunes, music, connection, blank`,
+Kinds: document, web, settings, glyph-channel,
+memory-atlas, flight-log, diagnostics, pi, db8, survey,
+career, realmorphism-kit, rola-dex, connection, blank`,
 
   glyph: `[MUTHUR HELP // GLYPH / ASCII]
 

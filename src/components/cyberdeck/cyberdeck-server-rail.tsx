@@ -2,7 +2,6 @@
 
 import { useEffect, type MouseEvent, type RefObject, type WheelEvent } from "react";
 import { motion, useMotionValue, type PanInfo } from "motion/react";
-import { CadreRailIcon } from "@/components/cyberdeck/cadre-rail-icon";
 import { PowerfistRailIcon } from "@/components/cyberdeck/powerfist-rail-icon";
 import { SurveyRailIcon } from "@/components/cyberdeck/survey-rail-icon";
 import { RailAsciiButton } from "@/components/cyberdeck/rail-ascii-button";
@@ -58,9 +57,6 @@ export function CyberdeckServerRail({
   const dragY = useMotionValue(0);
 
   const railIconForCustomTab = (tab: { kind: string }) => {
-    if (tab.kind === "cadre") {
-      return <CadreRailIcon />;
-    }
     if (tab.kind === "rola-dex") {
       return <PowerfistRailIcon />;
     }
