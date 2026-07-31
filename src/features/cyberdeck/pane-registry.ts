@@ -15,7 +15,6 @@ export const CYBERDECK_PANE_KINDS = [
   "photoshop",
   "db8",
   "survey",
-  "career",
   "muthur-load",
 ] as const;
 
@@ -54,7 +53,6 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   photoshop: { label: "PHOTOSHOP", fetchHints: ["CANVAS", "LAYERS", "EXPORT"] },
   db8: { label: "DB8", fetchHints: ["CHAMBER", "DEBATE ROUND", "CONSENSUS"] },
   survey: { label: "SURVEY", fetchHints: ["ECHO", "MIRAGE", "POWERFIST", "PAIRING"] },
-  career: { label: "CAREER", fetchHints: ["PORTFOLIO", "TIMELINE", "EVIDENCE"] },
   "muthur-load": {
     label: "MUTHUR-LOAD",
     fetchHints: ["PACK", "RELATIONSHIP SLICE", "PORTABLE LINK"],

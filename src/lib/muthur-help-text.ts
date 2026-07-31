@@ -134,7 +134,7 @@ delete tab · close tab
 
 Kinds: document, web, settings, glyph-channel,
 memory-atlas, flight-log, diagnostics, pi, db8, survey,
-career, realmorphism-kit, rola-dex, connection, blank`,
+realmorphism-kit, rola-dex, connection, blank`,
 
   glyph: `[MUTHUR HELP // GLYPH / ASCII]
 
