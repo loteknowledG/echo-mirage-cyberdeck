@@ -34,7 +34,7 @@ const PREVIEW_DECK_TARGET_BY_NAME: Record<string, CyberdeckPaneKind> = {
   "Execution Deck": "operator",
   "Diagnostics Deck": "diagnostics",
   "Quorum Deck": "db8",
-  "Coding Deck": "cadre",
+  "Coding Deck": "operator",
   "Operator Deck": "operator",
   "Filesystem Deck": "document",
   "Gateway Deck": "pi",
