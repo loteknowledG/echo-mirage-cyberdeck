@@ -21,7 +21,6 @@ const PANE_IMPORTS: Record<CyberdeckPaneKind, () => Promise<CyberdeckPaneModule>
   photoshop: () => import("@/features/cyberdeck/pane-loaders/photoshop"),
   db8: () => import("@/features/cyberdeck/pane-loaders/db8"),
   survey: () => import("@/features/cyberdeck/pane-loaders/survey"),
-  career: () => import("@/features/cyberdeck/pane-loaders/career"),
   "muthur-load": () => import("@/features/cyberdeck/pane-loaders/muthur-load"),
 };
 

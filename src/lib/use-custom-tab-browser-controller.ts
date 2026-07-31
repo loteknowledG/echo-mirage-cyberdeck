@@ -18,8 +18,7 @@ type CustomTabBrowserKind =
   | "glyph-channel"
   | "rola-dex"
   | "realmorphism-kit"
-  | "survey"
-  | "career";
+  | "survey";
 
 type CustomTabBrowserState = {
   id: string;
