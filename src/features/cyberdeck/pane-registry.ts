@@ -12,7 +12,6 @@ export const CYBERDECK_PANE_KINDS = [
   "glyph-channel",
   "rola-dex",
   "call-center",
-  "photoshop",
   "db8",
   "survey",
   "muthur-load",
@@ -50,7 +49,6 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   "glyph-channel": { label: "GLYPH CHANNEL", fetchHints: ["GLYPH BUS", "RENDER"] },
   "rola-dex": { label: "ROLA-DEX", fetchHints: ["DEX", "CAROUSEL"] },
   "call-center": { label: "CALL CENTER", fetchHints: ["QUEUE", "INBOUND", "RESIDENT COMMS"] },
-  photoshop: { label: "PHOTOSHOP", fetchHints: ["CANVAS", "LAYERS", "EXPORT"] },
   db8: { label: "DB8", fetchHints: ["CHAMBER", "DEBATE ROUND", "CONSENSUS"] },
   survey: { label: "SURVEY", fetchHints: ["ECHO", "MIRAGE", "POWERFIST", "PAIRING"] },
   "muthur-load": {
