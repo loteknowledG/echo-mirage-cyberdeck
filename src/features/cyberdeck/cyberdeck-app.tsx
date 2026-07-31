@@ -1124,6 +1124,12 @@ const operatorWorkspace = useOperatorWorkspaceState({
                 onReloadOperatorFile={reloadOperatorFolderFile}
               />
             </CyberdeckFixedServerPane>
+            <CyberdeckFixedServerPane
+              serverId="d"
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            >
+              <ActivatedCyberdeckPane kind="muthur-load" />
+            </CyberdeckFixedServerPane>
             <CyberdeckFixedServerPane serverId="b" className="flex min-h-0 flex-1 flex-col">
               <div ref={gatewayBlankSettingsRef} className="flex min-h-0 flex-1 flex-col">
                   <ActivatedCyberdeckPane

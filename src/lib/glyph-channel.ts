@@ -86,9 +86,9 @@ export function mergeGlyphChannelContent(
 
 export function appendGlyphChannelText(existing: string, addition: string): string {
   const base = normalizeGlyphChannelText(existing).trimEnd();
-  const next = normalizeGlyphChannelText(addition).trim();
+  const next = normalizeGlyphChannelText(addition).trimEnd();
   if (!base) return next;
-  if (!next) return base;
+  if (!next.trim()) return base;
   return `${base}\n\n${next}`;
 }
 

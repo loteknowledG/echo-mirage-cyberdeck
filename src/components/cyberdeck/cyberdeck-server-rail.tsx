@@ -4,6 +4,7 @@ import { useEffect, type MouseEvent, type RefObject, type WheelEvent } from "rea
 import { motion, useMotionValue, type PanInfo } from "motion/react";
 import { PowerfistRailIcon } from "@/components/cyberdeck/powerfist-rail-icon";
 import { SurveyRailIcon } from "@/components/cyberdeck/survey-rail-icon";
+import { MuthurLoadRailIcon } from "@/components/cyberdeck/muthur-load-rail-icon";
 import { RailAsciiButton } from "@/components/cyberdeck/rail-ascii-button";
 import { MORPHISM_ZONE_ASCIIMORPHISM } from "@/lib/cyberdeck/morphism-zones";
 import {
@@ -62,6 +63,16 @@ export function CyberdeckServerRail({
     }
     if (tab.kind === "survey") {
       return <SurveyRailIcon className="h-4 w-4 text-[#8a8a8a]" />;
+    }
+    if (tab.kind === "muthur-load") {
+      return <MuthurLoadRailIcon className="h-4 w-4 text-[#8a8a8a]" />;
+    }
+    return undefined;
+  };
+
+  const railIconForFixedServer = (btn: FixedServerBtn) => {
+    if (btn.id === "d") {
+      return <MuthurLoadRailIcon className="h-4 w-4 text-[#8a8a8a]" />;
     }
     return undefined;
   };
@@ -150,6 +161,7 @@ export function CyberdeckServerRail({
         >
           <RailAsciiButton
             glyph={railGlyphForServer(btn)}
+            icon={railIconForFixedServer(btn)}
             isPushed={selectedRailTabId === btn.id}
             className={`ascii-btn${selectedRailTabId === btn.id ? " is-pushed" : ""}${
               navRailContext === "tabs" && serverKeyboardHighlightId === btn.id
