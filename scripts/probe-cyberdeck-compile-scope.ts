@@ -18,7 +18,6 @@ const MAX_CYBERDECK_APP_IMPORTS = 81;
 const FORBIDDEN_STATIC_IMPORTS = [
   "operator-pane-body",
   "glyph-channel-pane-body",
-  "photoshop-pane-body",
   "db8-pane-body",
   "pane-loaders/",
   "@monaco-editor",

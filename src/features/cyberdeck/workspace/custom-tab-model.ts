@@ -15,7 +15,6 @@ export const CUSTOM_TAB_KINDS = [
   "rola-dex",
   "realmorphism-kit",
   "call-center",
-  "photoshop",
   "db8",
   "survey",
   "muthur-load",
@@ -57,7 +56,6 @@ export const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "MUTHUR-LOAD", kind: "muthur-load", action: "convert" },
   { label: "Flight Log", kind: "flight-log", action: "convert" },
   { label: "Call Center", kind: "call-center", action: "convert" },
-  { label: "Photoshop", kind: "photoshop", action: "convert" },
   { label: "Drop Bay", kind: "drop-bay", action: "convert" },
   { label: "Ascii", kind: "glyph-channel", action: "convert" },
   { label: "Kit", action: "kit-pane" },
@@ -120,6 +118,9 @@ export function migrateRetiredDemoPaneKind(kind: string): string {
     return "blank";
   }
   if (kind === "career") {
+    return "blank";
+  }
+  if (kind === "photoshop" || kind === "photo-shop" || kind === "photo_shop") {
     return "blank";
   }
   return kind;
@@ -240,9 +241,6 @@ export function normalizeCustomTabKind(kind: string) {
   ) {
     return "call-center" as CustomTabKind;
   }
-  if (nextKind === "photo-shop" || nextKind === "photo_shop") {
-    return "photoshop" as CustomTabKind;
-  }
   if (nextKind === "muthur-load" || nextKind === "muthur_load" || nextKind === "load") {
     return "muthur-load" as CustomTabKind;
   }
@@ -265,7 +263,6 @@ export function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "survey") return "◉";
   if (kind === "realmorphism-kit") return "K";
   if (kind === "call-center") return "CC";
-  if (kind === "photoshop") return "Ps";
   if (kind === "db8") return "8";
   if (kind === "muthur-load") return "↓";
   if (kind === "pi" || kind === "diagnostics") return "π";
@@ -281,7 +278,6 @@ export function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "survey") return "Survey";
   if (kind === "realmorphism-kit") return "Registry";
   if (kind === "call-center") return "CALL CENTER";
-  if (kind === "photoshop") return "PHOTOSHOP";
   if (kind === "db8") return "DB8";
   if (kind === "muthur-load") return "MUTHUR-LOAD";
   return kind.toUpperCase();
@@ -326,7 +322,7 @@ export function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|memory-atlas|muthur-load|load|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|spy|espionage|realmorphism-kit|kit|registry|survey|test-pane|test|call-center|callcenter|call_center|photoshop|photo-shop|photo_shop)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|memory-atlas|muthur-load|load|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|spy|espionage|realmorphism-kit|kit|registry|survey|test-pane|test|call-center|callcenter|call_center)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");
