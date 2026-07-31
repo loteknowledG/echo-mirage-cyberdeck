@@ -99,7 +99,7 @@ function main(): void {
   assertNoStaticImport(cyberdeckApp, "pane-chunks", "cyberdeck-app");
 
   const dynamicImportCount = (cyberdeckApp.match(/^const\s+\w+\s*=\s*dynamic\(/gm) ?? []).length;
-  assert.ok(dynamicImportCount >= 3, `cyberdeck-app should keep heavy widgets dynamic (found ${dynamicImportCount})`);
+  assert.ok(dynamicImportCount >= 2, `cyberdeck-app should keep heavy widgets dynamic (found ${dynamicImportCount})`);
 
   console.log("probe-cyberdeck-compile-scope: all checks passed");
   console.log(`  ${appPath}: ${lineCount} lines, ${importCount} imports`);

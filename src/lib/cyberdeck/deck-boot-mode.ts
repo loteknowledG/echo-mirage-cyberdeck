@@ -39,7 +39,6 @@ export function isSubsystemEnabledAtBoot(
     | "muthur"
     | "operator"
     | "settings"
-    | "card-table"
     | "glyph-channel"
     | "atlas"
     | "pi-chat"

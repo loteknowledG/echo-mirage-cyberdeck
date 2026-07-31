@@ -11,7 +11,7 @@ export function loadComputerUse(): Promise<ComputerUseBundle> {
 /** Cheap gate before pulling the computer-use chunk during chat send. */
 export function messageMayUseComputerUse(message: string): boolean {
   const text = message.toLowerCase().trim();
-  return /\b(status report|inspect|card table|execution deck|reviewer hand|staged hand|clear deck|push hand|execute|teaching demo|indicate|highlight|indicators?|pointers?|markers?)\b/i.test(
+  return /\b(status report|inspect|teaching demo|indicate|highlight|indicators?|pointers?|markers?)\b/i.test(
     text,
   );
 }

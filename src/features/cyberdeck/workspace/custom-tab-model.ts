@@ -339,7 +339,6 @@ export function parseCustomTabCommand(input: string) {
 }
 
 export {
-  ENABLE_CARD_TABLE,
   isFixedServerTabId,
   safeServerId,
   SERVER_IDS,

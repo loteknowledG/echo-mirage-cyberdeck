@@ -6,7 +6,6 @@ import { getWorkflowState, getCurrentStep, getNextStep } from "./guided-workflow
 import { getPresenceState } from "./cursor-presence";
 import { getInspectionSummary } from "./inspect-layer";
 import { getSession, getEventCount, getNextPendingQuestion, getPendingQuestionCount, getConfirmedEvents } from "./workflow-observation";
-import { getCardTableState, getStagedCardCount, getStackDepth, isExecutionEnabled, getTopStackCard, getStackCards, getCurrentStatuses } from "./card-table";
 import { getReceiptSummary, getReceiptCount } from "./receipt-store";
 import type { ActionName } from "./computer-use-types";
 
@@ -226,20 +225,16 @@ export function getComputerUseStatus(): ComputerUseStatus {
         workflowName: session.workflowName,
       };
     })(),
-    executionDeck: (() => {
-      const deck = getCardTableState();
-      const top = getTopStackCard();
-      return {
-        stagedCardCount: getStagedCardCount(),
-        stackDepth: getStackDepth(),
-        isOpen: deck.openedAt !== null,
-        lastResult: deck.lastResult,
-        executionEnabled: isExecutionEnabled(),
-        activeHand: deck.activeHand,
-        topStackCard: top?.title ?? null,
-        currentStatuses: getCurrentStatuses(),
-      };
-    })(),
+    executionDeck: {
+      stagedCardCount: 0,
+      stackDepth: 0,
+      isOpen: false,
+      lastResult: null,
+      executionEnabled: false,
+      activeHand: null,
+      topStackCard: null,
+      currentStatuses: {},
+    },
     recentEvents,
     receipts: getReceiptSummary(),
   };
