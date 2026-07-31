@@ -89,20 +89,25 @@ export function useCyberdeckWorkspaceHydration({
       const stored = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Partial<CyberdeckUiState> | null;
-        const allFixedIds = ["m", "s", "ct", "b"] as const;
         const savedServer = parsed?.server;
-        if (savedServer && allFixedIds.includes(savedServer as (typeof allFixedIds)[number])) {
-          useCyberdeckTabStore.getState().setServer(safeServerId(savedServer) as (typeof SERVER_IDS)[number]);
-          restored = true;
+        if (typeof savedServer === "string") {
+          const normalized = safeServerId(savedServer);
+          if ((SERVER_IDS as readonly string[]).includes(normalized)) {
+            useCyberdeckTabStore.getState().setServer(normalized as (typeof SERVER_IDS)[number]);
+            restored = true;
+          }
         }
         if (parsed?.navRailContext === "gateway" || parsed?.navRailContext === "tabs") {
           setNavRailContext(parsed.navRailContext);
           restored = true;
         }
         const highlightId = parsed?.serverKeyboardHighlightId;
-        if (highlightId && allFixedIds.includes(highlightId as (typeof allFixedIds)[number])) {
-          setServerKeyboardHighlightId(safeServerId(highlightId) as (typeof SERVER_IDS)[number] | null);
-          restored = true;
+        if (typeof highlightId === "string") {
+          const normalized = safeServerId(highlightId);
+          if ((SERVER_IDS as readonly string[]).includes(normalized)) {
+            setServerKeyboardHighlightId(normalized as (typeof SERVER_IDS)[number]);
+            restored = true;
+          }
         }
         if (
           parsed?.operatorSurfaceMode === "workspace" ||

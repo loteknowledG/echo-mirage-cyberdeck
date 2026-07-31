@@ -229,7 +229,7 @@ export type UseMuthurChatSendOptions = {
     options?: { label?: string; glyph?: string },
   ) => void;
   deleteActiveTab: () => void;
-  handleModelLabelClick: (targetServer?: "s" | "ct" | "b") => void;
+  handleModelLabelClick: (targetServer?: "s" | "b") => void;
 
   // chat scroll + audio
   pinMuthurChatToBottom: () => void;

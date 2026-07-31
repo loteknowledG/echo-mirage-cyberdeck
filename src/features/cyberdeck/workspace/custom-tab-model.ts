@@ -132,7 +132,7 @@ export function sanitizeCustomTabs(value: unknown): CustomTab[] {
     if (!item || typeof item !== "object") return [];
     const tab = item as Partial<CustomTab>;
     const id = typeof tab.id === "string" && tab.id.trim() ? tab.id.trim() : "";
-    const kindRaw = typeof tab.kind === "string" ? tab.kind : "blank";
+    const kindRaw: string = typeof tab.kind === "string" ? tab.kind : "blank";
     const migratedKind = migrateRetiredDemoPaneKind(migrateLegacyTestPaneKind(kindRaw));
     const kind = isCustomTabKind(migratedKind) ? migratedKind : "blank";
     const rawLabel = typeof tab.label === "string" && tab.label.trim() ? tab.label.trim() : "TAB";

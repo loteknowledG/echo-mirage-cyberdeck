@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type SetStateAction } from "react";
 import { playDeckSystemSound } from "@/features/cyberdeck/runtime/defer-deck-audio";
 import type { ChatMessage } from "@/features/cyberdeck/muthur/muthur-chat-types";
-import type { CustomTab, ServerRailButton } from "@/features/cyberdeck/workspace/custom-tab-model";
+import type { CustomTab } from "@/features/cyberdeck/workspace/custom-tab-model";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { applyGlyphActions, GLYPH_CHANNEL_FOCUS_EVENT } from "@/lib/glyph-channel-apply.client";
 import {
@@ -61,7 +61,7 @@ export function useCyberdeckGlyphChannel({
   }, [setNavRailContext, syncGlyphChannelTabGlyphs]);
 
   const railGlyphForServer = useCallback(
-    (btn: ServerRailButton) => {
+    (btn: { id: string; glyph: string }) => {
       if (glyphModeActive && btn.id === "s") return "⟁";
       return btn.glyph;
     },

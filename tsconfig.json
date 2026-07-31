@@ -40,6 +40,7 @@
   ],
   "exclude": [
     "node_modules",
+    "scripts",
     "apps/echo-probe",
     "apps/echo-satellite-electron",
     ".history",

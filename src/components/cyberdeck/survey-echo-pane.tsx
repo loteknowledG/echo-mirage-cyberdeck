@@ -15,6 +15,7 @@ import {
   normalizePairedMirages,
   regenerateEchoSurveyCodes,
   type EchoSurveyStatus,
+  type EchoSurveyStatusSource,
 } from "@/lib/cyberdeck/survey-pairing-client";
 import { SATELLITE_GITHUB_RELEASES_URL } from "@/lib/electron/desktop-install.client";
 import { readPowerfistCaptureCredentials } from "@/lib/cyberdeck/powerfist-capture-client";
@@ -77,7 +78,7 @@ export function SurveyEchoPane() {
   const [powerfistExpiresAt, setPowerfistExpiresAt] = useState<string | null>(null);
   const [pairedMirages, setPairedMirages] = useState<{ nodeId: string }[]>([]);
   const [pairedPowerfist, setPairedPowerfist] = useState<{ deviceId: string } | null>(null);
-  const [statusSource, setStatusSource] = useState<"cyberdeck" | "local-cyberdeck" | "satellite" | null>(null);
+  const [statusSource, setStatusSource] = useState<EchoSurveyStatusSource | null>(null);
   const [satelliteArmed, setSatelliteArmed] = useState<boolean | null>(null);
   const [satelliteWsStatus, setSatelliteWsStatus] = useState<string | null>(null);
   const [captureMirage, setCaptureMirage] = useState<{ host: string; port: number } | null>(null);

@@ -67,7 +67,7 @@ export function useCyberdeckGatewayColumn({
   const [isMarkdownDragOver, setIsMarkdownDragOver] = useState(false);
 
   const handleModelLabelClick = useCallback(
-    (targetServer: "s" | "ct" | "b" = "s") => {
+    (targetServer: "s" | "b" = "s") => {
       const safe = safeServerId(targetServer);
       useCyberdeckTabStore.getState().setActiveCustomTabId(null);
       useCyberdeckTabStore.getState().setServer(safe as (typeof SERVER_IDS)[number]);
@@ -99,10 +99,6 @@ export function useCyberdeckGatewayColumn({
     (serverId: (typeof SERVER_IDS)[number]) => {
       if (serverId === "s") {
         handleModelLabelClick("s");
-        return;
-      }
-      if (serverId === "ct") {
-        handleModelLabelClick("ct");
         return;
       }
       if (serverId === "b") {
