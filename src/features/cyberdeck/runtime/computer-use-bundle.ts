@@ -3,30 +3,13 @@
 export {
   detectSelfStatusIntent,
   detectInspectIntent,
-  detectExecDeckShowIntent,
-  detectExecDeckPrepareIntent,
-  detectExecDeckClearIntent,
-  detectExecDeckPushIntent,
-  detectExecDeckExecuteIntent,
-  detectExecDeckDescribeStagedIntent,
+  detectObserveIntent,
+  detectStopObserveIntent,
+  detectPauseObserveIntent,
+  detectResumeObserveIntent,
 } from "@/lib/computer-use/intent-detect";
 
 export { formatStatusText } from "@/lib/computer-use/introspection";
-
-export {
-  openDeck,
-  prepareHand,
-  clearDeck,
-  describeDeck,
-  buildReviewerHand,
-  isDeckOpen,
-  pushHandToStack,
-  attemptExecute,
-  isExecutionEnabled,
-  getCardTableState,
-  prepareHandFromRegistry,
-  syncStagedHandFromSelectedIds,
-} from "@/lib/computer-use/card-table";
 
 export { runComputerUseAction as runComputerUseBridgeAction } from "@/lib/computer-use/electron-computer-use-bridge";
 

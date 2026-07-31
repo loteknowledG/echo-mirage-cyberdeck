@@ -7,7 +7,6 @@ import {
 const FIXED_SERVER_PANE_LABELS: Record<string, string> = {
   m: "OPERATOR",
   s: "MAINNET-UPLINK",
-  ct: "CARD TABLE",
   b: "SETTINGS",
 };
 

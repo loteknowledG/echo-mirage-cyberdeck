@@ -115,7 +115,6 @@ import { useCyberdeckAppBootstrap } from "@/features/cyberdeck/bootstrap/use-cyb
 import { MuthurChatColumn } from "@/features/cyberdeck/muthur/muthur-chat-column";
 import {
   type CustomTab,
-  ENABLE_CARD_TABLE,
   SERVER_IDS,
   type ServerRailButton,
 } from "@/features/cyberdeck/workspace/custom-tab-model";
@@ -137,14 +136,6 @@ const ActivatedCyberdeckPane = dynamic(
       default: m.ActivatedCyberdeckPane,
     })),
   { ssr: false, loading: () => <PanelLoader label="SUBSYSTEM" /> },
-);
-
-const LazyCardTablePaneHost = dynamic(
-  () =>
-    import("@/features/cyberdeck/card-table-pane-host").then((m) => ({
-      default: m.CardTablePaneHost,
-    })),
-  { ssr: false, loading: () => <PanelLoader label="CARD TABLE" /> },
 );
 
 const LazyIndicateOverlay = dynamic(() => import("@/lib/computer-use/IndicateOverlay"), {
@@ -290,8 +281,7 @@ export default function CyberdeckApp() {
     ) => boolean
   >(() => false);
 
-  const [showCardTablePane, setShowCardTablePane] = useState(false);
-  const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
+
   const { isMobileLayout, handleContentSplitSizesChange, mirageHeaderCollapse } =
     useMobileCyberdeckLayout();
 
@@ -1068,20 +1058,7 @@ const operatorWorkspace = useOperatorWorkspaceState({
             onDragLeave={handleThirdColumnDragLeave}
             onDrop={handleThirdColumnDrop}
             leadingPaneContent={
-              <>
-                {ENABLE_CARD_TABLE ? (
-                  <CyberdeckFixedServerPane
-                    serverId="ct"
-                    className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-                  >
-                    <LazyCardTablePaneHost
-                      selectedCardIds={selectedCardIds}
-                      setSelectedCardIds={setSelectedCardIds}
-                    />
-                  </CyberdeckFixedServerPane>
-                ) : null}
-                <CyberdeckCustomTabPanes renderTab={(tab) => renderCustomTabSurface(tab as CustomTab)} />
-              </>
+              <CyberdeckCustomTabPanes renderTab={(tab) => renderCustomTabSurface(tab as CustomTab)} />
             }
             gatewayConnectionPanelRef={gatewayConnectionPanelRef}
             providerKeyboardHighlightId={providerKeyboardHighlightId}

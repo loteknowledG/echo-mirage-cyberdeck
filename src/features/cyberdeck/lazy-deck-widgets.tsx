@@ -4,11 +4,6 @@ import dynamic from "next/dynamic";
 import type { ComponentProps, ComponentType } from "react";
 import { PanelLoader } from "@/features/cyberdeck/panel-loader";
 
-export const CardTablePane = dynamic(
-  () => import("@/components/cyberdeck/card-table-pane").then((m) => ({ default: m.CardTablePane })),
-  { ssr: false, loading: () => <PanelLoader label="CARD TABLE" /> },
-);
-
 export const IndicateOverlay = dynamic(
   () => import("@/lib/computer-use/IndicateOverlay"),
   { ssr: false, loading: () => null },

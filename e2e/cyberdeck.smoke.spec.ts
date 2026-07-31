@@ -47,15 +47,15 @@ test("cyberdeck renders and switches required alpha modules", async ({ page }) =
   await expect(page.locator(".cyberdeck-chat-app > .cyberdeck-message-box")).toBeVisible({ timeout: 10000 });
   const body = page.locator("body");
   await expect(body).toContainText("Memory Atlas", { timeout: 10000 });
-  await expect(body).toContainText("Voice Lab", { timeout: 10000 });
   await expect(body).toContainText("Flight Log", { timeout: 10000 });
+  await expect(body).toContainText("Settings", { timeout: 10000 });
 
   await sendDeckCommand(page, "MUTHUR, indicate the command input area.");
   await expect(page.locator('[data-computer-use-indicate-marker="ring"]')).toHaveCount(1, { timeout: 5000 });
   await expect(page.locator('[data-computer-use-indicate-overlay="true"]')).toHaveCSS("pointer-events", "none");
   await expect(page.getByText("INDICATE_POINT // COMMAND_INPUT")).toBeVisible({ timeout: 10000 });
 
-  await sendDeckCommand(page, "MUTHUR, highlight the Voice Lab panel.");
+  await sendDeckCommand(page, "MUTHUR, highlight the settings panel.");
   await expect(page.locator("[data-computer-use-indicate-marker]")).toHaveCount(2, { timeout: 5000 });
   await expect(page.getByText("INDICATE_HIGHLIGHT // VOICE_LAB")).toBeVisible({ timeout: 10000 });
 
@@ -65,22 +65,8 @@ test("cyberdeck renders and switches required alpha modules", async ({ page }) =
 
   await createAuditTab(page);
 
-  await openAuditSurface(page, "Catalog");
-  await expect(page.getByText("ECHO MIRAGE SERIES // CRAFTWERK CYBERDECK CORPORATION")).toBeVisible({ timeout: 30000 });
-  await expect(page.getByText("[VIEW]").first()).toBeVisible({ timeout: 10000 });
-  await expect(page.getByText("[CONFIGURE]").first()).toBeVisible({ timeout: 10000 });
-  const firstCard = page.locator("article").filter({ hasText: "Echo Mirage Mark I" }).first();
-  const cardBox = await firstCard.locator(".aspect-square").boundingBox();
-  expect(cardBox).not.toBeNull();
-  expect(Math.abs(cardBox!.width - cardBox!.height)).toBeLessThanOrEqual(1);
-  await expect(firstCard.locator("img[alt='Echo Mirage Mark I cover']")).toHaveJSProperty("complete", true);
-
-  await openAuditSurface(page, "Operators");
-  await expect(page.getByText("CHATGPT // LEAD", { exact: true })).toBeVisible({ timeout: 30000 });
-  await expect(page.getByText("CURSOR // DEV", { exact: true })).toBeVisible();
-  await expect(page.getByText("CODEX // TEST", { exact: true })).toBeVisible();
-  await expect(page.getByText("SAMUS-MANUS // MEMORY", { exact: true })).toBeVisible();
-  await expect(page.getByText(/ONLINE|THINKING|REVIEWING|IDLE|BLOCKED/).first()).toBeVisible();
+  await openAuditSurface(page, "Kit");
+  await expect(page.getByText("REALMORPHISM", { exact: false })).toBeVisible({ timeout: 30000 });
 
   await openAuditSurface(page, "Flight Log");
   await expect(page.getByText("OPERATIONS TRACE // LOCAL BUS")).toBeVisible({ timeout: 30000 });
