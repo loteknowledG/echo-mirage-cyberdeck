@@ -1253,9 +1253,17 @@ export function CyberdeckOperatorPaneBody({
     // Get live context from MonacoEditorContext store
     const ctx = getMonacoEditorContext();
 
-    // Also read current text from operatorDocText as fallback
-    const content = ctx.contentLength > 0 ? ctx.content : operatorDocText;
-    const dirty = ctx.dirty ?? (operatorDocText !== operatorDocHistoryTextRef.current);
+    // Also read current text from operatorDocText / view buffer as fallback
+    const content =
+      operatorDocMode === "view"
+        ? operatorViewText
+        : ctx.contentLength > 0
+          ? ctx.content
+          : operatorDocText;
+    const dirty =
+      operatorDocMode === "view"
+        ? false
+        : (ctx.dirty ?? operatorDocText !== operatorDocHistoryTextRef.current);
     const filePath = operatorActiveFilePath ?? ctx.filePath ?? null;
 
     void publishMuthurObservation({
@@ -1266,7 +1274,7 @@ export function CyberdeckOperatorPaneBody({
       visibleDocument: operatorDroppedAsset.name,
       documentExcerpt: content.slice(0, 200) + (content.length > 200 ? "..." : ""),
       editor: {
-        active: true,
+        active: operatorDocMode === "edit",
         filePath,
         fileName: operatorDroppedAsset.name,
         fileExtension: filePath?.includes(".") ? filePath.split(".").pop() ?? null : null,
@@ -1280,7 +1288,14 @@ export function CyberdeckOperatorPaneBody({
         readOnly: operatorDocMode !== "edit",
       },
     });
-  }, [operatorTextDocument, operatorDroppedAsset, operatorActiveFilePath, operatorDocText, operatorDocMode]);
+  }, [
+    operatorTextDocument,
+    operatorDroppedAsset,
+    operatorActiveFilePath,
+    operatorDocText,
+    operatorDocMode,
+    operatorViewText,
+  ]);
 
   // Tell MUTHUR when a DOCX (not Monaco) is open in the operator pane
   useEffect(() => {

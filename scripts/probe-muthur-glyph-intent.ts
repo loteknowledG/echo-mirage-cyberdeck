@@ -3,7 +3,9 @@ import {
   parseGlyphNaturalLanguageIntent,
   parseGlyphResponseActions,
   resolveGlyphCommand,
+  isOperatorAsciiArtRequest,
 } from "../src/lib/muthur-glyph-intent";
+import { buildAsciiArtExecutionPrompt } from "../src/lib/muthur-glyph-doctrine";
 import { renderGlyph } from "../src/lib/glyph-render.server";
 
 function assert(label: string, condition: boolean) {
@@ -59,11 +61,33 @@ const glyphReply = parseGlyphResponseActions(
 assert("glyph directive parsed", glyphReply.actions.length === 1);
 assert("glyph directive stripped", !glyphReply.displayText.includes("[GLYPH:"));
 
+const asciiFenceReply = parseGlyphResponseActions(
+  "Here's your cat.\n```ascii\n /\\_/\\\n( o.o )\n > ^ <\n```",
+);
+assert("ascii fence auto-applied", asciiFenceReply.actions.length === 1);
+assert(
+  "ascii fence content",
+  asciiFenceReply.actions[0]?.kind === "set" &&
+    asciiFenceReply.actions[0]?.text.includes("/\\_/\\"),
+);
+assert("ascii fence stripped from chat", !asciiFenceReply.displayText.includes("/\\_/\\"));
+
+assert("operator ascii art intent", isOperatorAsciiArtRequest("draw me a cat in ascii art"));
+assert(
+  "ascii execution prompt",
+  buildAsciiArtExecutionPrompt("figlet HELLO").includes("ascii-render"),
+);
+
 async function run() {
-  const rendered = await renderGlyph({ engine: "ascii", text: "TEST" });
+  const rendered = await renderGlyph({ engine: "ascii", text: "TEST", decorate: true });
   assert("render output", rendered.includes("⟁") && rendered.includes("TEST"));
 
-  const figlet = await renderGlyph({ engine: "figlet", text: "ECHO", font: "ANSI Shadow" });
+  const figlet = await renderGlyph({
+    engine: "figlet",
+    text: "ECHO",
+    font: "ANSI Shadow",
+    decorate: true,
+  });
   assert("figlet banner", figlet.includes("FIGLET") && figlet.includes("ANSI Shadow"));
   assert("figlet art lines", figlet.split("\n").length > 6);
 

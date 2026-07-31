@@ -37,6 +37,8 @@ Template hints:
 - route_verify_report — two-column hop audit
 
 Use evidence/status phrasing (e.g. "uplink verified", "route 3050 active"). Prefer merge=append for figlet-adjacent stacks; merge=replace for full-pane takeovers.
+
+When the operator asks for art, emit the ascii-render JSON block or a hand-drawn ascii fenced block in the same reply — never only describe what you will draw.
 `.trim();
 
 export function buildAsciiSkillContextPrompt(extra?: string): string {

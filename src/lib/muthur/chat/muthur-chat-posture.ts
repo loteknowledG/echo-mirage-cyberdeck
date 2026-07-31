@@ -5,6 +5,7 @@ import {
   shouldEnableMuthurTools,
 } from "@/lib/muthur-core/muthur-chat-intent";
 import { isCalyxMuthurToolsEnabled } from "@/lib/muthur/calyx/calyx-muthur-tools.server";
+import { buildAsciiArtExecutionPrompt } from "@/lib/muthur-glyph-doctrine";
 import { buildMuthurPiControlDoctrine } from "@/lib/muthur/control/muthur-control-doctrine";
 import { isMuthurDirectPiComputerUseEnabled } from "@/lib/muthur/control/muthur-direct-pi-computer-use";
 import {
@@ -34,7 +35,8 @@ import { buildSamusHandsEyesDoctrine } from "@/lib/samus-manus/hands-eyes-doctri
 import { isSamusHandsEyesEnabled } from "@/lib/samus-manus/samus-manus-config.server";
 
 const MUTHUR_COGNITION_DOCTRINE =
-  "\n\nCOGNITION: You interpret operator intent and choose tools. The deck does not pre-run browser searches, file reads, or conversions from regex on the operator's message — call tools yourself (localfs, operator_browser, observe_operator_pane, etc.). Do not emit [GLYPH:...] unless the operator explicitly asked for a glyph render.";
+  "\n\nCOGNITION: You interpret operator intent and choose tools. The deck does not pre-run browser searches, file reads, or conversions from regex on the operator's message — call tools yourself (localfs, operator_browser, observe_operator_pane, etc.). " +
+  "When the operator asks for ASCII art, figlet banners, or glyph channel output, you MUST deliver machine-readable output in the same reply (```ascii-render JSON, [GLYPH:…], or ```ascii art with [GLYPH:apply-block merge=append]). Never only promise in prose.";
 
 function buildMuthurAvailableToolsPrompt(posture: MuthurPosture): string {
   const directPi = isMuthurDirectPiComputerUseEnabled();
@@ -158,14 +160,16 @@ function buildEditorContextPrompt(): string {
     const obs = getLatestMuthurObservation("cyberdeck");
     if (!obs) return "";
     const e = obs.editor;
-    if (!e || !e.active) return "";
+    const fileName = e?.fileName?.trim() || obs.visibleDocument?.trim();
+    if (!fileName) return "";
     const lines = [
-      `\n\nOperator pane editor state:`,
-      `File: ${e.fileName ?? "unknown"}`,
-      `Language: ${e.language ?? "unknown"}`,
-      `Dirty: ${e.dirty ? "true" : "false"}`,
-      e.cursorLine != null ? `Cursor: line ${e.cursorLine}, column ${e.cursorColumn ?? 1}` : null,
-      `Content excerpt: ${e.contentExcerpt ?? e.content?.slice(0, 200) ?? "(empty)"}`,
+      `\n\nOperator pane editor state (server observation):`,
+      `File: ${fileName}`,
+      e?.language ? `Language: ${e.language}` : null,
+      e?.readOnly || !e?.active ? "Mode: view (read-only preview)" : null,
+      e?.dirty != null ? `Dirty: ${e.dirty ? "true" : "false"}` : null,
+      e?.cursorLine != null ? `Cursor: line ${e.cursorLine}, column ${e.cursorColumn ?? 1}` : null,
+      `Content excerpt: ${e?.contentExcerpt ?? e?.content?.slice(0, 200) ?? obs.documentExcerpt ?? "(empty)"}`,
     ].filter(Boolean);
     return lines.join("\n");
   } catch {
@@ -182,6 +186,7 @@ export type BuildMuthurSystemContentArgs = {
   browserPrompt: string;
   glyphPrompt: string;
   glyphDoctrine: string;
+  deckScreenPrompt?: string;
 };
 
 export type BuildMuthurSystemContentResult = {
@@ -210,10 +215,16 @@ export function buildMuthurSystemContent(
   if (toolsEnabled) {
     systemContent += buildMuthurAvailableToolsPrompt(args.posture);
     systemContent += buildDocumentEditHint(args.message, args.operatorContext, args.posture);
-    if (needsOperator) {
+    if (args.operatorContext?.fileName?.trim()) {
       systemContent += formatOperatorChatContextPrompt(args.operatorContext);
+    }
+    if (needsOperator || args.operatorContext?.fileName?.trim()) {
       systemContent += buildEditorContextPrompt();
-    } else {
+    }
+    if (args.deckScreenPrompt?.trim()) {
+      systemContent += args.deckScreenPrompt;
+    }
+    if (!needsOperator && !args.operatorContext?.fileName?.trim()) {
       systemContent +=
         "\n\nInterpret the operator's intent and call tools when an action is needed (read a path, browse the web, edit a file, run a command). Do not probe unprompted.";
     }
@@ -259,7 +270,7 @@ export function buildMuthurSystemContent(
       " Do NOT search the web or open a browser for disk paths.";
   }
 
-  systemContent += args.glyphDoctrine + args.memoryPrompt + args.browserPrompt + args.glyphPrompt;
+  systemContent += args.glyphDoctrine + buildAsciiArtExecutionPrompt(args.message) + args.memoryPrompt + args.browserPrompt + args.glyphPrompt;
 
   return { systemContent, toolsEnabled };
 }

@@ -119,7 +119,21 @@ function hasGlyphArtIntent(input: string): boolean {
   if (/\b(?:figlet|ascii|glyph|banner|ascii\s+art|glyph\s+channel|ascii\s+pane)\b/i.test(input)) {
     return true;
   }
+  if (
+    /\b(?:draw|sketch|doodle|make|create|render|design)\b/i.test(input) &&
+    /\b(?:ascii|figlet|glyph|banner|art)\b/i.test(input)
+  ) {
+    return true;
+  }
   return /\b(?:render|make|show|design)\s+.+\s+in\s+(?:the\s+)?(?:font\s+)?\S+/i.test(input);
+}
+
+/** Operator asked for ASCII / figlet / glyph pane output (chat or direct command). */
+export function isOperatorAsciiArtRequest(input: string): boolean {
+  const text = normalizeGlyphCommandInput(input);
+  if (!text) return false;
+  if (resolveGlyphCommand(text)) return true;
+  return hasGlyphArtIntent(text);
 }
 
 /** Natural-language glyph requests from MUTHUR chat (e.g. "render ECHO in Impossible font"). */
@@ -269,6 +283,24 @@ export function extractFirstAsciiCodeBlock(text: string): string | null {
   return block?.trim() ? block : null;
 }
 
+function extractTaggedAsciiArtBlocks(text: string): string[] {
+  const blocks: string[] = [];
+  const re = /```(?:ascii|art)\s*\n([\s\S]*?)```/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    const body = match[1]?.replace(/\s+$/, "").trim();
+    if (body) blocks.push(body);
+  }
+  return blocks;
+}
+
+function stripTaggedAsciiArtFences(text: string): string {
+  return text
+    .replace(/```(?:ascii|art)\s*\n[\s\S]*?```/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** Parse [GLYPH:…] directives and ascii.render JSON from a MUTHUR reply. */
 export function parseGlyphResponseActions(responseText: string): {
   actions: GlyphApplyAction[];
@@ -293,6 +325,15 @@ export function parseGlyphResponseActions(responseText: string): {
     actions.push(parsed);
   }
 
+  const hasSetWithContent = actions.some(
+    (action) => action.kind === "set" && action.text.trim().length > 0,
+  );
+  if (!hasSetWithContent) {
+    for (const block of extractTaggedAsciiArtBlocks(responseText)) {
+      actions.push({ kind: "set", text: block, merge: "append" });
+    }
+  }
+
   const asciiExtract = extractAsciiRenderRequests(responseText);
   for (const request of asciiExtract.requests) {
     actions.push({ kind: "ascii-skill", request });
@@ -301,6 +342,9 @@ export function parseGlyphResponseActions(responseText: string): {
   let displayText = responseText.replace(directiveRe, "");
   if (asciiExtract.requests.length > 0) {
     displayText = asciiExtract.strippedText;
+  }
+  if (actions.some((action) => action.kind === "set" && action.text.trim())) {
+    displayText = stripTaggedAsciiArtFences(displayText);
   }
 
   displayText = displayText

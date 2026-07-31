@@ -27,14 +27,15 @@ const cachedObservation: CachedObservation = {
 export function updateCachedObservation(): void {
   try {
     const obs = getLatestMuthurObservation("cyberdeck");
-    if (!obs?.editor?.active) return;
-    const e = obs.editor;
-    cachedObservation.fileName = e.fileName ?? null;
-    cachedObservation.filePath = e.filePath ?? null;
-    cachedObservation.language = e.language ?? null;
-    cachedObservation.dirty = e.dirty ?? false;
-    cachedObservation.contentExcerpt = e.contentExcerpt ?? e.content?.slice(0, 300) ?? null;
-    cachedObservation.fullContent = e.content ?? null;
+    const e = obs?.editor;
+    const fileName = e?.fileName ?? obs?.visibleDocument ?? null;
+    if (!fileName) return;
+    cachedObservation.fileName = fileName;
+    cachedObservation.filePath = e?.filePath ?? null;
+    cachedObservation.language = e?.language ?? null;
+    cachedObservation.dirty = e?.dirty ?? false;
+    cachedObservation.contentExcerpt = e?.contentExcerpt ?? e?.content?.slice(0, 300) ?? obs?.documentExcerpt ?? null;
+    cachedObservation.fullContent = e?.content ?? null;
     cachedObservation.timestamp = Date.now();
   } catch {
     /* ignore */
