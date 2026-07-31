@@ -270,31 +270,8 @@ function CustomTabPaneRendererInner({
     );
   }
 
-  if (tab.kind === "catelog" || tab.kind === "catalog") {
-    return shell(<ActivatedCyberdeckPane kind="catalog" />);
-  }
-
-  if (tab.kind === "operators") {
-    return shell(<ActivatedCyberdeckPane kind="operators" orchestration={orchestration} />);
-  }
-
   if (tab.kind === "memory-atlas") {
     return shell(<ActivatedCyberdeckPane kind="memory-atlas" />);
-  }
-
-  if (tab.kind === "voice-lab") {
-    return shell(
-      <ActivatedCyberdeckPane
-        kind="voice-lab"
-        voiceEnabled={voiceEnabled}
-        voiceHealth={voiceHealth}
-        voiceDial={voiceDial}
-        onVoiceToggle={onVoiceToggle}
-        onVoiceDialChange={onVoiceDialChange}
-        onVoiceTest={onVoiceTest}
-        onSpeakPreview={onSpeakPreview}
-      />,
-    );
   }
 
   if (tab.kind === "flight-log") {
@@ -303,10 +280,6 @@ function CustomTabPaneRendererInner({
 
   if (tab.kind === "drop-bay") {
     return shell(<ActivatedCyberdeckPane kind="drop-bay" />);
-  }
-
-  if (tab.kind === "cadre") {
-    return shell(<ActivatedCyberdeckPane kind="cadre" />);
   }
 
   if (tab.kind === "glyph-channel") {
@@ -344,17 +317,6 @@ function CustomTabPaneRendererInner({
 
   if (tab.kind === "career") {
     return shell(<ActivatedCyberdeckPane kind="career" />);
-  }
-
-  if (tab.kind === "tunes" || String(tab.kind) === "sound-profile") {
-    return (
-      <div
-        className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-black"
-        data-pointer-target="tunes"
-      >
-        <ActivatedCyberdeckPane kind="tunes" />
-      </div>
-    );
   }
 
   if (tab.kind === "call-center") {

@@ -72,7 +72,7 @@ function installMockDocument() {
   const mockDocument = {
     querySelector: (selector: string) => {
       if (selector === '[data-pointer-target="command-input"]') return commandInput;
-      if (selector === '[data-pointer-target="voice-lab"]') return voiceLab;
+      if (selector === '[data-pointer-target="settings"]') return voiceLab;
       if (selector === "input[type='text'], input:not([type])") return commandInput;
       return null;
     },

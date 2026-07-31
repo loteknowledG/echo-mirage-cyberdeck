@@ -43,9 +43,9 @@ export function findTeachingTarget(targetName: string): TeachingTarget | null {
     label = "COMMAND_INPUT";
   } else if (targetName === "VOICE_LAB") {
     element =
-      document.querySelector<HTMLElement>('[data-pointer-target="voice-lab"]') ??
+      document.querySelector<HTMLElement>('[data-pointer-target="settings"]') ??
       document.querySelector<HTMLElement>('[data-cy="voice-lab-button"]') ??
-      findVisibleTextTarget("voice lab") ??
+      findVisibleTextTarget("settings") ??
       null;
     label = "VOICE_LAB";
   } else if (targetName === "LEFT_CONSOLE") {

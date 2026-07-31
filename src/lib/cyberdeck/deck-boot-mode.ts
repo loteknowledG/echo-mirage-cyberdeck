@@ -40,12 +40,9 @@ export function isSubsystemEnabledAtBoot(
     | "operator"
     | "settings"
     | "card-table"
-    | "voice-lab"
     | "glyph-channel"
     | "atlas"
     | "pi-chat"
-    | "catalog"
-    | "operators"
     | "flight-log"
     | "rola-dex",
 ): boolean {

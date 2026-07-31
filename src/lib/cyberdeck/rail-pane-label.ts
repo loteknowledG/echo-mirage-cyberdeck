@@ -14,8 +14,6 @@ const FIXED_SERVER_PANE_LABELS: Record<string, string> = {
 /** Shorter rail tooltip names for a few panes (user-facing kind, not tab index). */
 const RAIL_KIND_DISPLAY: Partial<Record<CyberdeckPaneKind, string>> = {
   "glyph-channel": "ASCII",
-  "voice-lab": "VOICE",
-  tunes: "TUNES",
   "rola-dex": "POWERFIST",
   survey: "SURVEY",
   "call-center": "CALL CENTER",

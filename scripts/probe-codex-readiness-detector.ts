@@ -94,7 +94,6 @@ function testNoInputInjection(): void {
   const scanRoots = [
     path.join(SRC, "lib", "server", "cadre"),
     path.join(SRC, "lib", "server", "cadre-runtime-manager.server.ts"),
-    path.join(SRC, "components", "cyberdeck", "cadre-pane-body.tsx"),
     path.join(SRC, "lib", "cadre"),
   ];
   const offenders: string[] = [];

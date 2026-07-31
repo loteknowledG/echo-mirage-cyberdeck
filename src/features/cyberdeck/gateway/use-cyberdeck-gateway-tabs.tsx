@@ -38,13 +38,9 @@ export type CustomTabPaneContext = Omit<
 
 const MODULE_TAB_KINDS = [
   "memory-atlas",
-  "catalog",
-  "operators",
   "flight-log",
-  "voice-lab",
   "glyph-channel",
   "rola-dex",
-  "tunes",
   "settings",
 ] as const;
 

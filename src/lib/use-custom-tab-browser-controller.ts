@@ -13,15 +13,13 @@ type CustomTabBrowserKind =
   | "connection"
   | "pi"
   | "diagnostics"
-  | "catalog"
-  | "catelog"
-  | "operators"
   | "memory-atlas"
-  | "voice-lab"
   | "flight-log"
   | "glyph-channel"
   | "rola-dex"
-  | "tunes";
+  | "realmorphism-kit"
+  | "survey"
+  | "career";
 
 type CustomTabBrowserState = {
   id: string;
