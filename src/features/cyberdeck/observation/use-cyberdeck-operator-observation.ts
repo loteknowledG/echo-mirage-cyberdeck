@@ -45,16 +45,50 @@ export function useCyberdeckOperatorObservation({
     const visibleAsset =
       activeCustomTab?.asset ??
       (operatorSurfaceMode === "workspace" ? operatorDroppedAsset : null);
+    const operatorDocText =
+      operatorSurfaceIsDocument && operatorDroppedAsset
+        ? readOperatorPaneSaveText(operatorDroppedAsset.text || "")
+        : null;
+    const workspaceOperatorOpen =
+      operatorSurfaceMode === "workspace" && operatorDroppedAsset != null;
     void publishMuthurObservation({
       route: "/cyberdeck",
       surface: "cyberdeck",
       activeTab: activeCustomTab?.label ?? server,
-      activePane: activeCustomTab?.kind ?? server,
-      visibleDocument: visibleAsset?.name ?? null,
+      activePane: workspaceOperatorOpen ? "operator" : (activeCustomTab?.kind ?? server),
+      visibleDocument: operatorDroppedAsset?.name ?? visibleAsset?.name ?? null,
       documentExcerpt:
-        typeof visibleAsset?.text === "string" ? visibleAsset.text.slice(0, 800) : null,
+        operatorDocText?.slice(0, 800) ??
+        (typeof visibleAsset?.text === "string" ? visibleAsset.text.slice(0, 800) : null),
+      editor: workspaceOperatorOpen
+        ? {
+            active: operatorDocMode === "edit",
+            filePath: operatorActiveFilePath?.trim() || operatorDroppedAsset.localFilePath?.trim() || null,
+            fileName: operatorDroppedAsset.name ?? null,
+            fileExtension: operatorDroppedAsset.name?.includes(".")
+              ? operatorDroppedAsset.name.split(".").pop() ?? null
+              : null,
+            language: null,
+            content: operatorDocText,
+            contentExcerpt: operatorDocText
+              ? operatorDocText.slice(0, 200) + (operatorDocText.length > 200 ? "..." : "")
+              : null,
+            selectionText: null,
+            cursorLine: null,
+            cursorColumn: null,
+            dirty: false,
+            readOnly: operatorDocMode !== "edit",
+          }
+        : undefined,
     });
-  }, [deckUiHydrated, operatorDroppedAsset, operatorSurfaceMode]);
+  }, [
+    deckUiHydrated,
+    operatorActiveFilePath,
+    operatorDocMode,
+    operatorDroppedAsset,
+    operatorSurfaceIsDocument,
+    operatorSurfaceMode,
+  ]);
 
   useEffect(() => {
     publishOperatorObservation();

@@ -38,7 +38,8 @@ const MUTHUR_PI_CONTROL_DIRECT_FLOW = isPiControlLeaseGatingEnabled()
 
 const MUTHUR_PI_CONTROL_FOOTER =
   "\n\nDo NOT use workspace_exec, localfs, or operator_browser for tasks that require real desktop embodiment when Pi computer use is available." +
-  "\nFor 'draw me a cat' style requests: recognize image creation on the desktop requires computer use → request Pi lease → execute via pi_computer_use.";
+  "\nFor ASCII / figlet art in the ⟁ Glyph Channel: use ascii.render JSON or [GLYPH:apply-block] — NOT Pi computer use." +
+  "\nFor raster painting in desktop apps (MS Paint, Photoshop): request Pi lease → pi_computer_use.";
 
 export const MUTHUR_PI_CONTROL_DOCTRINE =
   MUTHUR_PI_CONTROL_BASE +

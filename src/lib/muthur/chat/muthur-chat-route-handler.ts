@@ -18,6 +18,7 @@ import { buildMemoryPrompt } from "@/muthur/memory/chat-memory";
 import type { OperatorChatContext } from "@/lib/muthur/document-edit-intent";
 import { normalizeMuthurPosture } from "@/lib/muthur/muthur-posture";
 import { buildMuthurSystemContent } from "@/lib/muthur/chat/muthur-chat-posture";
+import { recordMuthurObservation } from "@/lib/muthur/observation/observation-store.server";
 import { getMuthurChatMemoryContext } from "@/lib/muthur/chat/muthur-chat-memory-context";
 import {
   buildProviderReceipt,
@@ -286,8 +287,15 @@ export async function handleCyberdeckChatPost(request: Request) {
       posture: postureRaw,
       uplinkMode: legacyPostureRaw,
       commanderMissionActive: commanderMissionActiveRaw,
+      deckScreenContext: deckScreenContextRaw,
+      clientObservation: clientObservationRaw,
     } = body;
     const operatorContext = parseOperatorChatContext(operatorContextRaw);
+    const deckScreenContext =
+      typeof deckScreenContextRaw === "string" ? deckScreenContextRaw.trim() : "";
+    if (clientObservationRaw && typeof clientObservationRaw === "object") {
+      recordMuthurObservation(clientObservationRaw);
+    }
     const posture = normalizeMuthurPosture(postureRaw ?? legacyPostureRaw);
     const commanderMissionActive = commanderMissionActiveRaw === true;
     const chatHistory = normalizeChatHistory(history);
@@ -419,6 +427,7 @@ export async function handleCyberdeckChatPost(request: Request) {
           browserPrompt,
           glyphPrompt,
           glyphDoctrine,
+          deckScreenPrompt: deckScreenContext,
         });
 
         const baseMessages: Record<string, unknown>[] = [
@@ -472,6 +481,7 @@ export async function handleCyberdeckChatPost(request: Request) {
       browserPrompt,
       glyphPrompt,
       glyphDoctrine,
+      deckScreenPrompt: deckScreenContext,
     });
 
     const baseMessages: Record<string, unknown>[] = [

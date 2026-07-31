@@ -96,6 +96,11 @@ import {
   resolveOutboundProviderCredentials,
 } from "@/lib/provider-credentials";
 import { formatPiScreenContextForMuthur, readPiScreenSnapshot } from "@/lib/pi-screen-context";
+import {
+  buildClientOperatorObservation,
+  formatClientDeckContextForMuthur,
+} from "@/lib/muthur/observation/client-operator-snapshot";
+import { readMuthurScreenSnapshot } from "@/lib/muthur-screen-context";
 import { buildGlyphContextSnapshot } from "@/lib/glyph-channel";
 import { canSaveOperatorDocumentInPlace } from "@/lib/operator-save";
 import { useCyberdeckTabStore } from "@/lib/cyberdeck-tab-store";
@@ -994,6 +999,9 @@ ${diff}`;
       const history = buildCyberdeckChatHistory(messages);
       const glyphContext = await buildGlyphContextSnapshot();
       const piScreenContext = formatPiScreenContextForMuthur(readPiScreenSnapshot());
+      const deckScreenSnapshot = readMuthurScreenSnapshot();
+      const deckScreenContext = formatClientDeckContextForMuthur(deckScreenSnapshot);
+      const clientObservation = buildClientOperatorObservation(deckScreenSnapshot);
       const outboundCredentials = resolveOutboundProviderCredentials(activeProvider, providerKeys);
       let res: Response;
       try {
@@ -1008,6 +1016,8 @@ ${diff}`;
             browserContext: browserContextForRequest,
             glyphContext,
             piScreenContext,
+            deckScreenContext,
+            clientObservation,
             history,
             operatorContext,
             posture: muthurPosture,

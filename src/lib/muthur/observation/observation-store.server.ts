@@ -58,6 +58,32 @@ class MuthurObservationStore {
     ) {
       return { ...currentForSurface };
     }
+
+    const incomingEditor = snapshotInput.editor;
+    const priorEditor = currentForSurface?.editor;
+    if (
+      priorEditor?.fileName &&
+      (!incomingEditor?.fileName ||
+        (incomingEditor.fileName === priorEditor.fileName && !incomingEditor.content?.trim()))
+    ) {
+      snapshotInput.editor = {
+        ...priorEditor,
+        ...incomingEditor,
+        fileName: incomingEditor?.fileName ?? priorEditor.fileName,
+        filePath: incomingEditor?.filePath ?? priorEditor.filePath,
+        content: incomingEditor?.content?.trim() ? incomingEditor.content : priorEditor.content,
+        contentExcerpt: incomingEditor?.contentExcerpt?.trim()
+          ? incomingEditor.contentExcerpt
+          : priorEditor.contentExcerpt,
+      };
+      if (!snapshotInput.visibleDocument) {
+        snapshotInput.visibleDocument = currentForSurface?.visibleDocument ?? priorEditor.fileName;
+      }
+      if (!snapshotInput.documentExcerpt?.trim()) {
+        snapshotInput.documentExcerpt = currentForSurface?.documentExcerpt ?? null;
+      }
+    }
+
     this.latest = {
       ...snapshotInput,
       capturedAt: new Date().toISOString(),

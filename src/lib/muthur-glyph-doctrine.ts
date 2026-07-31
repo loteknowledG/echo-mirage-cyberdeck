@@ -1,5 +1,6 @@
 /** System prompt snippet: teach MUTHUR how to co-create ASCII / figlet art in the glyph channel. */
 import { MUTHUR_ASCII_SKILL_DOCTRINE } from "@/lib/muthur-ascii-skill/skill-doctrine";
+import { isOperatorAsciiArtRequest } from "@/lib/muthur-glyph-intent";
 
 export const MUTHUR_GLYPH_DOCTRINE = `
 GLYPH CHANNEL (ASCII pane):
@@ -27,4 +28,15 @@ export function buildGlyphContextPrompt(glyphContext: string): string {
   const trimmed = glyphContext.trim();
   if (!trimmed) return "";
   return `\n\nLive Glyph Channel snapshot:\n${trimmed}`;
+}
+
+/** Strong nudge when the operator asked for art this turn — prevents prose-only promises. */
+export function buildAsciiArtExecutionPrompt(message: string): string {
+  if (!isOperatorAsciiArtRequest(message)) return "";
+  return (
+    "\n\nASCII ART (this turn): The operator asked for glyph channel output. " +
+    "Your reply MUST include one of: ```ascii-render { \"tool\": \"ascii.render\", ... }`, " +
+    "[GLYPH:engine=figlet ...] / [GLYPH:apply-block merge=append], or a ```ascii fenced art block. " +
+    "Do not only say you will draw — emit the payload in this message."
+  );
 }
