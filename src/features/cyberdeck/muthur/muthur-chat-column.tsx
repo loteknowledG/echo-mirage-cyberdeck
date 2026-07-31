@@ -14,6 +14,7 @@ import {
   MuthurCommandInput,
   type MuthurCommandInputHandle,
 } from "@/components/cyberdeck/muthur-command-input";
+import { MuthurComposerVoiceKnob } from "@/components/cyberdeck/muthur-composer-voice-knob";
 import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
 import { MuthurDelegationPanel } from "@/components/cyberdeck/muthur-delegation-panel";
 import { MuthurInhabitantRoller } from "@/components/cyberdeck/muthur-inhabitant-roller";
@@ -21,7 +22,6 @@ import { MuthurPostureRoller } from "@/components/cyberdeck/muthur-posture-rolle
 import { renderGatewayMessageText } from "@/features/cyberdeck/gateway/gateway-message-render";
 import type { ChatMessage } from "@/features/cyberdeck/muthur/muthur-chat-types";
 import type { DeckMode } from "@/lib/deck-mode";
-import { muthurVoiceControlOptions } from "@/lib/cyberdeck/muthur-depth-control";
 import type {
   MuthurDiagnosticsState,
   MuthurResponseStall,
@@ -92,13 +92,9 @@ export type MuthurChatColumnProps = {
   onPostureChange: (posture: MuthurPosture) => void;
   voiceEnabled: boolean;
   voiceHealth: "idle" | "backend" | "fallback" | "off";
+  voiceVolume: number;
   onVoiceToggle: () => void;
-  voiceBlockTotal: number;
-  voiceBlockFocusIndex: number;
-  voicePlaybackBusy: boolean;
-  onAbortSpeech: () => void;
-  onSpeakVoiceBlockAtIndex: (index: number) => void;
-  onReplayFullLastAssistant: () => void;
+  onVoiceVolumeChange: (volume: number) => void;
   canSendInput: boolean;
   onStop: () => void;
 };
@@ -151,13 +147,9 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
       onPostureChange,
       voiceEnabled,
       voiceHealth,
+      voiceVolume,
       onVoiceToggle,
-      voiceBlockTotal,
-      voiceBlockFocusIndex,
-      voicePlaybackBusy,
-      onAbortSpeech,
-      onSpeakVoiceBlockAtIndex,
-      onReplayFullLastAssistant,
+      onVoiceVolumeChange,
       canSendInput,
       onStop,
     } = props;
@@ -300,128 +292,13 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
                   data-morphism="realmorphism"
                 >
                   <CyberdeckPaneTooltipProvider delayDuration={300} disableHoverableContent>
-                    <CyberdeckControlTooltip label={voiceEnabled ? "Voice on" : "Voice off"}>
-                      <CyberdeckComposerControl
-                        control={muthurVoiceControlOptions(voiceEnabled, voiceHealth)}
-                        onClick={onVoiceToggle}
-                        aria-label={voiceEnabled ? "Voice on" : "Voice off"}
-                        aria-pressed={voiceEnabled}
-                      >
-                        {voiceEnabled ? (
-                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
-                            <path
-                              d="M5 10V14H8L12 18V6L8 10H5Z"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                            <path
-                              d="M16 9C16.9 9.7 17.5 10.8 17.5 12C17.5 13.2 16.9 14.3 16 15"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                            />
-                            <path
-                              d="M18.5 7C20 8.3 21 10.1 21 12C21 13.9 20 15.7 18.5 17"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        ) : (
-                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
-                            <path
-                              d="M5 10V14H8L12 18V6L8 10H5Z"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                            <path d="M15 9L21 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                            <path d="M21 9L15 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                          </svg>
-                        )}
-                      </CyberdeckComposerControl>
-                    </CyberdeckControlTooltip>
-                    {voiceEnabled && voiceBlockTotal > 0 ? (
-                      <>
-                        <span
-                          className="hidden min-w-[2.5rem] text-right font-mono text-[9px] text-gray-600 sm:inline"
-                          title="Paragraph position (◀ = speak one earlier paragraph only)"
-                        >
-                          {voiceBlockTotal > 1
-                            ? `${voiceBlockFocusIndex + 1}/${voiceBlockTotal}`
-                            : `${voiceBlockTotal}`}
-                        </span>
-                        <CyberdeckControlTooltip label="Stop speech (Esc)" disabled={!voicePlaybackBusy}>
-                          <CyberdeckComposerControl
-                            control={{ size: "icon", amber: true }}
-                            onClick={() => onAbortSpeech()}
-                            disabled={!voicePlaybackBusy}
-                            aria-label="Stop speech"
-                          >
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
-                              <path d="M8 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                              <path d="M16 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                            </svg>
-                          </CyberdeckComposerControl>
-                        </CyberdeckControlTooltip>
-                        <CyberdeckControlTooltip
-                          label="Earlier paragraph (more context)"
-                          disabled={voiceBlockFocusIndex <= 0}
-                        >
-                          <CyberdeckComposerControl
-                            control={{ size: "icon", signal: true, off: voiceBlockFocusIndex <= 0 }}
-                            onClick={() => {
-                              if (voiceBlockFocusIndex <= 0) return;
-                              const next = voiceBlockFocusIndex - 1;
-                              onAbortSpeech();
-                              onSpeakVoiceBlockAtIndex(next);
-                            }}
-                            disabled={voiceBlockFocusIndex <= 0}
-                            aria-label="Speak earlier paragraph"
-                          >
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
-                              <path
-                                d="M14 7L9 12L14 17"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          </CyberdeckComposerControl>
-                        </CyberdeckControlTooltip>
-                        <CyberdeckControlTooltip label="Replay entire last reply">
-                          <CyberdeckComposerControl
-                            control={{ size: "icon", signal: true }}
-                            onClick={() => {
-                              onAbortSpeech();
-                              onReplayFullLastAssistant();
-                            }}
-                            aria-label="Replay full response"
-                          >
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
-                              <path
-                                d="M6 8V4L2 8L6 12V9C8.5 9 11 10.5 12 13C12.5 11.5 13.5 10 15 9.2"
-                                stroke="currentColor"
-                                strokeWidth="1.8"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                              <path
-                                d="M18 16V20L22 16L18 12V15C15.5 15 13 13.5 12 11C11.5 12.5 10.5 14 9 14.8"
-                                stroke="currentColor"
-                                strokeWidth="1.8"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          </CyberdeckComposerControl>
-                        </CyberdeckControlTooltip>
-                      </>
-                    ) : null}
+                    <MuthurComposerVoiceKnob
+                      voiceEnabled={voiceEnabled}
+                      voiceHealth={voiceHealth}
+                      voiceVolume={voiceVolume}
+                      onVoiceToggle={onVoiceToggle}
+                      onVoiceVolumeChange={onVoiceVolumeChange}
+                    />
                     {!isStreaming ? (
                       <CyberdeckControlTooltip label="Send" disabled={!canSendInput}>
                         <CyberdeckComposerControl
