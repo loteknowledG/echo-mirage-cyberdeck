@@ -26,7 +26,7 @@ export type CyberdeckContextMenusProps = {
   replayFullLastAssistant: () => void;
   copyMirageLastAssistant: () => void | Promise<void>;
   copyMirageSelectionOrLastMessage: () => void | Promise<void>;
-  handleModelLabelClick: (targetServer?: "s" | "ct" | "b") => void;
+  handleModelLabelClick: (targetServer?: "s" | "b") => void;
   openOrFocusDiagnosticsTab: () => void;
 };
 
@@ -124,9 +124,7 @@ export function CyberdeckContextMenus({
                     ? "Focus MUTHUR-LOAD panel"
                   : railTabContextMenu.serverId === "s"
                     ? "Focus connection panel"
-                    : railTabContextMenu.serverId === "ct"
-                      ? "Focus card table"
-                      : "Focus settings panel"}
+                    : "Focus settings panel"}
               </CyberdeckMenuButton>
               <CyberdeckMenuButton
                 type="button"

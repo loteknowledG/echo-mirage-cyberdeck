@@ -4,6 +4,9 @@ export function safeServerId(id: string): string {
   if (id === "p") {
     return DEFAULT_SERVER_ID;
   }
+  if (id === "ct") {
+    return "m";
+  }
   return id;
 }
 

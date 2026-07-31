@@ -13,7 +13,7 @@ export function CyberdeckFixedServerPane({
   className,
   children,
 }: {
-  serverId: CyberdeckServerId | "ct";
+  serverId: CyberdeckServerId;
   className?: PaneClassName;
   children: ReactNode;
 }) {
