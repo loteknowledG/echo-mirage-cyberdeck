@@ -16,6 +16,7 @@ export const CYBERDECK_PANE_KINDS = [
   "db8",
   "survey",
   "career",
+  "muthur-load",
 ] as const;
 
 export type CyberdeckPaneKind = (typeof CYBERDECK_PANE_KINDS)[number];
@@ -54,6 +55,10 @@ export const CYBERDECK_PANE_REGISTRY: Record<CyberdeckPaneKind, CyberdeckPaneReg
   db8: { label: "DB8", fetchHints: ["CHAMBER", "DEBATE ROUND", "CONSENSUS"] },
   survey: { label: "SURVEY", fetchHints: ["ECHO", "MIRAGE", "POWERFIST", "PAIRING"] },
   career: { label: "CAREER", fetchHints: ["PORTFOLIO", "TIMELINE", "EVIDENCE"] },
+  "muthur-load": {
+    label: "MUTHUR-LOAD",
+    fetchHints: ["PACK", "RELATIONSHIP SLICE", "PORTABLE LINK"],
+  },
 };
 
 const TAB_KIND_ALIASES: Record<string, CyberdeckPaneKind> = {
@@ -69,6 +74,8 @@ const TAB_KIND_ALIASES: Record<string, CyberdeckPaneKind> = {
   "install-desktop": "survey",
   "install_desktop": "survey",
   "desktop-install": "survey",
+  "muthur_load": "muthur-load",
+  load: "muthur-load",
 };
 
 export function normalizeCyberdeckPaneKind(kind: string): CyberdeckPaneKind | null {

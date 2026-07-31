@@ -9,6 +9,7 @@ export function safeServerId(id: string): string {
 
 export const servers = [
   { id: "m", glyph: "Ø", label: "ØPERATOR" },
+  { id: "d", glyph: "↓", label: "MUTHUR-LOAD" },
   { id: "w", glyph: "W", label: "WEB" },
   { id: "c", glyph: "C", label: "CONNECTION" },
   { id: "s", glyph: "μ", label: "MAINNET-UPLINK" },
@@ -18,7 +19,7 @@ export const servers = [
 
 export type ServerRailButton = (typeof servers)[number];
 
-export const SERVER_IDS = ["m", "s", "b"] as const;
+export const SERVER_IDS = ["m", "d", "s", "b"] as const;
 
 export type ServerId = (typeof SERVER_IDS)[number];
 

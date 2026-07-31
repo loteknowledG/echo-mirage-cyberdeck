@@ -6,6 +6,7 @@ import {
 
 const FIXED_SERVER_PANE_LABELS: Record<string, string> = {
   m: "OPERATOR",
+  d: "MUTHUR-LOAD",
   s: "MAINNET-UPLINK",
   b: "SETTINGS",
 };
@@ -15,6 +16,7 @@ const RAIL_KIND_DISPLAY: Partial<Record<CyberdeckPaneKind, string>> = {
   "glyph-channel": "ASCII",
   "rola-dex": "POWERFIST",
   survey: "SURVEY",
+  "muthur-load": "MUTHUR-LOAD",
   "call-center": "CALL CENTER",
   photoshop: "PHOTOSHOP",
   db8: "DB8",

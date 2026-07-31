@@ -120,6 +120,8 @@ export function CyberdeckContextMenus({
               >
                 {railTabContextMenu.serverId === "m"
                   ? "Focus operator panel"
+                  : railTabContextMenu.serverId === "d"
+                    ? "Focus MUTHUR-LOAD panel"
                   : railTabContextMenu.serverId === "s"
                     ? "Focus connection panel"
                     : railTabContextMenu.serverId === "ct"

@@ -319,6 +319,10 @@ function CustomTabPaneRendererInner({
     return shell(<ActivatedCyberdeckPane kind="career" />);
   }
 
+  if (tab.kind === "muthur-load") {
+    return shell(<ActivatedCyberdeckPane kind="muthur-load" />);
+  }
+
   if (tab.kind === "call-center") {
     return (
       <div
