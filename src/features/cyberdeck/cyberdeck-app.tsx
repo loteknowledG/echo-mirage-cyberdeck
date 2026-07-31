@@ -244,9 +244,6 @@ export default function CyberdeckApp() {
 
   const {
     voiceEnabled,
-    voicePlaybackBusy,
-    voiceBlockFocusIndex,
-    voiceBlockTotal,
     voiceDial,
     sonarVolume,
     deckSfxVolume,
@@ -255,7 +252,6 @@ export default function CyberdeckApp() {
     speakDeckVoiceLine,
     abortMotherSpeech,
     toggleVoiceEnabled,
-    speakVoiceBlockAtIndex,
     replayFullLastAssistant,
     handleDeckSfxVolumeChange,
     handleVoiceVolumeChange,
@@ -1028,13 +1024,9 @@ const operatorWorkspace = useOperatorWorkspaceState({
               onPostureChange={handleMuthurPostureChange}
               voiceEnabled={voiceEnabled}
               voiceHealth={voiceHealth}
+              voiceVolume={voiceDial.volume}
               onVoiceToggle={toggleVoiceEnabled}
-              voiceBlockTotal={voiceBlockTotal}
-              voiceBlockFocusIndex={voiceBlockFocusIndex}
-              voicePlaybackBusy={voicePlaybackBusy}
-              onAbortSpeech={abortMotherSpeech}
-              onSpeakVoiceBlockAtIndex={speakVoiceBlockAtIndex}
-              onReplayFullLastAssistant={replayFullLastAssistant}
+              onVoiceVolumeChange={handleVoiceVolumeChange}
               canSendInput={canSendInput}
               onStop={handleStop}
             />
