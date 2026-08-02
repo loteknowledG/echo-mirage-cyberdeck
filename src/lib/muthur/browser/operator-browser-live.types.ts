@@ -3,7 +3,7 @@ export type OperatorBrowserLiveSnapshot = {
   title: string;
   pageText: string;
   status: number;
-  engine?: "playwright" | "firecrawl";
+  engine?: "playwright" | "firecrawl" | "tinyfish";
 };
 
 export type OperatorBrowserLiveResult =
