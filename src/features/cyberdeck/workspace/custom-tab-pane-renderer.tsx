@@ -319,6 +319,10 @@ function CustomTabPaneRendererInner({
     return shell(<ActivatedCyberdeckPane kind="muthur-load" />);
   }
 
+  if (tab.kind === "voice-lab") {
+    return shell(<ActivatedCyberdeckPane kind="voice-lab" />);
+  }
+
   if (tab.kind === "call-center") {
     return (
       <div

@@ -17,6 +17,7 @@ const RAIL_KIND_DISPLAY: Partial<Record<CyberdeckPaneKind, string>> = {
   "rola-dex": "POWERFIST",
   survey: "SURVEY",
   "muthur-load": "MUTHUR-LOAD",
+  "voice-lab": "VOICE LAB",
   "call-center": "CALL CENTER",
   db8: "DB8",
 };

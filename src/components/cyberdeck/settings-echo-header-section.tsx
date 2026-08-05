@@ -69,8 +69,8 @@ export function SettingsEchoHeaderSection() {
       <div className="font-mono text-[10px] tracking-[0.06em] text-[#8a8a8a]">ECHO HEADER</div>
       <div className="rounded-sm border border-[#1c1c1c] bg-black/75 p-3 font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[#707070]">
         <p className="mb-3">
-          The Echo column banner can pick a random figlet font on load, or stay on the classic{" "}
-          <span className="text-[#9a9a9a]">Impossible</span> art you have today.
+          Echo (left, right-aligned) and Mirage (right, left-aligned) banners share a figlet font in
+          random mode, or stay on the classic <span className="text-[#9a9a9a]">Impossible</span> art.
         </p>
         <div className="flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3">
           <div className="min-w-0">

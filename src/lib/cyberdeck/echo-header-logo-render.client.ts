@@ -1,15 +1,22 @@
 import { fetchFigletPreviewText } from "@/lib/figlet-preview-fetch";
 import { isFigletAllFonts } from "@/lib/figlet-fonts";
 import { ECHO_MIRAGE_LOGO_ASCII } from "@/lib/cyberdeck/echo-logo-art";
+import { MIRAGE_LOGO_ASCII } from "@/lib/cyberdeck/mirage-logo-art";
+import {
+  leftAlignAsciiBlock,
+  rightAlignAsciiBlock,
+} from "@/lib/cyberdeck/echo-header-logo-align";
 import {
   ECHO_HEADER_CLASSIC_FIGLET_FONT,
   ECHO_HEADER_LOGO_TEXT,
+  MIRAGE_HEADER_LOGO_TEXT,
 } from "@/lib/cyberdeck/echo-header-logo-preference.client";
 
 export type EchoHeaderLogoSource = "classic-static" | "figlet";
 
 export type EchoHeaderLogoRender = {
-  ascii: string;
+  echoAscii: string;
+  mirageAscii: string;
   font: string;
   source: EchoHeaderLogoSource;
 };
@@ -22,17 +29,26 @@ export function pickRandomFigletFont(fonts: readonly string[]): string {
 
 export function classicEchoHeaderLogo(): EchoHeaderLogoRender {
   return {
-    ascii: ECHO_MIRAGE_LOGO_ASCII,
+    echoAscii: ECHO_MIRAGE_LOGO_ASCII,
+    mirageAscii: MIRAGE_LOGO_ASCII,
     font: ECHO_HEADER_CLASSIC_FIGLET_FONT,
     source: "classic-static",
   };
 }
 
-async function tryFigletHeader(font: string): Promise<EchoHeaderLogoRender | null> {
+async function tryFigletHeaderPair(font: string): Promise<EchoHeaderLogoRender | null> {
   try {
-    const ascii = await fetchFigletPreviewText(font, ECHO_HEADER_LOGO_TEXT);
-    if (!ascii.trim()) return null;
-    return { ascii, font, source: "figlet" };
+    const [echoRaw, mirageRaw] = await Promise.all([
+      fetchFigletPreviewText(font, ECHO_HEADER_LOGO_TEXT),
+      fetchFigletPreviewText(font, MIRAGE_HEADER_LOGO_TEXT),
+    ]);
+    if (!echoRaw.trim() || !mirageRaw.trim()) return null;
+    return {
+      echoAscii: rightAlignAsciiBlock(echoRaw.trimEnd()),
+      mirageAscii: leftAlignAsciiBlock(mirageRaw.trimEnd()),
+      font,
+      source: "figlet",
+    };
   } catch {
     return null;
   }
@@ -48,7 +64,7 @@ export async function resolveDynamicEchoHeaderLogo(
     : [pickRandomFigletFont(fonts), ECHO_HEADER_CLASSIC_FIGLET_FONT];
 
   for (const font of candidates) {
-    const rendered = await tryFigletHeader(font);
+    const rendered = await tryFigletHeaderPair(font);
     if (rendered) return rendered;
   }
 
