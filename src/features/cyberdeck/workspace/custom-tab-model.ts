@@ -18,6 +18,7 @@ export const CUSTOM_TAB_KINDS = [
   "db8",
   "survey",
   "muthur-load",
+  "voice-lab",
 ] as const;
 
 export type CustomTabKind = (typeof CUSTOM_TAB_KINDS)[number];
@@ -53,6 +54,7 @@ export const CUSTOM_TAB_CONTEXT_MENU_ACTIONS = ([
   { label: "Document", kind: "document", action: "convert" },
   { label: "Web", kind: "web", action: "convert" },
   { label: "Memory Atlas", kind: "memory-atlas", action: "convert" },
+  { label: "Voice Lab", kind: "voice-lab", action: "convert" },
   { label: "MUTHUR-LOAD", kind: "muthur-load", action: "convert" },
   { label: "Flight Log", kind: "flight-log", action: "convert" },
   { label: "Call Center", kind: "call-center", action: "convert" },
@@ -98,9 +100,6 @@ export function migrateRetiredDemoPaneKind(kind: string): string {
   if (kind === "catalog" || kind === "catelog") {
     return "realmorphism-kit";
   }
-  if (kind === "voice-lab" || kind === "voicelab" || kind === "voice_lab") {
-    return "settings";
-  }
   if (kind === "operators") {
     return "blank";
   }
@@ -143,9 +142,6 @@ export function sanitizeCustomTabs(value: unknown): CustomTab[] {
       (kindRaw === "catalog" || kindRaw === "catelog")
     ) {
       label = "Registry";
-    }
-    if (kindRaw !== migratedKind && migratedKind === "settings" && kindRaw.includes("voice")) {
-      label = "Settings";
     }
     const rawGlyph = typeof tab.glyph === "string" && tab.glyph.trim() ? tab.glyph.trim() : "□";
     const glyph =
@@ -244,6 +240,9 @@ export function normalizeCustomTabKind(kind: string) {
   if (nextKind === "muthur-load" || nextKind === "muthur_load" || nextKind === "load") {
     return "muthur-load" as CustomTabKind;
   }
+  if (nextKind === "voice-lab" || nextKind === "voicelab" || nextKind === "voice_lab") {
+    return "voice-lab" as CustomTabKind;
+  }
   if (CUSTOM_TAB_KINDS.includes(nextKind as CustomTabKind)) {
     return nextKind as CustomTabKind;
   }
@@ -265,6 +264,7 @@ export function defaultCustomTabGlyphForKind(kind: CustomTabKind) {
   if (kind === "call-center") return "CC";
   if (kind === "db8") return "8";
   if (kind === "muthur-load") return "↓";
+  if (kind === "voice-lab") return "V";
   if (kind === "pi" || kind === "diagnostics") return "π";
   return "□";
 }
@@ -280,6 +280,7 @@ export function defaultCustomTabLabelForKind(kind: CustomTabKind) {
   if (kind === "call-center") return "CALL CENTER";
   if (kind === "db8") return "DB8";
   if (kind === "muthur-load") return "MUTHUR-LOAD";
+  if (kind === "voice-lab") return "VOICE LAB";
   return kind.toUpperCase();
 }
 
@@ -322,7 +323,7 @@ export function parseCustomTabCommand(input: string) {
   }
 
   const convertMatch = text.match(
-    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|memory-atlas|muthur-load|load|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|spy|espionage|realmorphism-kit|kit|registry|survey|test-pane|test|call-center|callcenter|call_center)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
+    /^(?:\/tab|tab:)?\s*(?:(?:convert|turn|make|set)(?:\s+this)?(?:\s+tab)?(?:\s+(?:to|into|as)\s+)?|(?:set|make)\s+tab\s+(?:to|as)?\s+)(blank|document|web|settings|connection|pi|db8|debate|diagnostics|diagnostic|execution|muthur-execution|memory-atlas|muthur-load|load|voice-lab|voicelab|voice_lab|flight-log|drop-bay|dropbay|glyph-channel|glyph|rola-dex|preview|roladex|spy|espionage|realmorphism-kit|kit|registry|survey|test-pane|test|call-center|callcenter|call_center)(?:\s+tab)?(?:\s+(?:named|called)\s+(.+?))?(?:\s+glyph\s+(.+))?$/i,
   );
   if (convertMatch) {
     const surfaceKind = normalizeCustomTabKind(convertMatch[1] || "");

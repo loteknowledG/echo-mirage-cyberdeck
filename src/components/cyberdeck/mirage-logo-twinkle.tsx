@@ -1,7 +1,7 @@
 "use client";
 
 import { AsciiLogoTwinkle } from "@/components/cyberdeck/ascii-logo-twinkle";
-import { MIRAGE_LOGO_ASCII } from "@/lib/cyberdeck/mirage-logo-art";
+import { useCyberdeckHeaderLogo } from "@/lib/cyberdeck/use-cyberdeck-header-logo";
 
 type MirageLogoTwinkleProps = {
   className?: string;
@@ -9,10 +9,13 @@ type MirageLogoTwinkleProps = {
 };
 
 export function MirageLogoTwinkle({ className, seedOffset = 17 }: MirageLogoTwinkleProps) {
+  const { render, mode } = useCyberdeckHeaderLogo();
+  const ariaLabel = mode === "classic" ? "Mirage logo" : `Mirage logo (${render.font} figlet)`;
+
   return (
     <AsciiLogoTwinkle
-      ascii={MIRAGE_LOGO_ASCII}
-      ariaLabel="Mirage logo"
+      ascii={render.mirageAscii}
+      ariaLabel={ariaLabel}
       className={className}
       seedOffset={seedOffset}
     />

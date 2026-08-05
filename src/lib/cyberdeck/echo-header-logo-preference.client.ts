@@ -5,7 +5,8 @@ export const ECHO_HEADER_LOGO_MODE_CHANGED_EVENT = "echo-mirage-echo-header-logo
 export const ECHO_HEADER_LOGO_REROLL_EVENT = "echo-mirage-echo-header-logo-reroll";
 export const ECHO_HEADER_LOGO_RENDERED_EVENT = "echo-mirage-echo-header-logo-rendered";
 
-export const ECHO_HEADER_LOGO_TEXT = "ECHO MIRAGE";
+export const ECHO_HEADER_LOGO_TEXT = "ECHO";
+export const MIRAGE_HEADER_LOGO_TEXT = "MIRAGE";
 export const ECHO_HEADER_CLASSIC_FIGLET_FONT = "Impossible";
 
 const DEFAULT_MODE: EchoHeaderLogoMode = "dynamic";
