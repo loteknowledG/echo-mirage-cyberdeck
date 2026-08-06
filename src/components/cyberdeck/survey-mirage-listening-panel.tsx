@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CyberdeckActionButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { LiveAudioVisualizer } from "@/components/cyberdeck/live-audio-visualizer";
+import { SurveyMirageListeningInputControls } from "@/components/cyberdeck/survey-mirage-listening-input-controls";
 import { SurveyListeningSourceToggle } from "@/components/cyberdeck/survey-listening-source-toggle";
 import { SurveyListeningSpectrum } from "@/components/cyberdeck/survey-listening-spectrum";
 import {
@@ -44,6 +45,7 @@ export function SurveyMirageListeningPanel() {
       : [echo.lastFinal, echo.interim].filter(Boolean).join(echo.interim ? " … " : "").trim();
   const interim = source === "mirage" ? mirage.interim : echo.interim;
   const finals = source === "mirage" ? mirage.transcript : echo.lastFinal;
+  const solveText = source === "mirage" ? mirage.transcript.trim() : transcript.trim();
   const error = source === "mirage" ? mirage.error : echo.error;
 
   const handleStart = useCallback(async () => {
@@ -92,9 +94,13 @@ export function SurveyMirageListeningPanel() {
   }, [mirage, source]);
 
   const handleSolve = useCallback(async () => {
-    const text = transcript;
+    const text = solveText;
     if (!text.trim()) {
-      setSolveError("No transcript yet — start listening and speak first.");
+      setSolveError(
+        source === "mirage"
+          ? "No finalized transcript yet — speak, pause briefly, then SOLVE."
+          : "No transcript yet — start listening and speak first.",
+      );
       setAdvice("");
       return;
     }
@@ -110,7 +116,7 @@ export function SurveyMirageListeningPanel() {
     }
     setAdvice(result.answerText?.trim() || result.message);
     setStatus(result.message || "Advice ready.");
-  }, [transcript]);
+  }, [solveText, source]);
 
   const handleClear = useCallback(() => {
     if (source === "mirage") {
@@ -132,9 +138,12 @@ export function SurveyMirageListeningPanel() {
         <SurveyListeningSourceToggle className="mb-3" disabled={busy || active} />
         <p className="mb-3 text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
           {source === "mirage"
-            ? "MIRAGE uses this device microphone and browser speech recognition."
+            ? "MIRAGE captures mic audio and transcribes via Whisper (server) or browser STT. Whisper needs OPENAI_API_KEY on Vercel."
             : `ECHO uses ${SURVEY_ECHO_DISPLAY} Satellite mic STT (relay / LAN poll).`}
         </p>
+        {source === "mirage" ? (
+          <SurveyMirageListeningInputControls disabled={busy || active} />
+        ) : null}
 
         <div className="mb-3 overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80 px-2 py-3">
           {source === "mirage" && mirage.mediaStream && mirage.active ? (
@@ -184,7 +193,7 @@ export function SurveyMirageListeningPanel() {
             STOP LISTENING
           </CyberdeckActionButton>
           <CyberdeckActionButton
-            disabled={busy || !transcript}
+            disabled={busy || !solveText}
             onClick={() => void handleSolve()}
             data-testid="survey-mirage-listening-solve"
           >
@@ -212,12 +221,19 @@ export function SurveyMirageListeningPanel() {
         className="rounded-sm border border-[#1c1c1c] bg-black/70 p-3"
         data-testid="survey-mirage-listening-stt"
       >
-        <div className="mb-2 text-[9px] tracking-[0.1em] text-[#8a8a8a]">STT OUTPUT</div>
+        <div className="mb-2 text-[9px] tracking-[0.1em] text-[#8a8a8a]">
+          STT OUTPUT{source === "mirage" ? " · gray … = interim guess" : ""}
+        </div>
         <pre className="min-h-[4.5rem] whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-[#c8c8c8]">
           {interim
             ? `${finals ? `${finals}\n` : ""}… ${interim}`
             : finals || "— waiting for speech —"}
         </pre>
+        {source === "mirage" && interim && !finals ? (
+          <p className="mt-2 text-[9px] text-[#6a6a6a]">
+            Pause after a phrase so the browser can finalize words before SOLVE.
+          </p>
+        ) : null}
       </div>
 
       <div

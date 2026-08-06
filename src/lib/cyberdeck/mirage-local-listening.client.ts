@@ -1,28 +1,27 @@
 "use client";
 
-/**
- * Module-level Mirage-device mic + Web Speech STT.
- * Shared by Mirage LISTENING tab and PowerFist Listen card when source = mirage.
- *
- * Note: do NOT attach MediaRecorder to the mic stream while starting Web Speech —
- * Chromium often needs a second Start before STT works if MediaRecorder owns the track first.
- */
+import {
+  MIRAGE_LOCAL_LISTENING_CHANGED_EVENT,
+  type MirageLocalListeningState,
+} from "@/lib/cyberdeck/mirage-local-listening-shared.client";
+import {
+  clearMirageWhisperTranscript,
+  isMirageWhisperListeningActive,
+  readMirageWhisperListeningState,
+  startMirageWhisperListening,
+  stopMirageWhisperListening,
+} from "@/lib/cyberdeck/mirage-whisper-listening.client";
+import {
+  readSurveyListeningPreferences,
+  resolveMirageSpeechLang,
+} from "@/lib/cyberdeck/survey-listening-preferences.client";
 
-export const MIRAGE_LOCAL_LISTENING_CHANGED_EVENT =
-  "echo-mirage-local-listening-changed";
-
-export type MirageLocalListeningState = {
-  active: boolean;
-  interim: string;
-  transcript: string;
-  error: string | null;
-  /** Live mic stream for spectrum (no MediaRecorder). */
-  mediaStream: MediaStream | null;
-};
+export { MIRAGE_LOCAL_LISTENING_CHANGED_EVENT, type MirageLocalListeningState };
 
 type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
+  maxAlternatives: number;
   lang: string;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   onerror: ((event: { error?: string }) => void) | null;
@@ -33,12 +32,15 @@ type SpeechRecognitionLike = {
   abort: () => void;
 };
 
+type SpeechRecognitionResultLike = {
+  isFinal: boolean;
+  length: number;
+  [index: number]: { transcript: string; confidence?: number };
+};
+
 type SpeechRecognitionEventLike = {
   resultIndex: number;
-  results: ArrayLike<{
-    isFinal: boolean;
-    0: { transcript: string };
-  }>;
+  results: ArrayLike<SpeechRecognitionResultLike>;
 };
 
 const DEFAULT_STATE: MirageLocalListeningState = {
@@ -48,8 +50,6 @@ const DEFAULT_STATE: MirageLocalListeningState = {
   error: null,
   mediaStream: null,
 };
-
-const DEFAULT_LANG = "en-US";
 
 let state: MirageLocalListeningState = { ...DEFAULT_STATE };
 let stream: MediaStream | null = null;
@@ -73,6 +73,36 @@ function setState(patch: Partial<MirageLocalListeningState>) {
   emit();
 }
 
+function pickBestTranscript(result: SpeechRecognitionResultLike): string {
+  let best = "";
+  let bestConfidence = -1;
+  for (let i = 0; i < result.length; i += 1) {
+    const alt = result[i];
+    const text = alt?.transcript?.trim() ?? "";
+    if (!text) continue;
+    const confidence =
+      typeof alt.confidence === "number" ? alt.confidence : Math.max(0, 1 - i * 0.15);
+    if (confidence >= bestConfidence) {
+      bestConfidence = confidence;
+      best = text;
+    }
+  }
+  return best;
+}
+
+function buildMicConstraints(): MediaTrackConstraints {
+  const { micDeviceId, rawMic } = readSurveyListeningPreferences();
+  const constraints: MediaTrackConstraints = {
+    echoCancellation: !rawMic,
+    noiseSuppression: !rawMic,
+    autoGainControl: !rawMic,
+  };
+  if (micDeviceId) {
+    constraints.deviceId = { exact: micDeviceId };
+  }
+  return constraints;
+}
+
 function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   const w = window as unknown as {
     SpeechRecognition?: new () => SpeechRecognitionLike;
@@ -88,11 +118,14 @@ function clearStartDelay() {
 }
 
 export function readMirageLocalListeningState(): MirageLocalListeningState {
+  if (isMirageWhisperListeningActive()) {
+    return readMirageWhisperListeningState();
+  }
   return { ...state, mediaStream: state.mediaStream };
 }
 
 export function isMirageLocalListeningActive(): boolean {
-  return state.active;
+  return state.active || isMirageWhisperListeningActive();
 }
 
 export function subscribeMirageLocalListening(
@@ -105,6 +138,7 @@ export function subscribeMirageLocalListening(
 }
 
 function stopInternal() {
+  stopMirageWhisperListening();
   wantListening = false;
   sessionGeneration += 1;
   clearStartDelay();
@@ -185,16 +219,16 @@ function attachRecognitionHandlers(nextRecognition: SpeechRecognitionLike, gener
     let finalChunk = "";
     for (let i = event.resultIndex; i < event.results.length; i += 1) {
       const result = event.results[i];
-      const text = result?.[0]?.transcript ?? "";
+      const text = pickBestTranscript(result);
       if (!text) continue;
       if (result.isFinal) finalChunk += `${text} `;
-      else interimText += text;
+      else interimText += `${text} `;
     }
     if (finalChunk.trim()) {
       finals = [...finals, finalChunk.trim()];
       setState({ transcript: finals.join(" "), interim: "" });
     } else {
-      setState({ interim: interimText });
+      setState({ interim: interimText.trim() });
     }
   };
 
@@ -261,7 +295,8 @@ function beginRecognition(generation: number): void {
   recognition = nextRecognition;
   nextRecognition.continuous = true;
   nextRecognition.interimResults = true;
-  nextRecognition.lang = DEFAULT_LANG;
+  nextRecognition.maxAlternatives = 3;
+  nextRecognition.lang = resolveMirageSpeechLang();
   attachRecognitionHandlers(nextRecognition, generation);
 
   try {
@@ -294,6 +329,12 @@ export async function startMirageLocalListening(): Promise<{
     return { ok: false, message: "Mirage listening requires a browser." };
   }
 
+  const { sttEngine } = readSurveyListeningPreferences();
+  if (sttEngine === "whisper") {
+    stopInternal();
+    return startMirageWhisperListening();
+  }
+
   stopInternal();
   wantListening = true;
   sessionGeneration += 1;
@@ -319,11 +360,7 @@ export async function startMirageLocalListening(): Promise<{
   let nextStream: MediaStream;
   try {
     nextStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
+      audio: buildMicConstraints(),
       video: false,
     });
   } catch (err) {
@@ -380,12 +417,19 @@ export function stopMirageLocalListening(_message = "Mirage listening stopped.")
 }
 
 export function clearMirageLocalListeningTranscript(): { ok: true; message: string } {
+  if (isMirageWhisperListeningActive()) {
+    clearMirageWhisperTranscript();
+    return { ok: true, message: "Mirage transcript cleared." };
+  }
   finals = [];
   setState({ transcript: "", interim: "", error: null });
   return { ok: true, message: "Mirage transcript cleared." };
 }
 
 export function mirageLocalListeningDisplayText(): string {
+  if (isMirageWhisperListeningActive()) {
+    return readMirageWhisperListeningState().transcript.trim();
+  }
   const { transcript, interim } = state;
   return [transcript, interim].filter(Boolean).join(interim ? " … " : "").trim();
 }
