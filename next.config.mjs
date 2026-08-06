@@ -138,6 +138,7 @@ const nextConfig = {
 	// Treat as external in the Node.js server runtime (native / optional / E2E-only).
 	serverExternalPackages: [
 		"@cursor/sdk",
+		"edge-tts-universal",
 		"@mariozechner/pi-ai",
 		"@mariozechner/pi-agent-core",
 		"figlet",
