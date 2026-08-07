@@ -158,7 +158,7 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
       <div
         ref={ref}
         onContextMenu={onContextMenu}
-        className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full max-h-full min-h-0 flex-col overflow-hidden bg-black max-md:min-h-0 md:min-w-0 md:border-b-0 md:border-r md:border-[#141414] ${
+        className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full max-h-full min-h-0 flex-col overflow-hidden bg-black max-md:min-h-0 md:min-w-0 md:border-b-0 md:border-l md:border-[#141414] ${
           networkActivityActive ? "is-net-active" : ""
         }`}
         data-cyberdeck-pane="muthur-chat"
