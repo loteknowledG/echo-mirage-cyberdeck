@@ -2,7 +2,7 @@
 
 import type { MouseEvent as ReactMouseEvent, Ref } from "react";
 import { forwardRef } from "react";
-import { EchoHeader } from "@/components/cyberdeck/echo-header";
+import { MirageHeader } from "@/components/cyberdeck/mirage-header";
 import {
   CyberdeckControlTooltip,
   CyberdeckPaneTooltipProvider,
@@ -39,6 +39,7 @@ import type { MuthurPosture } from "@/lib/muthur/muthur-posture";
 
 export type MuthurChatColumnProps = {
   isMobileLayout: boolean;
+  mirageHeaderCollapse: number;
   networkActivityActive: boolean;
   onContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
   messageScrollRef: Ref<HTMLDivElement>;
@@ -103,6 +104,7 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
   function MuthurChatColumn(props, ref) {
     const {
       isMobileLayout,
+      mirageHeaderCollapse,
       networkActivityActive,
       onContextMenu,
       messageScrollRef,
@@ -165,7 +167,7 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
       >
         {!isMobileLayout ? (
           <div className="border-b border-[#1a1a1a] px-2 py-1">
-            <EchoHeader />
+            <MirageHeader collapse={mirageHeaderCollapse} />
           </div>
         ) : null}
         <div
@@ -183,7 +185,7 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
           >
             {isMobileLayout ? (
               <div className="mb-2">
-                <EchoHeader />
+                <MirageHeader collapse={mirageHeaderCollapse} />
               </div>
             ) : null}
             <MuthurCommanderStatus

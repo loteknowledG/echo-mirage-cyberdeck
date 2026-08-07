@@ -980,6 +980,7 @@ const operatorWorkspace = useOperatorWorkspaceState({
             <MuthurChatColumn
               ref={chatColumnRef}
               isMobileLayout={isMobileLayout}
+              mirageHeaderCollapse={mirageHeaderCollapse}
               networkActivityActive={networkActivityActive}
               onContextMenu={handleMiragePaneContextMenu}
               messageScrollRef={messageScrollRef}
@@ -1036,7 +1037,6 @@ const operatorWorkspace = useOperatorWorkspaceState({
             ref={gatewayColumnRef}
             networkActivityActive={networkActivityActive}
             isMarkdownDragOver={isMarkdownDragOver}
-            mirageHeaderCollapse={mirageHeaderCollapse}
             isMobileLayout={isMobileLayout}
             deckMode={deckMode}
             droppedMarkdown={droppedMarkdown}

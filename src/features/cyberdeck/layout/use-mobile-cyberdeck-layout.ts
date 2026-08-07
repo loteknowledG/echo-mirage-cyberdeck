@@ -17,12 +17,12 @@ export function useMobileCyberdeckLayout() {
 
   const mirageHeaderCollapse = useMemo(() => {
     if (!isMobileLayout || mobileContentSplit.length < 2) return 0;
-    const gatewayFraction = mobileContentSplit[0];
+    const muthurFraction = mobileContentSplit[1];
     const collapseStart = 0.46;
     const collapseEnd = 0.58;
-    if (gatewayFraction <= collapseStart) return 0;
-    if (gatewayFraction >= collapseEnd) return 1;
-    return (gatewayFraction - collapseStart) / (collapseEnd - collapseStart);
+    if (muthurFraction >= collapseEnd) return 0;
+    if (muthurFraction <= collapseStart) return 1;
+    return (collapseEnd - muthurFraction) / (collapseEnd - collapseStart);
   }, [isMobileLayout, mobileContentSplit]);
 
   useEffect(() => {

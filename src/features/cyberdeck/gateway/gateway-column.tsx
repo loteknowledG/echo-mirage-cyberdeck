@@ -3,7 +3,7 @@
 import type { CSSProperties, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref } from "react";
 import dynamic from "next/dynamic";
 import { forwardRef } from "react";
-import { MirageHeader } from "@/components/cyberdeck/mirage-header";
+import { EchoHeader } from "@/components/cyberdeck/echo-header";
 import { CyberdeckControlButton } from "@/components/cyberdeck/cyberdeck-control-button";
 import { CyberdeckGatewaySettingsPane } from "@/components/cyberdeck/cyberdeck-pane-slots";
 import {
@@ -38,7 +38,6 @@ type GatewayProvider = {
 export type GatewayColumnProps = {
   networkActivityActive: boolean;
   isMarkdownDragOver: boolean;
-  mirageHeaderCollapse: number;
   isMobileLayout: boolean;
   deckMode: DeckMode;
   droppedMarkdown: string | null;
@@ -81,7 +80,6 @@ export const GatewayColumn = forwardRef<HTMLDivElement, GatewayColumnProps>(func
   {
     networkActivityActive,
     isMarkdownDragOver,
-    mirageHeaderCollapse,
     isMobileLayout,
     deckMode,
     droppedMarkdown,
@@ -134,7 +132,7 @@ export const GatewayColumn = forwardRef<HTMLDivElement, GatewayColumnProps>(func
         networkActivityActive ? "is-net-active" : ""
       } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
     >
-      <MirageHeader collapse={mirageHeaderCollapse} />
+      <EchoHeader />
       <p className="sr-only">{GATEWAY_SR_ONLY_BLURB}</p>
       <div className="mirage-pane-body relative box-border flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden ps-2 pe-3">
         {leadingPaneContent}
