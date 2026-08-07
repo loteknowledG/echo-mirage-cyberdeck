@@ -585,6 +585,7 @@ export function useCyberdeckVoice({
     setVoiceBlockFocusIndex(focus);
     if (motherTerminalRef.current.shouldBurst(speechText)) {
       void motherTerminalRef.current.unlock().then(() => {
+        if (!isAudioAllowed()) return;
         motherTerminalRef.current.playBurstSound(speechText.length);
       });
     }

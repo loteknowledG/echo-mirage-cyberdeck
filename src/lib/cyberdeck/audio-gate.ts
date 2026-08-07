@@ -26,6 +26,10 @@ export function isSilentModeAudioSuppressed(): boolean {
   return silentModeEnabled;
 }
 
+export function isAudioMasterEnabled(): boolean {
+  return audioMasterEnabled;
+}
+
 export function setAudioMasterEnabled(enabled: boolean): void {
   audioMasterEnabled = Boolean(enabled);
   if (!audioMasterEnabled) {
