@@ -15,6 +15,7 @@ import { SettingsPowerfistPairingSection } from "@/components/cyberdeck/settings
 import { SettingsSilentModeSection } from "@/components/cyberdeck/settings-silent-mode-section";
 import { SettingsEchoHeaderSection } from "@/components/cyberdeck/settings-echo-header-section";
 import { SettingsVersionSection } from "@/components/cyberdeck/settings-version-section";
+import { SettingsDeckAudioSilentSection } from "@/components/cyberdeck/settings-deck-audio-silent-section";
 import { MuthurComposerAudioKnobs } from "@/components/cyberdeck/muthur-composer-audio-knobs";
 
 const SWITCH_LEGACY_EMERALD =
@@ -131,6 +132,7 @@ export function CyberdeckSettingsPaneBody({
                   className="justify-start gap-4"
                 />
               </div>
+              <SettingsDeckAudioSilentSection />
             </div>
           </section>
           <SettingsSilentModeSection />
