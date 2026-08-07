@@ -130,7 +130,7 @@ export const GatewayColumn = forwardRef<HTMLDivElement, GatewayColumnProps>(func
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`cyberdeck-net-pane right flex h-full min-w-0 flex-col overflow-hidden border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
+      className={`cyberdeck-net-pane right flex h-full min-w-0 flex-col overflow-hidden border-gray-800 bg-black outline-none focus-visible:ring-2 focus-visible:ring-green-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-black md:border-r md:border-[#141414] ${
         networkActivityActive ? "is-net-active" : ""
       } ${isMarkdownDragOver ? "ring-2 ring-amber-500/50 ring-inset" : ""}`}
     >

@@ -863,7 +863,7 @@ const operatorWorkspace = useOperatorWorkspaceState({
     [cancelLongPressFromContextMenu, openRailTabContextMenu],
   );
 
-  /* Weyland: col2 = nav, col3 = terminal. Echo: flipped → col2 = terminal (chat), col3 = nav (gateway). */
+  /* Weyland: col2 = nav, col3 = terminal. Echo: col2 = gateway (working pane), col3 = MUTHUR chat. */
   return (
     <div
       ref={cyberdeckRootRef}

@@ -6,7 +6,10 @@ const COMPOSER = ".cyberdeck-chat-app > .cyberdeck-message-box";
 const DIVIDER = '[role="separator"]';
 
 type SplitGeometry = {
+  chatPanelTop: number;
   composerBottom: number;
+  composerTop: number;
+  dividerBottom: number;
   dividerTop: number;
   groupBottom: number;
   groupDirection: string;
@@ -47,9 +50,13 @@ async function readSplitGeometry(page: Page): Promise<SplitGeometry> {
       const composerBox = composer.getBoundingClientRect();
       const dividerBox = divider.getBoundingClientRect();
       const groupBox = group.getBoundingClientRect();
+      const chatPanelBox = upperPanel.getBoundingClientRect();
 
       return {
+        chatPanelTop: chatPanelBox.top,
         composerBottom: composerBox.bottom,
+        composerTop: composerBox.top,
+        dividerBottom: dividerBox.bottom,
         dividerTop: dividerBox.top,
         groupBottom: groupBox.bottom,
         groupDirection: getComputedStyle(group).flexDirection,
@@ -83,8 +90,8 @@ async function openCustomTabContextMenu(page: Page) {
   await customTab.click({ button: "right" });
 }
 
-function expectComposerAttachedToDivider(geometry: SplitGeometry) {
-  expect(Math.abs(geometry.dividerTop - geometry.composerBottom)).toBeLessThanOrEqual(2);
+function expectChatPanelAttachedToDivider(geometry: SplitGeometry) {
+  expect(Math.abs(geometry.chatPanelTop - geometry.dividerBottom)).toBeLessThanOrEqual(2);
 }
 
 test.describe("Cyberdeck responsive split layout", () => {
@@ -95,35 +102,36 @@ test.describe("Cyberdeck responsive split layout", () => {
     expect(geometry.groupDirection).toBe("row");
   });
 
-  test("mobile composer moves with the divider and lower pane remains below it", async ({ page }) => {
+  test("mobile composer moves with the divider and MUTHUR pane remains below it", async ({ page }) => {
     await openCyberdeck(page, MOBILE_VIEWPORT);
 
     const initial = await readSplitGeometry(page);
     expect(initial.groupDirection).toBe("column");
-    expectComposerAttachedToDivider(initial);
+    expectChatPanelAttachedToDivider(initial);
 
     await dragDividerTo(page, initial.groupTop + 380);
     const moved = await readSplitGeometry(page);
 
     expect(moved.dividerTop).toBeLessThan(initial.dividerTop - 80);
-    expectComposerAttachedToDivider(moved);
+    expectChatPanelAttachedToDivider(moved);
+    expect(moved.composerBottom).toBeGreaterThan(initial.composerBottom + 40);
   });
 
-  test("mobile divider reaches both edges and clips ECHO when collapsed", async ({ page }) => {
+  test("mobile divider reaches both edges and clips MUTHUR when collapsed", async ({ page }) => {
     await openCyberdeck(page, MOBILE_VIEWPORT);
 
     const initial = await readSplitGeometry(page);
-    await dragDividerTo(page, initial.groupTop);
-    const collapsedEcho = await readSplitGeometry(page);
-
-    expect(collapsedEcho.dividerTop).toBeLessThan(initial.dividerTop - 40);
-    expect(collapsedEcho.panelOverflow).toBe("hidden");
-
-    await dragDividerTo(page, collapsedEcho.groupBottom);
+    await dragDividerTo(page, initial.groupBottom);
     const collapsedMuthur = await readSplitGeometry(page);
 
-    expect(collapsedMuthur.dividerTop).toBeGreaterThan(collapsedEcho.dividerTop + 40);
-    expectComposerAttachedToDivider(collapsedMuthur);
+    expect(collapsedMuthur.dividerTop).toBeGreaterThan(initial.dividerTop + 40);
+    expect(collapsedMuthur.panelOverflow).toBe("hidden");
+
+    await dragDividerTo(page, initial.groupTop);
+    const collapsedGateway = await readSplitGeometry(page);
+
+    expect(collapsedGateway.dividerTop).toBeLessThan(collapsedMuthur.dividerTop - 40);
+    expectChatPanelAttachedToDivider(collapsedGateway);
   });
 
   test("mobile divider position survives switching to desktop and back", async ({ page }) => {
@@ -132,7 +140,7 @@ test.describe("Cyberdeck responsive split layout", () => {
     const initial = await readSplitGeometry(page);
     await dragDividerTo(page, initial.groupTop + 360);
     const placed = await readSplitGeometry(page);
-    expectComposerAttachedToDivider(placed);
+    expectChatPanelAttachedToDivider(placed);
 
     await page.setViewportSize(DESKTOP_VIEWPORT);
     await expect.poll(async () => (await readSplitGeometry(page)).groupDirection).toBe("row");
@@ -142,7 +150,7 @@ test.describe("Cyberdeck responsive split layout", () => {
 
     const returned = await readSplitGeometry(page);
     expect(Math.abs(returned.dividerTop - placed.dividerTop)).toBeLessThanOrEqual(2);
-    expectComposerAttachedToDivider(returned);
+    expectChatPanelAttachedToDivider(returned);
   });
 
   test("mobile divider position survives a page reload", async ({ page }) => {
@@ -151,7 +159,7 @@ test.describe("Cyberdeck responsive split layout", () => {
     const initial = await readSplitGeometry(page);
     await dragDividerTo(page, initial.groupTop + 360);
     const placed = await readSplitGeometry(page);
-    expectComposerAttachedToDivider(placed);
+    expectChatPanelAttachedToDivider(placed);
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator(COMPOSER)).toBeVisible({ timeout: 10000 });
@@ -159,7 +167,7 @@ test.describe("Cyberdeck responsive split layout", () => {
 
     const returned = await readSplitGeometry(page);
     expect(Math.abs(returned.dividerTop - placed.dividerTop)).toBeLessThanOrEqual(2);
-    expectComposerAttachedToDivider(returned);
+    expectChatPanelAttachedToDivider(returned);
   });
 
   test("custom tab menu omits retired execution surface", async ({ page }) => {
