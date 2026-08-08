@@ -13,19 +13,22 @@
         <h1>Echo Satellite</h1>
         <p class="lede">
           Minimal Electron tray agent. Arm once — screenshots fire only when PowerFist signals Mirage.
-          On Mac, reopen from the <strong>Dock</strong>. On Windows, use the system tray.
+          On Mac, reopen from the <strong>Dock</strong> (closing the window hides it — Survey listening keeps running).
+          On Windows, use the system tray.
         </p>
       </header>
 
       <section class="card">
         <h2>1 · Permissions (before missions)</h2>
         <p class="hint">
-          macOS: grant <strong>Screen Recording</strong> in System Settings when prompted.
-          For Survey listening, also grant <strong>Microphone</strong>.
+          macOS: grant <strong>Screen Recording</strong>, <strong>Microphone</strong>, and
+          <strong>Speech Recognition</strong> for Echo Satellite in System Settings when prompted.
           Windows: no extra prompt usually required.
         </p>
         <button id="test-capture" type="button">Test silent capture</button>
         <button id="open-screen-settings" type="button" class="hidden">Open Screen Recording settings</button>
+        <button id="open-microphone-settings" type="button" class="hidden">Open Microphone settings</button>
+        <button id="open-speech-settings" type="button" class="hidden">Open Speech Recognition settings</button>
         <p id="permission-result" class="mono muted"></p>
         <p id="capture-result" class="mono muted"></p>
         <img id="capture-preview" class="capture-preview hidden" alt="Test capture preview" />
@@ -80,6 +83,24 @@
       </section>
 
       <section class="card">
+        <h2>Survey listening</h2>
+        <p class="hint">
+          When Mirage taps Start Listening, speech-to-text runs here. Keep Echo Satellite open;
+          internet is required for Chromium speech on Mac.
+        </p>
+        <dl class="status-grid">
+          <dt>Listening</dt>
+          <dd id="listening-armed">—</dd>
+          <dt>Interim</dt>
+          <dd id="listening-interim" class="mono">—</dd>
+          <dt>Last final</dt>
+          <dd id="listening-final" class="mono">—</dd>
+          <dt>STT error</dt>
+          <dd id="listening-error" class="mono">—</dd>
+        </dl>
+      </section>
+
+      <section class="card">
         <h2>Status</h2>
         <dl class="status-grid">
           <dt>Armed</dt>
@@ -95,7 +116,7 @@
         </dl>
         <div class="actions">
           <button id="refresh-status" type="button">Refresh connections</button>
-          <button id="hide-tray" type="button">Hide to tray</button>
+          <button id="hide-tray" type="button">Hide window</button>
           <button id="disarm" type="button">Disarm</button>
         </div>
       </section>

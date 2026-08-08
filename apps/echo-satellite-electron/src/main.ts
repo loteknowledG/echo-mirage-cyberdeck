@@ -105,6 +105,8 @@ type SatelliteApi = {
   hideToTray: () => Promise<void>;
   checkPermissions: () => Promise<SatellitePermissionStatus>;
   openScreenRecordingSettings: () => Promise<void>;
+  openMicrophoneSettings: () => Promise<void>;
+  openSpeechRecognitionSettings: () => Promise<void>;
   getDiagnostics: () => Promise<DiagnosticsReport>;
   getRelaySecretStatus: () => Promise<{ ok: true; configured: boolean; preview: string }>;
   saveRelaySecret: (
@@ -161,6 +163,12 @@ const captureResultEl = document.querySelector<HTMLElement>("#capture-result")!;
 const capturePreviewEl = document.querySelector<HTMLImageElement>("#capture-preview")!;
 const permissionResultEl = document.querySelector<HTMLElement>("#permission-result")!;
 const openScreenSettingsBtn = document.querySelector<HTMLButtonElement>("#open-screen-settings")!;
+const openMicrophoneSettingsBtn = document.querySelector<HTMLButtonElement>("#open-microphone-settings")!;
+const openSpeechSettingsBtn = document.querySelector<HTMLButtonElement>("#open-speech-settings")!;
+const listeningArmedEl = document.querySelector<HTMLElement>("#listening-armed")!;
+const listeningInterimEl = document.querySelector<HTMLElement>("#listening-interim")!;
+const listeningFinalEl = document.querySelector<HTMLElement>("#listening-final")!;
+const listeningErrorEl = document.querySelector<HTMLElement>("#listening-error")!;
 const statusArmedEl = document.querySelector<HTMLElement>("#status-armed")!;
 const statusWsEl = document.querySelector<HTMLElement>("#status-ws")!;
 const statusMissionsEl = document.querySelector<HTMLElement>("#status-missions")!;
@@ -275,20 +283,44 @@ async function refreshRelaySecretStatus(): Promise<void> {
 async function refreshPermissions(): Promise<void> {
   const perm = await api.checkPermissions();
   const micOk = perm.microphone !== false;
+  openScreenSettingsBtn.classList.remove("show");
+  openMicrophoneSettingsBtn.classList.remove("show");
+  openSpeechSettingsBtn.classList.remove("show");
+
   if (perm.screenRecording && micOk) {
     permissionResultEl.textContent = "Screen Recording: granted · Microphone: ready";
-    openScreenSettingsBtn.classList.remove("show");
+    if (perm.platform === "macos") {
+      openSpeechSettingsBtn.classList.add("show");
+    }
   } else if (!perm.screenRecording) {
     permissionResultEl.textContent =
       perm.hint ?? "Screen Recording not granted — required before missions.";
     if (perm.platform === "macos") {
       openScreenSettingsBtn.classList.add("show");
+      if (!micOk) {
+        openMicrophoneSettingsBtn.classList.add("show");
+      }
     }
   } else {
     permissionResultEl.textContent =
       perm.hint ?? "Microphone not granted — required for Survey listening.";
-    openScreenSettingsBtn.classList.remove("show");
+    if (perm.platform === "macos") {
+      openMicrophoneSettingsBtn.classList.add("show");
+      openSpeechSettingsBtn.classList.add("show");
+    }
   }
+}
+
+async function refreshListeningState(): Promise<void> {
+  const state = await api.getListeningState();
+  if (!state.ok) {
+    listeningArmedEl.textContent = "—";
+    return;
+  }
+  listeningArmedEl.textContent = state.listening ? "LIVE" : state.error ? "ERROR" : "idle";
+  listeningInterimEl.textContent = state.interim?.trim() || "—";
+  listeningFinalEl.textContent = state.lastFinal?.trim() || "—";
+  listeningErrorEl.textContent = state.error?.trim() || "—";
 }
 
 function formatLinkedMirages(status: SatelliteStatus): string {
@@ -345,6 +377,14 @@ document.querySelector<HTMLButtonElement>("#test-capture")!.addEventListener("cl
 
 openScreenSettingsBtn.addEventListener("click", async () => {
   await api.openScreenRecordingSettings();
+});
+
+openMicrophoneSettingsBtn.addEventListener("click", async () => {
+  await api.openMicrophoneSettings();
+});
+
+openSpeechSettingsBtn.addEventListener("click", async () => {
+  await api.openSpeechRecognitionSettings();
 });
 
 document.querySelector<HTMLButtonElement>("#pair-url-btn")!.addEventListener("click", async () => {
@@ -458,8 +498,10 @@ void refreshRelaySecretStatus();
 void refreshStatus();
 void refreshDiagnostics();
 void refreshUpdateCheck();
+void refreshListeningState();
 installEchoSttBridge();
 window.setInterval(() => {
   void refreshStatus();
   void refreshSpyCodes();
+  void refreshListeningState();
 }, 5000);
