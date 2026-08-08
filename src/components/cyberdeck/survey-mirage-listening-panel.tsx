@@ -23,6 +23,11 @@ import { solveMirageSelectedTextAsync } from "@/lib/cyberdeck/survey-mirage-item
 import { useMirageLocalListening } from "@/lib/cyberdeck/use-mirage-local-listening";
 import { stopMirageLocalListening } from "@/lib/cyberdeck/mirage-local-listening.client";
 import { SURVEY_ECHO_DISPLAY } from "@/lib/cyberdeck/survey-mode";
+import {
+  enableSurveyRelayPollingForDemo,
+  isSurveyRelayPollingEnabled,
+  isVercelDemoDeployment,
+} from "@/lib/cyberdeck/survey-boundary";
 
 /**
  * Mirage Survey LISTENING tab — Start/Stop, source toggle (Echo | Mirage), STT, Solve.
@@ -35,6 +40,9 @@ export function SurveyMirageListeningPanel() {
   const [status, setStatus] = useState("");
   const [advice, setAdvice] = useState("");
   const [solveError, setSolveError] = useState("");
+  const [relayPollingEnabled, setRelayPollingEnabled] = useState(isSurveyRelayPollingEnabled);
+  const showRelayPollingPrompt =
+    source === "echo" && isVercelDemoDeployment() && !relayPollingEnabled;
 
   useEffect(() => subscribeSurveyListeningSource(setSource), []);
 
@@ -143,6 +151,26 @@ export function SurveyMirageListeningPanel() {
         </p>
         {source === "mirage" ? (
           <SurveyMirageListeningInputControls disabled={busy || active} />
+        ) : null}
+        {showRelayPollingPrompt ? (
+          <div className="mb-3 rounded-sm border border-amber-900/50 bg-amber-950/20 p-2">
+            <p className="text-[9px] leading-relaxed tracking-[0.04em] text-amber-200/90">
+              Hosted Mirage cannot poll Echo transcripts until cloud relay polling is enabled.
+              Keep Echo Satellite open on your Mac, then enable relay below.
+            </p>
+            <CyberdeckActionButton
+              className="mt-2"
+              disabled={busy}
+              onClick={() => {
+                enableSurveyRelayPollingForDemo();
+                setRelayPollingEnabled(true);
+                window.location.reload();
+              }}
+              data-testid="survey-enable-relay-polling"
+            >
+              ENABLE RELAY POLLING
+            </CyberdeckActionButton>
+          </div>
         ) : null}
 
         <div className="mb-3 overflow-hidden rounded-sm border border-[#1c1c1c] bg-black/80 px-2 py-3">

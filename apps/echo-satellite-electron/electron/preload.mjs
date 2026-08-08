@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld("satellite", {
   hideToTray: () => ipcRenderer.invoke("satellite:hide-to-tray"),
   checkPermissions: () => ipcRenderer.invoke("satellite:check-permissions"),
   openScreenRecordingSettings: () => ipcRenderer.invoke("satellite:open-screen-settings"),
+  openMicrophoneSettings: () => ipcRenderer.invoke("satellite:open-microphone-settings"),
+  openSpeechRecognitionSettings: () => ipcRenderer.invoke("satellite:open-speech-settings"),
   getDiagnostics: () => ipcRenderer.invoke("satellite:get-diagnostics"),
   getRelaySecretStatus: () => ipcRenderer.invoke("satellite:get-relay-secret-status"),
   saveRelaySecret: (secret) => ipcRenderer.invoke("satellite:save-relay-secret", secret),

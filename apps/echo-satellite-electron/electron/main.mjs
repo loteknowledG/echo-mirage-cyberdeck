@@ -103,8 +103,18 @@ function statusSnapshot() {
 }
 
 /** Avoid spam when the setup window is closed but tray + pair server keep running. */
+function focusMainWindowForListening() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
 function sendToMainWindow(channel, payload) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (process.platform === "darwin" && channel === "satellite:stt-start") {
+    focusMainWindowForListening();
+  }
   const contents = mainWindow.webContents;
   if (contents.isDestroyed()) return;
   try {
@@ -451,6 +461,22 @@ function registerIpc() {
     if (process.platform === "darwin") {
       await shell.openExternal(
         "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+      );
+    }
+  });
+
+  ipcMain.handle("satellite:open-microphone-settings", async () => {
+    if (process.platform === "darwin") {
+      await shell.openExternal(
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
+      );
+    }
+  });
+
+  ipcMain.handle("satellite:open-speech-settings", async () => {
+    if (process.platform === "darwin") {
+      await shell.openExternal(
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition",
       );
     }
   });

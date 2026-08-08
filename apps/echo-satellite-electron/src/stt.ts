@@ -33,6 +33,21 @@ type SpeechRecognitionEventLike = {
   }>;
 };
 
+function formatSpeechError(code: string): string {
+  switch (code) {
+    case "network":
+      return "Speech recognition network error — Echo Satellite needs internet for Chromium speech on Mac. Check Wi‑Fi, then retry. Or use MIRAGE source with Whisper on Mirage.";
+    case "not-allowed":
+      return "Speech recognition blocked — grant Microphone and Speech Recognition for Echo Satellite in System Settings, then quit and reopen.";
+    case "service-not-allowed":
+      return "Speech recognition service blocked — enable Speech Recognition for Echo Satellite in System Settings.";
+    case "audio-capture":
+      return "Microphone capture failed — grant Microphone access for Echo Satellite in System Settings.";
+    default:
+      return `Speech recognition error: ${code}`;
+  }
+}
+
 type SatelliteSttApi = {
   onSttStart: (handler: (payload?: { lang?: string }) => void) => () => void;
   onSttStop: (handler: (payload?: unknown) => void) => () => void;
@@ -240,7 +255,7 @@ async function startRecognition(lang = "en-US") {
   next.onerror = (event) => {
     const code = event?.error || "speech-error";
     if (code === "aborted" || code === "no-speech") return;
-    report({ error: `Speech recognition error: ${code}` });
+    report({ error: formatSpeechError(code) });
   };
 
   next.onend = () => {

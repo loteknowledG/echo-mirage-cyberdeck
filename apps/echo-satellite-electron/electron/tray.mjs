@@ -59,7 +59,8 @@ export function createTrayManager(deps) {
     mainWindow = window;
     window.on("close", (event) => {
       if (quitting) return;
-      if (!trayReady) return;
+      // macOS has no tray icon — hide instead of destroying the renderer (STT bridge lives here).
+      if (process.platform !== "darwin" && !trayReady) return;
       event.preventDefault();
       window.hide();
     });
