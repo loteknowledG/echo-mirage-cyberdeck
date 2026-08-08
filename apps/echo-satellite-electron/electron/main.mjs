@@ -25,6 +25,10 @@ import { startWsClient } from "./ws-client.mjs";
 import { createTrayManager } from "./tray.mjs";
 import * as logger from "./logger.mjs";
 import {
+  fetchEchoWhisperStatus,
+  transcribeEchoWhisperChunk,
+} from "./echo-whisper-proxy.mjs";
+import {
   getEchoSurveyPairingStatus,
   initSpyEchoPairing,
   refreshEchoSurveyPairCodes,
@@ -456,6 +460,12 @@ function registerIpc() {
     ok: true,
     ...readEchoListeningState(),
   }));
+
+  ipcMain.handle("satellite:get-whisper-status", async () => fetchEchoWhisperStatus());
+
+  ipcMain.handle("satellite:transcribe-chunk", async (_event, input) =>
+    transcribeEchoWhisperChunk(input && typeof input === "object" ? input : {}),
+  );
 
   ipcMain.handle("satellite:open-screen-settings", async () => {
     if (process.platform === "darwin") {

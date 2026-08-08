@@ -31,6 +31,10 @@ function relayBaseUrl() {
   return cyberdeckOrigin() || DEFAULT_SURVEY_RELAY_BASE_URL;
 }
 
+export function getSurveyRelayBaseUrl() {
+  return relayBaseUrl();
+}
+
 /**
  * @param {object} status
  */

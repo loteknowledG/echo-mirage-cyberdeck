@@ -1,8 +1,9 @@
 /**
- * Renderer-side continuous Web Speech STT for Echo Survey listening.
- * Driven by main-process satellite:stt-start / satellite:stt-stop IPC.
- * Also meters mic volume for PowerFist Listen spectrum.
+ * Renderer-side STT for Echo Survey listening.
+ * Prefers Whisper (Vercel cloud) — Chromium Web Speech is unreliable in Electron on macOS.
  */
+
+import { fetchEchoWhisperAvailable, startWhisperStt, stopWhisperStt } from "./whisper-stt";
 
 type SttReport = {
   interim?: string;
@@ -33,21 +34,6 @@ type SpeechRecognitionEventLike = {
   }>;
 };
 
-function formatSpeechError(code: string): string {
-  switch (code) {
-    case "network":
-      return "Speech recognition network error — Echo Satellite needs internet for Chromium speech on Mac. Check Wi‑Fi, then retry. Or use MIRAGE source with Whisper on Mirage.";
-    case "not-allowed":
-      return "Speech recognition blocked — grant Microphone and Speech Recognition for Echo Satellite in System Settings, then quit and reopen.";
-    case "service-not-allowed":
-      return "Speech recognition service blocked — enable Speech Recognition for Echo Satellite in System Settings.";
-    case "audio-capture":
-      return "Microphone capture failed — grant Microphone access for Echo Satellite in System Settings.";
-    default:
-      return `Speech recognition error: ${code}`;
-  }
-}
-
 type SatelliteSttApi = {
   onSttStart: (handler: (payload?: { lang?: string }) => void) => () => void;
   onSttStop: (handler: (payload?: unknown) => void) => () => void;
@@ -62,6 +48,7 @@ let audioContext: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
 let meterRaf: number | null = null;
 let wantListening = false;
+let usingWhisper = false;
 let uninstallStart: (() => void) | null = null;
 let uninstallStop: (() => void) | null = null;
 let lastLevelPushAt = 0;
@@ -77,6 +64,10 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
 function report(payload: SttReport) {
   const api = (window as Window & { satellite?: SatelliteSttApi }).satellite;
   void api?.reportStt?.(payload);
+}
+
+function isActive() {
+  return wantListening;
 }
 
 function stopMeter() {
@@ -106,11 +97,9 @@ function stopMediaStream() {
   mediaStream = null;
 }
 
-function stopRecognition() {
-  wantListening = false;
+function stopWebSpeech() {
   const active = recognition;
   recognition = null;
-  stopMediaStream();
   if (!active) return;
   try {
     active.onresult = null;
@@ -124,6 +113,14 @@ function stopRecognition() {
       /* ignore */
     }
   }
+}
+
+function stopListening() {
+  wantListening = false;
+  usingWhisper = false;
+  stopWhisperStt();
+  stopWebSpeech();
+  stopMediaStream();
   report({ listening: false, interim: "", level: 0, bands: [] });
 }
 
@@ -144,8 +141,8 @@ function startMeter(stream: MediaStream) {
     return;
   }
 
-  const time = new Uint8Array(analyser.fftSize);
-  const freq = new Uint8Array(analyser.frequencyBinCount);
+  const time = new Uint8Array(analyser!.fftSize);
+  const freq = new Uint8Array(analyser!.frequencyBinCount);
 
   const tick = () => {
     if (!analyser || !wantListening) return;
@@ -182,10 +179,13 @@ function startMeter(stream: MediaStream) {
   meterRaf = window.requestAnimationFrame(tick);
 }
 
-async function ensureMicrophone(): Promise<boolean> {
+async function ensureMicrophone(): Promise<MediaStream | null> {
   if (!navigator.mediaDevices?.getUserMedia) {
-    // Fall through — Web Speech may still open the mic itself.
-    return true;
+    report({
+      listening: false,
+      error: "Microphone API unavailable in this Electron build.",
+    });
+    return null;
   }
   try {
     stopMediaStream();
@@ -197,7 +197,7 @@ async function ensureMicrophone(): Promise<boolean> {
       video: false,
     });
     startMeter(mediaStream);
-    return true;
+    return mediaStream;
   } catch (error) {
     report({
       listening: false,
@@ -206,29 +206,22 @@ async function ensureMicrophone(): Promise<boolean> {
           ? `Microphone blocked: ${error.message}`
           : "Microphone permission denied.",
     });
-    return false;
+    return null;
   }
 }
 
-async function startRecognition(lang = "en-US") {
+async function startWebSpeech(lang: string, stream: MediaStream) {
   const Ctor = getSpeechRecognitionCtor();
   if (!Ctor) {
     report({
       listening: false,
-      error: "Speech recognition unavailable in this Chromium build (needs network speech).",
+      error:
+        "Chromium speech unavailable — ensure OPENAI_API_KEY is set on Vercel for Whisper STT.",
     });
     return;
   }
 
-  stopRecognition();
-  wantListening = true;
-
-  const micOk = await ensureMicrophone();
-  if (!micOk || !wantListening) {
-    wantListening = false;
-    return;
-  }
-
+  stopWebSpeech();
   const next = new Ctor();
   recognition = next;
   next.continuous = true;
@@ -255,18 +248,26 @@ async function startRecognition(lang = "en-US") {
   next.onerror = (event) => {
     const code = event?.error || "speech-error";
     if (code === "aborted" || code === "no-speech") return;
-    report({ error: formatSpeechError(code) });
+    if (code === "network") {
+      void switchToWhisper(lang, stream);
+      return;
+    }
+    report({
+      error:
+        code === "not-allowed"
+          ? "Speech blocked — grant Microphone in System Settings."
+          : `Speech recognition error: ${code}`,
+    });
   };
 
   next.onend = () => {
-    if (!wantListening) return;
-    // Chromium often ends continuous sessions — restart while armed.
+    if (!wantListening || usingWhisper) return;
     window.setTimeout(() => {
-      if (!wantListening || recognition !== next) return;
+      if (!wantListening || usingWhisper || recognition !== next) return;
       try {
         next.start();
       } catch {
-        void startRecognition(lang);
+        void switchToWhisper(lang, stream);
       }
     }, 120);
   };
@@ -274,15 +275,45 @@ async function startRecognition(lang = "en-US") {
   try {
     next.start();
     report({ listening: true, interim: "", error: undefined });
-  } catch (error) {
-    wantListening = false;
-    recognition = null;
-    stopMediaStream();
+  } catch {
+    void switchToWhisper(lang, stream);
+  }
+}
+
+async function switchToWhisper(lang: string, stream: MediaStream) {
+  stopWebSpeech();
+  const whisperOk = await fetchEchoWhisperAvailable();
+  if (!whisperOk || !wantListening) {
     report({
       listening: false,
-      error: error instanceof Error ? error.message : "Could not start speech recognition.",
+      error:
+        "Chromium speech failed and Whisper is unavailable — set OPENAI_API_KEY on Vercel, keep Echo Satellite online, then retry.",
     });
+    return;
   }
+  usingWhisper = true;
+  startWhisperStt(stream, lang, report, isActive);
+}
+
+async function startListening(lang = "en-US") {
+  stopListening();
+  wantListening = true;
+
+  const stream = await ensureMicrophone();
+  if (!stream || !wantListening) {
+    wantListening = false;
+    return;
+  }
+
+  const whisperOk = await fetchEchoWhisperAvailable();
+  if (whisperOk) {
+    usingWhisper = true;
+    startWhisperStt(stream, lang, report, isActive);
+    return;
+  }
+
+  usingWhisper = false;
+  await startWebSpeech(lang, stream);
 }
 
 /** Install STT IPC listeners once the Echo Satellite UI loads. */
@@ -294,16 +325,16 @@ export function installEchoSttBridge(): () => void {
   uninstallStart?.();
   uninstallStop?.();
   uninstallStart = api.onSttStart((payload) => {
-    void startRecognition(payload?.lang || "en-US");
+    void startListening(payload?.lang || "en-US");
   });
   uninstallStop = api.onSttStop(() => {
-    stopRecognition();
+    stopListening();
   });
   return () => {
     uninstallStart?.();
     uninstallStop?.();
     uninstallStart = null;
     uninstallStop = null;
-    stopRecognition();
+    stopListening();
   };
 }

@@ -85,8 +85,8 @@
       <section class="card">
         <h2>Survey listening</h2>
         <p class="hint">
-          When Mirage taps Start Listening, speech-to-text runs here. Keep Echo Satellite open;
-          internet is required for Chromium speech on Mac.
+          When Mirage taps Start Listening, mic audio is sent to Vercel Whisper (~5s chunks).
+          Chromium Web Speech is not used — it fails in Electron on Mac.
         </p>
         <dl class="status-grid">
           <dt>Listening</dt>
