@@ -46,4 +46,6 @@ contextBridge.exposeInMainWorld("satellite", {
   },
   reportStt: (report) => ipcRenderer.invoke("satellite:stt-report", report),
   getListeningState: () => ipcRenderer.invoke("satellite:get-listening-state"),
+  getWhisperStatus: () => ipcRenderer.invoke("satellite:get-whisper-status"),
+  transcribeChunk: (input) => ipcRenderer.invoke("satellite:transcribe-chunk", input),
 });

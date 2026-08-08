@@ -147,7 +147,7 @@ export function SurveyMirageListeningPanel() {
         <p className="mb-3 text-[9px] leading-relaxed tracking-[0.04em] text-[#5f5f5f]">
           {source === "mirage"
             ? "MIRAGE captures mic audio and transcribes via Whisper (server) or browser STT. Whisper needs OPENAI_API_KEY on Vercel."
-            : `ECHO uses ${SURVEY_ECHO_DISPLAY} Satellite mic STT (relay / LAN poll).`}
+            : `ECHO records mic on ${SURVEY_ECHO_DISPLAY} Satellite and transcribes via Whisper on Vercel (~5s chunks, relay poll).`}
         </p>
         {source === "mirage" ? (
           <SurveyMirageListeningInputControls disabled={busy || active} />
