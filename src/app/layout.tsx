@@ -11,7 +11,7 @@ import { QueryProvider } from '@/components/providers/query-provider';
 import { AppUpdatePrompt } from '@/components/providers/app-update-prompt';
 import { ChunkReload } from '@/components/providers/chunk-reload';
 import { ClientRequestInstrumentation } from '@/components/providers/client-request-instrumentation';
-import { RuntimeWindowTitle } from '@/components/providers/runtime-window-title';
+import { RuntimeShellIndicator } from '@/components/providers/runtime-shell-indicator';
 
 const SignatureScript = Mrs_Saint_Delafield({
   subsets: ['latin'],
@@ -52,6 +52,8 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning data-echo-mirage-release={releaseVersion}>
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/icon-192.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
         <meta name="echo-mirage-release" content={releaseVersion} />
       </head>
       <body
@@ -60,7 +62,7 @@ export default async function RootLayout({
         <ThemeProvider attribute="class" forcedTheme="dark">
           <QueryProvider>
             <div className="app-min-width-wrapper min-h-screen bg-background">
-              <RuntimeWindowTitle />
+              <RuntimeShellIndicator />
               <ChunkReload />
               <ClientRequestInstrumentation />
               <AppUpdatePrompt />
