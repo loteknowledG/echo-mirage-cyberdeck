@@ -265,6 +265,12 @@
   -webkit-font-smoothing: auto;
 }
 
+html[data-os="win"] .ascii-logo-twinkle__base,
+html[data-os="win"] .ascii-logo-twinkle__lit,
+html[data-os="win"] .ascii-logo-twinkle__sonar {
+  font-size: 5.5px;
+}
+
 .ascii-logo-twinkle__base {
   position: relative;
   z-index: 1;

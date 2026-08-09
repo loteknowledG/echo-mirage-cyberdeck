@@ -1,5 +1,6 @@
 const fs = require('fs/promises');
 const path = require('path');
+const { loadTrayNativeIcon } = require('./app-icon');
 
 /** @type {boolean} */
 let silentModeEnabled = false;
@@ -59,12 +60,16 @@ function notifyRenderer() {
 }
 
 function resolveTrayIcon() {
-  if (!electron?.nativeImage) return null;
-  let image = electron.nativeImage.createFromDataURL(TRAY_ICON_DATA_URL);
-  if (process.platform === 'win32') {
-    image = image.resize({ width: 16, height: 16 });
+  if (!electron?.nativeImage || !electron?.app) return null;
+  const image = loadTrayNativeIcon(electron.app, electron.nativeImage, __dirname);
+  if (!image.isEmpty()) {
+    return image;
   }
-  return image;
+  let fallback = electron.nativeImage.createFromDataURL(TRAY_ICON_DATA_URL);
+  if (process.platform === 'win32') {
+    fallback = fallback.resize({ width: 32, height: 32 });
+  }
+  return fallback;
 }
 
 function buildTrayMenu() {

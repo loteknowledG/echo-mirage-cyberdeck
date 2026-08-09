@@ -31,6 +31,7 @@ const {
   writeDesktopProviderEnv,
   DESKTOP_PROVIDER_ENV_KEYS,
 } = require('./load-desktop-provider-env');
+const { loadAppNativeIcon, loadTrayNativeIcon } = require('./app-icon');
 const { initializeAutoUpdater } = require('./auto-updater');
 
 initializeSilentMode({ app, Tray, Menu, nativeImage });
@@ -668,11 +669,13 @@ async function loadStartupErrorPage(win, message) {
 }
 
 function createCyberdeckBrowserWindow(options = {}) {
+  const appIcon = loadAppNativeIcon(app, nativeImage, __dirname);
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
     show: false,
     backgroundColor: '#000000',
+    ...(appIcon.isEmpty() ? {} : { icon: appIcon }),
     ...options,
     webPreferences: {
       nodeIntegration: false,
@@ -1412,6 +1415,13 @@ ipcMain.handle('computer-use:run-action', async (_event, action) => {
 });
 
 app.whenReady().then(async () => {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.craftwerk.echo-mirage-cyberdeck');
+  }
+  const appIcon = loadAppNativeIcon(app, nativeImage, __dirname);
+  if (!appIcon.isEmpty() && process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(appIcon);
+  }
   if (app.isPackaged) {
     Menu.setApplicationMenu(null);
   }
