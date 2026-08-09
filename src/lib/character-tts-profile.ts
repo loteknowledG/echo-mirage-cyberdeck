@@ -2,6 +2,11 @@ export const CHARACTER_TTS_PROFILE_OPTIONS = [
   { id: "jenny-neural", label: "Jenny Neural", description: "Clean styled profile." },
   { id: "jenna-jacket", label: "Jenna Jacket", description: "Friendly operator profile." },
   { id: "muthur", label: "MUTHUR", description: "Calm system voice with reverb." },
+  {
+    id: "mechanicus-voice",
+    label: "Tech Priest (Mechanicus)",
+    description: "Real Tech Priest — Coderobo AndrewNeural + Samus mechanicus FX (ffmpeg). Falls back to Edge locally without ffmpeg.",
+  },
   { id: "asian-elder", label: "Asian Elder", description: "Slow older male voice with East Asian accent." },
   {
     id: "vietnamese-male",
@@ -66,6 +71,14 @@ function normalizeProfileId(value: unknown): CharacterTtsProfileId | undefined {
     return "jenna-jacket";
   }
   if (normalized === "muthur" || normalized === "mother") return "muthur";
+  if (
+    normalized === "mechanicus" ||
+    normalized === "mechanicus-voice" ||
+    normalized === "tech-priest" ||
+    normalized === "tech priest"
+  ) {
+    return "mechanicus-voice";
+  }
   return CHARACTER_TTS_PROFILE_OPTIONS.find((option) => option.id === normalized)?.id;
 }
 

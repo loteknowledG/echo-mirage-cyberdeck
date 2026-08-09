@@ -30,6 +30,12 @@ export const VOICE_PROFILE_EDGE_CONFIG: Record<CharacterTtsProfileId, VoiceProfi
     pitch: "-5Hz",
     volume: "+0%",
   },
+  "mechanicus-voice": {
+    voice: "en-US-AndrewNeural",
+    rate: "-24%",
+    pitch: "-10Hz",
+    volume: "+0%",
+  },
   "asian-elder": {
     voice: "zh-CN-YunjianNeural",
     rate: "-28%",

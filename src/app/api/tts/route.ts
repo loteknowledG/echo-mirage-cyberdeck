@@ -3,7 +3,9 @@ export const runtime = "nodejs";
 
 import { EdgeTTS } from "edge-tts-universal";
 import { NextRequest, NextResponse } from "next/server";
+import { isMechanicusVoiceProfile } from "@/lib/cyberdeck/mechanicus-voice-profile";
 import { resolveVoiceProfileEdgeConfig } from "@/lib/voice-profile-edge";
+import { renderMechanicusVoice } from "@/server/render-mechanicus-voice";
 
 const TTS_TIMEOUT_MS = 120_000;
 
@@ -33,6 +35,32 @@ async function renderVoiceProfile(profile: string, text: string) {
   };
 }
 
+async function renderMechanicusWithFallback(text: string) {
+  const real = await renderMechanicusVoice(text);
+  if (real.ok) {
+    return {
+      ok: true as const,
+      provider: "coderobo+mechanicus" as const,
+      audioBase64: real.audio.toString("base64"),
+    };
+  }
+
+  const edge = await renderVoiceProfile("mechanicus-voice", text);
+  if (!edge.ok) {
+    return {
+      ok: false as const,
+      error: real.message || edge.error || "Mechanicus render failed",
+    };
+  }
+
+  return {
+    ok: true as const,
+    provider: "edge-tts-fallback" as const,
+    audioBase64: edge.audioBase64,
+    fallbackReason: real.message,
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -41,6 +69,25 @@ export async function POST(request: NextRequest) {
     const voiceProfile = profileRaw === "jenny" ? "jenny-neural" : profileRaw || "jenny-neural";
 
     if (!text) return NextResponse.json({ error: "Missing text" }, { status: 400 });
+
+    if (isMechanicusVoiceProfile(voiceProfile)) {
+      const result = await renderMechanicusWithFallback(text);
+      if (!result.ok) {
+        return NextResponse.json(
+          { ok: false, error: "VOICE_PROFILE_FAILED", detail: result.error || "Mechanicus render failed" },
+          { status: 200 },
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        provider: result.provider,
+        profile: "mechanicus-voice",
+        audioBase64: result.audioBase64,
+        contentType: "audio/mpeg",
+        ...(result.provider === "edge-tts-fallback" ? { fallbackReason: result.fallbackReason } : {}),
+      });
+    }
 
     const result = await renderVoiceProfile(voiceProfile, text);
     if (!result.ok) {
