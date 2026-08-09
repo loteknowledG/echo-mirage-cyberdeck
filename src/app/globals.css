@@ -169,6 +169,53 @@ body,
   }
 }
 
+/* Traveling highlight along draggable panel edges */
+@keyframes cyberdeck-resize-edge-travel-vertical {
+  0%,
+  100% {
+    background-position: 50% 0%;
+  }
+  50% {
+    background-position: 50% 100%;
+  }
+}
+
+@keyframes cyberdeck-resize-edge-travel-horizontal {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.cyberdeck-resize-edge-travel-vertical {
+  background-image: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(52, 211, 153, 0.25),
+    rgba(52, 211, 153, 0.95),
+    rgba(34, 211, 238, 0.45),
+    transparent
+  );
+  background-size: 100% 220%;
+  animation: cyberdeck-resize-edge-travel-vertical 5.5s ease-in-out infinite;
+}
+
+.cyberdeck-resize-edge-travel-horizontal {
+  background-image: linear-gradient(
+    to right,
+    transparent,
+    rgba(52, 211, 153, 0.25),
+    rgba(52, 211, 153, 0.95),
+    rgba(34, 211, 238, 0.45),
+    transparent
+  );
+  background-size: 220% 100%;
+  animation: cyberdeck-resize-edge-travel-horizontal 5.5s ease-in-out infinite;
+}
+
 @layer components {
   .mc-shadow-hover:hover {
     box-shadow: 14px 14px 42px rgba(0, 0, 0, 0.92);
@@ -320,15 +367,16 @@ body,
   flex-shrink: 0;
   touch-action: none;
   pointer-events: auto;
+  overflow: visible;
 }
 
-.cyberdeck-chat-resizer > div {
+.cyberdeck-chat-resizer > .cyberdeck-resize-edge-grip {
   background: #2d2d2d !important;
   box-shadow: none !important;
 }
 
-.cyberdeck-chat-resizer:hover > div,
-.cyberdeck-chat-resizer:focus-visible > div {
+.cyberdeck-chat-resizer:hover > .cyberdeck-resize-edge-grip,
+.cyberdeck-chat-resizer:focus-visible > .cyberdeck-resize-edge-grip {
   background: rgba(52, 211, 153, 0.72) !important;
   box-shadow: 0 0 10px rgba(52, 211, 153, 0.28) !important;
 }

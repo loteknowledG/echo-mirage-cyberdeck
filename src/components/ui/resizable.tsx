@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 
+import { ShineResizeEdge } from '@/components/ui/shine-resize-edge';
 import { cn } from '@/lib/utils';
 
 type Orientation = 'horizontal' | 'vertical';
@@ -516,6 +517,7 @@ ResizablePanel.resizableRole = 'panel' as const;
 export type ResizableHandleProps = {
   withHandle?: boolean;
   stacked?: boolean;
+  shineBorder?: boolean;
   className?: string;
   style?: React.CSSProperties;
 } & React.HTMLAttributes<HTMLDivElement>;
@@ -523,6 +525,7 @@ export type ResizableHandleProps = {
 export function ResizableHandle({
   withHandle = false,
   stacked = false,
+  shineBorder = true,
   className,
   onPointerDown,
   ...props
@@ -531,18 +534,21 @@ export function ResizableHandle({
     <div
       className={cn(
         stacked
-          ? 'relative z-20 box-border flex h-px min-h-[6px] w-full flex-none shrink-0 cursor-row-resize touch-none select-none items-center justify-center border-y border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 [-webkit-tap-highlight-color:transparent] before:absolute before:-top-3 before:-bottom-3 before:left-0 before:right-0 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
-          : 'relative z-20 flex-none self-stretch w-px min-w-[6px] flex items-center justify-center border-x border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none select-none [-webkit-tap-highlight-color:transparent]',
+          ? 'relative z-20 box-border flex h-px min-h-[6px] w-full flex-none shrink-0 cursor-row-resize touch-none select-none items-center justify-center overflow-visible border-y border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 [-webkit-tap-highlight-color:transparent] before:absolute before:-top-3 before:-bottom-3 before:left-0 before:right-0 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
+          : 'relative z-20 flex-none self-stretch w-px min-w-[6px] flex items-center justify-center overflow-visible border-x border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none select-none [-webkit-tap-highlight-color:transparent]',
         className,
       )}
       onPointerDown={onPointerDown}
       {...props}
     >
+      {shineBorder ? (
+        <ShineResizeEdge orientation={stacked ? 'horizontal' : 'vertical'} />
+      ) : null}
       {withHandle ? (
         stacked ? (
-          <div className="pointer-events-none h-px w-full rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />
+          <div className="cyberdeck-resize-edge-grip pointer-events-none h-px w-full rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />
         ) : (
-          <div className="pointer-events-none h-full w-px rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />
+          <div className="cyberdeck-resize-edge-grip pointer-events-none h-full w-px rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />
         )
       ) : null}
     </div>
