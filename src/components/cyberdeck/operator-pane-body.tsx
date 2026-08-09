@@ -24,6 +24,7 @@ import { OperatorDocFolderPane } from "@/components/cyberdeck/operator-doc-folde
 import type { OperatorDocFolderRoot } from "@/lib/operator-folder-nav";
 import { CyberdeckPaneHeader, CyberdeckPaneHeaderTitle } from "@/components/cyberdeck/pane-header";
 import { OperatorDocTypeMenu } from "@/components/cyberdeck/operator-doc-type-menu";
+import { ShineResizeEdge } from "@/components/ui/shine-resize-edge";
 import type { OperatorExportFormat } from "@/components/cyberdeck/operator-export-picker";
 import {
   OperatorConvertPicker,
@@ -1354,9 +1355,10 @@ export function CyberdeckOperatorPaneBody({
           title="Resize folder pane"
           onPointerDown={beginFolderPaneResize}
           onDoubleClick={() => setFolderPaneWidth(OPERATOR_FOLDER_PANE_DEFAULT_WIDTH)}
-          className="group relative z-10 w-2 shrink-0 cursor-col-resize border-l border-[#141414] bg-black transition hover:border-emerald-500/50 focus:outline-none focus-visible:border-emerald-400/80"
+          className="group relative z-10 w-2 shrink-0 cursor-col-resize overflow-visible border-l border-[#141414] bg-black transition hover:border-emerald-500/50 focus:outline-none focus-visible:border-emerald-400/80"
         >
-          <span className="absolute left-1/2 top-1/2 h-10 w-px -translate-x-1/2 -translate-y-1/2 bg-[#2d2d2d] transition group-hover:bg-emerald-400/70" />
+          <ShineResizeEdge orientation="vertical" />
+          <span className="cyberdeck-resize-edge-grip absolute left-1/2 top-1/2 h-10 w-px -translate-x-1/2 -translate-y-1/2 bg-[#2d2d2d] transition group-hover:bg-emerald-400/70" />
         </button>
         <div
           className="min-w-0 shrink-0 border-l border-[#1c1c1c]"

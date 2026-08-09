@@ -25,6 +25,7 @@ import {
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
 import { Textarea } from "@/components/ui/textarea";
+import { ShineResizeEdge } from "@/components/ui/shine-resize-edge";
 import { useDeckMode } from "@/lib/deck-mode";
 import {
   CyberdeckComposerControl,
@@ -834,9 +835,10 @@ export function CyberdeckGlyphChannelPaneBody() {
           onPointerDown={handleComposerResizePointerDown}
           onMouseDown={handleComposerResizeMouseDown}
           onKeyDown={handleComposerResizeKeyDown}
-          className="cyberdeck-chat-resizer group flex h-3 w-full cursor-row-resize items-center justify-center bg-black focus:outline-none"
+          className="cyberdeck-chat-resizer group flex h-3 w-full cursor-row-resize items-center justify-center overflow-visible bg-black focus:outline-none"
         >
-          <div className="h-px w-16 transition-colors group-focus-visible:bg-emerald-400" />
+          <ShineResizeEdge orientation="horizontal" />
+          <div className="cyberdeck-resize-edge-grip h-px w-16 transition-colors group-focus-visible:bg-emerald-400" />
         </div>
 
         <footer
