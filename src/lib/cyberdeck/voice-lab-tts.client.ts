@@ -146,6 +146,39 @@ type TtsApiResponse = {
   detail?: string;
 };
 
+function decodeAudioBase64ToArrayBuffer(audioBase64: string): ArrayBuffer {
+  const binary = atob(audioBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer.slice(0);
+}
+
+/** Fetch Edge TTS audio for a Voice Lab profile (no playback). */
+export async function fetchVoiceLabProfileAudio(
+  text: string,
+  profile: CharacterTtsProfileId,
+): Promise<ArrayBuffer | null> {
+  if (typeof window === "undefined") return null;
+  const speechText = text.trim().replace(/\s+/g, " ");
+  if (!speechText) return null;
+
+  try {
+    const response = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ text: speechText, profile }),
+    });
+    const data = (await response.json().catch(() => null)) as TtsApiResponse | null;
+    if (!response.ok || !data?.ok || !data.audioBase64) return null;
+    return decodeAudioBase64ToArrayBuffer(data.audioBase64);
+  } catch {
+    return null;
+  }
+}
+
 async function speakViaVoiceProfile(text: string, profile: CharacterTtsProfileId): Promise<VoiceLabTtsResult> {
   if (typeof window === "undefined") {
     return { ok: false, error: "TTS is unavailable in this environment." };

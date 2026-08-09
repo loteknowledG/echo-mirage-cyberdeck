@@ -7,6 +7,7 @@ import {
   CyberdeckPaneHeaderSubtitle,
   CyberdeckPaneHeaderTitle,
 } from "@/components/cyberdeck/pane-header";
+import { Switch } from "@/components/ui/switch";
 import {
   CHARACTER_TTS_PROFILE_OPTIONS,
   CHARACTER_TTS_PROFILE_OPTIONS_ALPHABETICAL,
@@ -17,19 +18,28 @@ import {
   type CharacterTtsVoice,
 } from "@/lib/character-tts-profile";
 import {
+  MUTHUR_VOICE_LAB_CHANGED_EVENT,
+  readMuthurVoiceLabEnabled,
+  writeMuthurVoiceLabEnabled,
+} from "@/lib/cyberdeck/muthur-voice-lab.client";
+import {
   previewVoiceLabProfile,
   readVoiceLabStoredProfile,
   unlockVoiceLabAudioPlayback,
   writeVoiceLabStoredProfile,
 } from "@/lib/cyberdeck/voice-lab-tts.client";
+import { cn } from "@/lib/utils";
 
 const DEFAULT_PREVIEW_TEXT = "Hello. This is how I will sound when I speak.";
 const selectClassName =
   "h-8 w-full rounded-sm border border-[#1c1c1c] bg-black/80 px-2 text-[10px] text-[#c8c8c8] outline-none focus:border-emerald-500/40";
+const SWITCH_LEGACY_EMERALD =
+  "data-[state=checked]:border-emerald-500/70 data-[state=checked]:bg-emerald-500/10 data-[state=unchecked]:border-[#2d2d2d] data-[state=unchecked]:bg-[#0c0c0c]";
 
 /** Voice Lab — m4trix voice profiles with Edge TTS preview (works on Vercel). */
 export function CyberdeckVoiceLabPaneBody() {
   const [voice, setVoice] = useState<CharacterTtsVoice>(() => readVoiceLabStoredProfile());
+  const [useForMuthur, setUseForMuthur] = useState(() => readMuthurVoiceLabEnabled());
   const [previewText, setPreviewText] = useState(DEFAULT_PREVIEW_TEXT);
   const [activeProfileId, setActiveProfileId] = useState<CharacterTtsProfileId | null>(null);
   const [status, setStatus] = useState("");
@@ -37,6 +47,15 @@ export function CyberdeckVoiceLabPaneBody() {
   useEffect(() => {
     writeVoiceLabStoredProfile(voice);
   }, [voice]);
+
+  useEffect(() => {
+    const onChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ enabled?: boolean }>).detail;
+      setUseForMuthur(detail?.enabled ?? readMuthurVoiceLabEnabled());
+    };
+    window.addEventListener(MUTHUR_VOICE_LAB_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(MUTHUR_VOICE_LAB_CHANGED_EVENT, onChanged);
+  }, []);
 
   const settings = resolveCharacterTtsVoice(voice);
   const selectedOption = CHARACTER_TTS_PROFILE_OPTIONS.find(
@@ -145,6 +164,32 @@ export function CyberdeckVoiceLabPaneBody() {
                 {activeProfileId === settings.profileId ? "PLAYING…" : "PREVIEW VOICE"}
               </CyberdeckActionButton>
             </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-[#1c1c1c] pt-3">
+              <div className="min-w-0">
+                <div className="text-[9px] tracking-[0.06em] text-[#8a8a8a]">USE FOR MUTHUR</div>
+                <div className="mt-0.5 text-[9px] tracking-[0.04em] text-[#5f5f5f]">
+                  {useForMuthur
+                    ? `MUTHUR speaks with ${characterTtsVoiceLabel(settings)} via Edge TTS.`
+                    : "MUTHUR uses the locked ship-computer voice preset."}
+                </div>
+              </div>
+              <Switch
+                checked={useForMuthur}
+                onCheckedChange={(checked) => {
+                  writeMuthurVoiceLabEnabled(checked);
+                  setUseForMuthur(checked);
+                  setStatus(
+                    checked
+                      ? `MUTHUR will use ${characterTtsVoiceLabel(settings)}.`
+                      : "MUTHUR voice preset restored.",
+                  );
+                }}
+                aria-label={useForMuthur ? "Voice Lab profile active for MUTHUR" : "Use Voice Lab profile for MUTHUR"}
+                className={cn("realmorphism-switch shrink-0", SWITCH_LEGACY_EMERALD)}
+                data-testid="voice-lab-use-for-muthur"
+              />
+            </div>
           </section>
 
           <section className="min-h-0 flex-1 rounded-sm border border-[#1c1c1c] bg-black/70 p-3">
@@ -178,7 +223,12 @@ export function CyberdeckVoiceLabPaneBody() {
                       <button
                         type="button"
                         className="text-[9px] tracking-[0.06em] text-[#6a6a6a] hover:text-emerald-300/90"
-                        onClick={() => setVoice(normalizeCharacterTtsVoice({ profileId: option.id }))}
+                        onClick={() => {
+                          setVoice(normalizeCharacterTtsVoice({ profileId: option.id }));
+                          if (useForMuthur) {
+                            setStatus(`MUTHUR will use ${option.label}.`);
+                          }
+                        }}
                       >
                         SELECT
                       </button>

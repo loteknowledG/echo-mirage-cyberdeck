@@ -42,6 +42,11 @@ import {
 import type { MuthurChatMessage } from "@/lib/muthur-core/muthur-command-console";
 import { textForSpeech } from "@/features/cyberdeck/muthur/coding-verify-format";
 import { MotherTerminal } from "@/features/cyberdeck/voice/mother-terminal";
+import { readMuthurVoiceLabEnabled } from "@/lib/cyberdeck/muthur-voice-lab.client";
+import {
+  fetchVoiceLabProfileAudio,
+  readVoiceLabStoredProfile,
+} from "@/lib/cyberdeck/voice-lab-tts.client";
 
 export type CyberdeckVoiceHealth = "idle" | "backend" | "fallback" | "off";
 
@@ -108,42 +113,50 @@ export function useCyberdeckVoice({
     speakQueueActiveRef.current = false;
   }, []);
 
-  const playMirageBuffer = useCallback(async (arrayBuffer: ArrayBuffer) => {
-    if (!isAudioAllowed()) return false;
-    if (typeof window === "undefined") return false;
-    const Ctx =
-      window.AudioContext ||
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return false;
+  const playMirageBuffer = useCallback(
+    async (arrayBuffer: ArrayBuffer, options?: { applyMuthurEffects?: boolean }) => {
+      if (!isAudioAllowed()) return false;
+      if (typeof window === "undefined") return false;
+      const Ctx =
+        window.AudioContext ||
+        (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctx) return false;
 
-    const ctx = audioContextRef.current ?? new Ctx();
-    audioContextRef.current = ctx;
-    if (ctx.state === "suspended") {
-      await ctx.resume();
-    }
+      const ctx = audioContextRef.current ?? new Ctx();
+      audioContextRef.current = ctx;
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
 
-    const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
-    const source = ctx.createBufferSource();
-    source.buffer = decoded;
-    const deckAudio = await loadDeckAudio();
-    const output = deckAudio.applyMuthurEffectChain(ctx, source, {
-      ...MUTHUR_PRESET.playback,
-    });
+      const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
+      const source = ctx.createBufferSource();
+      source.buffer = decoded;
+      const masterOutput = motherMasterGainRef.current ?? ctx.destination;
+      const applyMuthurEffects = options?.applyMuthurEffects ?? true;
 
-    const masterOutput = motherMasterGainRef.current ?? ctx.destination;
-    output.connect(masterOutput);
+      if (applyMuthurEffects) {
+        const deckAudio = await loadDeckAudio();
+        const output = deckAudio.applyMuthurEffectChain(ctx, source, {
+          ...MUTHUR_PRESET.playback,
+        });
+        output.connect(masterOutput);
+      } else {
+        source.connect(masterOutput);
+      }
 
-    activeSourceNodesRef.current.push(source);
-    source.start(0);
+      activeSourceNodesRef.current.push(source);
+      source.start(0);
 
-    await new Promise<void>((resolve) => {
-      source.onended = () => {
-        activeSourceNodesRef.current = activeSourceNodesRef.current.filter((s) => s !== source);
-        resolve();
-      };
-    });
-    return true;
-  }, []);
+      await new Promise<void>((resolve) => {
+        source.onended = () => {
+          activeSourceNodesRef.current = activeSourceNodesRef.current.filter((s) => s !== source);
+          resolve();
+        };
+      });
+      return true;
+    },
+    [],
+  );
 
   const initMotherAudio = useCallback((): AudioContext | null => {
     if (typeof window === "undefined") return null;
@@ -311,6 +324,18 @@ export function useCyberdeckVoice({
       }
 
       try {
+        if (readMuthurVoiceLabEnabled()) {
+          const voiceLabProfile = readVoiceLabStoredProfile();
+          const voiceLabAudio = await fetchVoiceLabProfileAudio(text, voiceLabProfile.profileId);
+          if (speakId !== speakSequenceRef.current) return false;
+          if (voiceLabAudio) {
+            setVoiceHealth("backend");
+            await playMirageBuffer(voiceLabAudio, { applyMuthurEffects: false });
+            if (speakId !== speakSequenceRef.current) return false;
+            return true;
+          }
+        }
+
         const result = await synthesizeMirageChunk(text, buildMuthurVoiceTuning(currentVoiceDial));
         if (speakId !== speakSequenceRef.current) return false;
         if (result.kind === "audio") {
