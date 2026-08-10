@@ -377,8 +377,46 @@ body,
 
 .cyberdeck-chat-resizer:hover > .cyberdeck-resize-edge-grip,
 .cyberdeck-chat-resizer:focus-visible > .cyberdeck-resize-edge-grip {
-  background: rgba(52, 211, 153, 0.72) !important;
-  box-shadow: 0 0 10px rgba(52, 211, 153, 0.28) !important;
+  background: rgba(239, 68, 68, 0.78) !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.35) !important;
+}
+
+.cyberdeck-chat-resizer:hover .cyberdeck-resize-edge-shine,
+.cyberdeck-chat-resizer:focus-visible .cyberdeck-resize-edge-shine {
+  background-image: radial-gradient(
+    transparent,
+    transparent,
+    rgba(239, 68, 68, 0.35),
+    rgba(239, 68, 68, 0.95),
+    rgba(248, 113, 113, 0.55),
+    transparent,
+    transparent
+  ) !important;
+  opacity: 1 !important;
+}
+
+.cyberdeck-chat-resizer:hover .cyberdeck-resize-edge-travel-vertical,
+.cyberdeck-chat-resizer:focus-visible .cyberdeck-resize-edge-travel-vertical {
+  background-image: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(239, 68, 68, 0.25),
+    rgba(239, 68, 68, 0.95),
+    rgba(248, 113, 113, 0.45),
+    transparent
+  ) !important;
+}
+
+.cyberdeck-chat-resizer:hover .cyberdeck-resize-edge-travel-horizontal,
+.cyberdeck-chat-resizer:focus-visible .cyberdeck-resize-edge-travel-horizontal {
+  background-image: linear-gradient(
+    to right,
+    transparent,
+    rgba(239, 68, 68, 0.25),
+    rgba(239, 68, 68, 0.95),
+    rgba(248, 113, 113, 0.45),
+    transparent
+  ) !important;
 }
 
 /* ⟁ Glyph composer — match ECHO m-2 inset; mirage-pane-body adds pane padding. */

@@ -47,8 +47,8 @@ export function CyberdeckLayoutShell({
           aria-label="Resize gateway and MUTHUR panes"
           className={
             isMobileLayout
-              ? "cyberdeck-chat-resizer !h-2 !min-h-2 !border-x-0 !border-y !border-[#141414] !bg-black hover:!border-emerald-500/50"
-              : "cyberdeck-chat-resizer !w-2 !min-w-2 !border-x-0 !border-r !border-[#141414] !bg-black hover:!border-emerald-500/50 before:absolute before:-inset-x-3 before:inset-y-0 before:content-['']"
+              ? "cyberdeck-chat-resizer !h-2 !min-h-2 !border-x-0 !border-y !border-[#141414] !bg-black hover:!border-red-500/70"
+              : "cyberdeck-chat-resizer !w-2 !min-w-2 !border-x-0 !border-r !border-[#141414] !bg-black hover:!border-red-500/70 before:absolute before:-inset-x-3 before:inset-y-0 before:content-['']"
           }
         />
 
