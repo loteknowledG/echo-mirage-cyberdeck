@@ -1,7 +1,7 @@
 # Quest 2 — Experiment 6: Git-integrated Vercel phase timing
 
-**Branch:** `codex/quest2-exp6-phase-timing`  
-**Base:** `cursor/voice-lab-mechanicus-wip` @ `d738799` (post PR #112)  
+**Branch:** `codex/quest2-exp6-phase-timing` (merged PR #113)  
+**Base:** `cursor/voice-lab-mechanicus-wip` @ `fc289cf` (post PR #114)  
 **Prerequisite:** Exp5 merged; Git-integrated deploys only (not CLI `vercel deploy`).
 
 **Rule:** **One controlled commit → one deployment.** No stacked probes.
@@ -64,9 +64,14 @@ Parsed artifact: `docs/engineering/quest2-results/vercel-d2d73f3-baseline.json`
 | Label | Commit | Deployment ID | queue+clone | install | preprocess | webpack | post+traces | upload | total | Notes |
 |-------|--------|---------------|-------------|---------|------------|---------|-------------|--------|-------|-------|
 | merge-baseline | `d2d73f3` | `Dsk5Ni2Mkj7Y3PZXqH5UZpymztTQ` | 4 | 18 | 2 | 1044 | 152 | 97 | 1323 | Exp5 merge; 1 worker in logs |
+| harness-deploy | `e61c0d5` | `99AzyvpuHPti8s2GueeiNNBPnwtU` | 5 | 18 | 2 | 949 | 145 | 94 | 1218 | PR #113 harness-only; ~20m wall; within baseline variance |
+
+Parsed artifact: `docs/engineering/quest2-results/vercel-e61c0d5-harness.json`
+
+**Harness vs baseline:** webpack −95s, total −105s — run variance, not a config win. Dominant bucket unchanged (~78–79% webpack).
 
 ---
 
-## Out of scope (Exp 7)
+## Exp 7 (next)
 
-- Reversing CI `parallelism = 1` — separate branch, one variable, after this baseline is recorded.
+Reversing CI `parallelism = 1` — separate branch (`codex/quest2-exp7-ci-parallelism`), one variable, one deployment.
