@@ -1,0 +1,15 @@
+{
+  "deployment": "99AzyvpuHPti8s2GueeiNNBPnwtU",
+  "commit": "e61c0d5",
+  "label": "exp6-harness-deploy",
+  "phases": {
+    "queue_and_clone_s": 5,
+    "install_s": 18,
+    "preprocessing_s": 2,
+    "next_build_webpack_s": 949,
+    "post_compile_and_traces_s": 145,
+    "upload_and_finalize_s": 94,
+    "total_wall_s": 1218
+  },
+  "notes": "PR #113 harness-only commit; Vercel Ready 20m wall. Compare to d2d73f3 baseline."
+}
