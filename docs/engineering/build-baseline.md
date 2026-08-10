@@ -329,4 +329,4 @@ NVMe warm is **80.7% faster** than USB warm — far above the **≥40%** thresho
 - [ ] Vercel compile-only phase split
 - [x] Ranked interventions with evidence (NVMe benchmark closed)
 
-**Exit gate:** attribution gate **PASSED** (2026-08-10). Primary cause: USB-HDD I/O. Quest 1: establish permanent NVMe development clone.
+**Evidence PR:** [#109](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/109) (`cursor/quest0-build-baseline-nvme` → `cursor/voice-lab-mechanicus-wip`)

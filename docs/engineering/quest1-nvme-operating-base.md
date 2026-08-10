@@ -1,9 +1,10 @@
 # Quest 1 — NVMe operating base verification
 
-**Status:** PASSED (initial verification)  
+**Status:** GO — operator checks substantially passed (automated); push pending PR #109 merge  
 **Date:** 2026-08-10  
-**Clone:** `C:\dev\echo-mirage-cyberdeck`  
-**Sibling:** `C:\dev\realmorphism`  
+**Authoritative clone:** `C:\dev\echo-mirage-cyberdeck`  
+**Branch:** `cursor/voice-lab-mechanicus-wip` @ `8b1b10d` (includes Quest 0/1 docs via fast-forward)  
+**Evidence PR:** https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/109  
 **Recovery copy (unchanged):** `F:\dev\echo-mirage-cyberdeck`  
 **Benchmark temp (preserve):** `C:\temp\quest0-nvme-echo-mirage-b219c91`
 
@@ -41,14 +42,39 @@ Open workspace: **`C:\dev\echo-mirage-cyberdeck`**
 
 Do not delete `F:\dev\echo-mirage-cyberdeck` until explicit acceptance sign-off.
 
+## Branch integration
+
+| Branch | Role |
+|--------|------|
+| `cursor/quest0-build-baseline-nvme` | Quest 0/1 evidence (2 commits on top of voice branch) |
+| `cursor/voice-lab-mechanicus-wip` | Voice Lab WIP + target integration branch |
+| **PR #109** | Stacks evidence onto voice branch: https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/109 |
+
+NVMe clone fast-forwarded `cursor/voice-lab-mechanicus-wip` to include evidence commits locally (`b219c91` → `8b1b10d`).
+
+## Operator acceptance checklist
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| Open project in Cursor at `C:\dev\echo-mirage-cyberdeck` | **Operator** | Automated tasks use this path |
+| `pnpm dev` | **PASS** | Ready in ~6.6s; sidecar :3051 ok |
+| Load `/cyberdeck` | **PASS** | HTTP 200; shell hydrated |
+| Voice Lab / Mechanicus | **PARTIAL** | `/api/tts` mechanicus-voice **ok** (Edge fallback when Coderobo unavailable); UI Voice toggle present |
+| MUTHUR assignment behavior | **PASS** | VOICE control visible; MUTHUR pane loaded |
+| Browser/server errors | **PASS*** | Survey tailscale 502 + powerfist 403 are environmental/expected; no NVMe blockers |
+| Git fetch/push | **PASS (dry-run)** | `git push --dry-run origin cursor/voice-lab-mechanicus-wip` → `b219c91..8b1b10d` |
+
+\*Operator should confirm Voice Lab pane preview interactively after opening a Voice Lab tab from the rail.
+
 ## Quest 1 exit gate checklist
 
 - [x] NVMe clone at `C:\dev\echo-mirage-cyberdeck`
-- [x] Branch `cursor/voice-lab-mechanicus-wip` @ `b219c91`
+- [x] Branch includes voice WIP + Quest 0/1 docs (`8b1b10d`)
 - [x] Fresh `pnpm install`
 - [x] `.env.local` restored
 - [x] `tsc --noEmit` clean
 - [x] Production build passes (cold **5m 19s**, warm **4m 24s**)
-- [ ] Dev server smoke (`pnpm dev`) — operator acceptance
-- [ ] Remote push/pull from NVMe clone — operator acceptance
-- [ ] Quest 0 evidence branch pushed / merged
+- [x] Dev server smoke (`pnpm dev`, `/cyberdeck` loads)
+- [x] Mechanicus `/api/tts` smoke
+- [x] Evidence PR opened (**#109**)
+- [ ] Operator: interactive Voice Lab preview + confirm PR #109 merged before push to origin
