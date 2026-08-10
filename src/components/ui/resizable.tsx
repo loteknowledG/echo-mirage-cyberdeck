@@ -591,15 +591,30 @@ export function ResizableHandle({
   const isTrailingMax = leadingFraction <= SNAP_EDGE_FRACTION;
   const showLeadingSnap = snapControls && Boolean(onSnapLeading) && !isLeadingMax;
   const showTrailingSnap = snapControls && Boolean(onSnapTrailing) && !isTrailingMax;
+  const isCyberdeckResizer = className?.includes('cyberdeck-chat-resizer');
+  const [resizeHovered, setResizeHovered] = React.useState(false);
 
   return (
     <div
       className={cn(
         stacked
-          ? 'relative z-20 box-border flex h-px min-h-[6px] w-full flex-none shrink-0 cursor-row-resize touch-none select-none items-center justify-center overflow-visible border-y border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 [-webkit-tap-highlight-color:transparent] before:absolute before:-top-3 before:-bottom-3 before:left-0 before:right-0 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
-          : 'relative z-20 flex-none self-stretch w-px min-w-[6px] flex items-center justify-center overflow-visible border-x border-slate-700/35 bg-slate-950/90 hover:bg-slate-700/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none select-none [-webkit-tap-highlight-color:transparent]',
+          ? cn(
+              'relative z-20 box-border flex h-px min-h-[6px] w-full flex-none shrink-0 cursor-row-resize touch-none select-none items-center justify-center overflow-visible border-y border-slate-700/35 bg-slate-950/90 [-webkit-tap-highlight-color:transparent] before:absolute before:-top-3 before:-bottom-3 before:left-0 before:right-0 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300',
+              isCyberdeckResizer ? 'hover:bg-transparent' : 'hover:bg-slate-700/30',
+            )
+          : cn(
+              'relative z-20 flex-none self-stretch w-px min-w-[6px] flex items-center justify-center overflow-visible border-x border-slate-700/35 bg-slate-950/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-col-resize touch-none select-none [-webkit-tap-highlight-color:transparent]',
+              isCyberdeckResizer ? 'hover:bg-transparent' : 'hover:bg-slate-700/30',
+            ),
         className,
       )}
+      data-resize-hover={isCyberdeckResizer && resizeHovered ? 'true' : undefined}
+      onPointerEnter={() => {
+        if (isCyberdeckResizer) setResizeHovered(true);
+      }}
+      onPointerLeave={() => {
+        if (isCyberdeckResizer) setResizeHovered(false);
+      }}
       onPointerDown={onPointerDown}
       {...props}
     >
