@@ -30,7 +30,7 @@ export function ShineResizeEdge({
         borderWidth={1}
         duration={duration}
         shineColor={CYBERDECK_RESIZE_SHINE}
-        className={cn("rounded-none opacity-80", className)}
+        className={cn("cyberdeck-resize-edge-shine rounded-none opacity-80", className)}
       />
       <span
         aria-hidden
