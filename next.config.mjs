@@ -163,9 +163,8 @@ const nextConfig = {
 	webpack: (config, { dev, isServer }) => {
 		// Avoid Windows EPERM readlink failures on Jupyter runtime / Pi venv symlinks.
 		config.resolve.symlinks = false;
-		if (process.env.CI && !dev) {
-			config.parallelism = 1;
-		}
+		// Quest 2 Exp7: allow webpack default parallelism on CI (was forced to 1).
+		// Revert if Vercel OOM or nondeterministic builds.
 		if (!dev) {
 			// Quest 2 exp1: enable filesystem cache on NVMe (revert on voice-lab if stale/nondeterministic).
 			config.cache = {
