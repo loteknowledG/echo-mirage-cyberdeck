@@ -45,6 +45,7 @@ export function CyberdeckLayoutShell({
           withHandle
           snapControls
           stacked={isMobileLayout}
+          data-cyberdeck-resizer="content-split"
           aria-label="Resize gateway and MUTHUR panes"
           className={
             isMobileLayout

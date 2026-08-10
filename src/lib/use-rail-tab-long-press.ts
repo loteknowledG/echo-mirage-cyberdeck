@@ -10,14 +10,13 @@ export const RAIL_TAB_LONG_PRESS_MOVE_PX = 10;
 type OpenMenuFn = (tabId: string, clientX: number, clientY: number) => void;
 
 /**
- * Pointer long-press for rail tabs (touch / pen). Selected-tab tap also opens the menu.
+ * Pointer long-press for rail tabs (touch / pen). Tap on selected tab also opens the menu.
  * Call {@link createHandlers} per tab with that tab's id.
  */
 export function useRailTabLongPress(options: {
   openMenu: OpenMenuFn;
-  getSelectedRailTabId: () => string;
 }) {
-  const { openMenu, getSelectedRailTabId } = options;
+  const { openMenu } = options;
 
   const timerRef = useRef<number | null>(null);
   const originRef = useRef<{ x: number; y: number } | null>(null);
@@ -46,7 +45,6 @@ export function useRailTabLongPress(options: {
   const createHandlers = useCallback(
     (tabId: string) => {
       const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
-        if (getSelectedRailTabId() !== tabId) return;
         if (event.pointerType === "mouse") return;
 
         clearTimer();
@@ -115,7 +113,7 @@ export function useRailTabLongPress(options: {
         onPointerLeave,
       };
     },
-    [clearTimer, getSelectedRailTabId, openMenu, releaseCaptureSafe],
+    [clearTimer, openMenu, releaseCaptureSafe],
   );
 
   const consumeClickIfLongPress = useCallback((tabId: string): boolean => {

@@ -586,6 +586,7 @@ const operatorWorkspace = useOperatorWorkspaceState({
     openNewTabMenu,
     applyTabMenuAction,
     deleteActiveTab,
+    deleteCustomTab,
     handleTabClick,
     openOrFocusDiagnosticsTab,
     openOrFocusPiTab,
@@ -612,11 +613,8 @@ const operatorWorkspace = useOperatorWorkspaceState({
     closeGatewayPaneContextMenu,
     handleMiragePaneContextMenu,
     handleGatewayPaneContextMenu,
-    copyMirageLastAssistant,
-    copyMirageSelectionOrLastMessage,
+    copySelection,
   } = useCyberdeckPaneContextMenus({
-    messages,
-    streamText,
     closeRailTabContextMenu,
   });
 
@@ -848,13 +846,11 @@ const operatorWorkspace = useOperatorWorkspaceState({
 
   const { createHandlers: createRailTabLongPressHandlers, consumeClickIfLongPress, cancelLongPressFromContextMenu } =
     useRailTabLongPress({
-      getSelectedRailTabId: getCyberdeckSelectedRailTabId,
       openMenu: openRailTabContextMenu,
     });
 
   const handleRailTabContextMenu = useCallback(
     (tabId: string, event: ReactMouseEvent<HTMLElement>) => {
-      if (getCyberdeckSelectedRailTabId() !== tabId) return;
       event.preventDefault();
       event.stopPropagation();
       cancelLongPressFromContextMenu();
@@ -946,13 +942,8 @@ const operatorWorkspace = useOperatorWorkspaceState({
         closeGatewayPaneContextMenu={closeGatewayPaneContextMenu}
         applyTabMenuAction={applyTabMenuAction}
         focusFixedServerPanel={focusFixedServerPanel}
-        deleteActiveTab={deleteActiveTab}
-        openOrFocusCallCenterTab={openOrFocusCallCenterTab}
-        replayFullLastAssistant={replayFullLastAssistant}
-        copyMirageLastAssistant={copyMirageLastAssistant}
-        copyMirageSelectionOrLastMessage={copyMirageSelectionOrLastMessage}
-        handleModelLabelClick={handleModelLabelClick}
-        openOrFocusDiagnosticsTab={openOrFocusDiagnosticsTab}
+        deleteCustomTab={deleteCustomTab}
+        copySelection={copySelection}
       />
       <CyberdeckServerRail
         railRef={serverRailRef}

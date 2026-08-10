@@ -233,23 +233,29 @@ export function useCyberdeckGatewayTabs({
     openRealmorphismKitTabRef.current = openRealmorphismKitTab;
   }, [openRealmorphismKitTab, openRealmorphismKitTabRef]);
 
-  const deleteActiveTab = useCallback(() => {
+  const deleteCustomTab = useCallback((tabId: string) => {
     closeRailTabContextMenu();
     closeMirageContextMenu();
     closeGatewayPaneContextMenu();
-    const activeCustomTabId = useCyberdeckTabStore.getState().activeCustomTabId;
-    if (!activeCustomTabId) return;
-    const closingTab = useCyberdeckTabStore
-      .getState()
-      .customTabs.find((tab) => tab.id === activeCustomTabId);
-    useCyberdeckTabStore.getState().setCustomTabs((prev) => prev.filter((tab) => tab.id !== activeCustomTabId));
-    useCyberdeckTabStore.setState((state) => ({
-      mountedCustomTabIds: state.mountedCustomTabIds.filter((id) => id !== activeCustomTabId),
+    const state = useCyberdeckTabStore.getState();
+    const closingTab = state.customTabs.find((tab) => tab.id === tabId);
+    if (!closingTab) return;
+    state.setCustomTabs((prev) => prev.filter((tab) => tab.id !== tabId));
+    useCyberdeckTabStore.setState((current) => ({
+      mountedCustomTabIds: current.mountedCustomTabIds.filter((id) => id !== tabId),
     }));
-    useCyberdeckTabStore.getState().setActiveCustomTabId(null);
-    notifySurveyTabClosed(closingTab?.kind);
+    if (state.activeCustomTabId === tabId) {
+      state.setActiveCustomTabId(null);
+    }
+    notifySurveyTabClosed(closingTab.kind);
     playDeckSystemSound("click", 0.02);
   }, [closeGatewayPaneContextMenu, closeMirageContextMenu, closeRailTabContextMenu]);
+
+  const deleteActiveTab = useCallback(() => {
+    const activeCustomTabId = useCyberdeckTabStore.getState().activeCustomTabId;
+    if (!activeCustomTabId) return;
+    deleteCustomTab(activeCustomTabId);
+  }, [deleteCustomTab]);
 
   const handleTabClick = useCallback(
     (
@@ -471,6 +477,7 @@ export function useCyberdeckGatewayTabs({
     applyTabMenuAction,
     openRealmorphismKitTab,
     deleteActiveTab,
+    deleteCustomTab,
     handleTabClick,
     openOrFocusDiagnosticsTab,
     openOrFocusPiTab,

@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { copyTextToClipboard } from "@/lib/grok-image-prompt";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
 import { contextMenuTargetIsTextField } from "@/features/cyberdeck/muthur/coding-verify-format";
-import type { ChatMessage } from "@/features/cyberdeck/muthur/muthur-chat-types";
 
 function contextMenuTargetIsPowerfistDeck(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
@@ -16,15 +15,16 @@ function contextMenuTargetIsPowerfistDeck(target: EventTarget | null): boolean {
   );
 }
 
+function readSelectedText(): string {
+  if (typeof window === "undefined") return "";
+  return window.getSelection()?.toString().trim() ?? "";
+}
+
 export type UseCyberdeckPaneContextMenusOptions = {
-  messages: ChatMessage[];
-  streamText: string;
   closeRailTabContextMenu: () => void;
 };
 
 export function useCyberdeckPaneContextMenus({
-  messages,
-  streamText,
   closeRailTabContextMenu,
 }: UseCyberdeckPaneContextMenusOptions) {
   const [mirageContextMenu, setMirageContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -47,8 +47,8 @@ export function useCyberdeckPaneContextMenus({
       if (typeof window === "undefined") return;
       closeRailTabContextMenu();
       closeGatewayPaneContextMenu();
-      const menuWidth = 176;
-      const menuHeight = 236;
+      const menuWidth = 112;
+      const menuHeight = 44;
       const padding = 8;
       const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
       const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
@@ -62,8 +62,8 @@ export function useCyberdeckPaneContextMenus({
       if (typeof window === "undefined") return;
       closeRailTabContextMenu();
       closeMirageContextMenu();
-      const menuWidth = 176;
-      const menuHeight = 200;
+      const menuWidth = 112;
+      const menuHeight = 44;
       const padding = 8;
       const x = Math.min(clientX, Math.max(padding, window.innerWidth - menuWidth - padding));
       const y = Math.min(clientY, Math.max(padding, window.innerHeight - menuHeight - padding));
@@ -72,15 +72,29 @@ export function useCyberdeckPaneContextMenus({
     [closeMirageContextMenu, closeRailTabContextMenu],
   );
 
+  const copySelection = useCallback(async () => {
+    const text = readSelectedText();
+    if (!text) {
+      toast.error("Nothing selected to copy.");
+      return;
+    }
+    try {
+      await copyTextToClipboard(text);
+      toast.success("Copied selection.");
+    } catch {
+      toast.error("Could not copy.");
+    }
+  }, []);
+
   const handleMiragePaneContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
       if (contextMenuTargetIsTextField(event.target)) return;
-      // Phone long-press on PowerFist cards must complete the 3-lap hold — not open Mirage menu.
       if (contextMenuTargetIsPowerfistDeck(event.target)) {
         event.preventDefault();
         event.stopPropagation();
         return;
       }
+      if (!readSelectedText()) return;
       event.preventDefault();
       event.stopPropagation();
       openMirageContextMenu(event.clientX, event.clientY);
@@ -96,50 +110,13 @@ export function useCyberdeckPaneContextMenus({
         event.stopPropagation();
         return;
       }
+      if (!readSelectedText()) return;
       event.preventDefault();
       event.stopPropagation();
       openGatewayPaneContextMenu(event.clientX, event.clientY);
     },
     [openGatewayPaneContextMenu],
   );
-
-  const copyMirageLastAssistant = useCallback(async () => {
-    let text = streamText.trim();
-    if (!text) {
-      const last = [...messages].reverse().find((m) => m.role === "assistant");
-      text = typeof last?.text === "string" ? last.text.trim() : "";
-    }
-    if (!text) {
-      toast.error("No assistant message to copy.");
-      return;
-    }
-    try {
-      await copyTextToClipboard(text);
-      toast.success("Copied last assistant message.");
-    } catch {
-      toast.error("Could not copy.");
-    }
-  }, [messages, streamText]);
-
-  const copyMirageSelectionOrLastMessage = useCallback(async () => {
-    const sel = typeof window !== "undefined" ? window.getSelection()?.toString().trim() ?? "" : "";
-    let text = sel;
-    if (!text) {
-      const last = messages[messages.length - 1];
-      text = typeof last?.text === "string" ? last.text.trim() : "";
-      if (!text) text = streamText.trim();
-    }
-    if (!text) {
-      toast.error("Nothing to copy.");
-      return;
-    }
-    try {
-      await copyTextToClipboard(text);
-      toast.success(sel ? "Copied selected text." : "Copied last message.");
-    } catch {
-      toast.error("Could not copy.");
-    }
-  }, [messages, streamText]);
 
   return {
     mirageContextMenu,
@@ -148,7 +125,6 @@ export function useCyberdeckPaneContextMenus({
     closeGatewayPaneContextMenu,
     handleMiragePaneContextMenu,
     handleGatewayPaneContextMenu,
-    copyMirageLastAssistant,
-    copyMirageSelectionOrLastMessage,
+    copySelection,
   };
 }
