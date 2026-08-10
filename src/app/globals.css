@@ -368,19 +368,52 @@ body,
   touch-action: none;
   pointer-events: auto;
   overflow: visible;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.cyberdeck-chat-resizer[data-resize-hover="true"],
+.cyberdeck-chat-resizer:hover,
+.cyberdeck-chat-resizer:focus-visible {
+  background: rgba(127, 29, 29, 0.42) !important;
+  border-color: rgba(239, 68, 68, 0.95) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(239, 68, 68, 0.75),
+    0 0 20px rgba(239, 68, 68, 0.35) !important;
 }
 
 .cyberdeck-chat-resizer > .cyberdeck-resize-edge-grip {
   background: #2d2d2d !important;
   box-shadow: none !important;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    width 0.15s ease,
+    height 0.15s ease;
 }
 
+.cyberdeck-chat-resizer[data-resize-hover="true"] > .cyberdeck-resize-edge-grip,
 .cyberdeck-chat-resizer:hover > .cyberdeck-resize-edge-grip,
 .cyberdeck-chat-resizer:focus-visible > .cyberdeck-resize-edge-grip {
-  background: rgba(239, 68, 68, 0.78) !important;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.35) !important;
+  background: rgba(239, 68, 68, 0.92) !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.55) !important;
 }
 
+.cyberdeck-chat-resizer[data-resize-hover="true"]:not(.cyberdeck-composer-resizer) > .cyberdeck-resize-edge-grip,
+.cyberdeck-chat-resizer:not(.cyberdeck-composer-resizer):hover > .cyberdeck-resize-edge-grip,
+.cyberdeck-chat-resizer:not(.cyberdeck-composer-resizer):focus-visible > .cyberdeck-resize-edge-grip {
+  width: 3px !important;
+}
+
+.cyberdeck-chat-resizer[data-resize-hover="true"].cyberdeck-composer-resizer > .cyberdeck-resize-edge-grip,
+.cyberdeck-chat-resizer.cyberdeck-composer-resizer:hover > .cyberdeck-resize-edge-grip,
+.cyberdeck-chat-resizer.cyberdeck-composer-resizer:focus-visible > .cyberdeck-resize-edge-grip {
+  height: 3px !important;
+}
+
+.cyberdeck-chat-resizer[data-resize-hover="true"] .cyberdeck-resize-edge-shine,
 .cyberdeck-chat-resizer:hover .cyberdeck-resize-edge-shine,
 .cyberdeck-chat-resizer:focus-visible .cyberdeck-resize-edge-shine {
   background-image: radial-gradient(
@@ -395,6 +428,7 @@ body,
   opacity: 1 !important;
 }
 
+.cyberdeck-chat-resizer[data-resize-hover="true"] .cyberdeck-resize-edge-travel-vertical,
 .cyberdeck-chat-resizer:hover .cyberdeck-resize-edge-travel-vertical,
 .cyberdeck-chat-resizer:focus-visible .cyberdeck-resize-edge-travel-vertical {
   background-image: linear-gradient(
@@ -407,6 +441,7 @@ body,
   ) !important;
 }
 
+.cyberdeck-chat-resizer[data-resize-hover="true"] .cyberdeck-resize-edge-travel-horizontal,
 .cyberdeck-chat-resizer:hover .cyberdeck-resize-edge-travel-horizontal,
 .cyberdeck-chat-resizer:focus-visible .cyberdeck-resize-edge-travel-horizontal {
   background-image: linear-gradient(
@@ -439,6 +474,7 @@ body,
   transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+.cyberdeck-chat-resizer[data-resize-hover="true"] .cyberdeck-resize-snap-btn,
 .cyberdeck-chat-resizer:hover .cyberdeck-resize-snap-btn,
 .cyberdeck-chat-resizer:focus-within .cyberdeck-resize-snap-btn {
   opacity: 1;
