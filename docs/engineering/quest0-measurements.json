@@ -1,0 +1,42 @@
+{
+  "quest": 0,
+  "status": "passed",
+  "commit": "b219c91",
+  "branch": "cursor/voice-lab-mechanicus-wip",
+  "toolchain": {
+    "node": "v24.17.0",
+    "pnpm": "10.33.2",
+    "next": "16.1.5"
+  },
+  "command": "pnpm exec next build --webpack",
+  "defender_realtime": true,
+  "usb_f_drive": {
+    "label": "USB-HDD",
+    "media": "HDD",
+    "bus": "USB",
+    "cold_wall_seconds": 2588.9,
+    "warm_wall_seconds": 1973.2,
+    "warm_run_webpack_seconds": 1670.2,
+    "warm_run_typescript_seconds": 102.5,
+    "warm_collect_build_traces_seconds": 145.1,
+    "warm_peak_working_set_mb": 3914.9,
+    "warm_max_node_processes": 25
+  },
+  "nvme_c_temp_benchmark": {
+    "path": "C:\\temp\\quest0-nvme-echo-mirage-b219c91",
+    "drive": "C: MSI M371 1TB NVMe",
+    "node_modules_method": "copied_from_usb",
+    "cold_wall_seconds": 457.8,
+    "warm_wall_seconds": 380.2,
+    "warm_run_webpack_seconds": 291.1,
+    "warm_run_typescript_seconds": 17.4,
+    "warm_collect_build_traces_seconds": 67.9,
+    "warm_peak_working_set_mb": 3143.0,
+    "warm_max_node_processes": 12,
+    "warm_vs_usb_improvement_percent": 80.7,
+    "run_webpack_vs_usb_improvement_percent": 82.6
+  },
+  "node22_warm_caveat": "Mixed Node 22/24 worker pool; sufficient to deprioritize Node pinning, not a pure Node isolation test.",
+  "attribution": "Primary cause: USB-HDD filesystem I/O across large node_modules graph. Not TypeScript, preprocessing, Node version, or worker count.",
+  "decision_gate": "filesystem_placement_primary_lever"
+}

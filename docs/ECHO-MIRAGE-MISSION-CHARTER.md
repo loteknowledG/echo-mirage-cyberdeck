@@ -1,8 +1,9 @@
 # Echo Mirage Mission Charter
 
-**Status:** Working target, intended to evolve with evidence  
+**Status:** Quest 0 passed · Quest 1 in progress (NVMe operating base)  
 **Prepared:** 2026-08-09  
-**Phase:** Pre-mission planning and build diagnosis
+**Updated:** 2026-08-10  
+**Phase:** Post–Quest 0 attribution; establishing NVMe development base
 
 ## 1. North star
 
@@ -41,7 +42,11 @@ The governing rule is:
 9. **Thin integration:** use contracts, adapters, events, and artifacts rather than importing other agents' implementations.
 10. **Incremental delivery:** build verified vertical slices; avoid a big-bang rewrite.
 
-## 4. Where we are now
+### Development prerequisites
+
+> Active Echo Mirage repositories, dependency stores, build caches, and generated Next artifacts **must reside on SSD/NVMe storage**. USB HDD storage is suitable for backup and archival use, not interactive builds.
+
+Quest 0 (2026-08-10) proved that keeping the repo on USB HDD inflated warm production builds from **~6 minutes** to **~33 minutes** (−81%) with identical commit, configuration, dependencies, and Defender state. See `docs/engineering/build-baseline.md`.
 
 ### Product state
 
@@ -64,7 +69,7 @@ The governing rule is:
 - Approximately 1,185 JavaScript and TypeScript source files were found across the inspected source, app, script, and test trees.
 - Several modules remain very large, although the codebase already contains dynamic-loading and compile-scope protections for heavy Cyberdeck panes.
 - The repository contains unrelated uncommitted voice/TTS work; diagnostic work must preserve it.
-- A complete cold/warm timing breakdown has not yet been captured.
+- **Quest 0 closed (2026-08-10):** extreme local build time is predominantly USB-HDD I/O. NVMe warm builds are **~6 minutes** vs **~33 minutes** on F: USB HDD. Evidence in `docs/engineering/build-baseline.md`.
 
 ### Fleet observations
 
@@ -122,7 +127,7 @@ Dependency flow must be one-way and cycle-free. The Cyberdeck shell composes dom
 
 ## 7. Quest plan
 
-### Quest 0 — Measure the twenty minutes
+### Quest 0 — Measure the twenty minutes — **PASSED**
 
 **Objective:** explain where build time goes before restructuring.
 
@@ -132,20 +137,34 @@ Dependency flow must be one-way and cycle-free. The Cyberdeck shell composes dom
 - Compare builds with controlled changes to Calyx, Voice Lab, Survey, and unrelated UI.
 - Produce `docs/engineering/build-baseline.md` with ranked interventions and expected impact.
 
-**Exit gate:** most of the twenty minutes is attributable to measured phases.
+**Exit gate:** most of the twenty minutes is attributable to measured phases. **Met:** primary cause is USB-HDD filesystem I/O (−81% on NVMe).
 
-### Quest 1 — Apply reversible build wins
+### Quest 1 — Establish the NVMe operating base
+
+**Objective:** move active development to NVMe with a fresh dependency install and verify reproducible builds.
+
+- Clone repository to NVMe (`C:\dev\echo-mirage-cyberdeck` or equivalent).
+- Preserve F: USB copy as recovery reference until acceptance.
+- Fresh `pnpm install` on NVMe (not copied `node_modules`).
+- Restore `.env.local` and sibling `realmorphism` layout.
+- Verify Node/pnpm toolchain; run production build (~6–8 minute target).
+- Verify Voice Lab / Mechanicus WIP present; run relevant voice/TTS checks.
+- Point Cursor and agent sessions at the NVMe repository.
+
+**Exit gate:** branch state, environment, dev server, production build, Voice WIP, and remote push/pull verified on NVMe.
+
+### Quest 2 — Apply reversible build wins
 
 - Narrow TypeScript and tracing scope where evidence supports it.
 - Stop unnecessary artifact rewrites and duplicated CI work.
-- evaluate safe persistent Webpack caching rather than assuming it must remain disabled.
+- Evaluate safe persistent Webpack caching rather than assuming it must remain disabled.
 - Prebuild source dependencies where appropriate.
 - Separate expensive probes and E2E suites from ordinary interactive builds.
 - Add repeatable benchmark commands and preserve before/after data.
 
 **Exit gate:** meaningful improvement with unchanged product behavior.
 
-### Quest 2 — Install the modular build substrate
+### Quest 3 — Install the modular build substrate
 
 - Add pnpm workspace configuration and Turborepo task orchestration.
 - Declare build, typecheck, lint, test, probe, and benchmark tasks with correct inputs and outputs.
@@ -154,7 +173,7 @@ Dependency flow must be one-way and cycle-free. The Cyberdeck shell composes dom
 
 **Exit gate:** the existing product builds through the workspace with reliable cache behavior.
 
-### Quest 3 — Prove boundaries with Calyx
+### Quest 4 — Prove boundaries with Calyx
 
 - Extract contracts first, then domain logic, server persistence, and UI integration.
 - Keep Calyx independent of the Cyberdeck shell.
@@ -163,7 +182,7 @@ Dependency flow must be one-way and cycle-free. The Cyberdeck shell composes dom
 
 **Exit gate:** a Calyx change rebuilds Calyx and true dependents, not the entire fleet.
 
-### Quest 4 — Consolidate the voice domain
+### Quest 5 — Consolidate the voice domain
 
 - Inventory all preview, persistence, TTS, character-profile, and MUTHUR-assignment paths.
 - Establish canonical `VoiceProfile`, `VoiceModulation`, `VoiceTarget`, `VoiceAssignment`, capability, and receipt contracts.
@@ -172,7 +191,7 @@ Dependency flow must be one-way and cycle-free. The Cyberdeck shell composes dom
 
 **Exit gate:** no competing source of truth for MUTHUR's active voice.
 
-### Quest 5 — Build the fleet Voice Lab
+### Quest 6 — Build the fleet Voice Lab
 
 - Use Roller Deck for browsing and selection.
 - Add manual modulation sliders and explicit preview/save/assign actions.
@@ -183,7 +202,7 @@ Dependency flow must be one-way and cycle-free. The Cyberdeck shell composes dom
 
 **Exit gate:** Voice Lab can change quickly, and every assignment produces a verifiable receipt.
 
-### Quest 6 — Establish Dispatch
+### Quest 7 — Establish Dispatch
 
 - Implement agent identity, surface, capability, budget, mission, task, context-envelope, handoff, artifact, approval, and receipt contracts.
 - Discover agents and query live capabilities through thin adapters.
@@ -191,7 +210,7 @@ Dependency flow must be one-way and cycle-free. The Cyberdeck shell composes dom
 
 **Exit gate:** Echo Mirage can select an eligible agent, dispatch a task, and receive a structured outcome.
 
-### Quest 7 — Mission readiness and remediation
+### Quest 8 — Mission readiness and remediation
 
 - Implement configured, reachable, authenticated, usable, funded, and end-to-end-verified probe levels.
 - Support `READY`, `READY_WITH_FALLBACK`, `DEGRADED`, and `BLOCKED` mission states.
@@ -200,7 +219,7 @@ Dependency flow must be one-way and cycle-free. The Cyberdeck shell composes dom
 
 **Exit gate:** critical missions cannot launch on configuration checks alone.
 
-### Quest 8 — First combat-mission vertical slice
+### Quest 9 — First combat-mission vertical slice
 
 Reproduce the macOS survey scenario:
 
@@ -217,7 +236,7 @@ Reproduce the macOS survey scenario:
 
 **Exit gate:** Echo Mirage recovers from the observed failure rather than merely displaying it.
 
-### Quest 9 — Close the Calyx learning loop
+### Quest 10 — Close the Calyx learning loop
 
 - Store claimed, observed, verified, repeated, stale, and contradicted capability evidence.
 - Tie evidence to agent, model, version, surface, environment, task type, artifact, and date.
