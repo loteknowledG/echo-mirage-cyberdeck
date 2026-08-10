@@ -419,6 +419,75 @@ body,
   ) !important;
 }
 
+.cyberdeck-resize-snap-btn {
+  position: absolute;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(239, 68, 68, 0.65);
+  background: rgba(0, 0, 0, 0.94);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.28);
+  cursor: pointer;
+  touch-action: manipulation;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cyberdeck-chat-resizer:hover .cyberdeck-resize-snap-btn,
+.cyberdeck-chat-resizer:focus-within .cyberdeck-resize-snap-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cyberdeck-resize-snap-btn:hover {
+  color: #fff;
+  background: rgba(127, 29, 29, 0.96);
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.45);
+  transform: scale(1.06);
+}
+
+.cyberdeck-resize-snap-leading-desktop {
+  top: 33.333%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cyberdeck-resize-snap-trailing-desktop {
+  top: 66.666%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cyberdeck-resize-snap-leading-stacked {
+  left: 33.333%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cyberdeck-resize-snap-trailing-stacked {
+  left: 66.666%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cyberdeck-chat-resizer:hover .cyberdeck-resize-snap-btn:hover,
+.cyberdeck-chat-resizer:focus-within .cyberdeck-resize-snap-btn:hover {
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .cyberdeck-chat-resizer .cyberdeck-resize-snap-btn {
+    opacity: 0.9;
+    pointer-events: auto;
+  }
+}
+
 /* ⟁ Glyph composer — match ECHO m-2 inset; mirage-pane-body adds pane padding. */
 .glyph-channel-composer {
   box-sizing: border-box;

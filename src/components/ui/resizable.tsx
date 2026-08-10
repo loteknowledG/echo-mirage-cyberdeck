@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { TfiShiftLeftAlt, TfiShiftRightAlt } from 'react-icons/tfi';
 
 import { ShineResizeEdge } from '@/components/ui/shine-resize-edge';
 import { cn } from '@/lib/utils';
@@ -248,6 +249,16 @@ export function ResizablePanelGroup({
     setSizes([...initialSizesRef.current]);
   }, []);
 
+  const snapToLeadingMax = React.useCallback(() => {
+    if (panelCount !== 2) return;
+    setSizes(normalizeInitialSizes([1, 0], panels as React.ReactElement[]));
+  }, [panelCount, panels]);
+
+  const snapToTrailingMax = React.useCallback(() => {
+    if (panelCount !== 2) return;
+    setSizes(normalizeInitialSizes([0, 1], panels as React.ReactElement[]));
+  }, [panelCount, panels]);
+
   const collectPanelConstraints = React.useCallback(() => {
     const minSizes = Array(panelCount).fill(0);
     const maxSizes = Array(panelCount).fill(1);
@@ -477,6 +488,13 @@ export function ResizablePanelGroup({
             event.stopPropagation();
             resetSizes();
           },
+          ...(useSplitGrid
+            ? {
+                leadingFraction,
+                onSnapLeading: snapToLeadingMax,
+                onSnapTrailing: snapToTrailingMax,
+              }
+            : {}),
           style: {
             cursor: isHorizontal ? 'col-resize' : 'row-resize',
             ...handle.props.style,
@@ -514,10 +532,45 @@ export function ResizablePanel({
 }
 ResizablePanel.resizableRole = 'panel' as const;
 
+const SNAP_EDGE_FRACTION = 0.02;
+
+type ResizeSnapButtonProps = {
+  label: string;
+  className: string;
+  onSnap: () => void;
+  children: React.ReactNode;
+};
+
+function ResizeSnapButton({ label, className, onSnap, children }: ResizeSnapButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className={cn('cyberdeck-resize-snap-btn', className)}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onSnap();
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export type ResizableHandleProps = {
   withHandle?: boolean;
   stacked?: boolean;
   shineBorder?: boolean;
+  snapControls?: boolean;
+  leadingFraction?: number;
+  onSnapLeading?: () => void;
+  onSnapTrailing?: () => void;
   className?: string;
   style?: React.CSSProperties;
 } & React.HTMLAttributes<HTMLDivElement>;
@@ -526,10 +579,19 @@ export function ResizableHandle({
   withHandle = false,
   stacked = false,
   shineBorder = true,
+  snapControls = false,
+  leadingFraction = 0.5,
+  onSnapLeading,
+  onSnapTrailing,
   className,
   onPointerDown,
   ...props
 }: ResizableHandleProps) {
+  const isLeadingMax = leadingFraction >= 1 - SNAP_EDGE_FRACTION;
+  const isTrailingMax = leadingFraction <= SNAP_EDGE_FRACTION;
+  const showLeadingSnap = snapControls && Boolean(onSnapLeading) && !isLeadingMax;
+  const showTrailingSnap = snapControls && Boolean(onSnapTrailing) && !isTrailingMax;
+
   return (
     <div
       className={cn(
@@ -550,6 +612,32 @@ export function ResizableHandle({
         ) : (
           <div className="cyberdeck-resize-edge-grip pointer-events-none h-full w-px rounded-full bg-slate-400/70 shadow-[0_0_8px_rgba(148,163,184,0.12)]" />
         )
+      ) : null}
+      {showLeadingSnap ? (
+        <ResizeSnapButton
+          label="Expand gateway pane"
+          onSnap={onSnapLeading!}
+          className={
+            stacked
+              ? 'cyberdeck-resize-snap-leading-stacked'
+              : 'cyberdeck-resize-snap-leading-desktop'
+          }
+        >
+          <TfiShiftLeftAlt aria-hidden className="h-4 w-4" />
+        </ResizeSnapButton>
+      ) : null}
+      {showTrailingSnap ? (
+        <ResizeSnapButton
+          label="Expand MUTHUR pane"
+          onSnap={onSnapTrailing!}
+          className={
+            stacked
+              ? 'cyberdeck-resize-snap-trailing-stacked'
+              : 'cyberdeck-resize-snap-trailing-desktop'
+          }
+        >
+          <TfiShiftRightAlt aria-hidden className="h-4 w-4" />
+        </ResizeSnapButton>
       ) : null}
     </div>
   );
