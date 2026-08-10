@@ -84,6 +84,7 @@ web_modules/
 .env.test.local
 .env.production.local
 .env.local
+.env*.local
 desktop-provider.env
 
 # parcel-bundler cache (https://parceljs.org/)
@@ -187,3 +188,7 @@ data/property-manager/cases/*
 node_modules
 *.docx
 /Documents
+
+# Quest 2 harness raw output (sanitized metrics live in quest2-measurements.json)
+docs/engineering/quest2-results/*-summary.json
+docs/engineering/quest2-results/*.log

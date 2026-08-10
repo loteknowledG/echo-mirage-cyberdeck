@@ -3,6 +3,9 @@
   "version": "0.1.12",
   "private": true,
   "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": "24.x"
+  },
   "main": "electron/main.js",
   "scripts": {
     "dev": "node scripts/next-dev.mjs",
