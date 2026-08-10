@@ -1,0 +1,27 @@
+﻿{
+  "deployment": "Dsk5Ni2Mkj7Y3PZXqH5UZpymztTQ",
+  "commit": "d2d73f3",
+  "phases": {
+    "queue_and_clone_s": 4,
+    "install_s": 18,
+    "preprocessing_s": 2,
+    "next_build_webpack_s": 1044,
+    "post_compile_and_traces_s": 152,
+    "upload_and_finalize_s": 97,
+    "total_wall_s": 1323
+  },
+  "marks": {
+    "buildStart": "2026-08-10T14:32:48.523Z",
+    "cloneStart": "2026-08-10T14:32:48.658Z",
+    "cloneEnd": "2026-08-10T14:32:52.645Z",
+    "installStart": "2026-08-10T14:32:57.836Z",
+    "installEnd": "2026-08-10T14:33:16.201Z",
+    "nextBuildStart": "2026-08-10T14:33:16.316Z",
+    "webpackStart": "2026-08-10T14:33:18.004Z",
+    "webpackEnd": "2026-08-10T14:50:42.101Z",
+    "buildOutputComplete": "2026-08-10T14:53:13.922Z",
+    "uploadStart": "2026-08-10T14:53:14.045Z",
+    "uploadEnd": "2026-08-10T14:54:51.256Z",
+    "deployEnd": "2026-08-10T14:54:51.256Z"
+  }
+}
