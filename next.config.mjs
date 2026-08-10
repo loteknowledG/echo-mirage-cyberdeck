@@ -167,7 +167,14 @@ const nextConfig = {
 			config.parallelism = 1;
 		}
 		if (!dev) {
-			config.cache = false;
+			// Quest 2 exp1: enable filesystem cache on NVMe (revert on voice-lab if stale/nondeterministic).
+			config.cache = {
+				type: "filesystem",
+				cacheDirectory: path.join(projectRoot, ".next/cache/webpack"),
+				buildDependencies: {
+					config: [path.join(projectRoot, "next.config.mjs")],
+				},
+			};
 		}
 
 		if (isServer) {

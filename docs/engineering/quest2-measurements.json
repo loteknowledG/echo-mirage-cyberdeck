@@ -1,0 +1,42 @@
+{
+  "experiment": "quest2-exp1-webpack-cache",
+  "repo": "C:\\dev\\echo-mirage-cyberdeck",
+  "branch": "cursor/quest2-webpack-cache",
+  "baseline_quest1_warm_cache_off_seconds": 263.6,
+  "baseline_run_webpack_seconds": 166.8,
+  "runs": [
+    {
+      "label": "exp1-a-cold-cache-on",
+      "wall_seconds": 307.2,
+      "run_webpack_seconds": 198.6,
+      "collect_build_traces_seconds": 76.1,
+      "cache_mb_after": 2117.6,
+      "peak_working_set_mb": 3075.5,
+      "max_node_count": 24,
+      "exit_code": 0,
+      "build_id": "TnGuNksPzQT6oICXnBxRo"
+    },
+    {
+      "label": "exp1-b-warm-identical",
+      "wall_seconds": 243.1,
+      "run_webpack_seconds": 146.6,
+      "collect_build_traces_seconds": 71.8,
+      "cache_mb_after": 2351.3,
+      "peak_working_set_mb": 3557.3,
+      "max_node_count": 14,
+      "exit_code": 0,
+      "build_id": "XsgIBrQlrTdjQ4s6n1LHv"
+    },
+    {
+      "label": "exp1-c-incremental-ui",
+      "wall_seconds": 244.4,
+      "run_webpack_seconds": 152.0,
+      "collect_build_traces_seconds": 68.3,
+      "cache_mb_after": 2354.7,
+      "peak_working_set_mb": 3333.6,
+      "exit_code": 0
+    }
+  ],
+  "warm_delta_vs_baseline_percent": -7.8,
+  "decision": "keep filesystem cache; proceed to exp2-exp4"
+}
