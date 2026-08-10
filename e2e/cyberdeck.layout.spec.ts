@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
 const DESKTOP_VIEWPORT = { width: 1280, height: 720 };
-const COMPOSER = ".cyberdeck-chat-app > .cyberdeck-message-box";
-const DIVIDER = '[role="separator"]';
+const COMPOSER = ".cyberdeck-chat-app .cyberdeck-message-box";
+const DIVIDER = '[data-cyberdeck-resizer="content-split"]';
 
 type SplitGeometry = {
   chatPanelTop: number;

@@ -21,14 +21,46 @@ export type CyberdeckContextMenusProps = {
   closeGatewayPaneContextMenu: () => void;
   applyTabMenuAction: (action: CustomTabContextMenuAction, existingTabId?: string) => void;
   focusFixedServerPanel: (serverId: (typeof SERVER_IDS)[number]) => void;
-  deleteActiveTab: () => void;
-  openOrFocusCallCenterTab: () => void;
-  replayFullLastAssistant: () => void;
-  copyMirageLastAssistant: () => void | Promise<void>;
-  copyMirageSelectionOrLastMessage: () => void | Promise<void>;
-  handleModelLabelClick: (targetServer?: "s" | "b") => void;
-  openOrFocusDiagnosticsTab: () => void;
+  deleteCustomTab: (tabId: string) => void;
+  copySelection: () => void | Promise<void>;
 };
+
+function PaneCopyMenu({
+  x,
+  y,
+  onClose,
+  onCopy,
+}: {
+  x: number;
+  y: number;
+  onClose: () => void;
+  onCopy: () => void | Promise<void>;
+}) {
+  return (
+    <div
+      role="menu"
+      aria-label="Copy selection"
+      className="absolute min-w-28 rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
+      style={{ left: x, top: y }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+    >
+      <CyberdeckMenuButton
+        type="button"
+        role="menuitem"
+        onClick={() => {
+          onClose();
+          void onCopy();
+        }}
+      >
+        Copy
+      </CyberdeckMenuButton>
+    </div>
+  );
+}
 
 export function CyberdeckContextMenus({
   railTabContextMenu,
@@ -39,13 +71,8 @@ export function CyberdeckContextMenus({
   closeGatewayPaneContextMenu,
   applyTabMenuAction,
   focusFixedServerPanel,
-  deleteActiveTab,
-  openOrFocusCallCenterTab,
-  replayFullLastAssistant,
-  copyMirageLastAssistant,
-  copyMirageSelectionOrLastMessage,
-  handleModelLabelClick,
-  openOrFocusDiagnosticsTab,
+  deleteCustomTab,
+  copySelection,
 }: CyberdeckContextMenusProps) {
   useEffect(() => {
     if (!railTabContextMenu && !mirageContextMenu && !gatewayPaneContextMenu) return;
@@ -177,7 +204,8 @@ export function CyberdeckContextMenus({
                 role="menuitem"
                 danger
                 onClick={() => {
-                  deleteActiveTab();
+                  if (railTabContextMenu.variant !== "custom") return;
+                  deleteCustomTab(railTabContextMenu.tabId);
                   closeRailTabContextMenu();
                 }}
               >
@@ -187,131 +215,19 @@ export function CyberdeckContextMenus({
           )}
         </div>
       ) : mirageContextMenu ? (
-        <div
-          role="menu"
-          aria-label="Mirage chat actions"
-          className="absolute min-w-44 rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
-          style={{ left: mirageContextMenu.x, top: mirageContextMenu.y }}
-          onPointerDown={(event) => event.stopPropagation()}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-        >
-          <CyberdeckMenuButton
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeMirageContextMenu();
-              openOrFocusCallCenterTab();
-            }}
-          >
-            Open Call Center
-          </CyberdeckMenuButton>
-          <CyberdeckMenuButton
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeMirageContextMenu();
-              replayFullLastAssistant();
-            }}
-          >
-            Speak last message
-          </CyberdeckMenuButton>
-          <CyberdeckMenuButton
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeMirageContextMenu();
-              void copyMirageLastAssistant();
-            }}
-          >
-            Copy last assistant message
-          </CyberdeckMenuButton>
-          <CyberdeckMenuButton
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeMirageContextMenu();
-              void copyMirageSelectionOrLastMessage();
-            }}
-          >
-            Copy selection or last message
-          </CyberdeckMenuButton>
-          <CyberdeckMenuButton
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeMirageContextMenu();
-              handleModelLabelClick("b");
-            }}
-          >
-            Open Settings
-          </CyberdeckMenuButton>
-          <CyberdeckMenuButton
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeMirageContextMenu();
-              handleModelLabelClick("s");
-            }}
-          >
-            Open connection panel
-          </CyberdeckMenuButton>
-        </div>
+        <PaneCopyMenu
+          x={mirageContextMenu.x}
+          y={mirageContextMenu.y}
+          onClose={closeMirageContextMenu}
+          onCopy={copySelection}
+        />
       ) : gatewayPaneContextMenu ? (
-        <div
-          role="menu"
-          aria-label="Gateway pane actions"
-          className="absolute min-w-44 rounded border border-[#2d2d2d] bg-black/95 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]"
-          style={{ left: gatewayPaneContextMenu.x, top: gatewayPaneContextMenu.y }}
-          onPointerDown={(event) => event.stopPropagation()}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-        >
-          <CyberdeckMenuButton
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeGatewayPaneContextMenu();
-              void copyMirageSelectionOrLastMessage();
-            }}
-          >
-            Copy selection or last message
-          </CyberdeckMenuButton>
-          <CyberdeckMenuButton
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeGatewayPaneContextMenu();
-              handleModelLabelClick("b");
-            }}
-          >
-            Open Settings
-          </CyberdeckMenuButton>
-          <CyberdeckMenuButton
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeGatewayPaneContextMenu();
-              handleModelLabelClick("s");
-            }}
-          >
-            Open connection panel
-          </CyberdeckMenuButton>
-          <CyberdeckMenuButton
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              closeGatewayPaneContextMenu();
-              openOrFocusDiagnosticsTab();
-            }}
-          >
-            Open Diagnostics tab
-          </CyberdeckMenuButton>
-        </div>
+        <PaneCopyMenu
+          x={gatewayPaneContextMenu.x}
+          y={gatewayPaneContextMenu.y}
+          onClose={closeGatewayPaneContextMenu}
+          onCopy={copySelection}
+        />
       ) : null}
     </div>
   );

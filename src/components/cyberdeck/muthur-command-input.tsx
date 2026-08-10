@@ -30,6 +30,7 @@ type MuthurCommandInputProps = {
   glyphModeActive: boolean;
   isStreaming: boolean;
   chatHydrated: boolean;
+  maxHeightPx?: number;
   onSubmit: (text: string) => void;
   onCanSendChange?: (canSend: boolean) => void;
   onFocusExtra?: () => void;
@@ -52,6 +53,7 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
       glyphModeActive,
       isStreaming,
       chatHydrated,
+      maxHeightPx = TEXTAREA_MAX_HEIGHT_PX,
       onSubmit,
       onCanSendChange,
       onFocusExtra,
@@ -75,8 +77,8 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
         return;
       }
       el.style.height = "auto";
-      el.style.height = `${Math.min(Math.max(el.scrollHeight, TEXTAREA_MIN_HEIGHT_PX), TEXTAREA_MAX_HEIGHT_PX)}px`;
-    }, []);
+      el.style.height = `${Math.min(Math.max(el.scrollHeight, TEXTAREA_MIN_HEIGHT_PX), maxHeightPx)}px`;
+    }, [maxHeightPx]);
 
     useImperativeHandle(
       ref,
@@ -129,7 +131,7 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
       adjustHeight();
       const frame = requestAnimationFrame(() => adjustHeight());
       return () => cancelAnimationFrame(frame);
-    }, [value, adjustHeight, chatHydrated, hasProviderAuth, glyphModeActive]);
+    }, [value, adjustHeight, chatHydrated, hasProviderAuth, glyphModeActive, maxHeightPx]);
 
     useEffect(() => {
       if (!chatHydrated) return;
@@ -288,8 +290,8 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
                   ? "Steer MUTHUR — type and Enter to interrupt (Shift+Enter for new line)"
                   : "Enter command or message... (Shift+Enter for new line)"
           }
-          style={{ height: TEXTAREA_MIN_HEIGHT_PX }}
-          className="muthur-command-input min-h-[44px] max-h-[200px] min-w-0 flex-1 resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-1 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"
+          style={{ height: TEXTAREA_MIN_HEIGHT_PX, maxHeight: maxHeightPx }}
+          className="muthur-command-input min-h-[44px] min-w-0 flex-1 resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-1 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"
           disabled={false}
           aria-label="MUTHUR command input"
         />

@@ -1,15 +1,12 @@
 "use client";
 
 import type { MouseEvent as ReactMouseEvent, SetStateAction } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { flushSync } from "react-dom";
 import { OPERATOR_BROWSER_HOME_URL } from "@/lib/browser-intents";
 import { playDeckSystemSound } from "@/features/cyberdeck/runtime/defer-deck-audio";
 import { emitSignal } from "@/lib/cyberdeck/signal-router";
-import {
-  getCyberdeckSelectedRailTabId,
-  useCyberdeckTabStore,
-} from "@/lib/cyberdeck-tab-store";
+import { useCyberdeckTabStore } from "@/lib/cyberdeck-tab-store";
 import type { ChatMessage } from "@/features/cyberdeck/muthur/muthur-chat-types";
 import {
   defaultCustomTabGlyphForKind,
@@ -21,7 +18,6 @@ import {
   type CustomTabContextMenuAction,
   type CustomTabKind,
 } from "@/features/cyberdeck/workspace/custom-tab-model";
-
 export type RailTabContextMenuState =
   | { variant: "custom"; tabId: string; x: number; y: number }
   | { variant: "fixed"; serverId: (typeof SERVER_IDS)[number]; x: number; y: number }
@@ -58,7 +54,7 @@ export function useRailTabContextMenu({
 
   const openRailTabContextMenu = useCallback(
     (tabId: string, clientX: number, clientY: number) => {
-      if (getCyberdeckSelectedRailTabId() !== tabId || typeof window === "undefined") return;
+      if (typeof window === "undefined") return;
       closeMirageContextMenu();
       closeGatewayPaneContextMenu();
 
@@ -146,29 +142,7 @@ export function useRailTabContextMenu({
     [closeRailTabContextMenu, convertCustomTab, openRealmorphismKitTab, setMessages, setNavRailContext],
   );
 
-  useEffect(() => {
-    if (!railTabContextMenu) return;
-    if (railTabContextMenu.variant !== "custom") return;
-    return useCyberdeckTabStore.subscribe((state) => {
-      if (state.activeCustomTabId !== railTabContextMenu.tabId) {
-        closeRailTabContextMenu();
-      }
-    });
-  }, [closeRailTabContextMenu, railTabContextMenu]);
-
-  useEffect(() => {
-    if (!railTabContextMenu) return;
-    if (railTabContextMenu.variant !== "fixed") return;
-    return useCyberdeckTabStore.subscribe((state) => {
-      const selected = state.activeCustomTabId ?? state.server;
-      if (railTabContextMenu.serverId !== selected) {
-        closeRailTabContextMenu();
-      }
-    });
-  }, [closeRailTabContextMenu, railTabContextMenu]);
-
-  return {
-    railTabContextMenu,
+  return {    railTabContextMenu,
     closeRailTabContextMenu,
     openRailTabContextMenu,
     openNewTabMenu,

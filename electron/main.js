@@ -616,34 +616,23 @@ function buildContextMenu(win, params) {
   const isCyberdeck = pageURL.includes('/cyberdeck');
 
   if (params.selectionText && params.selectionText.trim()) {
-    template.push({
-      label: `Search Google for "${params.selectionText.slice(0, 40)}${params.selectionText.length > 40 ? '…' : ''}"`,
-      click: () => {
-        const query = encodeURIComponent(params.selectionText);
-        void shell.openExternal(`https://www.google.com/search?q=${query}`);
-      },
-    });
     template.push({ role: 'copy' });
-    template.push({ role: 'selectAll' });
     const menu = Menu.buildFromTemplate(template);
     menu.popup({ window: win });
     return;
   }
 
   if (isCyberdeck) {
-    template.push({
-      label: 'Save Document...',
-      click: () => dispatchRendererAction(win, 'save-operator'),
-    });
-    template.push({
-      label: 'Paste',
-      click: () => dispatchRendererAction(win, 'paste-operator'),
-    });
-    template.push({
-      label: 'Copy Document',
-      click: () => dispatchRendererAction(win, 'copy-operator'),
-    });
-    template.push({ type: 'separator' });
+    if (params.isEditable) {
+      if (params.selectionText && params.selectionText.trim()) {
+        template.push({ role: 'copy' });
+      }
+      template.push({ role: 'paste' });
+      template.push({ role: 'selectAll' });
+      const menu = Menu.buildFromTemplate(template);
+      menu.popup({ window: win });
+    }
+    return;
   }
 
   template.push({ role: 'back', enabled: safeWebContentsCanGoBack(win) });

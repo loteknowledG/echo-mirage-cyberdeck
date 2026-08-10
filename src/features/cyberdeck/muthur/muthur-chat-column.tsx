@@ -1,7 +1,7 @@
 "use client";
 
 import type { MouseEvent as ReactMouseEvent, Ref } from "react";
-import { forwardRef } from "react";
+import { forwardRef, useLayoutEffect, useRef, useState } from "react";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
 import {
   CyberdeckControlTooltip,
@@ -16,6 +16,11 @@ import {
 } from "@/components/cyberdeck/muthur-command-input";
 import { MuthurComposerVoiceKnob } from "@/components/cyberdeck/muthur-composer-voice-knob";
 import { MuthurComposerShell } from "@/components/cyberdeck/muthur-composer-shell";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { MuthurDelegationPanel } from "@/components/cyberdeck/muthur-delegation-panel";
 import { MuthurInhabitantRoller } from "@/components/cyberdeck/muthur-inhabitant-roller";
 import { MuthurPostureRoller } from "@/components/cyberdeck/muthur-posture-roller";
@@ -36,6 +41,9 @@ import {
   type MuthurInhabitant,
 } from "@/lib/muthur/muthur-inhabitant";
 import type { MuthurPosture } from "@/lib/muthur/muthur-posture";
+
+const COMPOSER_TEXT_MIN_PX = 44;
+const COMPOSER_TEXT_MAX_FALLBACK_PX = 200;
 
 export type MuthurChatColumnProps = {
   isMobileLayout: boolean;
@@ -156,6 +164,23 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
       onStop,
     } = props;
 
+    const composerInputBandRef = useRef<HTMLDivElement>(null);
+    const [composerMaxTextHeight, setComposerMaxTextHeight] = useState(COMPOSER_TEXT_MAX_FALLBACK_PX);
+
+    useLayoutEffect(() => {
+      const band = composerInputBandRef.current;
+      if (!band) return;
+
+      const updateMaxHeight = () => {
+        setComposerMaxTextHeight(Math.max(COMPOSER_TEXT_MIN_PX, band.clientHeight));
+      };
+
+      updateMaxHeight();
+      const observer = new ResizeObserver(updateMaxHeight);
+      observer.observe(band);
+      return () => observer.disconnect();
+    }, []);
+
     return (
       <div
         ref={ref}
@@ -170,84 +195,101 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
             <MirageHeader collapse={mirageHeaderCollapse} />
           </div>
         ) : null}
-        <div
-          ref={messageScrollRef}
-          tabIndex={-1}
-          data-cyberdeck-scroll-y-only
-          className="cyberdeck-chat-content custom-scrollbar flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-y-auto overflow-x-hidden p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
-          onScroll={(event) => {
-            onChatScroll(event.currentTarget);
-          }}
+        <ResizablePanelGroup
+          orientation="vertical"
+          memoryKey="muthur-composer-split-v1"
+          className="min-h-0 min-w-0 flex-1"
         >
-          <div
-            ref={muthurChatScrollContentRef}
-            className="cyberdeck-chat-scroll-body min-h-0 min-w-0 max-w-full pb-6"
-          >
-            {isMobileLayout ? (
-              <div className="mb-2">
-                <MirageHeader collapse={mirageHeaderCollapse} />
-              </div>
-            ) : null}
-            <MuthurCommanderStatus
-              posture={muthurPosture}
-              mission={muthurMission}
-              disabled={isStreaming}
-              onCreateMission={onCreateMission}
-              onStartMission={onStartMission}
-              className="mb-3"
-            />
-            <MuthurCommandConsoleLog
-              messages={messages}
-              diagnosticsState={muthurDiagnostics}
-              streamText={streamText}
-              streamToolTrace={streamToolTrace}
-              streamReasoning={streamReasoning}
-              isStreaming={isStreaming}
-              responseStall={muthurStall}
-              chatUserDisplayName={chatUserDisplayName}
-              onChatUserDisplayNameChange={onChatUserDisplayNameChange}
-              chatKeyboardHighlightIndex={chatKeyboardHighlightIndex}
-              renderDiagnosticText={renderGatewayMessageText}
-              cognitionStatusLine={cognitionStatusLine}
-              streamInhabitant={muthurInhabitant}
-              delegationPanel={
-                muthurPosture === "commander" ? (
-                  <MuthurDelegationPanel
-                    variant="accordion"
-                    mission={muthurMission}
-                    assignments={muthurDelegations}
-                    disabled={isStreaming}
-                    onCreateDelegation={onCreateDelegation}
-                    onDispatchDelegation={onDispatchDelegation}
-                    onRecordDelegationResult={onRecordDelegationResult}
-                    onCancelDelegation={onCancelDelegation}
-                  />
-                ) : null
-              }
-            />
-            <div ref={messagesEndRef} className="h-px" aria-hidden />
-          </div>
-        </div>
-
-        <footer className="cyberdeck-message-box realmorphism-host-surface shrink-0 border-t bg-black p-0">
-          <div className="mx-2 mb-2 mt-2 flex flex-col gap-2">
-            <MuthurComposerShell deckMode={deckMode}>
-              <div className="flex px-2 py-2">
-                <MuthurCommandInput
-                  ref={messageInputRef}
-                  inputHistory={inputHistory}
-                  hasProviderAuth={muthurInhabitant === "muthur" ? hasProviderAuth : true}
-                  glyphModeActive={glyphModeActive}
-                  isStreaming={isStreaming}
-                  chatHydrated={chatHydrated}
-                  onSubmit={(text) => void onSend(text)}
-                  onCanSendChange={onCanSendChange}
-                  onFocusExtra={onComposerFocusExtra}
-                  onPasteImage={onPasteImage}
+          <ResizablePanel defaultSize={72} minSize={25} className="min-h-0 overflow-hidden">
+            <div
+              ref={messageScrollRef}
+              tabIndex={-1}
+              data-cyberdeck-scroll-y-only
+              className="cyberdeck-chat-content custom-scrollbar flex h-full min-h-0 min-w-0 flex-col overflow-y-auto overflow-x-hidden p-4 outline-none focus-visible:ring-1 focus-visible:ring-green-500/25"
+              onScroll={(event) => {
+                onChatScroll(event.currentTarget);
+              }}
+            >
+              <div
+                ref={muthurChatScrollContentRef}
+                className="cyberdeck-chat-scroll-body min-h-0 min-w-0 max-w-full pb-6"
+              >
+                {isMobileLayout ? (
+                  <div className="mb-2">
+                    <MirageHeader collapse={mirageHeaderCollapse} />
+                  </div>
+                ) : null}
+                <MuthurCommanderStatus
+                  posture={muthurPosture}
+                  mission={muthurMission}
+                  disabled={isStreaming}
+                  onCreateMission={onCreateMission}
+                  onStartMission={onStartMission}
+                  className="mb-3"
                 />
+                <MuthurCommandConsoleLog
+                  messages={messages}
+                  diagnosticsState={muthurDiagnostics}
+                  streamText={streamText}
+                  streamToolTrace={streamToolTrace}
+                  streamReasoning={streamReasoning}
+                  isStreaming={isStreaming}
+                  responseStall={muthurStall}
+                  chatUserDisplayName={chatUserDisplayName}
+                  onChatUserDisplayNameChange={onChatUserDisplayNameChange}
+                  chatKeyboardHighlightIndex={chatKeyboardHighlightIndex}
+                  renderDiagnosticText={renderGatewayMessageText}
+                  cognitionStatusLine={cognitionStatusLine}
+                  streamInhabitant={muthurInhabitant}
+                  delegationPanel={
+                    muthurPosture === "commander" ? (
+                      <MuthurDelegationPanel
+                        variant="accordion"
+                        mission={muthurMission}
+                        assignments={muthurDelegations}
+                        disabled={isStreaming}
+                        onCreateDelegation={onCreateDelegation}
+                        onDispatchDelegation={onDispatchDelegation}
+                        onRecordDelegationResult={onRecordDelegationResult}
+                        onCancelDelegation={onCancelDelegation}
+                      />
+                    ) : null
+                  }
+                />
+                <div ref={messagesEndRef} className="h-px" aria-hidden />
               </div>
-            </MuthurComposerShell>
-            <div className="muthur-composer-controls deck-pane-depth-toolbar px-1">
+            </div>
+          </ResizablePanel>
+
+          <ResizableHandle
+            withHandle
+            stacked
+            data-cyberdeck-resizer="composer-split"
+            aria-label="Resize MUTHUR message log and composer"
+            className="cyberdeck-chat-resizer cyberdeck-composer-resizer !h-2 !min-h-2 !border-x-0 !border-y !border-[#141414] !bg-black hover:!border-red-500/70"
+          />
+
+          <ResizablePanel defaultSize={28} minSize={18} maxSize={75} className="min-h-0 overflow-hidden">
+            <footer className="cyberdeck-message-box realmorphism-host-surface flex h-full min-h-0 flex-col border-t bg-black p-0">
+              <div className="mx-2 mb-2 mt-2 flex min-h-0 flex-1 flex-col gap-2">
+                <MuthurComposerShell deckMode={deckMode} className="flex min-h-0 flex-1 flex-col">
+                  <div ref={composerInputBandRef} className="flex min-h-0 flex-1 px-2 py-2">
+                    <MuthurCommandInput
+                      ref={messageInputRef}
+                      maxHeightPx={composerMaxTextHeight}
+                      inputHistory={inputHistory}
+                      hasProviderAuth={muthurInhabitant === "muthur" ? hasProviderAuth : true}
+                      glyphModeActive={glyphModeActive}
+                      isStreaming={isStreaming}
+                      chatHydrated={chatHydrated}
+                      onSubmit={(text) => void onSend(text)}
+                      onCanSendChange={onCanSendChange}
+                      onFocusExtra={onComposerFocusExtra}
+                      onPasteImage={onPasteImage}
+                    />
+                  </div>
+                </MuthurComposerShell>
+                <div className="muthur-composer-controls deck-pane-depth-toolbar shrink-0 px-1">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   <button
@@ -389,8 +431,10 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
                 </div>
               </div>
             </div>
-          </div>
-        </footer>
+              </div>
+            </footer>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
     );
   },
