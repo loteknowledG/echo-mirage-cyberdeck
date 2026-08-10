@@ -43,6 +43,7 @@ export function CyberdeckLayoutShell({
 
         <ResizableHandle
           withHandle
+          snapControls
           stacked={isMobileLayout}
           aria-label="Resize gateway and MUTHUR panes"
           className={
