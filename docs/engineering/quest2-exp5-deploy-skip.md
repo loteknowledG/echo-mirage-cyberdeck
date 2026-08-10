@@ -87,11 +87,16 @@ Record deployment status URLs in the receipt table below.
 
 ## Live verification receipt
 
+**Merged:** PR #111 → `d2d73f3` on `cursor/voice-lab-mechanicus-wip` (2026-08-10)
+
 | Step | Commit | Vercel status | Notes |
 |------|--------|---------------|-------|
-| A infrastructure | `e388bff` | *in progress* | scripts + vercel.json → expect BUILD |
-| B docs-only | *pending* | | |
-| C runtime | *pending* | | |
+| A infrastructure | `e388bff` | **Canceled** | Superseded in queue when B/C pushed |
+| B docs-only | `dbe7cf2` | **Canceled / skipped** | `aathofqk0` / `rhmuedfx3` — ignoreCommand skip + queue supersession |
+| C runtime | `4a8ae6e` | **Success** | `CVFZiaPnuhk8EM2pxQVVxLKtY47F` — full build completed |
+| Merge | `d2d73f3` | **Success** | `Dsk5Ni2Mkj7Y3PZXqH5UZpymztTQ` — Ready ~22 min (settled 10:55 EDT) |
+
+**Exp 5 gate:** **PASS** — C completed full build; B canceled/skipped; A canceled in stacked queue. Use **one commit per verification** going forward.
 
 ---
 
