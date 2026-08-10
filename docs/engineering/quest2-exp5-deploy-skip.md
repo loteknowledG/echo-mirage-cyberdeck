@@ -89,7 +89,7 @@ Record deployment status URLs in the receipt table below.
 
 | Step | Commit | Vercel status | Notes |
 |------|--------|---------------|-------|
-| A infrastructure | *pending push* | | |
+| A infrastructure | `e388bff` | *in progress* | scripts + vercel.json → expect BUILD |
 | B docs-only | *pending* | | |
 | C runtime | *pending* | | |
 
