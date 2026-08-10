@@ -329,4 +329,5 @@ NVMe warm is **80.7% faster** than USB warm — far above the **≥40%** thresho
 - [ ] Vercel compile-only phase split
 - [x] Ranked interventions with evidence (NVMe benchmark closed)
 
-**Evidence PR:** [#109](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/109) (`cursor/quest0-build-baseline-nvme` → `cursor/voice-lab-mechanicus-wip`)
+**Evidence PR:** [#109 merged](https://github.com/loteknowledG/echo-mirage-cyberdeck/pull/109) · merge commit `01c33e5`  
+**Quest 1:** **PASSED** — authoritative base `C:\dev\echo-mirage-cyberdeck` (see `quest1-nvme-operating-base.md`)
