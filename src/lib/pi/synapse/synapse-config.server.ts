@@ -9,11 +9,14 @@ export const SYNAPSE_HEALTH_URL =
   process.env.SYNAPSE_HEALTH_URL?.trim() ||
   SYNAPSE_MCP_URL.replace(/\/mcp\/?$/, "/health");
 
-const TOKEN_FILE = path.join(
-  process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"),
-  "synapse",
-  "token.txt",
-);
+const TOKEN_FILE =
+  process.env.NODE_ENV === "production"
+    ? null
+    : path.join(
+        process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"),
+        "synapse",
+        "token.txt",
+      );
 
 export function readSynapseBearerToken(): string | null {
   const fromEnv = process.env.SYNAPSE_BEARER_TOKEN?.trim();
@@ -21,7 +24,7 @@ export function readSynapseBearerToken(): string | null {
     return fromEnv;
   }
   try {
-    return fs.readFileSync(TOKEN_FILE, "utf8").trim() || null;
+    return TOKEN_FILE ? fs.readFileSync(TOKEN_FILE, "utf8").trim() || null : null;
   } catch {
     return null;
   }

@@ -22,6 +22,11 @@ export function resolveCalyxMcpBinary(): string {
   if (fromEnv) {
     return path.resolve(fromEnv);
   }
+  // Production output tracing must not expand os.homedir() into the operator profile.
+  // Deployments use CALYX_MCP_BINARY or resolve calyx-mcp from PATH.
+  if (process.env.NODE_ENV === "production") {
+    return process.platform === "win32" ? "calyx-mcp.exe" : "calyx-mcp";
+  }
   const cargoBin = path.join(os.homedir(), ".cargo", "bin", "calyx-mcp.exe");
   if (process.platform === "win32" && fs.existsSync(cargoBin)) {
     return cargoBin;
