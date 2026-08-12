@@ -638,7 +638,10 @@ export function ResizableHandle({
               : 'cyberdeck-resize-snap-leading-desktop'
           }
         >
-          <TfiShiftLeftAlt aria-hidden className="h-4 w-4" />
+          <TfiShiftLeftAlt
+            aria-hidden
+            className={cn('h-4 w-4', stacked && 'rotate-90')}
+          />
         </ResizeSnapButton>
       ) : null}
       {showTrailingSnap ? (
@@ -651,7 +654,10 @@ export function ResizableHandle({
               : 'cyberdeck-resize-snap-trailing-desktop'
           }
         >
-          <TfiShiftRightAlt aria-hidden className="h-4 w-4" />
+          <TfiShiftRightAlt
+            aria-hidden
+            className={cn('h-4 w-4', stacked && 'rotate-90')}
+          />
         </ResizeSnapButton>
       ) : null}
     </div>
