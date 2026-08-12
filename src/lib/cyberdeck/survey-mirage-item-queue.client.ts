@@ -123,6 +123,45 @@ function hydrateQueueItem(item: SurveyMirageQueueItem): SurveyMirageQueueItem {
   return imageDataUrl ? { ...item, imageDataUrl } : item;
 }
 
+function normalizeQueueItem(raw: unknown, index: number): SurveyMirageQueueItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const item = raw as Partial<SurveyMirageQueueItem>;
+  if (typeof item.id !== "string" || !item.id.trim()) return null;
+
+  const source: SurveyMirageQueueItemSource =
+    item.source === "capture" ||
+    item.source === "clipboard" ||
+    item.source === "mission" ||
+    item.source === "manual"
+      ? item.source
+      : "manual";
+
+  return {
+    id: item.id.trim(),
+    title:
+      typeof item.title === "string" && item.title.trim()
+        ? item.title.trim()
+        : `Item ${index + 1}`,
+    prompt:
+      typeof item.prompt === "string" && item.prompt.trim()
+        ? item.prompt
+        : SURVEY_SILENT_CAPTURE_PROMPT,
+    ...(typeof item.imageDataUrl === "string" && item.imageDataUrl
+      ? { imageDataUrl: item.imageDataUrl }
+      : {}),
+    ...(typeof item.imageRef === "string" && item.imageRef.trim()
+      ? { imageRef: item.imageRef.trim() }
+      : {}),
+    ...(typeof item.answer === "string" ? { answer: item.answer } : {}),
+    ...(typeof item.transcript === "string" ? { transcript: item.transcript } : {}),
+    source,
+    createdAt:
+      typeof item.createdAt === "string" && item.createdAt
+        ? item.createdAt
+        : new Date(0).toISOString(),
+  };
+}
+
 function serializeQueueItem(item: SurveyMirageQueueItem): SurveyMirageQueueItem {
   if (!item.imageDataUrl) {
     const { imageDataUrl: _drop, ...rest } = item;
@@ -166,9 +205,12 @@ function readItems(): SurveyMirageQueueItem[] {
   try {
     const raw = window.localStorage.getItem(ITEMS_STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as SurveyMirageQueueItem[];
+    const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.map(hydrateQueueItem);
+    return parsed
+      .map(normalizeQueueItem)
+      .filter((item): item is SurveyMirageQueueItem => item !== null)
+      .map(hydrateQueueItem);
   } catch {
     return [];
   }
