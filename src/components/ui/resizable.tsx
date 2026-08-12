@@ -630,7 +630,7 @@ export function ResizableHandle({
       ) : null}
       {showLeadingSnap ? (
         <ResizeSnapButton
-          label="Expand gateway pane"
+          label={stacked ? 'Push divider down' : 'Expand gateway pane'}
           onSnap={onSnapLeading!}
           className={
             stacked
@@ -640,13 +640,13 @@ export function ResizableHandle({
         >
           <TfiShiftLeftAlt
             aria-hidden
-            className={cn('h-4 w-4', stacked && 'rotate-90')}
+            className={cn('h-4 w-4', stacked && '-rotate-90')}
           />
         </ResizeSnapButton>
       ) : null}
       {showTrailingSnap ? (
         <ResizeSnapButton
-          label="Expand MUTHUR pane"
+          label={stacked ? 'Push divider up' : 'Expand MUTHUR pane'}
           onSnap={onSnapTrailing!}
           className={
             stacked
@@ -656,7 +656,7 @@ export function ResizableHandle({
         >
           <TfiShiftRightAlt
             aria-hidden
-            className={cn('h-4 w-4', stacked && 'rotate-90')}
+            className={cn('h-4 w-4', stacked && '-rotate-90')}
           />
         </ResizeSnapButton>
       ) : null}
