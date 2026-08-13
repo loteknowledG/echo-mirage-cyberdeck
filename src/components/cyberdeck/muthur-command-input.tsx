@@ -5,7 +5,6 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -13,8 +12,6 @@ import { playDeckMemorizeKeySound } from "@/features/cyberdeck/runtime/defer-dec
 
 const INPUT_STORAGE_KEY = "echo-mirage-chat-input-v1";
 const INPUT_PERSIST_MS = 400;
-const TEXTAREA_MIN_HEIGHT_PX = 44;
-const TEXTAREA_MAX_HEIGHT_PX = 200;
 
 export type MuthurCommandInputHandle = {
   focus: (options?: FocusOptions) => void;
@@ -30,7 +27,6 @@ type MuthurCommandInputProps = {
   glyphModeActive: boolean;
   isStreaming: boolean;
   chatHydrated: boolean;
-  maxHeightPx?: number;
   onSubmit: (text: string) => void;
   onCanSendChange?: (canSend: boolean) => void;
   onFocusExtra?: () => void;
@@ -53,7 +49,6 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
       glyphModeActive,
       isStreaming,
       chatHydrated,
-      maxHeightPx = TEXTAREA_MAX_HEIGHT_PX,
       onSubmit,
       onCanSendChange,
       onFocusExtra,
@@ -68,17 +63,15 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
     const [inputHistoryIndex, setInputHistoryIndex] = useState<number | null>(null);
     const [inputHistoryDraft, setInputHistoryDraft] = useState("");
 
-    const adjustHeight = useCallback(() => {
-      const el = inputRef.current;
-      if (!el) return;
-      // Empty input: ignore placeholder wrap (long placeholder was inflating scrollHeight on load).
-      if (!el.value.trim()) {
-        el.style.height = `${TEXTAREA_MIN_HEIGHT_PX}px`;
-        return;
-      }
-      el.style.height = "auto";
-      el.style.height = `${Math.min(Math.max(el.scrollHeight, TEXTAREA_MIN_HEIGHT_PX), maxHeightPx)}px`;
-    }, [maxHeightPx]);
+    const notifyCanSend = useCallback(
+      (raw: string) => {
+        const canSend = raw.trim().length > 0;
+        if (canSendRef.current === canSend) return;
+        canSendRef.current = canSend;
+        onCanSendChange?.(canSend);
+      },
+      [onCanSendChange],
+    );
 
     useImperativeHandle(
       ref,
@@ -89,29 +82,15 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
           setValue(next);
           if (inputRef.current) inputRef.current.value = next;
           notifyCanSend(next);
-          adjustHeight();
         },
         clear: () => {
           setValue("");
-          if (inputRef.current) {
-            inputRef.current.value = "";
-            inputRef.current.style.height = `${TEXTAREA_MIN_HEIGHT_PX}px`;
-          }
+          if (inputRef.current) inputRef.current.value = "";
           notifyCanSend("");
         },
         element: inputRef.current,
       }),
-      [adjustHeight, value],
-    );
-
-    const notifyCanSend = useCallback(
-      (raw: string) => {
-        const canSend = raw.trim().length > 0;
-        if (canSendRef.current === canSend) return;
-        canSendRef.current = canSend;
-        onCanSendChange?.(canSend);
-      },
-      [onCanSendChange],
+      [notifyCanSend, value],
     );
 
     useEffect(() => {
@@ -126,12 +105,6 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
         /* ignore */
       }
     }, [chatHydrated, notifyCanSend]);
-
-    useLayoutEffect(() => {
-      adjustHeight();
-      const frame = requestAnimationFrame(() => adjustHeight());
-      return () => cancelAnimationFrame(frame);
-    }, [value, adjustHeight, chatHydrated, hasProviderAuth, glyphModeActive, maxHeightPx]);
 
     useEffect(() => {
       if (!chatHydrated) return;
@@ -181,10 +154,9 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
           const end = nextValue.length;
           el.focus({ preventScroll: true });
           el.setSelectionRange(end, end);
-          adjustHeight();
         });
       },
-      [adjustHeight],
+      [],
     );
 
     const handleChange = useCallback(
@@ -265,10 +237,10 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
     );
 
     return (
-      <div className="muthur-command-input-row flex min-w-0 flex-1 items-start gap-1">
+      <div className="muthur-command-input-row flex h-full min-h-0 min-w-0 flex-1 items-stretch gap-1">
         <span
           aria-hidden
-          className="muthur-command-prompt shrink-0 select-none py-3 font-mono text-sm font-bold leading-relaxed text-green-500"
+          className="muthur-command-prompt shrink-0 select-none self-start py-3 font-mono text-sm font-bold leading-relaxed text-green-500"
         >
           $
         </span>
@@ -290,8 +262,7 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
                   ? "Steer MUTHUR — type and Enter to interrupt (Shift+Enter for new line)"
                   : "Enter command or message... (Shift+Enter for new line)"
           }
-          style={{ height: TEXTAREA_MIN_HEIGHT_PX, maxHeight: maxHeightPx }}
-          className="muthur-command-input min-h-[44px] min-w-0 flex-1 resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-1 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"
+          className="muthur-command-input h-full min-h-[44px] min-w-0 flex-1 resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-1 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"
           disabled={false}
           aria-label="MUTHUR command input"
         />
