@@ -224,9 +224,19 @@
   --panel-border: #1a1a1a;
   --panel-side: #222;
   --panel-bottom: #181818;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
 }
 
 [data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-inset .depth-panel__face {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
   border-radius: 0;
   background: #000;
 }
@@ -237,6 +247,10 @@
 }
 
 [data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-inset .depth-panel__face > * {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
   border-radius: 0;
 }
 

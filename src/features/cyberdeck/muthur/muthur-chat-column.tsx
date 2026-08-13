@@ -1,7 +1,7 @@
 "use client";
 
 import type { MouseEvent as ReactMouseEvent, Ref } from "react";
-import { forwardRef } from "react";
+import { forwardRef, useCallback } from "react";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
 import {
   CyberdeckControlTooltip,
@@ -36,6 +36,10 @@ import {
   type MuthurInhabitant,
 } from "@/lib/muthur/muthur-inhabitant";
 import type { MuthurPosture } from "@/lib/muthur/muthur-posture";
+import {
+  MUTHUR_COMPOSER_MIN_HEIGHT_PX,
+  useMuthurComposerResize,
+} from "@/features/cyberdeck/muthur/use-muthur-composer-resize";
 
 export type MuthurChatColumnProps = {
   isMobileLayout: boolean;
@@ -155,10 +159,33 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
       canSendInput,
       onStop,
     } = props;
+    const {
+      assignColumnNode,
+      footerRef,
+      composerHeight,
+      panelMax,
+      handleComposerResizePointerDown,
+      handleComposerResizeMouseDown,
+      handleComposerResizeKeyDown,
+    } = useMuthurComposerResize();
+
+    const setColumnRef = useCallback(
+      (node: HTMLDivElement | null) => {
+        assignColumnNode(node);
+        if (typeof ref === "function") {
+          ref(node);
+          return;
+        }
+        if (ref) {
+          ref.current = node;
+        }
+      },
+      [assignColumnNode, ref],
+    );
 
     return (
       <div
-        ref={ref}
+        ref={setColumnRef}
         onContextMenu={onContextMenu}
         className={`cyberdeck-net-pane cyberdeck-chat-app left flex h-full max-h-full min-h-0 flex-col overflow-hidden bg-black max-md:min-h-0 md:min-w-0 md:border-b-0 md:border-l md:border-[#141414] ${
           networkActivityActive ? "is-net-active" : ""
@@ -166,7 +193,7 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
         data-cyberdeck-pane="muthur-chat"
       >
         {!isMobileLayout ? (
-          <div className="border-b border-[#1a1a1a] px-2 py-1">
+          <div data-muthur-column-header="" className="border-b border-[#1a1a1a] px-2 py-1">
             <MirageHeader collapse={mirageHeaderCollapse} />
           </div>
         ) : null}
@@ -229,12 +256,33 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
           </div>
         </div>
 
-        <footer className="cyberdeck-message-box realmorphism-host-surface shrink-0 border-t bg-black p-0">
-          <div className="mx-2 mb-2 mt-2 flex flex-col gap-2">
+        <div
+          role="separator"
+          aria-label="Resize MUTHUR message area"
+          aria-orientation="horizontal"
+          aria-valuemin={MUTHUR_COMPOSER_MIN_HEIGHT_PX}
+          aria-valuemax={panelMax}
+          aria-valuenow={composerHeight}
+          tabIndex={0}
+          onPointerDown={handleComposerResizePointerDown}
+          onMouseDown={handleComposerResizeMouseDown}
+          onKeyDown={handleComposerResizeKeyDown}
+          className="cyberdeck-chat-resizer group flex h-3 w-full cursor-row-resize items-center justify-center bg-black focus:outline-none"
+        >
+          <div className="h-px w-16 transition-colors group-focus-visible:bg-emerald-400" />
+        </div>
+
+        <footer
+          ref={footerRef}
+          className="cyberdeck-message-box realmorphism-host-surface min-h-0 shrink-0 overflow-hidden border-t bg-black p-0"
+          style={{ height: composerHeight }}
+        >
+          <div className="mx-2 mb-2 mt-2 flex h-[calc(100%-16px)] min-h-0 flex-col gap-2">
             <MuthurComposerShell deckMode={deckMode}>
-              <div className="flex px-2 py-2">
+              <div className="flex h-full min-h-0 min-w-0 flex-1 px-2 py-2">
                 <MuthurCommandInput
                   ref={messageInputRef}
+                  fillHeight
                   inputHistory={inputHistory}
                   hasProviderAuth={muthurInhabitant === "muthur" ? hasProviderAuth : true}
                   glyphModeActive={glyphModeActive}
@@ -247,7 +295,7 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
                 />
               </div>
             </MuthurComposerShell>
-            <div className="muthur-composer-controls deck-pane-depth-toolbar px-1">
+            <div className="muthur-composer-controls deck-pane-depth-toolbar shrink-0 px-1">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   <button

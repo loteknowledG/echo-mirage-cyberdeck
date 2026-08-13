@@ -173,13 +173,13 @@ export function ResizablePanelGroup({
       setContainerSize(orientation === 'horizontal' ? rect.width : rect.height);
       if (orientation === 'vertical') {
         let span = 0;
-        el.querySelectorAll('[role="separator"]').forEach((node) => {
+        el.querySelectorAll(':scope > [role="separator"]').forEach((node) => {
           span += node.getBoundingClientRect().height;
         });
         setHandleSpan(span);
       } else {
         let span = 0;
-        el.querySelectorAll('[role="separator"]').forEach((node) => {
+        el.querySelectorAll(':scope > [role="separator"]').forEach((node) => {
           span += node.getBoundingClientRect().width;
         });
         setHandleSpan(span);
