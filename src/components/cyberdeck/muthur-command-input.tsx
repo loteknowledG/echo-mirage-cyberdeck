@@ -71,13 +71,7 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
     const adjustHeight = useCallback(() => {
       const el = inputRef.current;
       if (!el) return;
-      // Empty input: ignore placeholder wrap (long placeholder was inflating scrollHeight on load).
-      if (!el.value.trim()) {
-        el.style.height = `${TEXTAREA_MIN_HEIGHT_PX}px`;
-        return;
-      }
-      el.style.height = "auto";
-      el.style.height = `${Math.min(Math.max(el.scrollHeight, TEXTAREA_MIN_HEIGHT_PX), maxHeightPx)}px`;
+      el.style.height = `${Math.max(TEXTAREA_MIN_HEIGHT_PX, maxHeightPx)}px`;
     }, [maxHeightPx]);
 
     useImperativeHandle(
@@ -95,13 +89,13 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
           setValue("");
           if (inputRef.current) {
             inputRef.current.value = "";
-            inputRef.current.style.height = `${TEXTAREA_MIN_HEIGHT_PX}px`;
+            inputRef.current.style.height = `${Math.max(TEXTAREA_MIN_HEIGHT_PX, maxHeightPx)}px`;
           }
           notifyCanSend("");
         },
         element: inputRef.current,
       }),
-      [adjustHeight, value],
+      [adjustHeight, maxHeightPx, value],
     );
 
     const notifyCanSend = useCallback(
@@ -265,7 +259,7 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
     );
 
     return (
-      <div className="muthur-command-input-row flex min-w-0 flex-1 items-start gap-1">
+      <div className="muthur-command-input-row flex h-full min-h-0 min-w-0 flex-1 items-stretch gap-1">
         <span
           aria-hidden
           className="muthur-command-prompt shrink-0 select-none py-3 font-mono text-sm font-bold leading-relaxed text-green-500"
@@ -291,7 +285,7 @@ export const MuthurCommandInput = forwardRef<MuthurCommandInputHandle, MuthurCom
                   : "Enter command or message... (Shift+Enter for new line)"
           }
           style={{ height: TEXTAREA_MIN_HEIGHT_PX, maxHeight: maxHeightPx }}
-          className="muthur-command-input min-h-[44px] min-w-0 flex-1 resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-1 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"
+          className="muthur-command-input h-full min-h-0 min-w-0 flex-1 resize-none overflow-y-auto rounded-none border-0 bg-black py-3 pl-1 pr-3 font-mono text-sm leading-relaxed text-green-400 placeholder:text-green-800 transition-[color,box-shadow] focus:outline-none"
           disabled={false}
           aria-label="MUTHUR command input"
         />

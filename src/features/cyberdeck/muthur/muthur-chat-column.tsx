@@ -273,7 +273,7 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
             <footer className="cyberdeck-message-box realmorphism-host-surface flex h-full min-h-0 flex-col border-t bg-black p-0">
               <div className="mx-2 mb-2 mt-2 flex min-h-0 flex-1 flex-col gap-2">
                 <MuthurComposerShell deckMode={deckMode} className="flex min-h-0 flex-1 flex-col">
-                  <div ref={composerInputBandRef} className="flex min-h-0 flex-1 px-2 py-2">
+                  <div ref={composerInputBandRef} className="flex h-full min-h-0 min-w-0 flex-1 items-stretch px-2 py-2">
                     <MuthurCommandInput
                       ref={messageInputRef}
                       maxHeightPx={composerMaxTextHeight}

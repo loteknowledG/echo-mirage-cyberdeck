@@ -537,12 +537,34 @@ body,
   border-radius: 2px 2px 0 0;
 }
 
-/* MUTHUR ECHO composer — lock empty height so long placeholders cannot inflate startup layout. */
-textarea.muthur-command-input:placeholder-shown {
-  height: 44px !important;
-  min-height: 44px !important;
-  max-height: 44px !important;
-  overflow: hidden;
+/* MUTHUR composer fills the resized message-box instead of locking to a 44px empty row. */
+.cyberdeck-message-box .muthur-composer-inset {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.cyberdeck-message-box .muthur-composer-inset .depth-panel__face {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.cyberdeck-message-box .muthur-composer-inset .depth-panel__face > * {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.cyberdeck-chat-app textarea.muthur-command-input {
+  height: 100%;
+  min-height: 0;
+  max-height: none;
 }
 
 .pi-pane-host message-editor > div {
