@@ -630,7 +630,7 @@ export function ResizableHandle({
       ) : null}
       {showLeadingSnap ? (
         <ResizeSnapButton
-          label={stacked ? 'Push divider down' : 'Expand gateway pane'}
+          label={stacked ? 'Push divider down' : 'Push divider right'}
           onSnap={onSnapLeading!}
           className={
             stacked
@@ -638,15 +638,15 @@ export function ResizableHandle({
               : 'cyberdeck-resize-snap-leading-desktop'
           }
         >
-          <TfiShiftLeftAlt
+          <TfiShiftRightAlt
             aria-hidden
-            className={cn('h-4 w-4', stacked && '-rotate-90')}
+            className={cn('h-4 w-4', stacked && 'rotate-90')}
           />
         </ResizeSnapButton>
       ) : null}
       {showTrailingSnap ? (
         <ResizeSnapButton
-          label={stacked ? 'Push divider up' : 'Expand MUTHUR pane'}
+          label={stacked ? 'Push divider up' : 'Push divider left'}
           onSnap={onSnapTrailing!}
           className={
             stacked
@@ -654,9 +654,9 @@ export function ResizableHandle({
               : 'cyberdeck-resize-snap-trailing-desktop'
           }
         >
-          <TfiShiftRightAlt
+          <TfiShiftLeftAlt
             aria-hidden
-            className={cn('h-4 w-4', stacked && '-rotate-90')}
+            className={cn('h-4 w-4', stacked && 'rotate-90')}
           />
         </ResizeSnapButton>
       ) : null}
