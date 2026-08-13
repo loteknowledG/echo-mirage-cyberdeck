@@ -237,6 +237,8 @@
 }
 
 [data-deck-mode="ascii"] .cyberdeck-message-box .muthur-composer-inset .depth-panel__face > * {
+  flex: 1 1 0;
+  min-height: 0;
   border-radius: 0;
 }
 

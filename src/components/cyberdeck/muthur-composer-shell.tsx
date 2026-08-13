@@ -15,7 +15,12 @@ type MuthurComposerShellProps = {
 export function MuthurComposerShell({ deckMode, children, className }: MuthurComposerShellProps) {
   if (deckMode === "ascii") {
     return (
-      <DepthPanel variant="inset" depth={6} className={cn("muthur-composer-inset", className)}>
+      <DepthPanel
+        variant="inset"
+        depth={6}
+        className={cn("muthur-composer-inset", className)}
+        faceClassName="flex min-h-0 min-w-0 flex-1 flex-col"
+      >
         {children}
       </DepthPanel>
     );

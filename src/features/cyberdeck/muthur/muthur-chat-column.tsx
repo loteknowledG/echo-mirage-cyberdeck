@@ -1,7 +1,7 @@
 "use client";
 
 import type { MouseEvent as ReactMouseEvent, Ref } from "react";
-import { forwardRef, useLayoutEffect, useRef, useState } from "react";
+import { forwardRef } from "react";
 import { MirageHeader } from "@/components/cyberdeck/mirage-header";
 import {
   CyberdeckControlTooltip,
@@ -41,9 +41,6 @@ import {
   type MuthurInhabitant,
 } from "@/lib/muthur/muthur-inhabitant";
 import type { MuthurPosture } from "@/lib/muthur/muthur-posture";
-
-const COMPOSER_TEXT_MIN_PX = 44;
-const COMPOSER_TEXT_MAX_FALLBACK_PX = 200;
 
 export type MuthurChatColumnProps = {
   isMobileLayout: boolean;
@@ -164,23 +161,6 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
       onStop,
     } = props;
 
-    const composerInputBandRef = useRef<HTMLDivElement>(null);
-    const [composerMaxTextHeight, setComposerMaxTextHeight] = useState(COMPOSER_TEXT_MAX_FALLBACK_PX);
-
-    useLayoutEffect(() => {
-      const band = composerInputBandRef.current;
-      if (!band) return;
-
-      const updateMaxHeight = () => {
-        setComposerMaxTextHeight(Math.max(COMPOSER_TEXT_MIN_PX, band.clientHeight));
-      };
-
-      updateMaxHeight();
-      const observer = new ResizeObserver(updateMaxHeight);
-      observer.observe(band);
-      return () => observer.disconnect();
-    }, []);
-
     return (
       <div
         ref={ref}
@@ -273,10 +253,9 @@ export const MuthurChatColumn = forwardRef<HTMLDivElement, MuthurChatColumnProps
             <footer className="cyberdeck-message-box realmorphism-host-surface flex h-full min-h-0 flex-col border-t bg-black p-0">
               <div className="mx-2 mb-2 mt-2 flex min-h-0 flex-1 flex-col gap-2">
                 <MuthurComposerShell deckMode={deckMode} className="flex min-h-0 flex-1 flex-col">
-                  <div ref={composerInputBandRef} className="flex min-h-0 flex-1 px-2 py-2">
+                  <div className="flex h-full min-h-0 flex-1 px-2 py-2" data-muthur-composer-input-band="">
                     <MuthurCommandInput
                       ref={messageInputRef}
-                      maxHeightPx={composerMaxTextHeight}
                       inputHistory={inputHistory}
                       hasProviderAuth={muthurInhabitant === "muthur" ? hasProviderAuth : true}
                       glyphModeActive={glyphModeActive}

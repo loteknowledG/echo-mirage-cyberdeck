@@ -176,4 +176,34 @@ test.describe("Cyberdeck responsive split layout", () => {
     await openCustomTabContextMenu(page);
     await expect(page.getByRole("menuitem", { name: "Execution" })).toHaveCount(0);
   });
+
+  test("resizing the MUTHUR composer grows the typing textarea", async ({ page }) => {
+    await openCyberdeck(page, DESKTOP_VIEWPORT);
+
+    const textarea = page.locator("textarea.muthur-command-input");
+    const composerSplit = page.locator('[data-cyberdeck-resizer="composer-split"]');
+    await expect(textarea).toBeVisible();
+    await expect(composerSplit).toBeVisible();
+
+    await textarea.fill("line one\nline two\nline three");
+
+    const before = await textarea.boundingBox();
+    const splitBefore = await composerSplit.boundingBox();
+    expect(before).not.toBeNull();
+    expect(splitBefore).not.toBeNull();
+
+    const x = splitBefore!.x + splitBefore!.width / 2;
+    const startY = splitBefore!.y + splitBefore!.height / 2;
+    await page.mouse.move(x, startY);
+    await page.mouse.down();
+    await page.mouse.move(x, startY - 180, { steps: 8 });
+    await page.mouse.up();
+
+    const after = await textarea.boundingBox();
+    const band = await page.locator("[data-muthur-composer-input-band]").boundingBox();
+    expect(after).not.toBeNull();
+    expect(band).not.toBeNull();
+    expect(after!.height).toBeGreaterThan(before!.height + 80);
+    expect(after!.height).toBeGreaterThan(band!.height * 0.7);
+  });
 });
