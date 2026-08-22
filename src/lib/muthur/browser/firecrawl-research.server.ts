@@ -1,10 +1,16 @@
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import type { OperatorBrowserLiveSnapshot } from "./operator-browser-live.types";
+import {
+  DEFAULT_SEARCH_LIMIT,
+  WebResearchProviderError,
+  clampPageText,
+  extractSearchQueryFromUrl,
+  formatSearchSnippetsAsPageText,
+  type WebSearchSnippet,
+} from "./web-research-shared.server";
 
 const FIRECRAWL_API_BASE = "https://api.firecrawl.dev/v2";
 const FIRECRAWL_TIMEOUT_MS = 45_000;
-const MAX_PAGE_TEXT_CHARS = 6000;
-const DEFAULT_SEARCH_LIMIT = 5;
 
 export function getFirecrawlApiKey(): string {
   return process.env.FIRECRAWL_API_KEY?.trim() ?? "";
@@ -19,24 +25,6 @@ function firecrawlHeaders(): Record<string, string> {
     Authorization: `Bearer ${getFirecrawlApiKey()}`,
     "Content-Type": "application/json",
   };
-}
-
-function clampPageText(text: string): string {
-  return text.trim().slice(0, MAX_PAGE_TEXT_CHARS);
-}
-
-function extractSearchQueryFromUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.toLowerCase();
-    if (host.includes("duckduckgo.com") || host.includes("google.com") || host.includes("bing.com")) {
-      const q = parsed.searchParams.get("q")?.trim();
-      if (q) return q;
-    }
-  } catch {
-    /* ignore */
-  }
-  return null;
 }
 
 type FirecrawlSearchHit = {
@@ -73,25 +61,6 @@ function collectSearchHits(payload: unknown): FirecrawlSearchHit[] {
   return [];
 }
 
-function formatSearchHitsAsPageText(hits: FirecrawlSearchHit[]): string {
-  const parts: string[] = [];
-  for (const [index, hit] of hits.entries()) {
-    const title = hit.title?.trim() || `Result ${index + 1}`;
-    const url = hit.url?.trim() || "";
-    const body = hit.markdown?.trim() || hit.description?.trim() || "";
-    parts.push(
-      [
-        `=== ${title} ===`,
-        url ? `URL: ${url}` : null,
-        body || "(no excerpt)",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-    );
-  }
-  return clampPageText(parts.join("\n\n"));
-}
-
 async function firecrawlPost(path: string, body: Record<string, unknown>): Promise<unknown> {
   const res = await fetchWithTimeout(
     `${FIRECRAWL_API_BASE}${path}`,
@@ -119,7 +88,7 @@ async function firecrawlPost(path: string, body: Record<string, unknown>): Promi
       typeof (payload as { error?: unknown }).error === "string"
         ? (payload as { error: string }).error
         : text.slice(0, 240) || `Firecrawl HTTP ${res.status}`;
-    throw new Error(message);
+    throw new WebResearchProviderError(message, "firecrawl", res.status);
   }
 
   return payload;
@@ -136,7 +105,12 @@ export async function firecrawlSearchWeb(
   });
 
   const hits = collectSearchHits(payload);
-  const pageText = formatSearchHitsAsPageText(hits);
+  const snippets: WebSearchSnippet[] = hits.map((hit) => ({
+    title: hit.title,
+    url: hit.url,
+    body: hit.markdown || hit.description,
+  }));
+  const pageText = formatSearchSnippetsAsPageText(snippets);
   if (!pageText.trim()) {
     throw new Error("Firecrawl search returned no readable results.");
   }

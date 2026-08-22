@@ -1,8 +1,7 @@
 import { normalizeOperatorBrowserUrl } from "@/lib/browser-intents";
-import {
-  firecrawlResearchGoto,
-  isFirecrawlConfigured,
-} from "@/lib/muthur/browser/firecrawl-research.server";
+import { remoteWebResearchGoto } from "@/lib/muthur/browser/remote-web-research.server";
+import { isFirecrawlConfigured } from "@/lib/muthur/browser/firecrawl-research.server";
+import { isTinyfishConfigured } from "@/lib/muthur/browser/tinyfish-research.server";
 import type {
   OperatorBrowserLiveResult,
   OperatorBrowserLiveSnapshot,
@@ -83,21 +82,21 @@ async function snapshotLivePlaywright(): Promise<OperatorBrowserLiveResult> {
   return { ok: true, snapshot };
 }
 
-async function gotoLiveFirecrawl(url: string): Promise<OperatorBrowserLiveResult> {
-  if (!isFirecrawlConfigured()) {
+async function gotoLiveRemote(url: string): Promise<OperatorBrowserLiveResult> {
+  if (!isFirecrawlConfigured() && !isTinyfishConfigured()) {
     return {
       ok: false,
       error:
-        "Playwright is not available on this server. Set FIRECRAWL_API_KEY (firecrawl.dev) for live web research on Vercel.",
+        "Playwright is not available on this server. Set FIRECRAWL_API_KEY and/or TINYFISH_API_KEY for live web research on Vercel.",
     };
   }
 
   try {
-    const snapshot = await firecrawlResearchGoto(url);
+    const snapshot = await remoteWebResearchGoto(url);
     lastLiveSnapshot = snapshot;
     return { ok: true, snapshot };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Firecrawl fetch failed.";
+    const message = error instanceof Error ? error.message : "Remote web research failed.";
     return { ok: false, error: message };
   }
 }
@@ -117,7 +116,7 @@ async function gotoLive(url: string): Promise<OperatorBrowserLiveResult> {
     /* Playwright unavailable — fall through to Firecrawl */
   }
 
-  return gotoLiveFirecrawl(validated.url);
+  return gotoLiveRemote(validated.url);
 }
 
 async function snapshotLive(): Promise<OperatorBrowserLiveResult> {
