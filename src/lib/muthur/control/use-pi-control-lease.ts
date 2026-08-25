@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createBackgroundPoll } from "@/lib/client/background-poll.client";
 import { isPiControlLeaseUiGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating.client";
 import type {
   PiControlLeaseRequest,
@@ -18,9 +17,11 @@ const EMPTY_SNAPSHOT: PiControlLeaseSnapshot = {
 
 const PENDING_STORAGE_KEY = "echo-mirage-pi-control-pending-v1";
 const PENDING_TTL_MS = 30 * 60 * 1000;
-const CONTROL_LEASE_POLL_INTERVAL_MS = 15_000;
+const CONTROL_LEASE_CHANGED_EVENT = "echo-mirage:pi-control-lease-changed";
+const CONTROL_LEASE_CHANNEL = "echo-mirage-pi-control-lease-sync";
 
 let latestServerSnapshot: PiControlLeaseSnapshot = EMPTY_SNAPSHOT;
+let snapshotFetchInFlight: Promise<PiControlLeaseSnapshot> | null = null;
 
 function persistPendingRequest(pending: PiControlLeaseRequest | null): void {
   if (typeof window === "undefined") return;
@@ -100,10 +101,7 @@ function mergeLeaseSnapshot(
   return server;
 }
 
-async function fetchSnapshot(): Promise<PiControlLeaseSnapshot> {
-  const res = await fetch("/api/muthur/control-lease", { cache: "no-store" });
-  if (!res.ok) return EMPTY_SNAPSHOT;
-  const payload = (await res.json()) as PiControlLeaseSnapshot & { ok?: boolean };
+function normalizeSnapshot(payload: PiControlLeaseSnapshot): PiControlLeaseSnapshot {
   return {
     pendingRequest: payload.pendingRequest ?? null,
     activeLease: payload.activeLease ?? null,
@@ -112,14 +110,37 @@ async function fetchSnapshot(): Promise<PiControlLeaseSnapshot> {
   };
 }
 
-const controlLeasePoll = createBackgroundPoll({
-  id: "muthur-control-lease",
-  getBaseIntervalMs: () => CONTROL_LEASE_POLL_INTERVAL_MS,
-  maxBackoffMs: 5 * 60_000,
-  tick: async () => {
-    latestServerSnapshot = await fetchSnapshot();
-  },
-});
+function publishLeaseSnapshot(snapshot: PiControlLeaseSnapshot): void {
+  latestServerSnapshot = snapshot;
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<PiControlLeaseSnapshot>(CONTROL_LEASE_CHANGED_EVENT, {
+      detail: snapshot,
+    }),
+  );
+  if ("BroadcastChannel" in window) {
+    const channel = new BroadcastChannel(CONTROL_LEASE_CHANNEL);
+    channel.postMessage(snapshot);
+    channel.close();
+  }
+}
+
+async function fetchSnapshot(): Promise<PiControlLeaseSnapshot> {
+  if (snapshotFetchInFlight) return snapshotFetchInFlight;
+  snapshotFetchInFlight = (async () => {
+    const res = await fetch("/api/muthur/control-lease", { cache: "no-store" });
+    if (!res.ok) return EMPTY_SNAPSHOT;
+    const payload = (await res.json()) as PiControlLeaseSnapshot & { ok?: boolean };
+    const snapshot = normalizeSnapshot(payload);
+    latestServerSnapshot = snapshot;
+    return snapshot;
+  })();
+  try {
+    return await snapshotFetchInFlight;
+  } finally {
+    snapshotFetchInFlight = null;
+  }
+}
 
 async function postLeaseAction(
   action: string,
@@ -134,12 +155,9 @@ async function postLeaseAction(
   if (!res.ok) {
     throw new Error(payload.error || `Control lease ${action} failed (${res.status})`);
   }
-  return {
-    pendingRequest: payload.pendingRequest ?? null,
-    activeLease: payload.activeLease ?? null,
-    conflictDetected: Boolean(payload.conflictDetected),
-    receipts: payload.receipts ?? [],
-  };
+  const snapshot = normalizeSnapshot(payload);
+  publishLeaseSnapshot(snapshot);
+  return snapshot;
 }
 
 export function usePiControlLease() {
@@ -154,11 +172,14 @@ export function usePiControlLease() {
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
 
-  const refresh = useCallback(async () => {
-    const server = await fetchSnapshot();
+  const applyServerSnapshot = useCallback((server: PiControlLeaseSnapshot) => {
     latestServerSnapshot = server;
     setSnapshot((current) => mergeLeaseSnapshot(current, server));
   }, []);
+
+  const refresh = useCallback(async () => {
+    applyServerSnapshot(await fetchSnapshot());
+  }, [applyServerSnapshot]);
 
   const requestMission = useCallback(
     async (
@@ -251,17 +272,38 @@ export function usePiControlLease() {
     if (!isPiControlLeaseUiGatingEnabled()) {
       persistPendingRequest(null);
     }
+
+    const onChanged = (event: Event) => {
+      const detail = (event as CustomEvent<PiControlLeaseSnapshot>).detail;
+      if (detail) applyServerSnapshot(detail);
+    };
+    const onFocus = () => void refresh();
+    const onVisible = () => {
+      if (!document.hidden) void refresh();
+    };
+
+    window.addEventListener(CONTROL_LEASE_CHANGED_EVENT, onChanged);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+
+    let channel: BroadcastChannel | null = null;
+    if ("BroadcastChannel" in window) {
+      channel = new BroadcastChannel(CONTROL_LEASE_CHANNEL);
+      channel.onmessage = (event: MessageEvent<PiControlLeaseSnapshot>) => {
+        if (event.data) applyServerSnapshot(normalizeSnapshot(event.data));
+      };
+    }
+
+    // One coalesced seed request. No recurring timer follows it.
     void refresh();
-  }, [refresh]);
 
-  useEffect(() => {
-    if (!isPiControlLeaseUiGatingEnabled()) return;
-    if (!snapshot.pendingRequest && snapshot.activeLease?.leaseStatus !== "active") return;
-
-    return controlLeasePoll.subscribe(() => {
-      setSnapshot((current) => mergeLeaseSnapshot(current, latestServerSnapshot));
-    });
-  }, [snapshot.activeLease?.leaseStatus, snapshot.pendingRequest]);
+    return () => {
+      window.removeEventListener(CONTROL_LEASE_CHANGED_EVENT, onChanged);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+      channel?.close();
+    };
+  }, [applyServerSnapshot, refresh]);
 
   return {
     snapshot,
