@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { MdLocalPhone } from "react-icons/md";
 import { motion, useDragControls } from "motion/react";
 import { PhoneDialer } from "@/components/property-manager/PhoneDialer";
+import { createBackgroundPoll } from "@/lib/client/background-poll.client";
 import {
   fetchDialerState,
   type DialerState,
@@ -24,6 +25,18 @@ type ConstraintBox = {
   width: number;
   height: number;
 };
+
+const DIALER_VISIBLE_POLL_MS = 30_000;
+let latestDialerState: DialerState = { incoming: null, active: null, recent: [] };
+
+const floatingDialerPoll = createBackgroundPoll({
+  id: "property-manager-floating-dialer",
+  getBaseIntervalMs: () => DIALER_VISIBLE_POLL_MS,
+  maxBackoffMs: 5 * 60_000,
+  tick: async () => {
+    latestDialerState = await fetchDialerState();
+  },
+});
 
 function isPhoneBusy(state: DialerState): boolean {
   return Boolean(state.active) || Boolean(state.incoming);
@@ -126,28 +139,21 @@ export function FloatingPhoneDialer({
 
   const applyDialerState = useCallback((next: DialerState) => {
     dialerSyncGen.current += 1;
+    latestDialerState = next;
     setPhoneState(next);
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const sync = async () => {
+    // The child dialer pushes state immediately after operator actions. This slow
+    // shared poll is only a recovery path for external/incoming-call changes.
+    // createBackgroundPoll guarantees one poll owner, pauses while hidden, and
+    // backs off after errors instead of hammering the edge every three seconds.
+    return floatingDialerPoll.subscribe(() => {
       const generation = dialerSyncGen.current;
-      try {
-        const next = await fetchDialerState();
-        if (!cancelled && generation === dialerSyncGen.current) {
-          setPhoneState(next);
-        }
-      } catch {
-        // ignore polling errors
+      if (generation === dialerSyncGen.current) {
+        setPhoneState(latestDialerState);
       }
-    };
-    void sync();
-    const interval = window.setInterval(sync, 3_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
+    });
   }, []);
 
   useEffect(() => {
