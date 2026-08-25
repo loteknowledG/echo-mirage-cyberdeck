@@ -10,8 +10,8 @@ import {
   refreshSurveyLinkWatch,
 } from "@/lib/cyberdeck/survey-link-watch-store.client";
 import {
-  isSurveyTeamTripleLinked,
   notifySurveyTeamStatusChanged,
+  type SurveyTeamStatus,
 } from "@/lib/cyberdeck/survey-team-status";
 import { probeSurveyTeamStatusDetailed } from "@/lib/cyberdeck/survey-team-status-probe.client";
 import {
@@ -20,12 +20,25 @@ import {
 } from "@/lib/cyberdeck/survey-team-status-store.client";
 
 const PAIRING_INTERVAL_MS = 5_000;
-const IDLE_INTERVAL_MS = 45_000;
+const SETTLED_INTERVAL_MS = 60_000;
+
+/**
+ * Keep the fast cadence only while the team state is genuinely unresolved.
+ * A known not-linked/terminated state is stable and should not hammer the edge
+ * every five seconds just because a teammate is powered off.
+ */
+function isSurveyTeamStatusPairing(team: SurveyTeamStatus): boolean {
+  if (team.loading) return true;
+  return (
+    team.echoMirage.state === "unknown" ||
+    team.echoPowerfist.state === "unknown" ||
+    team.miragePowerfist.state === "unknown"
+  );
+}
 
 function resolveSurveyTeamPollIntervalMs(): number {
   const team = getSurveyTeamStatusSnapshot();
-  if (team.loading) return PAIRING_INTERVAL_MS;
-  return isSurveyTeamTripleLinked(team) ? IDLE_INTERVAL_MS : PAIRING_INTERVAL_MS;
+  return isSurveyTeamStatusPairing(team) ? PAIRING_INTERVAL_MS : SETTLED_INTERVAL_MS;
 }
 
 async function runSurveyTeamStatusTick(signal: AbortSignal): Promise<void> {
