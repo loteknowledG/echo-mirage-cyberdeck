@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createBackgroundPoll } from "@/lib/client/background-poll.client";
 import { isPiControlLeaseUiGatingEnabled } from "@/lib/muthur/control/pi-control-lease-gating.client";
 import type {
   PiControlLeaseRequest,
@@ -17,6 +18,9 @@ const EMPTY_SNAPSHOT: PiControlLeaseSnapshot = {
 
 const PENDING_STORAGE_KEY = "echo-mirage-pi-control-pending-v1";
 const PENDING_TTL_MS = 30 * 60 * 1000;
+const CONTROL_LEASE_POLL_INTERVAL_MS = 15_000;
+
+let latestServerSnapshot: PiControlLeaseSnapshot = EMPTY_SNAPSHOT;
 
 function persistPendingRequest(pending: PiControlLeaseRequest | null): void {
   if (typeof window === "undefined") return;
@@ -108,6 +112,15 @@ async function fetchSnapshot(): Promise<PiControlLeaseSnapshot> {
   };
 }
 
+const controlLeasePoll = createBackgroundPoll({
+  id: "muthur-control-lease",
+  getBaseIntervalMs: () => CONTROL_LEASE_POLL_INTERVAL_MS,
+  maxBackoffMs: 5 * 60_000,
+  tick: async () => {
+    latestServerSnapshot = await fetchSnapshot();
+  },
+});
+
 async function postLeaseAction(
   action: string,
   body: Record<string, unknown> = {},
@@ -143,6 +156,7 @@ export function usePiControlLease() {
 
   const refresh = useCallback(async () => {
     const server = await fetchSnapshot();
+    latestServerSnapshot = server;
     setSnapshot((current) => mergeLeaseSnapshot(current, server));
   }, []);
 
@@ -243,11 +257,11 @@ export function usePiControlLease() {
   useEffect(() => {
     if (!isPiControlLeaseUiGatingEnabled()) return;
     if (!snapshot.pendingRequest && snapshot.activeLease?.leaseStatus !== "active") return;
-    const timer = window.setInterval(() => {
-      void refresh();
-    }, 4000);
-    return () => window.clearInterval(timer);
-  }, [refresh, snapshot.activeLease?.leaseStatus, snapshot.pendingRequest]);
+
+    return controlLeasePoll.subscribe(() => {
+      setSnapshot((current) => mergeLeaseSnapshot(current, latestServerSnapshot));
+    });
+  }, [snapshot.activeLease?.leaseStatus, snapshot.pendingRequest]);
 
   return {
     snapshot,
