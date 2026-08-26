@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 
 import { createBackgroundPoll, type BackgroundPollEnvironment } from "../src/lib/client/background-poll.client";
 import { SURVEY_LISTENING_MIN_POLL_MS } from "../src/lib/cyberdeck/survey-listening.client";
+import {
+  resolveSurveyTeamPollIntervalMs,
+  SURVEY_TEAM_PAIRING_POLL_MS,
+  SURVEY_TEAM_SETTLED_POLL_MS,
+  type SurveyTeamLinkState,
+  type SurveyTeamStatus,
+} from "../src/lib/cyberdeck/survey-team-status";
 
 type FakeEnvOptions = {
   hidden?: boolean;
@@ -200,6 +207,70 @@ async function testAbortOnLastUnsubscribe() {
   assert.equal(poll.getState().running, false);
 }
 
+function surveyTeamStatus(
+  loading: boolean,
+  echoMirage: SurveyTeamLinkState,
+  echoPowerfist: SurveyTeamLinkState,
+  miragePowerfist: SurveyTeamLinkState,
+): SurveyTeamStatus {
+  const link = (state: SurveyTeamLinkState) => ({ state, detail: null });
+  return {
+    loading,
+    echoMirage: link(echoMirage),
+    echoPowerfist: link(echoPowerfist),
+    miragePowerfist: link(miragePowerfist),
+    echoHost: null,
+  };
+}
+
+function testSurveyTeamPollingCadence() {
+  const cases: Array<{ name: string; team: SurveyTeamStatus; expected: number }> = [
+    {
+      name: "loading",
+      team: surveyTeamStatus(true, "linked", "linked", "linked"),
+      expected: SURVEY_TEAM_PAIRING_POLL_MS,
+    },
+    {
+      name: "unknown echo-mirage",
+      team: surveyTeamStatus(false, "unknown", "linked", "linked"),
+      expected: SURVEY_TEAM_PAIRING_POLL_MS,
+    },
+    {
+      name: "unknown echo-powerfist",
+      team: surveyTeamStatus(false, "linked", "unknown", "linked"),
+      expected: SURVEY_TEAM_PAIRING_POLL_MS,
+    },
+    {
+      name: "unknown mirage-powerfist",
+      team: surveyTeamStatus(false, "linked", "linked", "unknown"),
+      expected: SURVEY_TEAM_PAIRING_POLL_MS,
+    },
+    {
+      name: "offline teammate is settled",
+      team: surveyTeamStatus(false, "linked", "not-linked", "linked"),
+      expected: SURVEY_TEAM_SETTLED_POLL_MS,
+    },
+    {
+      name: "terminated teammate is settled",
+      team: surveyTeamStatus(false, "linked", "terminated", "not-linked"),
+      expected: SURVEY_TEAM_SETTLED_POLL_MS,
+    },
+    {
+      name: "triple linked is settled",
+      team: surveyTeamStatus(false, "linked", "linked", "linked"),
+      expected: SURVEY_TEAM_SETTLED_POLL_MS,
+    },
+  ];
+
+  for (const testCase of cases) {
+    assert.equal(
+      resolveSurveyTeamPollIntervalMs(testCase.team),
+      testCase.expected,
+      testCase.name,
+    );
+  }
+}
+
 function testListeningMinimumInterval() {
   assert.ok(SURVEY_LISTENING_MIN_POLL_MS >= 5_000);
   assert.notEqual(SURVEY_LISTENING_MIN_POLL_MS, 300);
@@ -210,6 +281,7 @@ async function main() {
   await testHiddenPausesPolling();
   await testErrorBackoff();
   await testAbortOnLastUnsubscribe();
+  testSurveyTeamPollingCadence();
   testListeningMinimumInterval();
   console.log("[probe:edge-polling] ok");
 }
