@@ -4,6 +4,9 @@ export const SURVEY_TEAM_STATUS_CHANGED_EVENT = "echo-mirage-survey-team-status-
 /** @deprecated listen via SURVEY_TEAM_STATUS_CHANGED_EVENT — still dispatched for one release */
 export const LEGACY_SPY_TEAM_STATUS_CHANGED_EVENT = "echo-mirage-spy-team-status-changed";
 
+export const SURVEY_TEAM_PAIRING_POLL_MS = 5_000;
+export const SURVEY_TEAM_SETTLED_POLL_MS = 60_000;
+
 export type SurveyTeamLinkState = "linked" | "not-linked" | "terminated" | "unknown";
 
 export type SurveyTeamLink = {
@@ -43,6 +46,25 @@ export const EMPTY_SURVEY_TEAM_STATUS: SurveyTeamStatus = {
   echoHost: null,
   loading: true,
 };
+
+/**
+ * Fast polling is only justified while Survey status is unresolved. Known
+ * linked/not-linked/terminated states are settled and can use the slow cadence.
+ */
+export function isSurveyTeamStatusPairing(team: SurveyTeamStatus): boolean {
+  if (team.loading) return true;
+  return (
+    team.echoMirage.state === "unknown" ||
+    team.echoPowerfist.state === "unknown" ||
+    team.miragePowerfist.state === "unknown"
+  );
+}
+
+export function resolveSurveyTeamPollIntervalMs(team: SurveyTeamStatus): number {
+  return isSurveyTeamStatusPairing(team)
+    ? SURVEY_TEAM_PAIRING_POLL_MS
+    : SURVEY_TEAM_SETTLED_POLL_MS;
+}
 
 export function isSurveyTeamTripleLinked(
   team: Pick<SurveyTeamStatus, "echoMirage" | "echoPowerfist" | "miragePowerfist" | "loading">,

@@ -1,0 +1,38 @@
+name: PR CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  CI: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+
+      - name: Probe edge polling
+        run: pnpm probe:edge-polling
