@@ -11,35 +11,14 @@ import {
 } from "@/lib/cyberdeck/survey-link-watch-store.client";
 import {
   notifySurveyTeamStatusChanged,
-  type SurveyTeamStatus,
+  resolveSurveyTeamPollIntervalMs,
+  SURVEY_TEAM_PAIRING_POLL_MS,
 } from "@/lib/cyberdeck/survey-team-status";
 import { probeSurveyTeamStatusDetailed } from "@/lib/cyberdeck/survey-team-status-probe.client";
 import {
   applySurveyTeamStatusSnapshot,
   getSurveyTeamStatusSnapshot,
 } from "@/lib/cyberdeck/survey-team-status-store.client";
-
-const PAIRING_INTERVAL_MS = 5_000;
-const SETTLED_INTERVAL_MS = 60_000;
-
-/**
- * Keep the fast cadence only while the team state is genuinely unresolved.
- * A known not-linked/terminated state is stable and should not hammer the edge
- * every five seconds just because a teammate is powered off.
- */
-function isSurveyTeamStatusPairing(team: SurveyTeamStatus): boolean {
-  if (team.loading) return true;
-  return (
-    team.echoMirage.state === "unknown" ||
-    team.echoPowerfist.state === "unknown" ||
-    team.miragePowerfist.state === "unknown"
-  );
-}
-
-function resolveSurveyTeamPollIntervalMs(): number {
-  const team = getSurveyTeamStatusSnapshot();
-  return isSurveyTeamStatusPairing(team) ? PAIRING_INTERVAL_MS : SETTLED_INTERVAL_MS;
-}
 
 async function runSurveyTeamStatusTick(signal: AbortSignal): Promise<void> {
   if (signal.aborted) return;
@@ -70,8 +49,8 @@ async function runSurveyTeamStatusTick(signal: AbortSignal): Promise<void> {
 export const surveyTeamStatusPoll = createBackgroundPoll({
   id: "survey-team-status",
   tick: runSurveyTeamStatusTick,
-  getBaseIntervalMs: resolveSurveyTeamPollIntervalMs,
-  minIntervalMs: PAIRING_INTERVAL_MS,
+  getBaseIntervalMs: () => resolveSurveyTeamPollIntervalMs(getSurveyTeamStatusSnapshot()),
+  minIntervalMs: SURVEY_TEAM_PAIRING_POLL_MS,
   maxBackoffMs: 5 * 60_000,
 });
 
